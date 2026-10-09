@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.audit
 
 import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.data.Index
+import com.lightningkite.services.data.References
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.TypedId
 import kotlin.jvm.JvmInline
@@ -33,6 +34,7 @@ public data class OriginRecord<REQUEST_INFO>(
 ) : HasId<OriginRecord.ID> {
     @Serializable
     @JvmInline
+    @References(OriginRecord::class)
     public value class ID(override val raw: ExecutionId) : TypedId<ExecutionId, ID>
 
     public val at: Instant

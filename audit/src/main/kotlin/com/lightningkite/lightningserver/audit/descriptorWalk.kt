@@ -13,17 +13,13 @@ import kotlinx.serialization.descriptors.elementDescriptors
 /** Whether this descriptor's *class* is marked [Audited], meaning its instances get their own records. */
 internal val SerialDescriptor.isAudited: Boolean get() = annotations.any { it is Audited }
 
+internal val SerialDescriptor.auditSerialName: String get() = serialName.removeSuffix("?")
+
+
 /** Whether the property at [index] is marked [Audited], meaning it gets a bit of its own. */
-internal fun SerialDescriptor.isElementAudited(index: Int): Boolean =
+private fun SerialDescriptor.isElementAudited(index: Int): Boolean =
     getElementAnnotations(index).any { it is Audited }
 
-/**
- * The serial name with any nullability marker removed.
- *
- * kotlinx wraps a nullable descriptor in a delegate that appends `?` to the serial name and changes
- * nothing else. Registry keys must be the same whether a model appears nullable or not.
- */
-internal val SerialDescriptor.auditSerialName: String get() = serialName.removeSuffix("?")
 
 /**
  * Every [Audited] model reachable through this descriptor, keyed by [auditSerialName].
@@ -45,6 +41,18 @@ internal fun SerialDescriptor.auditedModels(): Map<String, SerialDescriptor> {
 
     walk(this)
     return found
+}
+
+internal fun SerialDescriptor.anythingAudited(): Boolean {
+    val visited = HashSet<SerialDescriptor>()
+
+    fun check(descriptor: SerialDescriptor): Boolean {
+        if (!visited.add(descriptor)) return false
+        if (descriptor.isAudited) return true
+        return descriptor.auditChildren().any(::check)
+    }
+
+    return check(this)
 }
 
 /**

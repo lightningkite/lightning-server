@@ -76,7 +76,7 @@ import kotlin.uuid.Uuid
  * Lazy origin recording across execution graphs.
  *
  * Each test drives a shape of execution graph through the real interceptor chain, has some executions
- * in it "touch" — call [OriginRecordInterceptor.flush], as every audit layer does before
+ * in it "touch" — call [OriginRecording.flush], as every audit layer does before
  * writing — and then checks which [OriginRecord]s exist and what they say.
  *
  * The properties under test:

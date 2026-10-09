@@ -4,16 +4,17 @@ import com.lightningkite.lightningserver.definition.PreDeployTask
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.Engine
-import com.lightningkite.lightningserver.typed.ApiHttpHandler
-import com.lightningkite.lightningserver.typed.ApiWebSocketHandler
+import com.lightningkite.lightningserver.runtime.engine
+import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.typed.DatabaseTableRegistration
+import com.lightningkite.lightningserver.typed.sdk.usedTypes
 import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.all
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.flow.toList
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.serializer
 import kotlin.uuid.Uuid
 
@@ -75,17 +76,9 @@ public class AuditRegistry(
      * correct for the life of the process.
      */
     public class Assignments internal constructor(
-        private val modelIds: Map<SerialName, ModelTypeId>,
-        private val bitIndices: Map<ModelTypeId, Map<String, ModelFieldId>>,
+        internal val modelIds: Map<SerialName, ModelTypeId>,
+        internal val bitIndices: Map<ModelTypeId, Map<String, ModelFieldId>>,
     ) {
-        /**
-         * The permanent id of an audited model.
-         *
-         * Throws when the model was never registered, which fails the request that disclosed it. That
-         * is deliberate: a disclosure that cannot be recorded must not happen. It means a model reached
-         * a client through a path the deploy-time scan could not see — an open-polymorphic or
-         * contextual serializer — and the fix is to make that model reachable from an endpoint.
-         */
         public fun modelId(serialName: SerialName): ModelTypeId = modelIds[serialName] ?: throw IllegalStateException(
             // Claude: an empty registry means assignment never ran, which needs a different fix.
             if (modelIds.isEmpty()) "The audit registry is empty, so \"$serialName\" — and every other " +
@@ -115,7 +108,7 @@ public class AuditRegistry(
     private val assignTask: PreDeployTask = path.path("assign-audit-bits") bind PreDeployTask(
         dependencies = { listOf(models.preDeployTask, fields.preDeployTask) },
     ) {
-        assign(auditedModelsOnServer())
+        register(engine.usedTypes().filter { it.descriptor.isAudited })
     }
 
     context(server: Engine)
@@ -131,31 +124,29 @@ public class AuditRegistry(
      *
      * Append-only and convergent: existing assignments are never changed, so re-running it on every
      * deploy is a no-op.
-     *
-     * @param audited Audited models, as serial name to descriptor.
      */
     context(server: Engine)
-    internal suspend fun assign(audited: Map<SerialName, SerialDescriptor>) {
-        audited.forEach { (serialName, descriptor) -> requireUuidKeyed(serialName, descriptor) }
+    internal suspend fun register(audited: List<KSerializer<*>>) {
+        audited.forEach(::requireUuidKeyed)
 
-        val existingModels = models().all().toList()
-        val modelIds = existingModels.associate { it._id to it.modelId }.toMutableMap()
-        var nextModelId = (existingModels.maxOfOrNull { it.modelId.raw } ?: -1) + 1
+        val existing = load()
 
-        val newModels = audited.keys.filter { it !in modelIds }.map { serialName ->
+        val modelIds = existing.modelIds.toMutableMap()
+        var nextModelId = (existing.modelIds.values.maxOfOrNull { it.raw } ?: -1) + 1
+
+        val newModels = audited.map { it.descriptor.auditSerialName }.filter { it !in modelIds }.map { serialName ->
             AuditModelRegistration(_id = serialName, modelId = ModelTypeId(nextModelId++))
                 .also { modelIds[serialName] = it.modelId }
         }
         if (newModels.isNotEmpty()) models().insert(newModels)
 
-        val existingFields = fields().all().toList().groupBy { it.modelId }
-        val newFields = audited.flatMap { (serialName, descriptor) ->
+        val newFields = audited.flatMap { serializer ->
+            val serialName = serializer.descriptor.auditSerialName
             val modelId = modelIds.getValue(serialName)
-            val assigned = existingFields[modelId].orEmpty()
-            val byPath = assigned.associate { it.fieldPath to it.fieldId }
-            var nextBit = (assigned.maxOfOrNull { it.fieldId.raw } ?: -1) + 1
+            val assigned = existing.fields(modelId)
+            var nextBit = (assigned.maxOfOrNull { it.value.raw } ?: -1) + 1
 
-            descriptor.auditFieldPaths().filter { it !in byPath }.map { path ->
+            serializer.descriptor.auditFieldPaths().filter { it !in assigned }.map { path ->
                 if (nextBit >= FieldIdentifierSet.CAPACITY) throw IllegalStateException(
                     "Audited model \"$serialName\" has run out of field bits at \"$path\": " +
                         "${assigned.size} of ${FieldIdentifierSet.CAPACITY} are already assigned. Indices are never " +
@@ -173,31 +164,8 @@ public class AuditRegistry(
         }
         if (newFields.isNotEmpty()) fields().insert(newFields)
 
-        warnOnLowCapacity(modelIds, existingFields, newFields)
-    }
-
-    /**
-     * Every audited model this server can disclose, found by walking the serializers its endpoints
-     * declare.
-     *
-     * Endpoints only, deliberately: auditing keys off serializers, never tables, because a disclosure
-     * is observed with a serializer in hand and nothing else. A model no endpoint's serializer reaches
-     * gets no id, and disclosing it fails the request — see [Assignments.modelId].
-     */
-    context(server: Engine)
-    private fun auditedModelsOnServer(): Map<SerialName, SerialDescriptor> = buildMap {
-        for (endpoints in server.server.endpoints.values) {
-            for (handler in endpoints.http.values) {
-                if (handler !is ApiHttpHandler<*, *, *, *>) continue
-                putAll(handler.inputType.descriptor.auditedModels())
-                putAll(handler.outputType.descriptor.auditedModels())
-            }
-            val socket = endpoints.webSocket
-            if (socket is ApiWebSocketHandler<*, *, *, *, *>) {
-                putAll(socket.inputType.descriptor.auditedModels())
-                putAll(socket.outputType.descriptor.auditedModels())
-            }
-        }
+        // Claude: fresh reads, since the cached [assignments] would never see this deploy's additions.
+        warnOnLowCapacity(load())
     }
 
     /**
@@ -206,17 +174,12 @@ public class AuditRegistry(
      * Running out of bits fails a deploy, and finding out then is the worst time to find out. Bits are
      * consumed permanently, so a model creeps towards the ceiling over its life rather than jumping.
      */
-    private fun warnOnLowCapacity(
-        modelIds: Map<SerialName, ModelTypeId>,
-        existing: Map<ModelTypeId, List<AuditFieldRegistration>>,
-        added: List<AuditFieldRegistration>,
-    ) {
-        val total = existing.mapValues { it.value.size }.toMutableMap()
-        added.groupBy { it.modelId }.forEach { (modelId, rows) -> total[modelId] = total.getOrElse(modelId) { 0 } + rows.size }
-        val names = modelIds.entries.associate { it.value to it.key }
-        total.filter { it.value >= FieldIdentifierSet.CAPACITY * 3 / 4 }.forEach { (modelId, used) ->
+    private fun warnOnLowCapacity(assignments: Assignments) {
+        for ((serialName, modelId) in assignments.modelIds) {
+            val used = assignments.fields(modelId).size
+            if (used < FieldIdentifierSet.CAPACITY * 3 / 4) continue
             logger.warn {
-                "Audited model \"${names[modelId] ?: modelId.raw}\" has used $used of ${FieldIdentifierSet.CAPACITY} " +
+                "Audited model \"$serialName\" has used $used of ${FieldIdentifierSet.CAPACITY} " +
                     "field bits. Indices are never reused, so this only grows."
             }
         }
@@ -230,7 +193,9 @@ public class AuditRegistry(
      * identifier column is written more than anything else in the system and needs to stay sixteen
      * bytes wide rather than a string a backend will index poorly.
      */
-    private fun requireUuidKeyed(serialName: SerialName, descriptor: SerialDescriptor) {
+    private fun requireUuidKeyed(serializer: KSerializer<*>) {
+        val descriptor = serializer.descriptor
+        val serialName = descriptor.auditSerialName
         val idIndex = (0 until descriptor.elementsCount).firstOrNull { descriptor.getElementName(it) == "_id" }
             ?: throw IllegalStateException(
                 "Audited model \"$serialName\" has no _id field, so a disclosure record could not say " +

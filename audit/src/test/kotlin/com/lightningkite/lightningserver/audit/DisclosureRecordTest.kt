@@ -13,7 +13,7 @@ class DisclosureRecordTest {
     @OptIn(Unsafe::class)
     private fun record(id: Uuid) = DisclosureRecord(
         _id = DisclosureRecord.ID(UuidV7.fromRaw(id)),
-        requestId = OriginRecord.ID(ExecutionId(UuidV7.generate())),
+        origin = OriginRecord.ID(ExecutionId(UuidV7.generate())),
         recordType = ModelTypeId(1),
         recordId = Uuid.random(),
         disclosed = fieldIds(),

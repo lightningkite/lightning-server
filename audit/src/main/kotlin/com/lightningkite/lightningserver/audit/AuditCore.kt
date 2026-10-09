@@ -86,7 +86,7 @@ public class AuditCore<REQUEST_INFO>(
         )
     }
 
-    public val origins: OriginRecordInterceptor<REQUEST_INFO> = OriginRecordInterceptor(
+    public val origins: OriginRecording<REQUEST_INFO> = OriginRecording(
         originsTable,
         requestInfoSerializer,
         getInfo

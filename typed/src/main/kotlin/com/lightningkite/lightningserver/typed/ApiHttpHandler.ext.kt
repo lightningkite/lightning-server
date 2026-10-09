@@ -11,10 +11,14 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.executeWithMetrics
 import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.lightningserver.serialization.assertValidOrBadRequest
+import com.lightningkite.lightningserver.serialization.defaultEncoder
+import com.lightningkite.lightningserver.serialization.encoder
 import com.lightningkite.lightningserver.serialization.parse
 import com.lightningkite.lightningserver.serialization.toTypedData
 import com.lightningkite.lightningserver.serialization.validators
 import com.lightningkite.lightningserver.toLSError
+import com.lightningkite.services.data.Data
+import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.data.Unsafe
 import com.lightningkite.services.database.HasId
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -43,7 +47,7 @@ public suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHan
     val httpResponse = executeWithMetrics(request) { req ->
         val result = runCatching { handleTypedInput(req.access(auth), input) }
         outcome = result
-        typedResponse(req, result.getOrThrow())
+        internalCallResponse(req, result.getOrThrow())
     }
 
     outcome?.exceptionOrNull()?.let {
@@ -187,12 +191,7 @@ public suspend operator fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> A
 private fun <PATH : PathSpec> HttpRequest<*>.internalCallTo(path: RawHttpEndpoint<PATH>): HttpRequest<PATH> =
     subRequest(path, headers = headers.copy { remove(HttpHeader.Accept) })
 
-/**
- * Everything a call to this endpoint does once [input] is parsed: validation and the handler itself.
- *
- * Deliberately not typed output observation, which only a routed request does: an internal call returns
- * its output to server code rather than sending it to a client.
- */
+/** Everything a call to this endpoint does once [input] is parsed: validation and the handler itself. */
 context(server: ServerRuntime)
 internal suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PATH, USER, INPUT, OUTPUT>.handleTypedInput(
     access: HttpAccess<PATH, USER>,
@@ -217,13 +216,27 @@ internal suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpH
     return result
 }
 
-/** The response this endpoint sends for [output], encoded as [request] accepts. */
+/**
+ * Makes an HttpResponse with a lazily-encoded body. Most, if not all, interceptors don't read the body
+ * of the response, so this is more efficient and also prevents [com.lightningkite.lightningserver.serialization.EncodingInterceptor]s
+ * from being called for most internal calls.
+ */
 context(server: ServerRuntime)
-internal suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PATH, USER, INPUT, OUTPUT>.typedResponse(
+private fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PATH, USER, INPUT, OUTPUT>.internalCallResponse(
     request: HttpRequest<*>,
     output: OUTPUT,
-): HttpResponse = HttpResponse(
-    body = if (output == Unit) null else output.toTypedData(request.headers.accept, outputType),
+): HttpResponse {
+    if (output == Unit) return response(null)
+    val (mediaType, encoder) = request.headers.accept.encoder ?: defaultEncoder
+    return response(
+        TypedData.suspendingSink(mediaType) { sink ->
+            encoder.encode(mediaType, outputType, output).data.writeSuspending(sink)
+        }
+    )
+}
+
+internal fun ApiHttpHandler<*, *, *, *>.response(body: TypedData?): HttpResponse = HttpResponse(
+    body = body,
     status = successCode,
     headers = HttpHeaders {
         add(HttpHeader.Vary, HttpHeader.Accept)

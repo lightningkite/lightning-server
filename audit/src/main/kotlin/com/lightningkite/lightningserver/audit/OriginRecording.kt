@@ -21,18 +21,20 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 
 /**
- * Records the [OriginRecord]s other audit records reference, but only once [flush] asks for them.
+ * Records the [OriginRecord]s other audit records reference lazily.
+ *
+ * Records are only written once [flush] is called (or [withCurrentOrigin], which in turn calls `flush`)
  *
  * Each execution captures its origin into its context, which child executions and tasks inherit, so a
  * touch anywhere down the chain writes every origin it descends from. An execution that never touches
  * writes nothing.
  */
-public class OriginRecordInterceptor<REQUEST_INFO>(
+public class OriginRecording<REQUEST_INFO>(
     private val table: Runtime<Table<OriginRecord<REQUEST_INFO>>>,
     public val requestInfoSerializer: KSerializer<REQUEST_INFO>,
     private val getInfo: suspend context(ServerRuntime) (Request<*>) -> REQUEST_INFO
 ) : ExecutionInterceptor, WebSocketInterceptor, HttpInterceptor {
-    override val name: String = "OriginRecordInterceptor"
+    override val name: String = "OriginRecording"
 
     @Serializable
     private data class OriginQueue<REQUEST_INFO>(
@@ -40,7 +42,7 @@ public class OriginRecordInterceptor<REQUEST_INFO>(
         val written: Set<OriginRecord.ID> = emptySet(),
     )
 
-    private val originsKey = SerializableCache.Key<Execution, OriginQueue<REQUEST_INFO>>(
+    private val contextKey = SerializableCache.Key<Execution, OriginQueue<REQUEST_INFO>>(
         "com.lightningkite.lightningserver.audit.OriginRecordInterceptor",
         OriginQueue.serializer(requestInfoSerializer),
     )
@@ -62,10 +64,12 @@ public class OriginRecordInterceptor<REQUEST_INFO>(
 
     // Claude: a socket's phases don't share an execution context, only the connect request, so the
     // origin waits there. Keyed per socket because a virtual sub-socket shares its carrier's cache.
-    private fun socketOriginKey(socketId: Execution.ID) = SerializableCache.Key<WebSocketConnectRequest<*>, SocketOrigin<REQUEST_INFO>>(
+    private fun socketKey(socketId: Execution.ID) = SerializableCache.Key<WebSocketConnectRequest<*>, SocketOrigin<REQUEST_INFO>>(
         "com.lightningkite.lightningserver.audit.OriginRecordInterceptor/${socketId.raw.raw}",
         socketOriginSerializer,
     )
+
+    private val Execution.originId get() = OriginRecord.ID(origin.toExternal())
 
     /**
      * Writes all queued origins for the current execution
@@ -77,28 +81,37 @@ public class OriginRecordInterceptor<REQUEST_INFO>(
     context(runtime: ServerRuntime)
     internal suspend fun flush() {
         val context = runtime.execution.context
-        var origins = context[originsKey] ?: OriginQueue()
+        var origins = context[contextKey] ?: OriginQueue()
         if (origins.queue.isNotEmpty()) {
             origins.queue.forEachConcurrently(maxConcurrent = 5) {
                 try {
                     table().insertOne(it)
                 } catch (_: UniqueViolationException) {
-                    /*Squish. This means the row was already recorded, that's fine.*/
+                    /*Squish. This means the row was already recorded, likely by a child execution, that's fine.*/
                 }
             }
             origins = OriginQueue(written = origins.written + origins.queue.map { it._id })
-            context[originsKey] = origins
+            context[contextKey] = origins
         }
-        check(OriginRecord.ID(runtime.execution.origin.toExternal()) in origins.written) {
+        check(runtime.execution.originId in origins.written) {
             "Execution ${runtime.execution.id} has no captured origin, so its audit records would reference nothing."
         }
     }
 
+    context(runtime: ServerRuntime)
+    internal suspend inline fun <T> withCurrentOrigin(withOrigin: (OriginRecord.ID) -> T): T {
+        flush() // we're referencing the origin, flush to make sure it's in the table
+        return withOrigin(runtime.execution.originId)
+    }
+
+
+
+
     private fun ServerRuntime.queueOrigin(row: OriginRecord<REQUEST_INFO>) {
         val context = execution.context
-        val origins = context[originsKey] ?: OriginQueue()
+        val origins = context[contextKey] ?: OriginQueue()
         if (row._id in origins.written || origins.queue.any { it._id == row._id }) return
-        context[originsKey] = origins.copy(queue = origins.queue + row)
+        context[contextKey] = origins.copy(queue = origins.queue + row)
     }
 
     /** Gets the origin cached on the request, checks if it was already written previously, and checks if it was written during [action] */
@@ -108,11 +121,11 @@ public class OriginRecordInterceptor<REQUEST_INFO>(
     ): T {
         val context = this.execution.context
 
-        val origin = request.cache[socketOriginKey(request.socketId)]?.also { origin ->
-            val current = context[originsKey] ?: OriginQueue()
+        val origin = request.cache[socketKey(request.socketId)]?.also { origin ->
+            val current = context[contextKey] ?: OriginQueue()
             if (origin.id in current.written || current.queue.any { it._id == origin.id }) return@also
 
-            context[originsKey] = when (val queued = origin.queued) {
+            context[contextKey] = when (val queued = origin.queued) {
                 null -> current.copy(written = current.written + origin.id) // add the origin to written origins, we know it was written before in a previous phase
                 else -> current.copy(queue = current.queue + queued)
             }
@@ -120,15 +133,18 @@ public class OriginRecordInterceptor<REQUEST_INFO>(
 
         return if (origin?.queued == null) action() // nothing is queued for insertion, just run
         else try { action() } finally {
-            if (context[originsKey]?.written?.contains(origin.id) == true) {
+            if (context[contextKey]?.written?.contains(origin.id) == true) {
                 // the origin was written during execution, we don't need to queue in the future
-                request.cache[socketOriginKey(request.socketId)] = origin.markAsWritten()
+                request.cache[socketKey(request.socketId)] = origin.markAsWritten()
             }
         }
     }
 
     context(runtime: ServerRuntime)
     private suspend fun originOf(request: Request<*>?): OriginRecord<REQUEST_INFO> {
+        check(runtime.execution.id == runtime.execution.origin) {
+            "Attempted to get the origin of an execution which is not an origin: ${runtime.execution}"
+        }
         val execution = runtime.execution
         val (kind, location) = when (execution) {
             is Execution.Direct -> OriginRecord.ExecutionKind.Direct to ""
@@ -140,7 +156,7 @@ public class OriginRecordInterceptor<REQUEST_INFO>(
             is Execution.Task -> OriginRecord.ExecutionKind.Task to execution.location.toString()
         }
         return OriginRecord(
-            _id = OriginRecord.ID(execution.id.toExternal()),
+            _id = runtime.execution.originId,
             parent = execution.parent?.toExternal(),
             root = execution.rootExecution.toExternal(),
             kind = kind,
@@ -170,7 +186,7 @@ public class OriginRecordInterceptor<REQUEST_INFO>(
             @OverrideOnly
             context(serverRuntime: ServerRuntime)
             override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
-                request.cache[socketOriginKey(request.socketId)] = SocketOrigin(originOf(request))
+                request.cache[socketKey(request.socketId)] = SocketOrigin(originOf(request))
                 return serverRuntime.withSocketOrigin(request) {
                     wrapped.willConnect(request)
                 }
@@ -219,5 +235,3 @@ public class OriginRecordInterceptor<REQUEST_INFO>(
         builder.install(this as ExecutionInterceptor)
     }
 }
-
-internal val Execution.originId: OriginRecord.ID get() = OriginRecord.ID(origin.toExternal())

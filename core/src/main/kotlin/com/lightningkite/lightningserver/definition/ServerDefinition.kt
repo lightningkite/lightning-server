@@ -7,7 +7,6 @@ import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.ExecutionInterceptor
 import com.lightningkite.lightningserver.runtime.compileAndInstrument
 import com.lightningkite.lightningserver.serialization.*
-import com.lightningkite.lightningserver.typedoutput.TypedOutputInterceptor
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.data.*
 import com.lightningkite.services.database.validation.AnnotationValidators
@@ -42,7 +41,7 @@ public data class ServerDefinition(
         public val executionInterceptors: List<ExecutionInterceptor>,
         public val httpInterceptors: List<HttpInterceptor>,
         public val webSocketInterceptors: List<WebSocketInterceptor>,
-        public val typedOutputInterceptors: List<TypedOutputInterceptor>,
+        public val encodingInterceptors: List<EncodingInterceptor>,
         public val exceptionHandler: HttpExceptionHandler = HttpExceptionHandler.Default,
 
         public val startupTasks: Map<PathSpec0, StartupTask>,
@@ -91,12 +90,8 @@ public data class ServerDefinition(
     public fun <PATH : PathSpec, T> interceptIncomingSocket(
         handler: WebSocketHandler<PATH, T>,
     ): WebSocketHandler<PATH, T> = compiledWebSocketInterceptors.intercept(handler)
-    /**
-     * Observers of every typed value the server sends, applied before serialization. See
-     * [TypedOutputInterceptor]. A flat list rather than a compiled chain: these observe, they do not
-     * wrap.
-     */
-    public val typedOutputInterceptors: List<TypedOutputInterceptor> get() = flattened.typedOutputInterceptors
+    /** Everything called before [mediaTypeEncoders] encode a value. See [EncodingInterceptor]. */
+    public val encodingInterceptors: List<EncodingInterceptor> get() = flattened.encodingInterceptors
 
     public val exceptionHandler: HttpExceptionHandler get() = flattened.exceptionHandler
 
@@ -126,7 +121,7 @@ public data class ServerDefinition(
         executionInterceptors = executionInterceptors.toSealedList(),
         httpInterceptors = httpInterceptors.toSealedList(),
         webSocketInterceptors = webSocketInterceptors.toSealedList(),
-        typedOutputInterceptors = typedOutputInterceptors.toSealedList(),
+        encodingInterceptors = encodingInterceptors.toSealedList(),
         endpoints = endpoints.toSealedPathSpecMap(),
         schedules = schedules.toSealedMap(),
         tasks = tasks.toSealedMap(),
@@ -135,7 +130,11 @@ public data class ServerDefinition(
         settingOverrides = settingOverrides.toSealedMap(),
         extensions = extensions.sealed(),
         mediaTypeDecoders = mediaTypeDecoders.toSealedMap(),
-        mediaTypeEncoders = mediaTypeEncoders.toSealedMap(),
+        // Claude: wrapped here, once, so no encoder found through the server skips the observers.
+        mediaTypeEncoders = (
+            if (encodingInterceptors.isEmpty()) mediaTypeEncoders
+            else mediaTypeEncoders.mapValues { (_, encoders) -> encoders.map(::ObservedEncoder) }
+        ).toSealedMap(),
         exceptionHandler = exceptionHandler,
         startupTasks = startupTasks.toSealedMap().also {
             // Validate startup task dependencies for circular references
@@ -189,7 +188,7 @@ public data class ServerDefinition(
             executionInterceptors = flattenList { it.executionInterceptors },
             httpInterceptors = flattenList { it.httpInterceptors },
             webSocketInterceptors = flattenList { it.webSocketInterceptors },
-            typedOutputInterceptors = flattenList { it.typedOutputInterceptors },
+            encodingInterceptors = flattenList { it.encodingInterceptors },
             endpoints = buildPathSpecMap { // We want to be able to override existing entries here, but we'll have to check for duplicate registration manually.
                 putAll(thisLayer.endpoints)
                 for ((modPath, map) in flattenedModules.mapItems { it.endpoints })

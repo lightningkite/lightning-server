@@ -10,13 +10,14 @@ import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
-import com.lightningkite.lightningserver.typedoutput.TypedOutputInterceptor
+import com.lightningkite.lightningserver.serialization.EncodingInterceptor
 import com.lightningkite.services.data.MaxLength
 import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.database.validation.AnnotationValidators
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.json.*
@@ -54,12 +55,12 @@ class JsonRpcHandlerTest {
         val metadata: Map<String, String>,
     )
 
-    object Outputs : TypedOutputInterceptor {
+    object Outputs : EncodingInterceptor {
         val seen: MutableList<Any?> = Collections.synchronizedList(mutableListOf())
         override val name: String = "Outputs"
 
         context(runtime: ServerRuntime)
-        override suspend fun <T> outputProduced(request: Request<*>, serializer: KSerializer<T>, value: T) {
+        override suspend fun <T> beforeEncode(serializer: SerializationStrategy<T>, value: T) {
             seen.add(value)
         }
     }
@@ -149,7 +150,7 @@ class JsonRpcHandlerTest {
     }
 
     @Test
-    fun testResultIsObservedAsTypedOutput() = runBlocking {
+    fun testResultIsObservedBeforeEncoding() = runBlocking {
         TestServer.test({}) {
             Outputs.seen.clear()
             TestServer.rpcEndpoint.test(body = rpcBody("shortEcho", """{"name": "Ann"}"""))

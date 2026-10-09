@@ -45,9 +45,7 @@ class AuditRegistryTest {
 
     private class Fixture {
         context(server: ServerRuntime)
-        suspend fun deploy(vararg serializers: KSerializer<*>) = TestServer.registry.assign(
-            serializers.flatMap { it.descriptor.auditedModels().entries }.associate { it.key to it.value },
-        )
+        suspend fun deploy(vararg serializers: KSerializer<*>) = TestServer.registry.register(serializers.toList())
 
         context(server: ServerRuntime)
         suspend fun registry() = TestServer.registry.load()
@@ -126,7 +124,7 @@ class AuditRegistryTest {
 
     @Test
     fun `a nested audited model gets its own id rather than bits on its parent`() = onServer {
-        deploy(Patient.serializer())
+        deploy(Patient.serializer(), Doctor.serializer())
 
         val registry = registry()
         val patient = registry.modelId(Patient.serializer().descriptor.serialName)

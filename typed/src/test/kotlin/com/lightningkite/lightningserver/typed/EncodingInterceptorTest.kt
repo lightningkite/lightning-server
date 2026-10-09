@@ -18,8 +18,9 @@ import com.lightningkite.lightningserver.runtime.engine
 import com.lightningkite.lightningserver.runtime.handleRoot
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
+import com.lightningkite.lightningserver.serialization.toTypedData
 import com.lightningkite.lightningserver.settings.set
-import com.lightningkite.lightningserver.typedoutput.TypedOutputInterceptor
+import com.lightningkite.lightningserver.serialization.EncodingInterceptor
 import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.data.MediaType
@@ -29,6 +30,7 @@ import com.lightningkite.services.data.UuidV7
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationStrategy
 import java.util.Collections
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -41,7 +43,7 @@ import kotlin.uuid.Uuid
  * WebSocket push all arrive at the interceptor, and an interceptor that fails stops the send rather
  * than trailing it.
  */
-class TypedOutputInterceptorTest {
+class EncodingInterceptorTest {
 
     private data class Seen(
         val executionId: Execution.ID,
@@ -63,11 +65,11 @@ class TypedOutputInterceptorTest {
         }
     }
 
-    private class Recorder : TypedOutputInterceptor {
+    private class Recorder : EncodingInterceptor {
         override val name: String = "Recorder"
 
         context(runtime: ServerRuntime)
-        override suspend fun <T> outputProduced(request: Request<*>, serializer: KSerializer<T>, value: T) {
+        override suspend fun <T> beforeEncode(serializer: SerializationStrategy<T>, value: T) {
             Observed.seen.add(
                 Seen(
                     runtime.execution.id,
@@ -109,6 +111,11 @@ class TypedOutputInterceptorTest {
             auth = noAuth,
             implementation = { _: Unit -> "gamma:" + alpha(Unit) }
         )
+
+        /** Not an Api handler: it encodes its own body, and is observed only because the server's encoders are. */
+        val raw = path.path("raw").get bind HttpHandler { request ->
+            HttpResponse(body = "raw".toTypedData(request.headers.accept))
+        }
 
         val info = database.modelInfo<HasId<*>?, Sample, String>(
             tableName = "Sample",
@@ -155,6 +162,13 @@ class TypedOutputInterceptorTest {
         assertEquals("alpha", seen.value)
         assertEquals(outerRequestId, seen.executionId)
         assertTrue(seen.serialName.contains("String"), "expected the output serializer; was ${seen.serialName}")
+    }
+
+    @Test
+    fun `a raw handler that encodes through the server is observed`() = onServer {
+        engine.handleRoot(request("/raw"), outerRequestId)
+
+        assertEquals(listOf<Any?>("raw"), Observed.seen.map { it.value })
     }
 
     /**

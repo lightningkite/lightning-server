@@ -115,7 +115,7 @@ public data class HttpRequest<PATH : PathSpec>(
 )
 ```
 
-- `requestId` — **authoritative**, always generated or accepted by the engine. No default: an engine
+- `origin` — **authoritative**, always generated or accepted by the engine. No default: an engine
   that forgets to supply one fails to compile rather than silently producing unattributable audit
   records. This is a source-compatibility break for anything constructing `HttpRequest` directly,
   which is intended — engines are the only legitimate constructors. The `TestRunner` helpers take
@@ -128,7 +128,7 @@ public data class HttpRequest<PATH : PathSpec>(
 `copyWithNewPathType` gained the corresponding parameters and preserves identity unchanged. Deriving
 a *new* logical request is a separate, explicitly-named operation so it cannot happen by accident:
 
-- `HttpRequest.subRequest(...)` — fresh `requestId`, `parent` set to the outer request. Used
+- `HttpRequest.subRequest(...)` — fresh `origin`, `parent` set to the outer request. Used
   by the `/meta/bulk` dispatcher.
 - `WebSocketConnectRequest.subConnection(...)` — the same, for multiplexing. Used by
   `MultiplexWebSocketHandler`, where each channel is a distinct logical socket.
@@ -137,7 +137,7 @@ a *new* logical request is a separate, explicitly-named operation so it cannot h
 the same physical socket rather than opening a new logical one, so identity carries over unchanged.
 
 **Operational note for AWS serverless.** `WebSocketConnectRequest` is persisted to DynamoDB
-(`AwsWebSocketDynamoDb.kt:219`), so making `requestId` required means rows written before the upgrade
+(`AwsWebSocketDynamoDb.kt:219`), so making `origin` required means rows written before the upgrade
 fail to deserialize. In-flight WebSocket connections are dropped on the deploy that picks this up and
 clients reconnect. This was chosen over a nullable field or a generated default: a default would mint
 a different ID each time a connection's state was loaded, which is worse than a reconnect because it
@@ -153,7 +153,7 @@ itself, so it has to be closed by construction rather than by convention.
 **Implemented** as `HttpHeaders.requestIdentity(trustedRequestIdHeader, onTrustedHeaderMissing)` in
 `core/.../http/RequestIdentity.kt`. Resolution order:
 
-1. If `trustedRequestIdHeader` is configured and present, adopt it as `requestId`.
+1. If `trustedRequestIdHeader` is configured and present, adopt it as `origin`.
 2. Otherwise generate one, and invoke `onTrustedHeaderMissing` if the header was configured but
    absent — a misconfigured or bypassed proxy degrades correlation rather than failing the request,
    but is reported.
@@ -176,7 +176,7 @@ ids are not UUIDs and not even 128 bits, so there is nothing to adopt. The adapt
 The join to the gateway's own access log is preserved rather than lost. The gateway's id is kept in
 `RequestRecord.engineRequestId` — trusted, because the engine supplied it rather than the caller, and
 therefore deliberately a separate column from the untrusted `upstreamRequestId`. The join is:
-gateway log `requestId` → `engineRequestId` → our `Uuid`. For WebSockets the connection id already
+gateway log `origin` → `engineRequestId` → our `Uuid`. For WebSockets the connection id already
 lives in `engineSocketId` and is surfaced through the same property, so a socket keeps one identity
 for its whole lifetime without storing the value twice.
 
@@ -489,11 +489,11 @@ disclosed the same way" is not a claim an audit log gets to make. Every disclosu
 The volume is paid down inside the row instead:
 
 1. **Request-constant data lives once.** IP, principal, endpoint, and outcome are
-   properties of the request, recorded once in the layer-1 record and referenced by `requestId`.
+   properties of the request, recorded once in the layer-1 record and referenced by `origin`.
    Disclosure records never repeat them. The row's own instant is the exception, and it costs
    nothing: `_id` is a version-7 UUID, so `DisclosureRecord.at` derives the moment of disclosure from
    the key itself. That is worth having here rather than deferring to the request record, because a
-   socket's `requestId` names the socket rather than the phase that disclosed
+   socket's `origin` names the socket rather than the phase that disclosed
    ([5.8.2](#582-a-sockets-row-is-keyed-by-the-socket-not-by-the-phase-resolved)) — without it, a
    disclosure on a long-lived connection can only be placed "sometime during this session".
 2. **The field set is two `Int`s, not four.** Itemising is opt-in ([5.1.1](#511-itemising-is-opt-in-disclosure-is-not)),
@@ -518,9 +518,9 @@ public data class DisclosureRecord(
 ```
 
 The two indexes are the two questions an investigation actually asks: *what did this request
-disclose* (`requestId`) and *who has seen this record* (`modelId, recordId`).
+disclose* (`origin`) and *who has seen this record* (`modelId, recordId`).
 
-`modelId` is keyed on the descriptor's **serial name**, not on a table name. A disclosure is
+`model` is keyed on the descriptor's **serial name**, not on a table name. A disclosure is
 observed with a serializer in hand and nothing else — the table a value came from is not knowable at
 that point, and an audited model need not be a table at all.
 
@@ -657,7 +657,7 @@ everything, but only annotates what was asked for:
 |---|---|---|
 | Property marked `@Audited` | a path | `ssn` |
 | Property not marked | no path, but still descended into | — |
-| Nested `@Audited` class | **stop** — it produces its own record under its own `modelId` | `doctor` |
+| Nested `@Audited` class | **stop** — it produces its own record under its own `model` | `doctor` |
 | List/Set | descend into the element with `[]` | `phones[].number` |
 | Map | descend into the value with `{}` | `tags{}.label` |
 | Sealed | descend per subclass | `payment(Card).last4` |
@@ -779,9 +779,9 @@ on the audited path, and adds no subsystem to get wrong. Where prevention is not
 answer is the emergency total-log ([section 10](#10-out-of-scope-external-capture-layer)), outside the
 server, not a chain inside it.
 
-### 5.8 The request record — what `requestId` points at
+### 5.8 The request record — what `origin` points at
 
-Every disclosure references a `requestId` and repeats nothing else, so a table holding what that id
+Every disclosure references a `origin` and repeats nothing else, so a table holding what that id
 *means* is not optional; without it the reference dangles.
 
 `AccessLogInterceptor` cannot be that table. It writes log lines, and it is deliberately fail-open —
@@ -859,9 +859,9 @@ session rather than to a frame. Socket-keying reproduces that exactly.
 The question was whether per-phase attribution justified a `OriginRecord` row per phase execution —
 for a chatty socket, a row per client message, against a fail-closed write path. It does not, because
 the precision that was actually wanted can be had without those rows. Both record types written
-during a socket's life now carry `executionId` alongside `requestId`:
+during a socket's life now carry `executionId` alongside `origin`:
 [`DataAccessRecord`](#62-record-shape-and-installation-resolved) from the outset, and any record that
-needs it can follow. `requestId` still names the socket, so the join to the request record is
+needs it can follow. `origin` still names the socket, so the join to the request record is
 unchanged and one row per socket remains; `executionId` names the phase, so "which message caused
 this" is answerable by reading the record rather than by multiplying request records.
 
@@ -946,7 +946,7 @@ it.
 
 Two things that effort has to settle:
 
-- ~~**`requestId` must be reachable from the database layer**~~ — **no longer a prerequisite, and the
+- ~~**`origin` must be reachable from the database layer**~~ — **no longer a prerequisite, and the
   proposed signature change is unnecessary.** Since the execution-context refactor a `ServerRuntime`
   carries `initiator.executionId`, and every seam below already runs in one. Nothing needs to travel
   with the table.
@@ -997,7 +997,7 @@ serializer at write time and stored as JSON, which stays readable and greppable 
 the ability to query *inside* a recorded condition — an investigation reads these rows, it does not
 join on their contents.
 
-**Both ids are recorded.** `requestId` matches [5.8](#58-the-request-record--what-requestid-points-at)
+**Both ids are recorded.** `origin` matches [5.8](#58-the-request-record--what-requestid-points-at)
 so a query joins to the same request record as a disclosure — which for a socket names the socket.
 `executionId` is the phase that actually issued the query. Carrying both costs 16 bytes and recovers
 the per-phase precision [5.8.2](#582-a-sockets-row-is-keyed-by-the-socket-not-by-the-phase-resolved)
@@ -1228,7 +1228,7 @@ Sequenced so each step is independently shippable and testable, and so prerequis
    this step is a build of the recording layer for reads *and* writes, not an extension of an
    existing one, and no record shape is specified anywhere yet.
 
-   The `requestId`-reachability blocker below is, however, largely resolved: `ModelInfo.table()` is
+   The `origin`-reachability blocker below is, however, largely resolved: `ModelInfo.table()` is
    already `context(ServerRuntime)`, and since the execution-context refactor a `ServerRuntime`
    carries `initiator.executionId`. The remaining question is placement — `ModelPermissionsTable`
    lives in service-abstractions and cannot see Lightning Server types, so the recording decorator

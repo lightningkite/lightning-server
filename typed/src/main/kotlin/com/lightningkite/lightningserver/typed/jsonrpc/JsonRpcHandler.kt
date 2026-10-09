@@ -9,7 +9,7 @@ import com.lightningkite.lightningserver.serialization.assertValidOrBadRequest
 import com.lightningkite.lightningserver.serialization.parse
 import com.lightningkite.lightningserver.serialization.validators
 import com.lightningkite.lightningserver.typed.access
-import com.lightningkite.lightningserver.typedoutput.emitTypedOutput
+import com.lightningkite.lightningserver.serialization.notifyEncoding
 import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.database.HasId
@@ -97,7 +97,8 @@ public class JsonRpcHandler<PATH : PathSpec>(
 
             // Execute the method
             val (result, customHeaders) = typedMethod.handleWithCustomHeaders(access, params)
-            server.emitTypedOutput(request, typedMethod.outputType, result)
+            // Claude: encoded below without the server's encoders, so it notifies the observers itself.
+            server.notifyEncoding(typedMethod.outputType, result)
 
             // Notifications get 202 Accepted with no body per JSON-RPC/MCP spec
             if (isNotification) return HttpResponse(status = HttpStatus.Accepted)

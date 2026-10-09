@@ -184,7 +184,7 @@ class FieldIdentifierSetTests {
     @OptIn(Unsafe::class)
     private fun record(vararg ids: Int) = DisclosureRecord(
         _id = DisclosureRecord.ID(UuidV7.generate()),
-        requestId = OriginRecord.ID(ExecutionId(UuidV7.generate())),
+        origin = OriginRecord.ID(ExecutionId(UuidV7.generate())),
         recordType = ModelTypeId(0),
         recordId = Uuid.NIL,
         disclosed = fieldIds(*ids),

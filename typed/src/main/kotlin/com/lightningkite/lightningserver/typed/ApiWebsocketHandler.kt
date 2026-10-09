@@ -10,7 +10,6 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.serialization.decoder
 import com.lightningkite.lightningserver.serialization.encoder
 import com.lightningkite.lightningserver.typed.sdk.SDK
-import com.lightningkite.lightningserver.typedoutput.emitTypedOutput
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.database.HasId
@@ -142,10 +141,7 @@ public interface ApiWebSocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
 
             override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) = wraps.subscribe(topic)
             override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) = wraps.unsubscribe(topic)
-            // The single chokepoint for every typed WebSocket output, model update streams included. See
-            // TypedOutputInterceptor for why observation happens before encoding.
             override suspend fun send(frame: OUTPUT) {
-                serverRuntime.emitTypedOutput(wraps.request, outputSerializer, frame)
                 wraps.send(wraps.currentState.mediaType.encoder!!.ws(wraps.currentState.mediaType, outputSerializer, frame))
             }
 

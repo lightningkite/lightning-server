@@ -1,11 +1,10 @@
 package com.lightningkite.lightningserver.audit
 
+import com.lightningkite.lightningserver.audit.disclosure.DisclosureLogInterceptor
 import com.lightningkite.lightningserver.auth.installAuthEventReporter
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.DatabaseTableRegistration
 import com.lightningkite.lightningserver.typed.registerTable
-import com.lightningkite.services.database.Table
 
 /**
  * Layer 2: one row per audited record that reaches a client, and no endpoint can opt out.

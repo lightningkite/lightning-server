@@ -68,6 +68,21 @@ public sealed interface Execution {
      * */
     public val origin: ID
 
+    /**
+     * Values that flow down an execution chain, from an execution to everything it starts.
+     *
+     * A sub-request, a WebSocket phase or a task started by this execution gets a copy of its context
+     * at creation. Writes made later, by either side, are not seen by the other. Executions with no
+     * parent, such as a client's request, a schedule tick, or a startup or pre-deploy task, start empty.
+     *
+     * A WebSocket's phases do not share a context. Each phase copies the context of whatever dispatched
+     * it, not that of the socket's earlier phases, so state for the whole socket belongs on the
+     * connect request instead.
+     *
+     * The context is serialized with the execution, which is how it reaches a queued task. Keep its
+     * values small. A `localOnly` key's value is copied within the process but dropped when the
+     * execution is serialized.
+     */
     public val context: SerializableCache<Execution>
 
     public sealed interface Requested : Execution

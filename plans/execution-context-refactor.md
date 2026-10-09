@@ -14,7 +14,7 @@ audit system has something to attribute records to.
 Today `ServerRuntime` is a *process-wide* object: one per server, carrying settings, serialization,
 telemetry, and task dispatch. Nothing in it knows which request, task, or socket is currently
 running. Every log that wants that information reconstructs it from whatever happens to be in scope,
-which is why `requestId` is threaded manually through `Request` and why the WebSocket lifecycle has
+which is why `origin` is threaded manually through `Request` and why the WebSocket lifecycle has
 to smuggle a runtime through `WebSocketConnection`.
 
 The fix splits the two concerns that are currently fused:
@@ -116,7 +116,7 @@ are both the compact ~11-byte base64 form). We do not attempt to map them. We al
 The join to the gateway's access log is preserved by a new **`engineRequestId: String?`** column on
 `OriginRecord`: trusted, engine-supplied, holding the gateway/proxy's own id. It is deliberately
 **distinct from `upstreamRequestId`**, which is documented as an untrusted client claim and must not
-be conflated with a trusted gateway id. The join is: gateway log `requestId` → `engineRequestId` →
+be conflated with a trusted gateway id. The join is: gateway log `origin` → `engineRequestId` →
 our `Uuid`.
 
 Nothing is lost for WebSockets: `connectionId` already lives in `engineSocketId`.
@@ -287,9 +287,9 @@ Each stage is one commit, must compile, and must leave `./gradlew check` no wors
   handlers (`MultiplexWebSocketHandler`, `QueryParamWebSocketHandler`, `CoroutineWebSocketHandler`,
   `ApiWebSocketHandler`) and the interceptors.
 - Removes the `with(connection as ServerRuntime)` casts in `AccessLogInterceptor` and
-  `OriginRecordInterceptor`.
+  `OriginRecording`.
 - **Add `abstract class DelegatingWebSocketHandler(wrapped)`** in core. `AccessLogInterceptor` and
-  `OriginRecordInterceptor` each hand-write all five methods to pass four of them straight through.
+  `OriginRecording` each hand-write all five methods to pass four of them straight through.
 - **Fix `WebSocketInterceptor.compileAndInstrument()`**: its 3-branch `when` drops the `name` override
   in the `else` branch and never filters `None`. The HTTP side is a clean `fold`. Unify them.
 
@@ -308,7 +308,7 @@ typed socket in the repo follow.
 ### Stage 3 — `Execution`
 
 - Add the type per 3.1.
-- Move `requestId` / `parent` **off** `Request` onto `Execution`. `Request` keeps
+- Move `origin` / `parent` **off** `Request` onto `Execution`. `Request` keeps
   `upstreamRequestId` only (a wire-level fact about the caller).
 - AWS persists the initiator alongside the connect request in the DynamoDB socket row so `socketId`
   survives the round trip.

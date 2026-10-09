@@ -1,5 +1,7 @@
 package com.lightningkite.lightningserver.audit
 
+import com.lightningkite.lightningserver.audit.disclosure.DisclosureLogInterceptor
+import com.lightningkite.lightningserver.audit.disclosure.DisclosureLogInterceptor.Disclosure
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.serverRuntime
@@ -28,13 +30,18 @@ import kotlin.uuid.Uuid
  * registration walk agree on the same wrong answer — the exact failure mode that hid the bitwise
  * condition bugs for so long.
  */
-class DisclosureExtractorTest {
+class DisclosureEncoderTest {
 
     object TestServer : ServerBuilder() {
         val database = setting("database", Database.Settings())
-        val models = database.registerTable("AuditModelRegistration", AuditModelRegistration.serializer())
-        val fields = database.registerTable("AuditFieldRegistration", AuditFieldRegistration.serializer())
-        val registry = path.path("registry") include AuditRegistry(models, fields)
+        val audit = path.path("audit") include AuditCore(database)
+
+        // Claude: constructed but not installed; the tests call it directly.
+        val interceptor = DisclosureLogInterceptor(
+            audit.registry,
+            audit.origins,
+            database.registerTable("AuditDisclosure", DisclosureRecord.serializer()),
+        )
     }
 
     private fun onServer(block: suspend context(ServerRuntime) Fixture.() -> Unit) = runBlocking {
@@ -45,24 +52,21 @@ class DisclosureExtractorTest {
 
     private class Fixture {
         lateinit var registry: AuditRegistry.Assignments
-        lateinit var extractor: DisclosureExtractor
 
         context(server: ServerRuntime)
         suspend fun deploy(vararg serializers: KSerializer<*>) {
-            TestServer.registry.assign(
-                serializers.flatMap { it.descriptor.auditedModels().entries }.associate { it.key to it.value },
-            )
-            registry = TestServer.registry.load()
-            extractor = DisclosureExtractor(registry)
+            TestServer.audit.registry.register(serializers.toList())
+            registry = TestServer.audit.registry.load()
         }
 
-        fun <T> extract(serializer: KSerializer<T>, value: T): List<Disclosure> =
-            extractor.extract(serializer, value)
+        context(server: ServerRuntime)
+        suspend fun <T> extract(serializer: KSerializer<T>, value: T): List<Disclosure> =
+            TestServer.interceptor.calculateDisclosures(serializer, value)
 
         /** The disclosed field paths of one disclosure, resolved back through the registry. */
         fun paths(disclosure: Disclosure): Set<String> {
-            val byBit = registry.fields(disclosure.modelId).entries.associate { it.value to it.key }
-            return disclosure.bits.map { byBit.getValue(it) }.toSet()
+            val byBit = registry.fields(disclosure.model).entries.associate { it.value to it.key }
+            return disclosure.disclosed.map { byBit.getValue(it) }.toSet()
         }
 
         fun modelIdOf(serializer: KSerializer<*>): ModelTypeId = registry.modelId(serializer.descriptor.serialName)
@@ -84,7 +88,7 @@ class DisclosureExtractorTest {
 
         val disclosure = extract(Patient.serializer(), patient).single()
 
-        assertEquals(modelIdOf(Patient.serializer()), disclosure.modelId)
+        assertEquals(modelIdOf(Patient.serializer()), disclosure.model)
         assertEquals(id, disclosure.recordId)
         assertEquals(setOf("name"), paths(disclosure), "an empty ssn is a default, not a disclosure")
     }
@@ -204,17 +208,17 @@ class DisclosureExtractorTest {
 
     @Test
     fun `a nested audited model produces its own record rather than bits on its parent`() = onServer {
-        deploy(Patient.serializer())
+        deploy(Patient.serializer(), Doctor.serializer())
         val patient = Patient(_id = id, name = "Ada", ssn = "x", doctor = Doctor(otherId, "Dr Who"))
 
         val disclosures = extract(Patient.serializer(), patient)
 
         assertEquals(2, disclosures.size, "expected one record each for the patient and the doctor")
-        val doctor = disclosures.single { it.modelId == modelIdOf(Doctor.serializer()) }
+        val doctor = disclosures.single { it.model == modelIdOf(Doctor.serializer()) }
         assertEquals(otherId, doctor.recordId)
         assertEquals(setOf("name"), paths(doctor))
 
-        val patientDisclosure = disclosures.single { it.modelId == modelIdOf(Patient.serializer()) }
+        val patientDisclosure = disclosures.single { it.model == modelIdOf(Patient.serializer()) }
         assertTrue("doctor" in paths(patientDisclosure), "the parent still records that a doctor was disclosed")
     }
 
@@ -252,7 +256,7 @@ class DisclosureExtractorTest {
 
         val disclosure = extract(PartialSerializer(Patient.serializer()), partial).single()
 
-        assertEquals(modelIdOf(Patient.serializer()), disclosure.modelId)
+        assertEquals(modelIdOf(Patient.serializer()), disclosure.model)
         assertEquals(id, disclosure.recordId)
         assertEquals(setOf("name"), paths(disclosure), "ssn was never sent, so it was not disclosed")
     }

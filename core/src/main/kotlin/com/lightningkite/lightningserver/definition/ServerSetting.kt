@@ -8,7 +8,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.KSerializer
 import java.lang.ref.WeakReference
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 /**
  * Represents a computation that can only be completed at runtime and executed asynchronously.
@@ -28,28 +27,34 @@ public fun interface RuntimeDeferred<out T> {
     public suspend fun await(): T
 
     /**
-     * A caching wrapper that executes the deferred computation only once.
+     * A caching wrapper that executes the deferred computation once per engine.
      *
-     * Subsequent calls to [await] return the cached value without re-executing.
+     * Subsequent calls to [await] on the same engine return the cached value without re-executing.
      *
      * **Thread Safety**: The cache is thread-safe. Concurrent calls will only execute
      * the computation once, with other threads waiting for the result. If the first
      * call is cancelled before the computation is finished it will be recalculated.
      */
-    @OptIn(ExperimentalAtomicApi::class)
     public data class Cached<out T>(private val wraps: RuntimeDeferred<T>) : RuntimeDeferred<T> {
+        private class Computed<T>(
+            val runtime: WeakReference<Engine>,
+            val result: T,
+        )
+
         @kotlin.concurrent.Volatile
-        private var cache: NullWrapper<T>? = null
+        private var cache: Computed<T>? = null
         private val mutex = Mutex()
 
         context(server: Engine)
-        override suspend fun await(): T =
-            cache?.value ?: mutex.withLock {
-                cache?.value?.let { return@withLock it }
-                val n = wraps.await()
-                cache = NullWrapper(n)
-                n
+        override suspend fun await(): T {
+            // Claude: keyed on the engine like Runtime.Cached, so a server built twice in one process never sees the first engine's value.
+            val key = server.processEngine
+            cache?.let { if (it.runtime.get() == key) return it.result }
+            return mutex.withLock {
+                cache?.let { if (it.runtime.get() == key) return@withLock it.result }
+                wraps.await().also { cache = Computed(WeakReference(key), it) }
             }
+        }
     }
 }
 
@@ -208,10 +213,6 @@ public interface ServerSetting<SETTING, RESULT> : Runtime<RESULT>, TerraformNeed
     context(server: Engine)
     override fun invoke(): RESULT = server.settings.get(this)
 }
-
-/** Internal wrapper to allow caching of nullable values. */
-@JvmInline
-private value class NullWrapper<T>(val value: T)
 
 /**
  * Internal implementation of ServerSetting with custom getter logic.

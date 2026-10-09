@@ -37,7 +37,7 @@ public data class ServerRuntime private constructor(
     public val wrapped: Engine,
     // The execution lives on the runtime rather than being passed as a parameter because the sites that
     // must attribute their work include the inside of handler bodies (disclosure auditing hangs off
-    // emitTypedOutput, called from ApiHttpHandler and ApiWebSocketHandler). Passing it would mean adding a
+    // notifyEncoding, called from the server's encoders). Passing it would mean adding a
     // parameter to HttpHandler.handle and so to every handler; the runtime context already reaches them all.
     /** The work being performed, and what caused it. */
     public val execution: Execution,

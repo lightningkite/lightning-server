@@ -166,7 +166,7 @@ class RealDbAuditRecordsTest {
             (0 until 2000).map {
                 DisclosureRecord(
                     _id = DisclosureRecord.ID(UuidV7.generate()),
-                    requestId = OriginRecord.ID(randomExecutionId()),
+                    origin = OriginRecord.ID(randomExecutionId()),
                     recordType = ModelTypeId(it % 8),
                     recordId = if (it == 7) target else Uuid.random(),
                     disclosed = fieldIds(),
@@ -209,7 +209,7 @@ class RealDbAuditRecordsTest {
         fun disclosure(vararg indices: Int): DisclosureRecord {
             return DisclosureRecord(
                 _id = DisclosureRecord.ID(UuidV7.generate()),
-                requestId = OriginRecord.ID(randomExecutionId()),
+                origin = OriginRecord.ID(randomExecutionId()),
                 recordType = ModelTypeId(modelId),
                 recordId = Uuid.random(),
                 disclosed = fieldIds(*indices),

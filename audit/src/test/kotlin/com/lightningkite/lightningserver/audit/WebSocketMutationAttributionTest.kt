@@ -61,7 +61,7 @@ import kotlin.uuid.Uuid
  *
  * Turning a [MutationRecord] into a person means looking up its `attributedTo` in [OriginRecord] and
  * reading `principal`. For HTTP that join is trivially sound — the row is keyed by the request's own
- * execution id. For a socket it is not obvious: [OriginRecordInterceptor] keys the row by the
+ * execution id. For a socket it is not obvious: [OriginRecording] keys the row by the
  * *socket* id rather than by the phase execution that wrote the change, and a virtual socket
  * multiplexed inside a physical one gets its own socket id and its own row.
  *

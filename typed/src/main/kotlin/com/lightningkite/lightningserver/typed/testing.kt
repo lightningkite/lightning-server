@@ -100,7 +100,7 @@ import com.lightningkite.services.database.HasId
 //    }
 //}
 // Runs the endpoint as a direct call from the test, through validation, its own auth requirement, the
-// HTTP interceptors and typed output observation. [presented] stands in for whatever the request's
+// HTTP interceptors and encoding interceptors. [presented] stands in for whatever the request's
 // credentials would have resolved to, so the requirement is checked against it as it would be for a
 // real request.
 context(test: TestRunner<*>)

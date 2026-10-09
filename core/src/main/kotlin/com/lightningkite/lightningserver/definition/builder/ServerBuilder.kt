@@ -6,7 +6,7 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.ExecutionInterceptor
 import com.lightningkite.lightningserver.serialization.*
-import com.lightningkite.lightningserver.typedoutput.TypedOutputInterceptor
+import com.lightningkite.lightningserver.serialization.EncodingInterceptor
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.Setting
 import com.lightningkite.services.SettingContext
@@ -95,7 +95,7 @@ public abstract class ServerBuilder : Extendable {
     private val webSocketHandlers: PathSpecRegistry<WebSocketHandler<*, *>> = PathSpecRegistry()
     private val webSocketTopics: PathSpecRegistry<WebSocketTopic<*, *>> = PathSpecRegistry()
 
-    private val typedOutputInterceptors: ListRegistry<TypedOutputInterceptor> = ListRegistry()
+    private val encodingInterceptors: ListRegistry<EncodingInterceptor> = ListRegistry()
 
 
     private var exceptionHandler: HttpExceptionHandler = HttpExceptionHandler.Default
@@ -132,9 +132,9 @@ public abstract class ServerBuilder : Extendable {
             webSocketInterceptors.register(it)
         }
 
-    @JvmName("installTypedOutputInterceptor")
-    public fun <T : TypedOutputInterceptor> install(interceptor: T): T =
-        interceptor.also { typedOutputInterceptors.register(it) }
+    @JvmName("installEncodingInterceptor")
+    public fun <T : EncodingInterceptor> install(interceptor: T): T =
+        interceptor.also { encodingInterceptors.register(it) }
 
     public infix fun <PATH : PathSpec, HANDLER : HttpHandler<PATH>> HttpEndpoint<PATH>.bind(handler: HANDLER): HANDLER {
         httpHandlers.getOrRegister(this.path, ::MapRegistry).register(this.method, handler)
@@ -327,7 +327,7 @@ public abstract class ServerBuilder : Extendable {
             executionInterceptors = executionInterceptors.toSealedList(),
             httpInterceptors = httpInterceptors.toSealedList(),
             webSocketInterceptors = webSocketInterceptors.toSealedList(),
-            typedOutputInterceptors = typedOutputInterceptors.toSealedList(),
+            encodingInterceptors = encodingInterceptors.toSealedList(),
             endpoints = buildSealedPathSpecMap {
                 for (path in httpHandlers.keys + webSocketHandlers.keys) {
                     put(

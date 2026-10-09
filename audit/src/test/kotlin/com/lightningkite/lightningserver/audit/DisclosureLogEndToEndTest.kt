@@ -146,7 +146,7 @@ class DisclosureLogEndToEndTest {
         assertEquals(HttpStatus.OK, response.status)
 
         val disclosure = disclosures().single()
-        assertEquals(testId(1).originId, disclosure.requestId)
+        assertEquals(testId(1).originId, disclosure.origin)
         assertEquals(TestServer.ada._id, disclosure.recordId)
         assertEquals(setOf("name", "ssn"), pathsOf(disclosure))
 
@@ -178,7 +178,7 @@ class DisclosureLogEndToEndTest {
 
         val known = requests().map { it._id }.toSet()
         disclosures().forEach {
-            assertTrue(it.requestId in known, "disclosure ${it._id} refers to unknown request ${it.requestId}")
+            assertTrue(it.origin in known, "disclosure ${it._id} refers to unknown request ${it.origin}")
         }
     }
 
@@ -199,7 +199,7 @@ class DisclosureLogEndToEndTest {
 
         val disclosure = disclosures().single()
         assertTrue(
-            disclosure.requestId in subs.map { it._id },
+            disclosure.origin in subs.map { it._id },
             "the disclosure was attributed to the outer request rather than the sub-request that made it",
         )
     }

@@ -93,7 +93,7 @@ class AuditLayerRuntimeIndependenceTest {
 
             execute {
                 val disclosure = TestServer.disclosureLog.disclosures().find(Condition.Always).toList().single()
-                assertEquals(requestId.originId, disclosure.requestId)
+                assertEquals(requestId.originId, disclosure.origin)
                 assertEquals(TestServer.ada._id, disclosure.recordId)
 
                 // The bits are readable, which is the part that actually depends on the core: the
