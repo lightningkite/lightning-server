@@ -17,7 +17,6 @@ dependencies {
     api(project(":sessions-shared"))
     api(libs.services.database)
     api(libs.services.cache)
-    api(libs.kotlin.reflect)
 
     ksp(libs.services.database.processor)
 

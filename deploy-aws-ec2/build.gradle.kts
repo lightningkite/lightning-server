@@ -17,12 +17,6 @@ dependencies {
         exclude("software.amazon.awssdk:apache-client")
     }
     api(libs.services.aws.client) { excludeNetty() }
-    api(libs.aws.s3) { excludeNetty() }
-    api(libs.aws.sqs) { excludeNetty() }
-    api(libs.aws.secrets.manager) { excludeNetty() }
-    implementation(libs.coroutines.reactive)
-    implementation(libs.coroutines.jdk)
-    api(libs.kotlin.reflect)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)
 }

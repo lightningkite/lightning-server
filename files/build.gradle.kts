@@ -13,7 +13,6 @@ dependencies {
     api(project(":files-shared"))
     api(libs.services.database)
     api(libs.services.files)
-    api(libs.kotlin.reflect)
 
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)

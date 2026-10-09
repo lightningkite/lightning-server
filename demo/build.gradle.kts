@@ -76,8 +76,6 @@ dependencies {
     api(libs.services.voiceagent.openai)
 
     implementation(libs.kotlinerCli)
-    implementation(libs.ktor.call.logging)
-    implementation(project(":sessions"))
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)
 }

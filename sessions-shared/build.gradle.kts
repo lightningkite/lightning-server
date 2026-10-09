@@ -63,7 +63,6 @@ kotlin {
         val commonTest = getByName("commonTest") {
             dependencies {
                 implementation(libs.kotlin.test)
-                implementation(libs.serialization.protobuf)
             }
             kotlin {
                 srcDir(file("build/generated/ksp/common/commonTest/kotlin"))

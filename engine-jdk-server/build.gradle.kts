@@ -9,12 +9,7 @@ plugins {
 }
 
 dependencies {
-    api(project(":core"))
     api(project(":engine-local"))
-    api(libs.services.database)
-    api(libs.services.cache)
-    api(libs.services.pubsub)
-    api(libs.kotlin.reflect)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)
     testImplementation(testFixtures(project(":engine-local")))

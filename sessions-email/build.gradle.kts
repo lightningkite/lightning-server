@@ -15,7 +15,6 @@ dependencies {
 
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)
-    testImplementation(libs.services.cache)
 }
 
 kotlin {

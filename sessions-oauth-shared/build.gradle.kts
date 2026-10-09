@@ -51,7 +51,7 @@ kotlin {
             dependencies {
                 api(libs.kotlinx.serialization.json)
                 api(libs.kotlinx.datetime)
-                api(libs.services.database)
+                api(libs.services.database.shared)
             }
             kotlin {
                 srcDir(file("build/generated/ksp/common/commonMain/kotlin"))
@@ -60,7 +60,6 @@ kotlin {
         val commonTest = getByName("commonTest") {
             dependencies {
                 implementation(libs.kotlin.test)
-                implementation(libs.serialization.protobuf)
             }
             kotlin {
                 srcDir(file("build/generated/ksp/common/commonTest/kotlin"))

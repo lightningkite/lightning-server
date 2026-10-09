@@ -9,19 +9,13 @@ plugins {
 }
 
 dependencies {
-    api(project(":core"))
     api(project(":engine-local"))
-    api(libs.services.database)
-    api(libs.services.cache)
-    api(libs.services.pubsub)
-    api(libs.kotlin.reflect)
 
     implementation(platform(libs.netty.bom))
     implementation(libs.netty.codec.http)
     implementation(libs.netty.handler)
     implementation(libs.netty.transport)
     implementation(libs.netty.buffer)
-    implementation(libs.netty.codec)
 
     // For native transports (compile-time APIs); actual native libs load if present on the platform
     implementation(libs.netty.transport.classes.epoll)

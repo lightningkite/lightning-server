@@ -10,16 +10,13 @@ plugins {
 }
 
 dependencies {
-    api(project(":core"))
-    api(project(":auth"))
     api(project(":typed"))
     api(project(":notifications-shared"))
     api(libs.services.database)
     api(libs.services.email)
-    api(libs.services.notifications.fcm)
+    api(libs.services.notifications)
     api(libs.services.sms)
     api(libs.services.cache)
-    api(libs.kotlin.reflect)
 
     ksp(libs.services.database.processor)
 
