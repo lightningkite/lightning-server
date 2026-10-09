@@ -76,6 +76,8 @@ dependencies {
     implementation("com.lightningkite.lightningserver:sessions-shared:$lightningServerVersion")
     implementation("com.lightningkite.lightningserver:sessions-email:$lightningServerVersion")
     implementation("com.lightningkite.lightningserver:sessions-sms:$lightningServerVersion")
+    implementation("com.lightningkite.lightningserver:sessions-totp:$lightningServerVersion")
+    implementation("com.lightningkite.lightningserver:sessions-webauthn:$lightningServerVersion")
 
     // Optional: File handling
     implementation("com.lightningkite.lightningserver:files:$lightningServerVersion")

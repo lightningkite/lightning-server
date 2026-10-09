@@ -26,7 +26,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
-import org.bouncycastle.util.encoders.Base32
+import org.apache.commons.codec.binary.Base32
 import org.junit.Test
 import java.net.URLDecoder
 import java.util.concurrent.TimeUnit
@@ -74,7 +74,7 @@ class TimeBasedOTPProofEndpointsTest {
 
     // Create a known secret for testing
     private val testSecret = ByteArray(32) { (it + 1).toByte() }
-    private val testSecretBase32 = Base32.encode(testSecret).toString(Charsets.UTF_8)
+    private val testSecretBase32 = Base32().encodeToString(testSecret)
 
     private val testConfig = TimeBasedOneTimePasswordConfig(
         timeStep = 30,
@@ -438,8 +438,8 @@ class TimeBasedOTPProofEndpointsTest {
         // Different secrets for different users
         val secret1 = ByteArray(32) { (it + 1).toByte() }
         val secret2 = ByteArray(32) { (it + 100).toByte() }
-        val secretBase32_1 = Base32.encode(secret1).toString(Charsets.UTF_8)
-        val secretBase32_2 = Base32.encode(secret2).toString(Charsets.UTF_8)
+        val secretBase32_1 = Base32().encodeToString(secret1)
+        val secretBase32_2 = Base32().encodeToString(secret2)
 
         object : ServerBuilder() {
             val database = setting("database", Database.Settings("ram"))

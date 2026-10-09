@@ -105,8 +105,9 @@ subprojects {
 // Coverage: Kover aggregation + verification (by Claude)
 // ---------------------------------------------------------------------------
 // Kover is applied in each JVM module (core, auth, typed, sessions,
-// sessions-email, sessions-sms, ratelimit). Here we aggregate those modules
-// into the root report and add a verification rule.
+// sessions-email, sessions-sms, sessions-totp, sessions-webauthn, ratelimit).
+// Here we aggregate those modules into the root report and add a verification
+// rule.
 //
 // The minimum-coverage bound starts at 0% so `koverVerify` gates the pipeline
 // (it runs and would fail on a *drop below* the bound) WITHOUT failing the
@@ -118,6 +119,8 @@ dependencies {
     kover(project(":sessions"))
     kover(project(":sessions-email"))
     kover(project(":sessions-sms"))
+    kover(project(":sessions-totp"))
+    kover(project(":sessions-webauthn"))
     kover(project(":ratelimit"))
 }
 

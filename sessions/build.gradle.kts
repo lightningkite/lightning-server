@@ -19,13 +19,8 @@ dependencies {
     api(libs.services.cache)
     api(libs.kotlin.reflect)
 
-    implementation(libs.oneTimePass)
-    implementation(libs.bouncy.castle.bcprov)
-    implementation(libs.bouncy.castle.bcpkix)
-
     ksp(libs.services.database.processor)
 
-    implementation(libs.webauthn4j.core)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)
 }

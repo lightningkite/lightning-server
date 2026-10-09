@@ -2,7 +2,7 @@
 agp = "9.1.1"
 androidDesugaring = "2.1.5"
 awsVersion = "2.55.5"
-bouncyCastle = "1.86"
+commonsCodec = "1.21.0"
 coroutines = "1.11.0"
 cryptographyKotlin = "0.6.0"
 dependencyCheck = "13.0.0"
@@ -21,7 +21,7 @@ ksp = "2.3.12"
 ktor = "3.5.2"
 lambdaJavaCore = "1.4.0"
 lambdaJavaEvents = "3.16.1"
-lkGradleHelpers = "4.1.1"
+lkGradleHelpers = "4.1.2"
 netty = "4.2.18.Final"
 okhttp = "5.5.0"
 openTelemetry = "1.66.0"
@@ -41,8 +41,7 @@ aws-lambda = { module = "software.amazon.awssdk:lambda", version = { ref = "awsV
 aws-s3 = { module = "software.amazon.awssdk:s3", version = { ref = "awsVersion" } }
 aws-sqs = { module = "software.amazon.awssdk:sqs", version = { ref = "awsVersion" } }
 aws-secrets-manager = { module = "software.amazon.awssdk:secretsmanager", version = { ref = "awsVersion" } }
-bouncy-castle-bcpkix = { module = "org.bouncycastle:bcpkix-jdk18on", version = { ref = "bouncyCastle" } }
-bouncy-castle-bcprov = { module = "org.bouncycastle:bcprov-jdk18on", version = { ref = "bouncyCastle" } }
+commons-codec = { module = "commons-codec:commons-codec", version = { ref = "commonsCodec" } }
 coroutines-jdk = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-jdk8", version = { ref = "coroutines" } }
 coroutines-reactive = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactive", version = { ref = "coroutines" } }
 dynamodb = { module = "software.amazon.awssdk:dynamodb", version = { ref = "dynamodb" } }

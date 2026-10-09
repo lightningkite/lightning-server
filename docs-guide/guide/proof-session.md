@@ -48,9 +48,9 @@ in a `ServerBuilder` with the `module` infix.
 | `EmailProofEndpoints` | `sessions-email` | Two-step: sends a PIN by email; user submits key + PIN |
 | `SmsProofEndpoints` | `sessions-sms` | Two-step: sends a PIN by SMS; user submits key + PIN |
 | `PasswordProofEndpoints` | `sessions` | One-step: verifies a stored password hash |
-| `TimeBasedOTPProofEndpoints` | `sessions` | One-step: validates a TOTP code from an authenticator app |
+| `TimeBasedOTPProofEndpoints` | `sessions-totp` | One-step: validates a TOTP code from an authenticator app |
 | `KnownDeviceProofEndpoints` | `sessions` | One-step: validates a device token issued on a prior login |
-| `WebAuthNProofEndpoints` | `sessions` | Two-step: WebAuthn/passkey challenge → assertion flow |
+| `WebAuthNProofEndpoints` | `sessions-webauthn` | Two-step: WebAuthn/passkey challenge → assertion flow |
 | `BackupCodeEndpoints` | `sessions` | One-step: single-use backup recovery codes |
 | `OauthProofEndpoints` | `sessions-oauth` | External: redirects to OAuth provider; resume URL returns a `Proof` |
 
@@ -64,11 +64,11 @@ posted to the session exchange endpoint.
 ## Wiring: a complete example
 
 The following is illustrative, verified against the demo server and session module source.  It
-requires the `sessions`, `sessions-email`, `sessions-sms`, and `sessions-oauth` modules as
+requires the `sessions`, `sessions-email`, `sessions-sms`, `sessions-totp`, and `sessions-oauth` modules as
 Gradle dependencies — not available for compiled samples in this module.
 
 ```kotlin
-// Illustrative — requires sessions / sessions-email / sessions-sms / sessions-oauth modules.
+// Illustrative — requires sessions / sessions-email / sessions-sms / sessions-totp / sessions-oauth modules.
 object Server : ServerBuilder() {
     val database = setting("database", Database.Settings())
     val cache    = setting("cache",    Cache.Settings())

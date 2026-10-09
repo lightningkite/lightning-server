@@ -6,12 +6,14 @@ integration.
 
 ## Overview
 
-The sessions system consists of four modules:
+The sessions system consists of six modules:
 
 - **sessions-shared** - Multiplatform data models and client interfaces
 - **sessions** - JVM server-side implementation with proof methods
 - **sessions-email** - Email-based authentication (magic links, PIN codes)
 - **sessions-sms** - SMS-based authentication (PIN codes)
+- **sessions-totp** - Time-based one-time passwords from authenticator apps
+- **sessions-webauthn** - WebAuthn / passkey authentication
 
 ## Key Concepts
 
@@ -323,8 +325,10 @@ class AuthTest {
 
 - **sessions-email** - Add with `implementation("com.lightningkite.lightningserver:sessions-email:$version")`
 - **sessions-sms** - Add with `implementation("com.lightningkite.lightningserver:sessions-sms:$version")`
+- **sessions-totp** - Add with `implementation("com.lightningkite.lightningserver:sessions-totp:$version")`
+- **sessions-webauthn** - Add with `implementation("com.lightningkite.lightningserver:sessions-webauthn:$version")`
 
-Both modules require appropriate service configurations (Email/SMS providers) in your settings.
+The email and SMS modules require appropriate service configurations (Email/SMS providers) in your settings.
 
 ## See Also
 

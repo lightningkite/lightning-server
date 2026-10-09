@@ -8,7 +8,7 @@ import com.lightningkite.lightningserver.sessions.TotpSecret
 import com.lightningkite.lightningserver.sessions.proofs.TotpHashAlgorithm
 import com.lightningkite.services.data.ExperimentalLightningServer
 import dev.turingcomplete.kotlinonetimepassword.*
-import org.bouncycastle.util.encoders.Base32
+import org.apache.commons.codec.binary.Base32
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
@@ -29,7 +29,7 @@ public fun TotpSecret(
 ): TotpSecret = TotpSecret(
     subjectId = subjectId,
     subjectType = subjectType,
-    secretBase32 = Base32.encode(secret).toString(Charsets.UTF_8),
+    secretBase32 = Base32().encodeToString(secret),
     digits = config.codeDigits,
     label = label,
     issuer = issuer,
@@ -50,7 +50,7 @@ public fun TotpSecret(
     establishedAt = now()
 )
 
-public val TotpSecret.secret: ByteArray get() = Base32.decode(secretBase32)
+public val TotpSecret.secret: ByteArray get() = Base32().decode(secretBase32)
 
 /**
  * The `otpauth://` URI for this secret. [accountName] becomes the account part of the URI's `Issuer:AccountName`

@@ -119,8 +119,9 @@ module:
 - **Typed modules** (`typed`, `typed-shared`): Type-safe API endpoint definitions with auto-generated documentation and
   SDKs
 - **Auth modules** (`auth`, `auth-shared`): Pre-built authentication functionality
-- **Session modules** (`sessions`, `sessions-shared`, `sessions-email`, `sessions-sms`): Session management with various
-  authentication methods (email magic links, PIN codes, SMS, OAuth)
+- **Session modules** (`sessions`, `sessions-shared`, `sessions-email`, `sessions-sms`, `sessions-totp`,
+  `sessions-webauthn`): Session management with various authentication methods (email magic links, PIN codes, SMS,
+  TOTP, WebAuthn/passkeys, OAuth)
 - **File modules** (`files`, `files-shared`): File upload/download handling with multiple backend support
 - **Media modules** (`media`, `media-shared`): Media processing capabilities
 - **Engine modules**: Different deployment targets

@@ -34,6 +34,8 @@ include(":sessions-email")
 include(":sessions-oauth")
 include(":sessions-oauth-shared")
 include(":sessions-sms")
+include(":sessions-totp")
+include(":sessions-webauthn")
 
 include(":notifications")
 include(":notifications-shared")
