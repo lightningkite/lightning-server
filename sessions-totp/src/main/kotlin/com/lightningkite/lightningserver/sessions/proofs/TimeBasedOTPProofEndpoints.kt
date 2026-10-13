@@ -11,6 +11,7 @@ import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.*
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.sessions.*
 import com.lightningkite.lightningserver.sessions.proofs.extensions.*
 import com.lightningkite.lightningserver.typed.*
@@ -21,7 +22,6 @@ import com.lightningkite.services.database.*
 import dev.turingcomplete.kotlinonetimepassword.HmacAlgorithm
 import dev.turingcomplete.kotlinonetimepassword.TimeBasedOneTimePasswordConfig
 import kotlinx.coroutines.flow.toList
-import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.builtins.serializer
 import java.security.SecureRandom
 import java.util.concurrent.TimeUnit
@@ -31,7 +31,6 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
 
 
-@OptIn(InternalSerializationApi::class)
 public class TimeBasedOTPProofEndpoints(
     database: Runtime<Database>,
     private val cache: Runtime<Cache>,
@@ -43,6 +42,7 @@ public class TimeBasedOTPProofEndpoints(
         codeDigits = 6,
         hmacAlgorithm = HmacAlgorithm.SHA1
     ),
+    signals: (context(ServerRuntime) (Table<TotpSecret>) -> Table<TotpSecret>)? = null,
     /**
      * Supplies the account name authenticator apps show for a new secret (the account part of the `otpauth://` URI's
      * label), usually the subject's email or username. Returning null falls back to the secret's [TotpSecret.label],
@@ -72,6 +72,7 @@ public class TimeBasedOTPProofEndpoints(
     public val modelInfo: ModelInfo<HasId<*>, TotpSecret, Uuid> = database.modelInfo(
         tableName = "TotpSecret",
         auth = proofMethodAuth or AuthRequirement.IsAdmin,
+        signals = { table -> signals?.invoke(serverRuntime, table) ?: table },
         permissions = {
             val admin = condition<TotpSecret>(AuthRequirement.IsAdmin.accepts(authOrNull))
             val mine = condition<TotpSecret> {
@@ -85,7 +86,6 @@ public class TimeBasedOTPProofEndpoints(
                 },
                 update = admin or (mine and active),
                 updateRestrictions = whitelistRestrictions {
-                    it.label.canBeModified()
                     it.disabledAt.canBeModified()
                 },
                 delete = Condition.Never,

@@ -18,7 +18,6 @@ import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultIn
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toList
-import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.builtins.serializer
 import kotlin.time.Clock
 import kotlin.time.Duration
@@ -26,12 +25,12 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
 
-@OptIn(InternalSerializationApi::class)
 public class PasswordProofEndpoints(
     database: Runtime<Database>,
     private val cache: Runtime<Cache>,
     override val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
     override val proofExpiration: Duration = 1.hours,
+    signals: (context(ServerRuntime) (Table<PasswordSecret>) -> Table<PasswordSecret>)? = null,
     private val evaluatePassword: (String) -> Unit = { },
 ) : ServerBuilder(), DirectProofMethod {
 
@@ -58,8 +57,10 @@ public class PasswordProofEndpoints(
         database.modelInfo(
             tableName = "PasswordSecret",
             auth = proofMethodAuth or AuthRequirement.IsAdmin,
-            signals = { col ->
-                col.interceptCreate {
+            signals = { table ->
+                val table = signals?.invoke(serverRuntime, table) ?: table
+                table.interceptCreate {
+                    // The hash property is the plain text password at this point. This intercept is what hashes the value.
                     evaluatePassword(it.hash)
                     if (it.hint?.contains(it.hash, true) == true)
                         throw BadRequestException("Hint cannot contain the password itself!")
@@ -80,10 +81,8 @@ public class PasswordProofEndpoints(
                         it.hash.mask("")
                     },
                     update = admin or (mine and active),
-                    updateRestrictions = updateRestrictions {
-                        it.subjectType.cannotBeModified()
-                        it.subjectId.cannotBeModified()
-                        it.hash.cannotBeModified()
+                    updateRestrictions = whitelistRestrictions {
+                        it.disabledAt.canBeModified()
                     },
                     delete = Condition.Never,
                 )
@@ -175,7 +174,10 @@ public class PasswordProofEndpoints(
                 // account share one bucket. Keying on the raw value would let an attacker dodge the limiter
                 // (and its exponential backoff) simply by varying case or whitespace.
                 val normalizedValue = handler.normalizePropertyValue(input.property, input.value)
-                cache().constrainAttemptRate("password-${input.property}-${normalizedValue}", minFailureDuration = 1.seconds) {
+                cache().constrainAttemptRate(
+                    "password-${input.property}-${normalizedValue}",
+                    minFailureDuration = 1.seconds
+                ) {
                     val subjectId = handler.fetchUserIdString(input.property, normalizedValue)
                         ?: throw BadRequestException("User ID and code do not match")
 
