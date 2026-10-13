@@ -61,11 +61,10 @@ public fun <T : Any> DataAccessLog.dataAccessLogged(table: Table<T>): Table<T> {
             "one model, so this shape cannot be attributed and is refused rather than logged " +
             "inconsistently."
     )
-    val serialName = descriptor.auditSerialName
     val initiator = runtime.execution
     return DataAccessLogTable(
         wraps = table,
-        modelId = { registry.assignments.await().modelId(serialName) },
+        modelId = { registry.assignments.await().modelId(descriptor) },
         // The anchor, not this execution's own id. A query run inside a task has no request row of
         // its own, so its own id would join to nothing; `attributedTo` names the row of whoever is
         // responsible. For http and websocket executions it is their own request row.

@@ -32,7 +32,11 @@ data class Phone(@Audited val number: String, val label: String)
 /** Audited in its own right, so it must not consume bits of the model that carries it. */
 @Serializable
 @Audited
-data class Doctor(override val _id: Uuid, @Audited val name: String) : HasId<Uuid>
+data class Doctor(override val _id: Uuid, @Audited val name: String) : HasId<Uuid> {
+    /** Not audited, but has an `_id` of its own that must not be mistaken for its parent's. */
+    @Serializable
+    data class Ref(val _id: Uuid)
+}
 
 @Serializable
 sealed class Payment {
@@ -48,6 +52,62 @@ sealed class Payment {
 @Serializable
 @Audited
 data class Order(override val _id: Uuid, @Audited val payment: Payment) : HasId<Uuid>
+
+/** Two subclasses share an audited field name, so a path naming the wrong one is caught. */
+@Serializable
+sealed interface Channel {
+    @Serializable
+    @SerialName("Email")
+    data class Email(@Audited val address: String) : Channel
+
+    @Serializable
+    @SerialName("Post")
+    data class Post(@Audited val address: String) : Channel
+
+    /** No `@SerialName`, so its path segment is the fully qualified class name. */
+    @Serializable
+    data class Pigeon(@Audited val loft: String) : Channel
+}
+
+@Serializable
+@Audited
+data class Subscriber(
+    override val _id: Uuid,
+    @Audited val via: Channel,
+    val fallbacks: List<Channel> = listOf(),
+) : HasId<Uuid>
+
+/** Each subclass is its own audited model, reached only through the sealed parent. */
+@Serializable
+sealed interface Visit {
+    @Serializable
+    @SerialName("Checkup")
+    @Audited
+    data class Checkup(override val _id: Uuid, @Audited val notes: String) : Visit, HasId<Uuid>
+
+    @Serializable
+    @SerialName("Surgery")
+    @Audited
+    data class Surgery(override val _id: Uuid, @Audited val notes: String) : Visit, HasId<Uuid>
+}
+
+/** Other Uuids, raw and wrapped, on both sides of `_id`, plus a nested audited record before it. */
+@Serializable
+@Audited
+data class Referencing(
+    val before: Uuid,
+    val typedBefore: TypedKeyed.ID,
+    @Audited val doctor: Doctor? = null,
+    override val _id: ID,
+    val after: Uuid,
+    val typedAfter: TypedKeyed.ID,
+    val nested: Doctor.Ref? = null,
+    @Audited val value: String = "",
+) : HasId<Referencing.ID> {
+    @Serializable
+    @JvmInline
+    value class ID(override val raw: Uuid) : TypedId<Uuid, ID>
+}
 
 @Serializable
 data class Node(@Audited val label: String = "", val child: Node? = null)
@@ -110,7 +170,41 @@ data class Reading(
     @Audited val severity: Severity? = null,
     @Audited val count: Int = 0,
     @Audited val flagged: Boolean = false,
-) : HasId<Uuid>
+    @Audited val code: Code = Code(0),
+    @Audited val note: String? = null,
+) : HasId<Uuid> {
+    @Serializable
+    @JvmInline
+    value class Code(val raw: Int)
+}
+
+/** One audited field of every type, each defaulting to the most empty value that type allows. */
+@Serializable
+@Audited
+data class Emptiness(
+    override val _id: Uuid,
+    @Audited val boolean: Boolean = false,
+    @Audited val byte: Byte = 0,
+    @Audited val short: Short = 0,
+    @Audited val int: Int = 0,
+    @Audited val long: Long = 0,
+    @Audited val float: Float = 0f,
+    @Audited val double: Double = 0.0,
+    @Audited val char: Char = '\u0000',
+    @Audited val string: String = "",
+    @Audited val list: List<String> = listOf(),
+    @Audited val set: Set<String> = setOf(),
+    @Audited val map: Map<String, Int> = mapOf(),
+    @Audited val wrapped: Wrapped = Wrapped(""),
+    @Audited val nullableInt: Int? = null,
+    @Audited val nullableString: String? = null,
+    @Audited val nullableList: List<String>? = null,
+    @Audited val nullableWrapped: Wrapped? = null,
+) : HasId<Uuid> {
+    @Serializable
+    @JvmInline
+    value class Wrapped(val raw: String)
+}
 
 @Serializable
 data class Deep3(

@@ -18,6 +18,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.nullable
+import kotlinx.serialization.descriptors.elementNames
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -55,7 +56,7 @@ class DisclosureEncoderTest {
 
         context(server: ServerRuntime)
         suspend fun deploy(vararg serializers: KSerializer<*>) {
-            TestServer.audit.registry.register(serializers.toList())
+            TestServer.audit.registry.register(serializers.map { it.descriptor })
             registry = TestServer.audit.registry.load()
         }
 
@@ -69,7 +70,7 @@ class DisclosureEncoderTest {
             return disclosure.disclosed.map { byBit.getValue(it) }.toSet()
         }
 
-        fun modelIdOf(serializer: KSerializer<*>): ModelTypeId = registry.modelId(serializer.descriptor.serialName)
+        fun modelIdOf(serializer: KSerializer<*>): ModelTypeId = registry.modelId(serializer.descriptor)
     }
 
     /** A `Patient` reduced to just the named fields, as `queryPartial` would return it. */
@@ -109,15 +110,6 @@ class DisclosureEncoderTest {
     }
 
     @Test
-    fun `nulls, zeroes, empty strings and empty collections are all defaults`() = onServer {
-        deploy(Reading.serializer())
-
-        val disclosure = extract(Reading.serializer(), Reading(_id = id)).single()
-
-        assertEquals(emptySet(), paths(disclosure), "a record with nothing tracked in its payload is still a record")
-    }
-
-    @Test
     fun `an enum discloses whatever value it holds`() = onServer {
         deploy(Reading.serializer())
 
@@ -135,6 +127,85 @@ class DisclosureEncoderTest {
 
         val loud = extract(Reading.serializer(), Reading(_id = id, count = 3, flagged = true)).single()
         assertEquals(setOf("count", "flagged"), paths(loud))
+    }
+
+    @Test
+    fun `a value class is judged on the value it wraps`() = onServer {
+        deploy(Reading.serializer())
+
+        assertEquals(emptySet(), paths(extract(Reading.serializer(), Reading(_id = id, code = Reading.Code(0))).single()))
+        assertEquals(setOf("code"), paths(extract(Reading.serializer(), Reading(_id = id, code = Reading.Code(7))).single()))
+    }
+
+    @Test
+    fun `the most empty value of every type is not a disclosure`() = onServer {
+        deploy(Emptiness.serializer())
+
+        assertEquals(emptySet(), paths(extract(Emptiness.serializer(), Emptiness(_id = id)).single()))
+    }
+
+    @Test
+    fun `a non-empty value of every type is a disclosure`() = onServer {
+        deploy(Emptiness.serializer())
+        val full = Emptiness(
+            _id = id,
+            boolean = true,
+            byte = 1,
+            short = 1,
+            int = 1,
+            long = 1,
+            float = 1f,
+            double = 1.0,
+            char = 'a',
+            string = "a",
+            list = listOf("a"),
+            set = setOf("a"),
+            map = mapOf("a" to 1),
+            wrapped = Emptiness.Wrapped("a"),
+            nullableInt = 1,
+            nullableString = "a",
+            nullableList = listOf("a"),
+            nullableWrapped = Emptiness.Wrapped("a"),
+        )
+
+        assertEquals(
+            Emptiness.serializer().descriptor.elementNames.toSet() - "_id",
+            paths(extract(Emptiness.serializer(), full).single()),
+        )
+    }
+
+    @Test
+    fun `negative zero is as empty as zero but NaN is not`() = onServer {
+        deploy(Emptiness.serializer())
+
+        val negativeZero = extract(Emptiness.serializer(), Emptiness(_id = id, float = -0f, double = -0.0)).single()
+        assertEquals(emptySet(), paths(negativeZero))
+
+        val nan = extract(Emptiness.serializer(), Emptiness(_id = id, float = Float.NaN, double = Double.NaN)).single()
+        assertEquals(setOf("float", "double"), paths(nan))
+    }
+
+    @Test
+    fun `a non-null value in a nullable field is a disclosure however empty`() = onServer {
+        deploy(Emptiness.serializer())
+        val cases = mapOf(
+            "nullableInt" to Emptiness(_id = id, nullableInt = 0),
+            "nullableString" to Emptiness(_id = id, nullableString = ""),
+            "nullableList" to Emptiness(_id = id, nullableList = listOf()),
+            "nullableWrapped" to Emptiness(_id = id, nullableWrapped = Emptiness.Wrapped("")),
+        )
+
+        for ((field, value) in cases) {
+            assertEquals(setOf(field), paths(extract(Emptiness.serializer(), value).single()), field)
+        }
+    }
+
+    @Test
+    fun `a collection of empty elements is a disclosure`() = onServer {
+        deploy(Emptiness.serializer())
+        val value = Emptiness(_id = id, list = listOf(""), set = setOf(""), map = mapOf("" to 0))
+
+        assertEquals(setOf("list", "set", "map"), paths(extract(Emptiness.serializer(), value).single()))
     }
 
     @Test
@@ -207,6 +278,72 @@ class DisclosureEncoderTest {
     }
 
     @Test
+    fun `a sealed field with same-named fields records only the subclass it held`() = onServer {
+        deploy(Subscriber.serializer())
+
+        val email = extract(Subscriber.serializer(), Subscriber(_id = id, via = Channel.Email("a@b.c"))).single()
+        assertEquals(setOf("via", "via(Email).address"), paths(email))
+
+        val post = extract(Subscriber.serializer(), Subscriber(_id = id, via = Channel.Post("1 Main"))).single()
+        assertEquals(setOf("via", "via(Post).address"), paths(post))
+    }
+
+    @Test
+    fun `a subclass without a SerialName is pathed by its qualified name`() = onServer {
+        deploy(Subscriber.serializer())
+        val name = Channel.Pigeon.serializer().descriptor.serialName
+
+        val disclosure = extract(Subscriber.serializer(), Subscriber(_id = id, via = Channel.Pigeon("roof"))).single()
+
+        assertEquals(setOf("via", "via($name).loft"), paths(disclosure))
+    }
+
+    @Test
+    fun `sealed elements of a list record the subclass each held`() = onServer {
+        deploy(Subscriber.serializer())
+        val subscriber = Subscriber(
+            _id = id,
+            via = Channel.Email(""),
+            fallbacks = listOf(Channel.Post("1 Main"), Channel.Email("")),
+        )
+
+        val disclosure = extract(Subscriber.serializer(), subscriber).single()
+
+        assertEquals(setOf("via", "fallbacks[](Post).address"), paths(disclosure))
+    }
+
+    @Test
+    fun `an audited subclass sent as its sealed parent is recorded as the subclass`() = onServer {
+        deploy(Visit.Checkup.serializer(), Visit.Surgery.serializer())
+
+        val disclosure = extract(Visit.serializer(), Visit.Surgery(id, "appendix")).single()
+
+        assertEquals(modelIdOf(Visit.Surgery.serializer()), disclosure.model)
+        assertEquals(id, disclosure.recordId)
+        assertEquals(setOf("notes"), paths(disclosure))
+    }
+
+    @Test
+    fun `the record id is the _id, not another Uuid the model carries`() = onServer {
+        deploy(Referencing.serializer(), Doctor.serializer())
+        val decoys = List(5) { Uuid.random() }
+        val value = Referencing(
+            before = decoys[0],
+            typedBefore = TypedKeyed.ID(decoys[1]),
+            doctor = Doctor(decoys[2], "Dr Who"),
+            _id = Referencing.ID(id),
+            after = decoys[3],
+            typedAfter = TypedKeyed.ID(decoys[4]),
+            nested = Doctor.Ref(otherId),
+        )
+
+        val disclosures = extract(Referencing.serializer(), value)
+
+        assertEquals(id, disclosures.single { it.model == modelIdOf(Referencing.serializer()) }.recordId)
+        assertEquals(decoys[2], disclosures.single { it.model == modelIdOf(Doctor.serializer()) }.recordId)
+    }
+
+    @Test
     fun `a nested audited model produces its own record rather than bits on its parent`() = onServer {
         deploy(Patient.serializer(), Doctor.serializer())
         val patient = Patient(_id = id, name = "Ada", ssn = "x", doctor = Doctor(otherId, "Dr Who"))
@@ -219,6 +356,7 @@ class DisclosureEncoderTest {
         assertEquals(setOf("name"), paths(doctor))
 
         val patientDisclosure = disclosures.single { it.model == modelIdOf(Patient.serializer()) }
+        assertEquals(id, patientDisclosure.recordId, "the doctor's id must not be taken for the patient's")
         assertTrue("doctor" in paths(patientDisclosure), "the parent still records that a doctor was disclosed")
     }
 

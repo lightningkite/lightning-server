@@ -20,7 +20,9 @@ import com.lightningkite.services.database.Table
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.descriptors.PolymorphicKind
+import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.encoding.AbstractEncoder
 import kotlinx.serialization.encoding.CompositeEncoder
@@ -32,13 +34,38 @@ import kotlin.uuid.Uuid
  *
  * ## Fail-closed
  *
- * Nothing is caught here on purpose. An extraction that cannot resolve a model, a record with no
+ * An extraction that cannot resolve a model, a record with no
  * `_id`, or a sink that will not accept the write all propagate out of
  * [EncodingInterceptor.beforeEncode], which aborts the send before the value is serialized. A
  * disclosure that could not be recorded does not happen.
  *
  * The practical consequence is worth stating plainly: an outage of the audit database is an outage
  * of every endpoint that returns an audited model.
+ *
+ * ## The 'Mask-Empty' Assumption
+ *
+ * This interceptor makes the assumption that sensitive information when masked will appear as an *'empty'* value (`0`, `null`, `""`).
+ * Any non-empty value will be reported as disclosed. This has the following consequences:
+ *
+ * - If you mask information to a non-empty value, it will **always** be marked as disclosed
+ * - Legitimate disclosures of empty values will not be marked as disclosed. This is considered acceptable because the disclosed value is indistinguishable from the masked state.
+ *
+ * Only the *most* empty value of a field's type counts as masked. In a nullable field that is `null`, so
+ * `0` there is disclosed; in a collection it is the empty collection, so `listOf("")` is disclosed.
+ *
+ * | Value | Disclosed? |
+ * |---|---|
+ * | `null` | no |
+ * | `false` | no |
+ * | `0` (any integer type) | no |
+ * | `0.0` and `-0.0` (`Float`, `Double`) | no (`NaN` is disclosed) |
+ * | `'\u0000'` | no |
+ * | `""` | no |
+ * | Empty `List`, `Set` or `Map` | no |
+ * | Any enum entry, including the first | yes |
+ * | Any non-null value in a nullable field, such as `0` in an `Int?` or `listOf()` in a `List<T>?` | yes |
+ * | A value class wrapping an empty value | no |
+ * | A collection whose elements are all empty, such as `listOf("")` | yes |
  */
 public class DisclosureLogInterceptor(
     private val registry: AuditRegistry,
@@ -92,7 +119,7 @@ public class DisclosureLogInterceptor(
         val found = ArrayList<Disclosure>()
 
         private class DisclosureBuilder(val modelId: ModelTypeId) {
-            var bits: FieldIdentifierSet = FieldIdentifierSet.EMPTY
+            var disclosed: FieldIdentifierSet = FieldIdentifierSet.EMPTY
             var id: Uuid? = null
         }
 
@@ -127,7 +154,7 @@ public class DisclosureLogInterceptor(
             val parent = structures.lastOrNull()
             structures += when {
                 effective.isAudited ->
-                    Structure(effective, path = "", DisclosureBuilder(registry.modelId(effective.auditSerialName)), startsRecord = true)
+                    Structure(effective, path = "", DisclosureBuilder(registry.modelId(effective)), startsRecord = true)
                 parent?.descriptor?.kind is PolymorphicKind ->
                     Structure(effective, "${parent.path}(${effective.auditSerialName})", parent.disclosed, startsRecord = false)
                 else -> Structure(effective, parent?.elementPath ?: "", parent?.disclosed, startsRecord = false)
@@ -147,7 +174,7 @@ public class DisclosureLogInterceptor(
                         "disclosure could not name which record was disclosed. A partial query on an audited " +
                         "model must include _id."
                 ),
-                builder.bits,
+                builder.disclosed,
             )
         }
 
@@ -169,7 +196,7 @@ public class DisclosureLogInterceptor(
         private fun disclose() {
             val structure = structures.lastOrNull() ?: return
             val builder = structure.disclosed ?: return
-            registry.bitIndexOrNull(builder.modelId, structure.elementPath)?.let { builder.bits += it }
+            registry.bitIndexOrNull(builder.modelId, structure.elementPath)?.let { builder.disclosed += it }
         }
 
         override fun encodeValue(value: Any) {}
@@ -192,7 +219,7 @@ public class DisclosureLogInterceptor(
             value: T,
         ) {
             encodeElement(descriptor, index)
-            if (value?.carriesAValue() == true) disclose()
+            if (!serializer.descriptor.isLeaf() && value?.carriesAValue() == true) disclose()
             encodeSerializableValue(serializer, value)
         }
 
@@ -204,9 +231,12 @@ public class DisclosureLogInterceptor(
         ) {
             encodeElement(descriptor, index)
             if (value == null) return
-            if (value.carriesAValue()) disclose()
+            disclose()
             encodeSerializableValue(serializer, value)
         }
+
+        /** A leaf discloses itself through its own `encodeX` call, so it is judged on the value it holds. */
+        private fun SerialDescriptor.isLeaf(): Boolean = isInline || kind is PrimitiveKind || kind == SerialKind.ENUM
 
         private fun Any.carriesAValue(): Boolean = when (this) {
             is Collection<*> -> isNotEmpty()

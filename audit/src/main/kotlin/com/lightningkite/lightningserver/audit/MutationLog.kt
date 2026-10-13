@@ -64,12 +64,11 @@ public fun <T : Any> MutationLog.mutationLogged(table: Table<T>): Table<T> {
             "one model, so this shape cannot be attributed and is refused rather than logged " +
             "inconsistently."
     )
-    val serialName = descriptor.auditSerialName
     val initiator = runtime.execution
     val json = runtime.internalSerialization.json
     return MutationLogTable(
         wraps = table,
-        modelId = { registry.assignments.await().modelId(serialName) },
+        modelId = { registry.assignments.await().modelId(descriptor) },
         // Exactly where a request record exists: a task or schedule tick is not part of a request,
         // so this is null rather than an id that joins to nothing.
         requestId = (initiator as? Execution.Requested)?.logicalId?.let { OriginRecord.ID(it.toExternal()) },

@@ -45,7 +45,7 @@ class AuditRegistryTest {
 
     private class Fixture {
         context(server: ServerRuntime)
-        suspend fun deploy(vararg serializers: KSerializer<*>) = TestServer.registry.register(serializers.toList())
+        suspend fun deploy(vararg serializers: KSerializer<*>) = TestServer.registry.register(serializers.map { it.descriptor })
 
         context(server: ServerRuntime)
         suspend fun registry() = TestServer.registry.load()
@@ -80,7 +80,7 @@ class AuditRegistryTest {
         deploy(VersionedV1.serializer())
 
         val registry = registry()
-        val modelId = registry.modelId("Versioned")
+        val modelId = registry.modelId(VersionedV1.serializer().descriptor)
         assertEquals(mapOf("a" to ModelFieldId(0)), registry.fields(modelId))
     }
 
@@ -99,7 +99,7 @@ class AuditRegistryTest {
         deploy(VersionedV2.serializer())
 
         val registry = registry()
-        val modelId = registry.modelId("Versioned")
+        val modelId = registry.modelId(VersionedV1.serializer().descriptor)
         assertEquals(mapOf("a" to ModelFieldId(0), "b" to ModelFieldId(1)), registry.fields(modelId))
     }
 
@@ -114,7 +114,7 @@ class AuditRegistryTest {
         deploy(VersionedV3.serializer())
 
         val registry = registry()
-        val modelId = registry.modelId("Versioned")
+        val modelId = registry.modelId(VersionedV1.serializer().descriptor)
         assertEquals(
             mapOf("a" to ModelFieldId(0), "b" to ModelFieldId(1), "renamed" to ModelFieldId(2)),
             registry.fields(modelId),
@@ -127,8 +127,8 @@ class AuditRegistryTest {
         deploy(Patient.serializer(), Doctor.serializer())
 
         val registry = registry()
-        val patient = registry.modelId(Patient.serializer().descriptor.serialName)
-        val doctor = registry.modelId(Doctor.serializer().descriptor.serialName)
+        val patient = registry.modelId(Patient.serializer().descriptor)
+        val doctor = registry.modelId(Doctor.serializer().descriptor)
         assertTrue(patient != doctor, "the two models shared an id")
         assertEquals(setOf("name"), registry.fields(doctor).keys)
         assertTrue("doctor" in registry.fields(patient).keys, "the parent still records that a doctor was disclosed")
@@ -158,8 +158,8 @@ class AuditRegistryTest {
         deploy(TypedKeyed.serializer(), DoublyTypedKeyed.serializer())
 
         val registry = registry()
-        assertEquals(setOf("value"), registry.fields(registry.modelId(TypedKeyed.serializer().descriptor.serialName)).keys)
-        assertEquals(setOf("value"), registry.fields(registry.modelId(DoublyTypedKeyed.serializer().descriptor.serialName)).keys)
+        assertEquals(setOf("value"), registry.fields(registry.modelId(TypedKeyed.serializer().descriptor)).keys)
+        assertEquals(setOf("value"), registry.fields(registry.modelId(DoublyTypedKeyed.serializer().descriptor)).keys)
     }
 
     @Test
@@ -211,6 +211,6 @@ class AuditRegistryTest {
     @Test
     fun `an unregistered model fails loudly rather than being recorded as unknown`() = onServer {
         deploy(VersionedV1.serializer())
-        assertFailsWith<IllegalStateException> { registry().modelId("NeverDeployed") }
+        assertFailsWith<IllegalStateException> { registry().modelId(Doctor.serializer().descriptor) }
     }
 }

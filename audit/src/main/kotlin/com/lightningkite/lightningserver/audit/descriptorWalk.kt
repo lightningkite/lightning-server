@@ -107,7 +107,8 @@ private class FieldPathWalk {
             StructureKind.CLASS, StructureKind.OBJECT -> members(descriptor, "$path.")
             StructureKind.LIST -> descend(descriptor.getElementDescriptor(0), "$path[]")
             StructureKind.MAP -> descend(descriptor.getElementDescriptor(1), "$path{}")
-            PolymorphicKind.SEALED -> descriptor.auditChildren()
+            PolymorphicKind.SEALED -> descriptor
+                .auditChildren()
                 .forEach { members(it, "$path(${it.auditSerialName}).") }
 
             else -> {}

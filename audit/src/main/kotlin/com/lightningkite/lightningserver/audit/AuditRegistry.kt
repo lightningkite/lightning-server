@@ -13,8 +13,8 @@ import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.all
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.flow.toList
-import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.serializer
 import kotlin.uuid.Uuid
 
@@ -79,16 +79,19 @@ public class AuditRegistry(
         internal val modelIds: Map<SerialName, ModelTypeId>,
         internal val bitIndices: Map<ModelTypeId, Map<String, ModelFieldId>>,
     ) {
-        public fun modelId(serialName: SerialName): ModelTypeId = modelIds[serialName] ?: throw IllegalStateException(
-            // Claude: an empty registry means assignment never ran, which needs a different fix.
-            if (modelIds.isEmpty()) "The audit registry is empty, so \"$serialName\" — and every other " +
-                "audited model — has no entry. Bit assignment never ran. Check that AuditCore is " +
-                "included in the server definition, not merely constructed, and that pre-deploy tasks " +
-                "run before serving."
-            else
-                "Audited model \"$serialName\" has no registry entry, so its disclosure cannot be recorded. " +
-                    "It reached a client through a serializer the deploy-time scan could not resolve statically."
-        )
+        public fun modelId(descriptor: SerialDescriptor): ModelTypeId {
+            val serialName = descriptor.auditSerialName
+            return modelIds[serialName] ?: throw IllegalStateException(
+                // Claude: an empty registry means assignment never ran, which needs a different fix.
+                if (modelIds.isEmpty()) "The audit registry is empty, so \"$serialName\" — and every other " +
+                    "audited model — has no entry. Bit assignment never ran. Check that AuditCore is " +
+                    "included in the server definition, not merely constructed, and that pre-deploy tasks " +
+                    "run before serving."
+                else
+                    "Audited model \"$serialName\" has no registry entry, so its disclosure cannot be recorded. " +
+                        "It reached a client through a serializer the deploy-time scan could not resolve statically."
+            )
+        }
 
         internal fun bitIndexOrNull(modelId: ModelTypeId, fieldPath: String): ModelFieldId? = bitIndices[modelId]?.get(fieldPath)
 
@@ -108,7 +111,7 @@ public class AuditRegistry(
     private val assignTask: PreDeployTask = path.path("assign-audit-bits") bind PreDeployTask(
         dependencies = { listOf(models.preDeployTask, fields.preDeployTask) },
     ) {
-        register(engine.usedTypes().filter { it.descriptor.isAudited })
+        register(engine.usedTypes().map { it.descriptor }.filter { it.isAudited })
     }
 
     context(server: Engine)
@@ -126,7 +129,7 @@ public class AuditRegistry(
      * deploy is a no-op.
      */
     context(server: Engine)
-    internal suspend fun register(audited: List<KSerializer<*>>) {
+    internal suspend fun register(audited: List<SerialDescriptor>) {
         audited.forEach(::requireUuidKeyed)
 
         val existing = load()
@@ -134,19 +137,19 @@ public class AuditRegistry(
         val modelIds = existing.modelIds.toMutableMap()
         var nextModelId = (existing.modelIds.values.maxOfOrNull { it.raw } ?: -1) + 1
 
-        val newModels = audited.map { it.descriptor.auditSerialName }.filter { it !in modelIds }.map { serialName ->
+        val newModels = audited.map { it.auditSerialName }.filter { it !in modelIds }.map { serialName ->
             AuditModelRegistration(_id = serialName, modelId = ModelTypeId(nextModelId++))
                 .also { modelIds[serialName] = it.modelId }
         }
         if (newModels.isNotEmpty()) models().insert(newModels)
 
-        val newFields = audited.flatMap { serializer ->
-            val serialName = serializer.descriptor.auditSerialName
+        val newFields = audited.flatMap { descriptor ->
+            val serialName = descriptor.auditSerialName
             val modelId = modelIds.getValue(serialName)
             val assigned = existing.fields(modelId)
             var nextBit = (assigned.maxOfOrNull { it.value.raw } ?: -1) + 1
 
-            serializer.descriptor.auditFieldPaths().filter { it !in assigned }.map { path ->
+            descriptor.auditFieldPaths().filter { it !in assigned }.map { path ->
                 if (nextBit >= FieldIdentifierSet.CAPACITY) throw IllegalStateException(
                     "Audited model \"$serialName\" has run out of field bits at \"$path\": " +
                         "${assigned.size} of ${FieldIdentifierSet.CAPACITY} are already assigned. Indices are never " +
@@ -193,8 +196,7 @@ public class AuditRegistry(
      * identifier column is written more than anything else in the system and needs to stay sixteen
      * bytes wide rather than a string a backend will index poorly.
      */
-    private fun requireUuidKeyed(serializer: KSerializer<*>) {
-        val descriptor = serializer.descriptor
+    private fun requireUuidKeyed(descriptor: SerialDescriptor) {
         val serialName = descriptor.auditSerialName
         val idIndex = (0 until descriptor.elementsCount).firstOrNull { descriptor.getElementName(it) == "_id" }
             ?: throw IllegalStateException(
