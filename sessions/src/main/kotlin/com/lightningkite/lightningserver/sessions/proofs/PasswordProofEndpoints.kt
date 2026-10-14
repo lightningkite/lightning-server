@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.*
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.sessions.*
 import com.lightningkite.lightningserver.sessions.proofs.extensions.constrainAttemptRate
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
@@ -31,7 +32,7 @@ public class PasswordProofEndpoints(
     override val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
     override val proofExpiration: Duration = 1.hours,
     signals: (context(ServerRuntime) (Table<PasswordSecret>) -> Table<PasswordSecret>)? = null,
-    private val evaluatePassword: (String) -> Unit = { },
+    private val evaluatePassword: suspend context(ServerRuntime) (String) -> Unit = { },
 ) : ServerBuilder(), DirectProofMethod {
 
     init {
