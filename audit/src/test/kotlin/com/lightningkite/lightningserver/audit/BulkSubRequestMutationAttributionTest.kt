@@ -61,9 +61,9 @@ import kotlin.uuid.Uuid
  * gives it its own query parameters while sharing the carrier's `cache`, and its `Execution.Http` has
  * its own `id` while inheriting the carrier's `rootExecution`. So if a sub-request
  * can authenticate where the carrier did not, everything the socket tests found follows here too —
- * which is why the fix is not about sockets: `rootExecutionId` names the outermost execution, and the
- * outermost execution is not necessarily the one that authenticated anybody. `attributedTo` is the
- * column that answers "who", and these tests assert it alongside the root so the two stay distinct.
+ * which is why the fix is not about sockets: the root names the outermost execution, and the
+ * outermost execution is not necessarily the one that authenticated anybody. A mutation's `origin` is
+ * what answers "who", and these tests assert it alongside the root so the two stay distinct.
  */
 @OptIn(InternalLightningServerApi::class, EngineApi::class)
 class BulkSubRequestMutationAttributionTest {
@@ -81,7 +81,7 @@ class BulkSubRequestMutationAttributionTest {
     private suspend fun requests() = BulkTestServer.audit.originsTable().find(Condition.Always).toList()
 
     context(server: ServerRuntime)
-    private suspend fun mutations() = BulkTestServer.mutationLog.mutations().find(Condition.Always).toList()
+    private suspend fun mutations() = BulkTestServer.mutations().find(Condition.Always).toList()
 
     private fun List<OriginRecord<OriginRecord.StandardRequestInfo>>.rowFor(id: OriginRecord.ID?): OriginRecord<OriginRecord.StandardRequestInfo>? = firstOrNull { it._id == id }
     private fun List<OriginRecord<OriginRecord.StandardRequestInfo>>.rowFor(id: ExecutionId?): OriginRecord<OriginRecord.StandardRequestInfo>? = firstOrNull { it._id.raw == id }
@@ -139,13 +139,7 @@ class BulkSubRequestMutationAttributionTest {
 
     // ===================== a direct mutation from a sub-request =====================
 
-    /**
-     * The two columns pulling apart, on one row, with no socket involved.
-     *
-     * `attributedTo` names the sub-request, which authenticated; `rootExecutionId` names the bulk
-     * carrier, which did not. Pinned together so neither can later be collapsed into the other on the
-     * grounds that they usually agree.
-     */
+    /** The origin names the sub-request, which authenticated; its root names the bulk carrier, which did not. */
     @Test
     fun `a direct mutation from an authenticated sub-request attributes to the person while its root stays anonymous`() =
         probe { engine ->
@@ -156,34 +150,26 @@ class BulkSubRequestMutationAttributionTest {
             val mutation = mutations().single()
             assertEquals(id.toString(), mutation.recordId)
 
-            val byAttribution = requests.rowFor(mutation.attributedTo)
-            assertNotNull(byAttribution, "attributedTo ${mutation.attributedTo} names no request row")
-            assertEquals("/mutate", byAttribution.endpoint, "attributedTo should name the sub-request's own row")
+            val byOrigin = requests.rowFor(mutation.origin)
+            assertNotNull(byOrigin, "origin ${mutation.origin} names no request row")
+            assertEquals("/mutate", byOrigin.endpoint, "origin should name the sub-request's own row")
             assertTrue(
-                byAttribution.request?.subjectId == user,
-                "the sub-request's own row does not name the person: ${byAttribution.request?.subjectId}",
+                byOrigin.request?.subjectId == user,
+                "the sub-request's own row does not name the person: ${byOrigin.request?.subjectId}",
             )
 
-            val byRoot = requests.rowFor(mutation.rootExecutionId)
-            assertNotNull(byRoot, "rootExecutionId ${mutation.rootExecutionId} names no request row")
+            val byRoot = requests.rowFor(byOrigin.root)
+            assertNotNull(byRoot, "root ${byOrigin.root} names no request row")
             assertEquals("/meta/bulk", byRoot.endpoint, "the root should be the carrying bulk request")
             assertNull(
                 byRoot.request?.subjectId,
                 "the root is the causal head, which here is the anonymous carrier; it must not be " +
                     "what an auditor reads to name the person",
             )
-            assertTrue(
-                byAttribution._id != byRoot._id,
-                "the whole reason for two columns is that they can differ, and here they must",
-            )
+            assertTrue(byOrigin._id != byRoot._id, "the origin and the root can differ, and here they must")
         }
 
-    /**
-     * The asymmetry with a sub-socket, and the one that matters for a fix: HTTP has no third
-     * identifier. `logicalId` is the execution itself for `Http` and the socket for `WebSocket`,
-     * so a sub-request's row is keyed by its own `executionId` — the id the mutation already carries
-     * in `executionId` as well as in `requestId`.
-     */
+    /** Unlike a socket's phases, an HTTP execution is its own origin. */
     @Test
     fun `a bulk sub-request's row is keyed by its own executionId`() = probe { engine ->
         engine.handleRoot(bulkOf("/mutate?${credential()}", Uuid.random().toString()), engine.newId())
@@ -191,13 +177,8 @@ class BulkSubRequestMutationAttributionTest {
         val mutation = mutations().single()
         assertEquals(
             mutation.executionId,
-            mutation.requestId?.raw,
+            mutation.origin.raw,
             "an HTTP execution's request row is keyed by the execution itself, unlike a socket's",
-        )
-        assertEquals(
-            mutation.executionId,
-            mutation.attributedTo.raw,
-            "an execution that has a request row of its own anchors to that row",
         )
         assertNotNull(requests().rowFor(mutation.executionId))
     }
@@ -208,14 +189,10 @@ class BulkSubRequestMutationAttributionTest {
      * The socket file's hardest case, reached through plain HTTP — which is what makes this a
      * framework-wide property rather than a websocket quirk.
      *
-     * A task has no request row of its own, so `requestId` is null and there is exactly one column
-     * left to trace it by. That column must not be `rootExecutionId`: the root is the head of the
-     * *causal* chain, which here is the bulk carrier — an execution that authenticated nobody,
-     * because the credential arrived on the sub-request's own query parameters. Anchoring to the
-     * causal head would answer "anonymous" for a change a known person made.
-     *
-     * `attributedTo` anchors to the innermost execution that had a request row, and a task inherits
-     * its launcher's anchor through the serialized `Execution.Task.attributedTo`, so it survives the queue.
+     * The root is the head of the *causal* chain, which here is the bulk carrier — an execution that
+     * authenticated nobody, because the credential arrived on the sub-request's own query parameters.
+     * A task inherits its launcher's origin through the serialized `Execution.Task.origin`, so the
+     * person survives the queue.
      */
     @Test
     fun `a task launched from an authenticated bulk sub-request attributes to the person who made it`() =
@@ -226,22 +203,20 @@ class BulkSubRequestMutationAttributionTest {
 
             val mutation = mutations().single()
             assertEquals(id.toString(), mutation.recordId)
-            assertEquals("task", mutation.initiatorKind, "the task ran inline rather than as its own execution")
-            assertNull(mutation.requestId, "a task has no request row, so attributedTo is the only handle")
+            assertTrue(mutation.executionId != mutation.origin.raw, "the task ran inline rather than as its own execution")
 
             val requests = requests()
-            val byAttribution = requests.rowFor(mutation.attributedTo)
-            assertNotNull(byAttribution, "attributedTo ${mutation.attributedTo} names no request row")
-            assertEquals("/mutate-task", byAttribution.endpoint, "the task inherited the sub-request's anchor")
+            val byOrigin = requests.rowFor(mutation.origin)
+            assertNotNull(byOrigin, "origin ${mutation.origin} names no request row")
+            assertEquals("/mutate-task", byOrigin.endpoint, "the task inherited the sub-request's origin")
             assertTrue(
-                byAttribution.request?.subjectId == user,
+                byOrigin.request?.subjectId == user,
                 "a change a person made through a bulk sub-request must name that person: " +
-                    "${byAttribution.request?.subjectId}",
+                    "${byOrigin.request?.subjectId}",
             )
 
-            // And the column that used to be the only handle still answers the causal question,
-            // still lands on the carrier, and is still anonymous.
-            val byRoot = requests.rowFor(mutation.rootExecutionId)
+            // And the causal root still lands on the carrier, which is still anonymous.
+            val byRoot = requests.rowFor(byOrigin.root)
             assertNotNull(byRoot)
             assertEquals("/meta/bulk", byRoot.endpoint)
             assertNull(byRoot.request?.subjectId)
@@ -271,17 +246,15 @@ class BulkSubRequestMutationAttributionTest {
 
             val mutation = mutations().single()
             val requests = requests()
-            val byRoot = requests.rowFor(mutation.rootExecutionId)
+            val byOrigin = requests.rowFor(mutation.origin)
+            assertNotNull(byOrigin)
+            assertTrue(byOrigin.request?.subjectId == user)
+            val byRoot = requests.rowFor(byOrigin.root)
             assertNotNull(byRoot)
             assertTrue(
                 byRoot.request?.subjectId == user,
                 "an authenticated carrier should make the whole tree attributable: ${byRoot.request?.subjectId}",
             )
-            // With the credential on the carrier the two questions have the same answer, which is
-            // why a single column looked sufficient until an inner execution held the credential.
-            val byAttribution = requests.rowFor(mutation.attributedTo)
-            assertNotNull(byAttribution)
-            assertTrue(byAttribution.request?.subjectId == user)
         }
 }
 
@@ -316,7 +289,7 @@ private object BulkTestServer : ServerBuilder() {
     val cache = setting("cache", Cache.Settings())
 
     val audit = path.path("audit") include AuditCore(database)
-    val mutationLog = path.path("audit-mutation") include MutationLog(audit)
+    val mutations = database.registerTable("AuditMutation", MutationRecord.serializer())
 
     init {
         registerBasicMediaTypeCoders()
@@ -336,7 +309,7 @@ private object BulkTestServer : ServerBuilder() {
     )
 
     val mutateTask: Task<Uuid> = path.path("mutate-task-impl") bind Task(Uuid.serializer()) { id ->
-        mutationLog.mutationLogged(patients()).insert(listOf(Patient(_id = id, name = "FromTask", ssn = "t")))
+        patients().mutationLogged(audit.origins, audit.registry, mutations).insert(listOf(Patient(_id = id, name = "FromTask", ssn = "t")))
     }
 
     /** POST so the record id travels in the body, leaving the query string to the credential. */
@@ -344,7 +317,7 @@ private object BulkTestServer : ServerBuilder() {
         summary = "Mutate",
         auth = noAuth,
         implementation = { id: Uuid ->
-            mutationLog.mutationLogged(patients()).insert(listOf(Patient(_id = id, name = "FromRequest", ssn = "s")))
+            patients().mutationLogged(audit.origins, audit.registry, mutations).insert(listOf(Patient(_id = id, name = "FromRequest", ssn = "s")))
             "ok"
         },
     )

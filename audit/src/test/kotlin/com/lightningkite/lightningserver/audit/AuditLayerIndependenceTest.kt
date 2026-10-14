@@ -36,7 +36,6 @@ class AuditLayerIndependenceTest {
         assertFalse("AuditDisclosure" in tables, "the core dragged in the disclosure log")
         assertFalse("AuditDataAccess" in tables, "the core dragged in the data access log")
         assertFalse("AuditAuthEvent" in tables, "the core dragged in the auth event log")
-        assertFalse("AuditMutation" in tables, "the core dragged in the mutation log")
     }
 
     /** The combination a deployment most likely wants: disclosure auditing without the firehose. */
@@ -68,39 +67,6 @@ class AuditLayerIndependenceTest {
     }
 
     /**
-     * Tampering and query abuse are unrelated investigations with unrelated volumes, so a deployment
-     * that wants to know who changed a record should not be made to carry a row per read to get it.
-     */
-    @Test
-    fun `the mutation log can be included alone`() {
-        val tables = tablesOf(object : ServerBuilder() {
-            val database = setting("database", Database.Settings())
-            val audit = path.path("audit") include AuditCore(database)
-            val mutations = path.path("mutation") include MutationLog(audit)
-        })
-
-        assertTrue("AuditMutation" in tables)
-        assertFalse("AuditDataAccess" in tables, "the mutation log pulled in the expensive layer")
-        assertFalse("AuditDisclosure" in tables)
-    }
-
-    /** Same guard as every other layer: a doubled writer means two rows per change. */
-    @Test
-    fun `attaching the mutation log twice to one core is refused`() {
-        try {
-            object : ServerBuilder() {
-                val database = setting("database", Database.Settings())
-                val audit = path.path("audit") include AuditCore(database)
-                val mutations = path.path("mutation") include MutationLog(audit)
-                val again = path.path("again") include MutationLog(audit)
-            }.build()
-            fail("a second MutationLog was accepted, silently doubling every mutation row")
-        } catch (e: IllegalStateException) {
-            assertTrue("already attached" in (e.message ?: ""), "unhelpful message: ${e.message}")
-        }
-    }
-
-    /**
      * Attaching a layer twice must fail loudly rather than double every row it writes.
      *
      * Every writer here appends to the builder's interceptor list without deduplication, so a second
@@ -128,8 +94,8 @@ class AuditLayerIndependenceTest {
      * Installing every layer by hand yields every table, and nothing extra.
      *
      * This replaced a test of the all-in-one bundle, which was cut: a helper that installs
-     * everything hides which layers a deployment is actually paying for, and the data access and
-     * mutation logs are far too voluminous to acquire by reflex. Each layer is now named at the
+     * everything hides which layers a deployment is actually paying for, and the data access log
+     * is far too voluminous to acquire by reflex. Each layer is now named at the
      * point of inclusion, which is also what makes the list below reviewable.
      */
     @Test
@@ -140,11 +106,10 @@ class AuditLayerIndependenceTest {
             val disclosure = path.path("audit-disclosure") include DisclosureLog(audit)
             val dataAccess = path.path("audit-data-access") include DataAccessLog(audit)
             val authEvents = path.path("audit-auth") include AuthEventLog(audit)
-            val mutations = path.path("audit-mutation") include MutationLog(audit)
         })
 
         assertEquals(
-            setOf("AuditRequest", "AuditDisclosure", "AuditDataAccess", "AuditAuthEvent", "AuditMutation"),
+            setOf("AuditRequest", "AuditDisclosure", "AuditDataAccess", "AuditAuthEvent"),
             tables.filter { name -> name.startsWith("Audit") && !name.contains("Registration") }.toSet(),
         )
     }

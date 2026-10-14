@@ -59,20 +59,15 @@ import kotlin.uuid.Uuid
 /**
  * Can a change made under a WebSocket be traced back to a person?
  *
- * Turning a [MutationRecord] into a person means looking up its `attributedTo` in [OriginRecord] and
- * reading `principal`. For HTTP that join is trivially sound — the row is keyed by the request's own
+ * Turning a [MutationRecord] into a person means looking up its `origin` in [OriginRecord] and
+ * reading `subjectId`. For HTTP that join is trivially sound — the row is keyed by the request's own
  * execution id. For a socket it is not obvious: [OriginRecording] keys the row by the
  * *socket* id rather than by the phase execution that wrote the change, and a virtual socket
  * multiplexed inside a physical one gets its own socket id and its own row.
  *
  * These tests answer that by driving real sockets through the real interceptor chain and then
- * performing exactly the join an auditor would: `requests().find { it._id == mutation.attributedTo }`,
- * and from a sub-socket's row, `parentRequestId` to the connection carrying it.
- *
- * Not `rootExecutionId`. The root is a *causal* key — the execution at the head of the chain — and a
- * socket phase follows the same parentage rules as everything else: one nothing dispatched is its own
- * root. Phases are linked to their socket by `socketId`, not by parentage, so a root phase names no
- * request row. The tests assert what the root actually is alongside the join, so the two stay apart.
+ * performing exactly the join an auditor would: `requests().find { it._id == mutation.origin }`,
+ * and from a sub-socket's row, `parent` to the connection carrying it.
  */
 @OptIn(InternalLightningServerApi::class)
 class WebSocketMutationAttributionTest {
@@ -90,7 +85,7 @@ class WebSocketMutationAttributionTest {
     private suspend fun requests() = TestServer.audit.originsTable().find(Condition.Always).toList()
 
     context(server: ServerRuntime)
-    private suspend fun mutations() = TestServer.mutationLog.mutations().find(Condition.Always).toList()
+    private suspend fun mutations() = TestServer.mutations().find(Condition.Always).toList()
 
     private fun authHeaders() = HttpHeaders { add(HttpHeader.Authorization, user.toString()) }
 
@@ -104,7 +99,7 @@ class WebSocketMutationAttributionTest {
     // ===================== 1. a plain socket, mutating directly =====================
 
     @Test
-    fun `a mutation made by a socket message joins back to the person through both ids`() = probe { engine ->
+    fun `a mutation made by a socket message joins back to the person`() = probe { engine ->
         val socket = engine.openSocket(TestServer.socket, authHeaders())
         val id = Uuid.random()
         socket.send("direct:$id")
@@ -112,19 +107,15 @@ class WebSocketMutationAttributionTest {
         val mutation = mutations().single()
         assertEquals(id.toString(), mutation.recordId)
 
+        assertEquals(socket.request.socketId.originId, mutation.origin, "the row is keyed by the socket, not the phase")
+
         val requests = requests()
-        val byRequestId = requests.rowFor(mutation.requestId)
-        assertNotNull(byRequestId, "requestId ${mutation.requestId} names no request row; rows are ${requests.map { it._id }}")
-
-        assertEquals(socket.request.socketId.originId, mutation.requestId, "the row is keyed by the socket, not the phase")
-
-        val byAttribution = requests.rowFor(mutation.attributedTo)
-        assertNotNull(byAttribution, "attributedTo ${mutation.attributedTo} names no request row")
+        val byOrigin = requests.rowFor(mutation.origin)
+        assertNotNull(byOrigin, "origin ${mutation.origin} names no request row; rows are ${requests.map { it._id }}")
         assertTrue(
-            byAttribution.request?.subjectId == user,
-            "the request the change attributes to does not name the authenticated user: ${byAttribution.request?.subjectId}",
+            byOrigin.request?.subjectId == user,
+            "the request the change attributes to does not name the authenticated user: ${byOrigin.request?.subjectId}",
         )
-        assertEquals(mutation.executionId, mutation.rootExecutionId, "a message phase nothing dispatched is its own root")
     }
 
     // ===================== 2. a plain socket, mutating from a task =====================
@@ -137,24 +128,16 @@ class WebSocketMutationAttributionTest {
         engine.drainTasks()
 
         val mutation = mutations().single()
-        assertEquals("task", mutation.initiatorKind, "the task ran inline rather than as its own execution")
-        assertNull(mutation.requestId, "a task has no request row of its own to point at")
+        assertTrue(mutation.executionId != mutation.origin.raw, "the task ran inline rather than as its own execution")
+        assertEquals(socket.request.socketId.originId, mutation.origin, "the task should attribute to the socket it descends from")
 
         val requests = requests()
-        val byAttribution = requests.rowFor(mutation.attributedTo)
-        assertNotNull(byAttribution, "attributedTo ${mutation.attributedTo} names no request row; rows are ${requests.map { it._id }}")
-        assertEquals(
-            socket.request.socketId.originId,
-            byAttribution._id,
-            "the task should attribute to the socket it descends from",
-        )
+        val byOrigin = requests.rowFor(mutation.origin)
+        assertNotNull(byOrigin, "origin ${mutation.origin} names no request row; rows are ${requests.map { it._id }}")
         assertTrue(
-            byAttribution.request?.subjectId == user,
-            "the request the change attributes to does not name the authenticated user: ${byAttribution.request?.subjectId}",
+            byOrigin.request?.subjectId == user,
+            "the request the change attributes to does not name the authenticated user: ${byOrigin.request?.subjectId}",
         )
-        // The anchor survived the queue: it is carried in the serialized Execution.Task, not derived.
-        // The root is the message phase that launched the task, which is its own root.
-        assertEquals(mutation.causedBy, mutation.rootExecutionId)
     }
 
     // ===================== 3. a virtual socket multiplexed inside a physical one =====================
@@ -170,26 +153,17 @@ class WebSocketMutationAttributionTest {
         assertEquals(id.toString(), mutation.recordId)
 
         val requests = requests()
-        val byRequestId = requests.rowFor(mutation.requestId)
-        assertNotNull(byRequestId, "requestId ${mutation.requestId} names no request row; rows are ${requests.map { it._id to it.endpoint }}")
-
+        val byOrigin = requests.rowFor(mutation.origin)
+        assertNotNull(byOrigin, "origin ${mutation.origin} names no request row; rows are ${requests.map { it._id to it.endpoint }}")
+        assertEquals("/socket", byOrigin.endpoint, "a sub-socket attributes to its own row, not the carrier's")
         assertEquals(
             physical.request.socketId.toExternal(),
-            byRequestId.parent,
+            byOrigin.parent,
             "a virtual socket's row should be parented to the physical connection carrying it",
         )
-        assertEquals(
-            mutation.causedBy,
-            mutation.rootExecutionId,
-            "a virtual socket's message is rooted at the physical socket's phase that carried it",
-        )
-
-        val byAttribution = requests.rowFor(mutation.attributedTo)
-        assertNotNull(byAttribution, "attributedTo ${mutation.attributedTo} names no request row")
-        assertEquals("/socket", byAttribution.endpoint, "a sub-socket attributes to its own row, not the carrier's")
         assertTrue(
-            byAttribution.request?.subjectId == user,
-            "the request the change attributes to does not name the authenticated user: ${byAttribution.request?.subjectId}",
+            byOrigin.request?.subjectId == user,
+            "the request the change attributes to does not name the authenticated user: ${byOrigin.request?.subjectId}",
         )
     }
 
@@ -203,23 +177,18 @@ class WebSocketMutationAttributionTest {
             engine.drainTasks()
 
             val mutation = mutations().single()
-            assertEquals("task", mutation.initiatorKind)
-            assertNull(mutation.requestId)
+            assertTrue(mutation.executionId != mutation.origin.raw, "the task ran inline rather than as its own execution")
 
             val requests = requests()
-            val byAttribution = requests.rowFor(mutation.attributedTo)
+            val byOrigin = requests.rowFor(mutation.origin)
             assertNotNull(
-                byAttribution,
-                "attributedTo ${mutation.attributedTo} names no request row; rows are ${requests.map { it._id to it.endpoint }}",
+                byOrigin,
+                "origin ${mutation.origin} names no request row; rows are ${requests.map { it._id to it.endpoint }}",
             )
-            assertEquals(
-                "/socket",
-                byAttribution.endpoint,
-                "the anchor a task inherits is the sub-socket's, not the carrier the root names",
-            )
+            assertEquals("/socket", byOrigin.endpoint, "the origin a task inherits is the sub-socket's, not the carrier's")
             assertTrue(
-                byAttribution.request?.subjectId == user,
-                "the request the change attributes to does not name the authenticated user: ${byAttribution.request?.subjectId}",
+                byOrigin.request?.subjectId == user,
+                "the request the change attributes to does not name the authenticated user: ${byOrigin.request?.subjectId}",
             )
         }
 
@@ -256,7 +225,7 @@ class WebSocketMutationAttributionTest {
     /**
      * Who did it, apart from what carried it, on one row.
      *
-     * `attributedTo` names the sub-socket, which authenticated; its row's parent is the carrier,
+     * The origin names the sub-socket, which authenticated; its row's parent is the carrier,
      * which did not. The carrier must not be what an auditor reads to name the person.
      */
     @Test
@@ -269,32 +238,25 @@ class WebSocketMutationAttributionTest {
             val requests = requests()
             val mutation = mutations().single()
 
-            val byAttribution = requests.rowFor(mutation.attributedTo)
-            assertNotNull(byAttribution, "attributedTo ${mutation.attributedTo} names no request row")
-            assertEquals("/socket", byAttribution.endpoint)
+            val byOrigin = requests.rowFor(mutation.origin)
+            assertNotNull(byOrigin, "origin ${mutation.origin} names no request row")
+            assertEquals("/socket", byOrigin.endpoint)
             assertTrue(
-                byAttribution.request?.subjectId == user,
-                "the sub-socket's own row does not name the person: ${byAttribution.request?.subjectId}",
+                byOrigin.request?.subjectId == user,
+                "the sub-socket's own row does not name the person: ${byOrigin.request?.subjectId}",
             )
 
-            val carrier = requests.rowFor(byAttribution.parent)
+            val carrier = requests.rowFor(byOrigin.parent)
             assertNotNull(carrier, "the sub-socket's row names no parent row")
             assertEquals("/multiplex", carrier.endpoint)
             assertNull(carrier.request?.subjectId, "the carrier is anonymous, so it must not be what names the person")
         }
 
     /**
-     * The hardest case, and the one `attributedTo` exists for.
-     *
-     * A task has no request row of its own, so `requestId` is null and there is exactly one column
-     * left to trace it by. That column must not be `rootExecutionId`: the root is the head of the
-     * *causal* chain, which here is the multiplex carrier's phase — an execution that authenticated
-     * nobody, because the credential arrived on the sub-socket's own query parameters. Anchoring to
-     * the causal head would therefore answer "anonymous" for a change a known person made.
-     *
-     * `attributedTo` anchors instead to the innermost execution that had a request row, and a task
-     * inherits its launcher's anchor through the serialized `Execution.Task.attributedTo` — so it survives the
-     * queue, which is the only reason it works on a serverless engine at all.
+     * The hardest case: the credential arrived on the sub-socket's own query parameters, so the
+     * carrier names nobody. A task inherits its launcher's origin through the serialized
+     * `Execution.Task.origin`, so the person survives the queue, which is the only reason this works
+     * on a serverless engine at all.
      */
     @Test
     fun `a task launched from an authenticated sub-socket attributes to the person who opened it`() =
@@ -305,21 +267,20 @@ class WebSocketMutationAttributionTest {
             engine.drainTasks()
 
             val mutation = mutations().single()
-            assertEquals("task", mutation.initiatorKind)
-            assertNull(mutation.requestId, "a task has no request row, so attributedTo is the only handle")
+            assertTrue(mutation.executionId != mutation.origin.raw, "the task ran inline rather than as its own execution")
 
             val requests = requests()
-            val byAttribution = requests.rowFor(mutation.attributedTo)
-            assertNotNull(byAttribution, "attributedTo ${mutation.attributedTo} names no request row")
-            assertEquals("/socket", byAttribution.endpoint, "the task inherited the sub-socket's anchor")
+            val byOrigin = requests.rowFor(mutation.origin)
+            assertNotNull(byOrigin, "origin ${mutation.origin} names no request row")
+            assertEquals("/socket", byOrigin.endpoint, "the task inherited the sub-socket's origin")
             assertTrue(
-                byAttribution.request?.subjectId == user,
+                byOrigin.request?.subjectId == user,
                 "a change a person made through a multiplexed socket must name that person: " +
-                    "${byAttribution.request?.subjectId}",
+                    "${byOrigin.request?.subjectId}",
             )
 
             // And the carrier, reached through the sub-socket's parent row, is still anonymous.
-            val carrier = requests.rowFor(byAttribution.parent)
+            val carrier = requests.rowFor(byOrigin.parent)
             assertNotNull(carrier)
             assertEquals("/multiplex", carrier.endpoint)
             assertNull(carrier.request?.subjectId)
@@ -330,9 +291,8 @@ class WebSocketMutationAttributionTest {
      * and nothing can find it — which is what happened when `subConnection` drew separate ids for a
      * virtual socket's connect and its socket.
      *
-     * `causedBy` is not the link: a sub-socket's message phase is caused by the physical socket's
-     * phase that dispatched it. The row is keyed by the socket, and `requestId` and `attributedTo`
-     * name the socket, so they are what an auditor joins on.
+     * Parentage is not the link: a sub-socket's message phase is caused by the physical socket's
+     * phase that dispatched it. The row is keyed by the socket, and `origin` names the socket.
      */
     @Test
     fun `a virtual sub-socket's own request row is reachable from what it does`() = probe { engine ->
@@ -343,9 +303,7 @@ class WebSocketMutationAttributionTest {
         val mutation = mutations().single()
         val subRow = requests().single { it.endpoint == "/socket" }
 
-        assertEquals(subRow._id, mutation.requestId, "the sub-socket's row is unreachable from its own work")
-        assertEquals(subRow._id, mutation.attributedTo)
-        assertTrue(mutation.causedBy != subRow._id.raw, "a sub-socket's phase is caused by the carrier's phase")
+        assertEquals(subRow._id, mutation.origin, "the sub-socket's row is unreachable from its own work")
     }
 
     /** A virtual socket's row is its own, and its parent is the physical connection that carried it. */
@@ -359,7 +317,7 @@ class WebSocketMutationAttributionTest {
             val requests = requests()
             val mutation = mutations().single()
 
-            val subRow = requests.rowFor(mutation.requestId)
+            val subRow = requests.rowFor(mutation.origin)
             assertNotNull(subRow, "the virtual sub-socket has no request row of its own")
             assertEquals("/socket", subRow.endpoint, "the sub-socket's row should name the sub-socket's endpoint")
 
@@ -408,7 +366,7 @@ private object TestServer : ServerBuilder() {
     val cache = setting("cache", Cache.Settings())
 
     val audit = path.path("audit") include AuditCore(database)
-    val mutationLog = path.path("audit-mutation") include MutationLog(audit)
+    val mutations = database.registerTable("AuditMutation", MutationRecord.serializer())
 
     init {
         registerBasicMediaTypeCoders()
@@ -429,7 +387,7 @@ private object TestServer : ServerBuilder() {
 
     /** The indirect path: the change happens in an execution of its own, with no request behind it. */
     val mutateTask: Task<Uuid> = path.path("mutate-task") bind Task(Uuid.serializer()) { id ->
-        mutationLog.mutationLogged(patients()).insert(listOf(Patient(_id = id, name = "FromTask", ssn = "t")))
+        patients().mutationLogged(audit.origins, audit.registry, mutations).insert(listOf(Patient(_id = id, name = "FromTask", ssn = "t")))
     }
 
     val socket = path.path("socket") bind WebSocketHandler<PathSpec0, Unit>(
@@ -438,7 +396,7 @@ private object TestServer : ServerBuilder() {
             val text = (frame as WebSocketFrame.Text).content
             val id = Uuid.parse(text.substringAfter(':'))
             when (text.substringBefore(':')) {
-                "direct" -> mutationLog.mutationLogged(patients())
+                "direct" -> patients().mutationLogged(audit.origins, audit.registry, mutations)
                     .insert(listOf(Patient(_id = id, name = "FromSocket", ssn = "s")))
 
                 "task" -> mutateTask(id)

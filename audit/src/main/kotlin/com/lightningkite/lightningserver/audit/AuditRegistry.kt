@@ -7,18 +7,15 @@ import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.engine
-import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.typed.DatabaseTableRegistration
 import com.lightningkite.lightningserver.typed.sdk.usedTypes
 import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.all
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.serializer
 import kotlin.uuid.Uuid
 
 public typealias SerialName = String
@@ -82,7 +79,9 @@ public class AuditRegistry(
         internal val modelIds: Map<SerialName, ModelTypeId>,
         internal val bitIndices: Map<ModelTypeId, Map<String, ModelFieldId>>,
     ) {
-        public fun modelId(descriptor: SerialDescriptor): ModelTypeId {
+        public fun modelIdOrNull(descriptor: SerialDescriptor): ModelTypeId? = modelIds[descriptor.auditSerialName]
+
+        public fun modelType(descriptor: SerialDescriptor): ModelTypeId {
             val serialName = descriptor.auditSerialName
             return modelIds[serialName] ?: throw IllegalStateException(
                 // Claude: an empty registry means assignment never ran, which needs a different fix.

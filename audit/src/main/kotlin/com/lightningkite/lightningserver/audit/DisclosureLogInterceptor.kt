@@ -1,15 +1,7 @@
 @file:OptIn(ExperimentalSerializationApi::class)
 
-package com.lightningkite.lightningserver.audit.disclosure
+package com.lightningkite.lightningserver.audit
 
-import com.lightningkite.lightningserver.audit.AuditRegistry
-import com.lightningkite.lightningserver.audit.DisclosureRecord
-import com.lightningkite.lightningserver.audit.FieldIdentifierSet
-import com.lightningkite.lightningserver.audit.ModelTypeId
-import com.lightningkite.lightningserver.audit.OriginRecording
-import com.lightningkite.lightningserver.audit.anythingAudited
-import com.lightningkite.lightningserver.audit.auditSerialName
-import com.lightningkite.lightningserver.audit.isAudited
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.generateFromServerClock
@@ -30,7 +22,7 @@ import kotlinx.serialization.modules.SerializersModule
 import kotlin.uuid.Uuid
 
 /**
- * Writes one [com.lightningkite.lightningserver.audit.DisclosureRecord] for every audited record that reaches a client.
+ * Writes one [DisclosureRecord] for every audited record that reaches a client.
  *
  * ## Fail-closed
  *
@@ -154,7 +146,7 @@ public class DisclosureLogInterceptor(
             val parent = structures.lastOrNull()
             structures += when {
                 effective.isAudited ->
-                    Structure(effective, path = "", DisclosureBuilder(registry.modelId(effective)), startsRecord = true)
+                    Structure(effective, path = "", DisclosureBuilder(registry.modelType(effective)), startsRecord = true)
                 parent?.descriptor?.kind is PolymorphicKind ->
                     Structure(effective, "${parent.path}(${effective.auditSerialName})", parent.disclosed, startsRecord = false)
                 else -> Structure(effective, parent?.elementPath ?: "", parent?.disclosed, startsRecord = false)

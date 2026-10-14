@@ -1,7 +1,6 @@
 package com.lightningkite.lightningserver.audit
 
-import com.lightningkite.lightningserver.audit.disclosure.DisclosureLogInterceptor
-import com.lightningkite.lightningserver.audit.disclosure.DisclosureLogInterceptor.Disclosure
+import com.lightningkite.lightningserver.audit.DisclosureLogInterceptor.Disclosure
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.serverRuntime
@@ -70,7 +69,7 @@ class DisclosureEncoderTest {
             return disclosure.disclosed.map { byBit.getValue(it) }.toSet()
         }
 
-        fun modelIdOf(serializer: KSerializer<*>): ModelTypeId = registry.modelId(serializer.descriptor)
+        fun modelIdOf(serializer: KSerializer<*>): ModelTypeId = registry.modelType(serializer.descriptor)
     }
 
     /** A `Patient` reduced to just the named fields, as `queryPartial` would return it. */

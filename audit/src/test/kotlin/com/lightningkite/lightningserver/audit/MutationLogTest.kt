@@ -1,643 +1,197 @@
 package com.lightningkite.lightningserver.audit
 
-import com.lightningkite.lightningserver.HttpMethod
-import com.lightningkite.lightningserver.InternalLightningServerApi
-import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.http.PathSegments
-import com.lightningkite.lightningserver.http.get
-import com.lightningkite.lightningserver.pathing.*
-import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.engine
-import com.lightningkite.lightningserver.runtime.execute
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.executePreDeployTasks
 import com.lightningkite.lightningserver.runtime.test.test
-import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
-import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.registerTable
-import com.lightningkite.services.cache.Cache
-import com.lightningkite.services.data.Unsafe
+import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.data.UuidV7
-import com.lightningkite.services.database.*
+import com.lightningkite.services.database.Condition
+import com.lightningkite.services.database.Database
+import com.lightningkite.services.database.EntryChange
+import com.lightningkite.services.database.HasId
+import com.lightningkite.services.database.TypedId
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlin.jvm.JvmInline
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
-import kotlin.test.fail
 import kotlin.uuid.Uuid
 
-/**
- * The mutation log answers "who changed this record, and to what" — the question the data access
- * log's recorded `Modification` describes only as intent.
- *
- * Two things here are load-bearing beyond "a row appears". The `Ignoring*` methods must record just
- * as completely as their effect-returning twins, or the log is circumventable by picking a different
- * method on the same interface; and the value those upgraded calls hand back must be indistinguishable
- * from what the method they replaced would have returned, or wrapping a table silently changes what
- * every caller sees.
- */
-@OptIn(InternalLightningServerApi::class)
 class MutationLogTest {
 
     object TestServer : ServerBuilder() {
         val database = setting("database", Database.Settings())
-        val cache = setting("cache", Cache.Settings())
-
-        val audit = path.path("audit") include AuditCore(database)
-        val mutationLog = path.path("audit-mutation") include MutationLog(audit)
-
-        init {
-            registerBasicMediaTypeCoders()
-        }
-
-        val patients = database.registerTable("Patient", Patient.serializer())
-
-        /** An undecorated twin, so a decorated call's return value has something to be equal to. */
-        val patientsUndecorated = database.registerTable("PatientUndecorated", Patient.serializer())
-
-        /** Not audited, so it must generate no rows at all. */
-        val plain = database.registerTable("Plain", PlainThing.serializer())
-
-        /** Not audited itself, but contains an audited model — the shape that must be refused. */
-        val wrappers = database.registerTable("Wrapper", PatientWrapper.serializer())
-
-        /**
-         * The registry assigns ids by scanning endpoint serializers, never tables, so an audited
-         * model needs an endpoint that can return it before it has an id at all. Present only for
-         * that — no test calls it.
-         */
-        val sample = Patient(_id = Uuid.parse("00000000-0000-0000-0000-0000000000b1"), name = "", ssn = "")
-
-        val patientEndpoint = path.path("patient").get bind ApiHttpHandler(
-            summary = "Patient",
-            auth = noAuth,
-            implementation = { _: Unit -> sample },
+        val origins = OriginRecording(database).also { it.install() }
+        val registry = path.path("registry") include AuditRegistry(
+            database.registerTable("AuditModelRegistration", AuditModelRegistration.serializer()),
+            database.registerTable("AuditFieldRegistration", AuditFieldRegistration.serializer()),
+        )
+        val mutationLog = MutationLog(
+            database.registerTable("AuditMutation", MutationRecord.serializer()),
+            origins,
+            registry,
         )
     }
 
-    /** The same server, with the escape hatch turned on. */
-    object SummaryServer : ServerBuilder() {
-        val database = setting("database", Database.Settings())
-        val cache = setting("cache", Cache.Settings())
-
-        val audit = path.path("audit") include AuditCore(database)
-        val mutationLog = path.path("audit-mutation") include
-            MutationLog(audit, BulkMutationDetail.SummaryOnly)
-
-        init {
-            registerBasicMediaTypeCoders()
-        }
-
-        val patients = database.registerTable("Patient", Patient.serializer())
-
-        val sample = Patient(_id = Uuid.parse("00000000-0000-0000-0000-0000000000b2"), name = "", ssn = "")
-
-        val patientEndpoint = path.path("patient").get bind ApiHttpHandler(
-            summary = "Patient",
-            auth = noAuth,
-            implementation = { _: Unit -> sample },
-        )
-    }
-
-    /**
-     * @param initiator The execution the block runs as. Defaults to the test runner's own
-     *   `Execution.Direct`, which is the case with no request record behind it.
-     */
-    private fun onServer(
-        initiator: Execution? = null,
-        block: suspend context(ServerRuntime) (ServerRuntime) -> Unit,
-    ) = runBlocking {
-        TestServer.test(settings = { database set Database.Settings(); cache set Cache.Settings() }) {
+    private fun onServer(block: suspend context(ServerRuntime) () -> Unit) = runBlocking {
+        TestServer.test(settings = { database set Database.Settings() }) {
             executePreDeployTasks()
-            if (initiator == null) execute { block(serverRuntime, serverRuntime) }
-            // Runs as a fabricated execution, which is what these attribution tests are about.
-            else engine.execute("test", initiator) { block(this, this) }
+            execute {
+                TestServer.registry.register(listOf(Patient.serializer().descriptor, Appointment.serializer().descriptor))
+                block(serverRuntime)
+            }
         }
     }
 
-    private fun onSummaryServer(block: suspend context(ServerRuntime) (ServerRuntime) -> Unit) = runBlocking {
-        SummaryServer.test(settings = { database set Database.Settings(); cache set Cache.Settings() }) {
-            executePreDeployTasks()
-            execute { block(serverRuntime, serverRuntime) }
-        }
-    }
-
-    // SAFETY: Fixed, valid v7 ids, so rows can be asserted on by value.
-    @OptIn(Unsafe::class)
-    private fun id(n: Int) =
-        Execution.ID(UuidV7.fromRaw(Uuid.parse("00000000-0000-7000-8000-" + n.toString().padStart(12, '0'))))
-
+    /** Logs [changes] and returns every record written so far. */
     context(server: ServerRuntime)
-    private suspend fun logged() = TestServer.mutationLog.mutations().find(Condition.Always).toList()
-
-    context(server: ServerRuntime)
-    private fun auditedTable() = TestServer.mutationLog.mutationLogged(TestServer.patients())
-
-    private fun patient(name: String, ssn: String = "s", id: Uuid = Uuid.random()) =
-        Patient(_id = id, name = name, ssn = ssn)
-
-    // ===================== one row per changed record, with both sides =====================
-
-    @Test
-    fun `insert records a row per inserted record`() = onServer {
-        val table = auditedTable()
-        val ada = patient("Ada")
-        val grace = patient("Grace")
-        table.insert(listOf(ada, grace))
-
-        val rows = logged()
-        assertEquals(2, rows.size, "one row per inserted record")
-        assertEquals(setOf(ada._id.toString(), grace._id.toString()), rows.map { it.recordId }.toSet())
-        assertTrue(rows.all { it.operation == MutationOperation.Insert })
-        assertTrue(rows.all { it.old == null }, "an insert has no previous value")
-        assertTrue(rows.any { it.new?.contains("Ada") == true }, "the inserted value was not recorded")
+    private suspend fun <T : Any> log(serializer: KSerializer<T>, vararg changes: EntryChange<T>): List<MutationRecord> {
+        TestServer.mutationLog.logAuditedFieldChanges(serializer, changes.toList())
+        return TestServer.mutationLog.table().find(Condition.Always).toList()
     }
 
-    /**
-     * The heart of the layer: the data access log records `ssn assign "changed"` as *intent*, and
-     * cannot say what the row held before. Both sides live here.
-     */
-    @Test
-    fun `updateOne records the value before and after`() = onServer {
-        val table = auditedTable()
-        val ada = patient("Ada", ssn = "before")
-        table.insert(listOf(ada))
-        table.updateOneById(ada._id, modification<Patient> { it.ssn assign "after" })
+    private val MutationRecord.json: JsonObject get() = Json.parseToJsonElement(data!!).jsonObject
 
-        val row = logged().single { it.operation == MutationOperation.Update }
-        assertEquals(ada._id.toString(), row.recordId)
-        assertTrue(row.old?.contains("before") == true, "the previous value was not recorded: ${row.old}")
-        assertTrue(row.new?.contains("after") == true, "the resulting value was not recorded: ${row.new}")
+    private val ada = Patient(_id = Uuid.random(), name = "Ada", ssn = "111", address = Address("Main", "Provo"))
+    private val appointment = Appointment(_id = Appointment.ID(UuidV7.generate()))
+
+    // ===================== operations =====================
+
+    @Test
+    fun `a create records every audited field and nothing else`() = onServer {
+        val record = log(Patient.serializer(), EntryChange(null, ada)).single()
+
+        assertEquals(MutationRecord.Operation.Create, record.operation)
+        assertEquals(ada._id, record.modelId)
+        assertEquals(setOf("name", "ssn", "address", "phones", "doctor"), record.json.keys)
     }
 
     @Test
-    fun `replaceOne records the value before and after`() = onServer {
-        val table = auditedTable()
-        val ada = patient("Ada", ssn = "before")
-        table.insert(listOf(ada))
-        table.replaceOne(condition { it._id eq ada._id }, ada.copy(ssn = "after"))
+    fun `a modify records only the audited fields that changed`() = onServer {
+        val record = log(Patient.serializer(), EntryChange(ada, ada.copy(ssn = "222", tags = mapOf("a" to "b")))).single()
 
-        val row = logged().single { it.operation == MutationOperation.Replace }
-        assertEquals(ada._id.toString(), row.recordId)
-        assertTrue(row.old?.contains("before") == true, "the previous value was not recorded: ${row.old}")
-        assertTrue(row.new?.contains("after") == true, "the resulting value was not recorded: ${row.new}")
+        assertEquals(MutationRecord.Operation.Modify, record.operation)
+        assertEquals(setOf("ssn"), record.json.keys)
     }
 
     @Test
-    fun `upsertOne records the inserting branch with no previous value`() = onServer {
-        val table = auditedTable()
-        val ada = patient("Ada")
-        table.upsertOne(condition { it._id eq ada._id }, modification { it.ssn assign "x" }, ada)
+    fun `a delete is recorded without data`() = onServer {
+        val record = log(Patient.serializer(), EntryChange(ada, null)).single()
 
-        val row = logged().single()
-        assertEquals(MutationOperation.Upsert, row.operation)
-        assertEquals(ada._id.toString(), row.recordId)
-        assertNull(row.old, "nothing was there before, so there is no previous value to record")
-        assertTrue(row.new?.contains("Ada") == true)
+        assertEquals(MutationRecord.Operation.Delete, record.operation)
+        assertEquals(ada._id, record.modelId)
+        assertNull(record.data)
     }
 
     @Test
-    fun `deleteOne records what was removed`() = onServer {
-        val table = auditedTable()
-        val ada = patient("Ada")
-        table.insert(listOf(ada))
-        table.deleteOne(condition { it._id eq ada._id })
-
-        val row = logged().single { it.operation == MutationOperation.Delete }
-        assertEquals(ada._id.toString(), row.recordId)
-        assertTrue(row.old?.contains("Ada") == true, "the deleted value was not recorded: ${row.old}")
-        assertNull(row.new, "a delete leaves no resulting value")
+    fun `a modify of only unaudited fields is not recorded`() = onServer {
+        assertEquals(emptyList(), log(Patient.serializer(), EntryChange(ada, ada.copy(tags = mapOf("a" to "b")))))
     }
 
     @Test
-    fun `updateMany and deleteMany record a row per affected record`() = onServer {
-        val table = auditedTable()
-        val people = List(3) { patient("P$it") }
-        table.insert(people)
-        table.updateMany(Condition.Always, modification { it.ssn assign "bulk" })
-        table.deleteMany(Condition.Always)
-
-        val rows = logged()
-        assertEquals(3, rows.count { it.operation == MutationOperation.Update })
-        assertEquals(3, rows.count { it.operation == MutationOperation.Delete })
-        assertEquals(
-            people.map { it._id.toString() }.toSet(),
-            rows.filter { it.operation == MutationOperation.Delete }.map { it.recordId }.toSet(),
-        )
-    }
-
-    /**
-     * A call that matched nothing changed nothing. Recording the *attempt* is the data access log's
-     * job — it fails closed and writes the condition before the call runs — so a row here would be a
-     * change that never happened, which is the one thing an audit table must not contain.
-     */
-    @Test
-    fun `a mutation that matches nothing writes no rows`() = onServer {
-        val table = auditedTable()
-        table.updateMany(condition { it.name eq "nobody" }, modification { it.ssn assign "x" })
-        table.deleteOne(condition { it.name eq "nobody" })
-
-        assertEquals(emptyList(), logged())
-    }
-
-    // ===================== the Ignoring* variants record in full by default =====================
-
-    @Test
-    fun `replaceOneIgnoringResult records full detail by default`() = onServer {
-        val table = auditedTable()
-        val ada = patient("Ada", ssn = "before")
-        table.insert(listOf(ada))
-        table.replaceOneIgnoringResult(condition { it._id eq ada._id }, ada.copy(ssn = "after"))
-
-        val row = logged().single { it.operation == MutationOperation.Replace }
-        assertEquals(ada._id.toString(), row.recordId)
-        assertTrue(row.old?.contains("before") == true, "the previous value was skipped: ${row.old}")
-        assertTrue(row.new?.contains("after") == true, "the resulting value was skipped: ${row.new}")
-        assertNull(row.affectedCount, "a per-row record needs no count")
+    fun `changes that are not changes are not recorded`() = onServer {
+        assertEquals(emptyList(), log(Patient.serializer(), EntryChange(ada, ada), EntryChange(null, null)))
     }
 
     @Test
-    fun `upsertOneIgnoringResult records full detail by default`() = onServer {
-        val table = auditedTable()
-        val ada = patient("Ada", ssn = "before")
-        table.insert(listOf(ada))
-        table.upsertOneIgnoringResult(
-            condition { it._id eq ada._id },
-            modification { it.ssn assign "after" },
-            ada,
-        )
+    fun `each change in a call gets its own record`() = onServer {
+        val bob = ada.copy(_id = Uuid.random(), name = "Bob")
+        val records = log(Patient.serializer(), EntryChange(null, ada), EntryChange(null, bob))
 
-        val row = logged().single { it.operation == MutationOperation.Upsert }
-        assertEquals(ada._id.toString(), row.recordId)
-        assertTrue(row.old?.contains("before") == true, "the previous value was skipped: ${row.old}")
-        assertTrue(row.new?.contains("after") == true, "the resulting value was skipped: ${row.new}")
+        assertEquals(setOf(ada._id, bob._id), records.map { it.modelId }.toSet())
     }
 
     @Test
-    fun `updateOneIgnoringResult records full detail by default`() = onServer {
-        val table = auditedTable()
-        val ada = patient("Ada", ssn = "before")
-        table.insert(listOf(ada))
-        table.updateOneIgnoringResult(condition { it._id eq ada._id }, modification { it.ssn assign "after" })
+    fun `the record names the origin it was made under`() = onServer {
+        val record = log(Patient.serializer(), EntryChange(null, ada)).single()
 
-        val row = logged().single { it.operation == MutationOperation.Update }
-        assertEquals(ada._id.toString(), row.recordId)
-        assertTrue(row.old?.contains("before") == true, "the previous value was skipped: ${row.old}")
-        assertTrue(row.new?.contains("after") == true, "the resulting value was skipped: ${row.new}")
+        assertEquals(serverRuntime.execution.origin.originId, record.origin)
     }
 
-    /** The most expensive upgrade, and the one that most obviously must not be skippable. */
-    @Test
-    fun `updateManyIgnoringResult records full detail by default`() = onServer {
-        val table = auditedTable()
-        val people = List(3) { patient("P$it", ssn = "before") }
-        table.insert(people)
-        table.updateManyIgnoringResult(Condition.Always, modification { it.ssn assign "after" })
+    // ===================== which fields count =====================
 
-        val rows = logged().filter { it.operation == MutationOperation.Update }
-        assertEquals(3, rows.size, "the bulk call produced a summary rather than a row per change")
-        assertEquals(people.map { it._id.toString() }.toSet(), rows.map { it.recordId }.toSet())
-        assertTrue(rows.all { it.old?.contains("before") == true })
-        assertTrue(rows.all { it.new?.contains("after") == true })
-        assertTrue(rows.all { it.affectedCount == null })
+    @Test
+    fun `an audited nested class records its changed fields, audited or not`() = onServer {
+        val record = log(Patient.serializer(), EntryChange(ada, ada.copy(address = Address("Main", "Orem")))).single()
+
+        assertEquals(setOf("city"), record.json.getValue("address").jsonObject.keys)
     }
 
     @Test
-    fun `deleteOneIgnoringOld records what was removed by default`() = onServer {
-        val table = auditedTable()
-        val ada = patient("Ada")
-        table.insert(listOf(ada))
-        table.deleteOneIgnoringOld(condition { it._id eq ada._id })
+    fun `an audited field set to null is recorded as null`() = onServer {
+        val record = log(Patient.serializer(), EntryChange(ada, ada.copy(address = null))).single()
 
-        val row = logged().single { it.operation == MutationOperation.Delete }
-        assertEquals(ada._id.toString(), row.recordId)
-        assertTrue(row.old?.contains("Ada") == true, "the deleted value was skipped: ${row.old}")
+        assertEquals(JsonNull, record.json.getValue("address"))
     }
 
     @Test
-    fun `deleteManyIgnoringOld records what was removed by default`() = onServer {
-        val table = auditedTable()
-        val people = List(3) { patient("P$it") }
-        table.insert(people)
-        table.deleteManyIgnoringOld(Condition.Always)
+    fun `an unaudited nested class records only its audited fields`() = onServer {
+        val changed = appointment.copy(billing = Billing(account = "acct", plan = "gold"))
+        val record = log(Appointment.serializer(), EntryChange(appointment, changed)).single()
 
-        val rows = logged().filter { it.operation == MutationOperation.Delete }
-        assertEquals(3, rows.size, "the bulk call produced a summary rather than a row per change")
-        assertEquals(people.map { it._id.toString() }.toSet(), rows.map { it.recordId }.toSet())
-        assertTrue(rows.all { it.old != null }, "the deleted values were skipped")
-    }
-
-    // ===================== return-value equivalence, one test per method =====================
-
-    /**
-     * Each upgraded call must return exactly what the method it replaced would have. These run the
-     * same call against a decorated table and an undecorated twin holding the same rows, so the
-     * expected value is the real implementation's rather than a restatement of its documentation.
-     */
-    private fun equivalence(
-        seed: List<Patient>,
-        call: suspend (Table<Patient>) -> Any?,
-    ) = onServer {
-        val decorated = auditedTable()
-        val undecorated = TestServer.patientsUndecorated()
-        decorated.insert(seed)
-        undecorated.insert(seed)
-
-        assertEquals(call(undecorated), call(decorated), "the decorator changed what the caller sees")
-    }
-
-    private val ada = patient("Ada", ssn = "before", id = Uuid.parse("00000000-0000-4000-8000-00000000aaa1"))
-
-    @Test
-    fun `replaceOneIgnoringResult returns what the undecorated table returns when it matches`() =
-        equivalence(listOf(ada)) {
-            it.replaceOneIgnoringResult(condition { p -> p._id eq ada._id }, ada.copy(ssn = "after"))
-        }
-
-    @Test
-    fun `replaceOneIgnoringResult returns what the undecorated table returns when it misses`() =
-        equivalence(listOf(ada)) {
-            it.replaceOneIgnoringResult(condition { p -> p.name eq "nobody" }, ada.copy(ssn = "after"))
-        }
-
-    /**
-     * The trap: this one reports whether an element *already existed*, not whether anything changed,
-     * so the obvious `new != null` derivation would invert the answer on the inserting branch.
-     */
-    @Test
-    fun `upsertOneIgnoringResult returns what the undecorated table returns when it inserts`() =
-        equivalence(listOf()) {
-            it.upsertOneIgnoringResult(
-                condition { p -> p._id eq ada._id },
-                modification { p -> p.ssn assign "after" },
-                ada,
-            )
-        }
-
-    @Test
-    fun `upsertOneIgnoringResult returns what the undecorated table returns when it updates`() =
-        equivalence(listOf(ada)) {
-            it.upsertOneIgnoringResult(
-                condition { p -> p._id eq ada._id },
-                modification { p -> p.ssn assign "after" },
-                ada,
-            )
-        }
-
-    @Test
-    fun `updateOneIgnoringResult returns what the undecorated table returns when it matches`() =
-        equivalence(listOf(ada)) {
-            it.updateOneIgnoringResult(condition { p -> p._id eq ada._id }, modification { p -> p.ssn assign "after" })
-        }
-
-    @Test
-    fun `updateOneIgnoringResult returns what the undecorated table returns when it misses`() =
-        equivalence(listOf(ada)) {
-            it.updateOneIgnoringResult(condition { p -> p.name eq "nobody" }, modification { p -> p.ssn assign "after" })
-        }
-
-    @Test
-    fun `updateManyIgnoringResult returns the number of affected rows`() =
-        equivalence(List(3) { patient("P$it") }) {
-            it.updateManyIgnoringResult(Condition.Always, modification { p -> p.ssn assign "after" })
-        }
-
-    @Test
-    fun `updateManyIgnoringResult returns zero when nothing matches`() =
-        equivalence(List(3) { patient("P$it") }) {
-            it.updateManyIgnoringResult(condition { p -> p.name eq "nobody" }, modification { p -> p.ssn assign "after" })
-        }
-
-    @Test
-    fun `deleteOneIgnoringOld returns what the undecorated table returns when it matches`() =
-        equivalence(listOf(ada)) { it.deleteOneIgnoringOld(condition { p -> p._id eq ada._id }) }
-
-    @Test
-    fun `deleteOneIgnoringOld returns what the undecorated table returns when it misses`() =
-        equivalence(listOf(ada)) { it.deleteOneIgnoringOld(condition { p -> p.name eq "nobody" }) }
-
-    @Test
-    fun `deleteManyIgnoringOld returns the number of deleted rows`() =
-        equivalence(List(3) { patient("P$it") }) { it.deleteManyIgnoringOld(Condition.Always) }
-
-    @Test
-    fun `deleteManyIgnoringOld returns zero when nothing matches`() =
-        equivalence(List(3) { patient("P$it") }) { it.deleteManyIgnoringOld(condition { p -> p.name eq "nobody" }) }
-
-    // ===================== the escape hatch =====================
-
-    /**
-     * Counts the effect-returning calls, which is how "did the cheap path stay cheap" is observable
-     * from outside: the upgrade is precisely a call to [Table.updateMany] instead.
-     */
-    private class CountingTable<T : Any>(override val wraps: Table<T>) : Table<T> by wraps {
-        var updateManyCalls: Int = 0
-        var deleteManyCalls: Int = 0
-
-        override suspend fun updateMany(
-            condition: Condition<T>,
-            modification: Modification<T>,
-        ): CollectionChanges<T> {
-            updateManyCalls++
-            return wraps.updateMany(condition, modification)
-        }
-
-        override suspend fun deleteMany(condition: Condition<T>): List<T> {
-            deleteManyCalls++
-            return wraps.deleteMany(condition)
-        }
+        assertEquals(setOf("billing"), record.json.keys)
+        assertEquals(setOf("account"), record.json.getValue("billing").jsonObject.keys)
     }
 
     @Test
-    fun `SummaryOnly writes one summary row and does not materialise the changed rows`() = onSummaryServer {
-        val counting = CountingTable(SummaryServer.patients())
-        val table = SummaryServer.mutationLog.mutationLogged(counting)
-        table.insert(List(3) { patient("P$it") })
-        val affected = table.updateManyIgnoringResult(Condition.Always, modification { it.ssn assign "after" })
-
-        assertEquals(3, affected)
-        assertEquals(0, counting.updateManyCalls, "SummaryOnly took the expensive path anyway")
-
-        val rows = SummaryServer.mutationLog.mutations().find(Condition.Always).toList()
-        val summary = rows.single { it.operation == MutationOperation.Update }
-        assertEquals(3, summary.affectedCount)
-        assertNull(summary.recordId, "a summary row names no single record")
-        assertNull(summary.old)
-        assertNull(summary.new)
+    fun `an unaudited nested class whose audited fields did not change is not recorded`() = onServer {
+        assertEquals(emptyList(), log(Appointment.serializer(), EntryChange(appointment, appointment.copy(billing = Billing(plan = "gold")))))
     }
 
     @Test
-    fun `SummaryOnly summarises deletes too`() = onSummaryServer {
-        val counting = CountingTable(SummaryServer.patients())
-        val table = SummaryServer.mutationLog.mutationLogged(counting)
-        table.insert(List(2) { patient("P$it") })
-        assertEquals(2, table.deleteManyIgnoringOld(Condition.Always))
-        assertEquals(0, counting.deleteManyCalls, "SummaryOnly took the expensive path anyway")
+    fun `an unaudited list holding audited fields is recorded whole`() = onServer {
+        val record = log(Patient.serializer(), EntryChange(ada, ada.copy(phones = listOf(Phone("555", "home"))))).single()
 
-        val summary = SummaryServer.mutationLog.mutations().find(Condition.Always).toList()
-            .single { it.operation == MutationOperation.Delete }
-        assertEquals(2, summary.affectedCount)
-        assertNull(summary.recordId)
-    }
-
-    /** SummaryOnly is about the `Ignoring*` variants only; a call that already has the rows keeps them. */
-    @Test
-    fun `SummaryOnly still records effect-returning calls in full`() = onSummaryServer {
-        val table = SummaryServer.mutationLog.mutationLogged(SummaryServer.patients())
-        val people = List(2) { patient("P$it") }
-        table.insert(people)
-        table.updateMany(Condition.Always, modification { it.ssn assign "after" })
-
-        val rows = SummaryServer.mutationLog.mutations().find(Condition.Always).toList()
-            .filter { it.operation == MutationOperation.Update }
-        assertEquals(2, rows.size)
-        assertTrue(rows.all { it.recordId != null && it.affectedCount == null })
-    }
-
-    // ===================== attribution =====================
-
-    /** A task has no request record to point at, so an id there would join to nothing. */
-    @Test
-    fun `a schedule tick records no request id`() {
-        val schedule = Execution.Schedule(
-            id = id(501),
-            location = PathSegments(listOf("schedule", "nightly")),
-        )
-        onServer(schedule) {
-            auditedTable().insert(listOf(patient("Ada")))
-
-            val row = logged().single()
-            assertNull(row.requestId, "a schedule tick has no RequestRecord, so this would dangle")
-            assertEquals(schedule.id.toExternal(), row.executionId)
-            assertEquals("schedule", row.initiatorKind)
-            assertTrue("schedule" in row.initiator && "nightly" in row.initiator, row.initiator)
-        }
+        assertEquals(setOf("phones"), record.json.keys)
     }
 
     @Test
-    fun `an http request records the id its request record is keyed by`() {
-        val http = Execution.Http(
-            id = id(601),
-            endpoint = RawHttpEndpoint(asString = "/patient", method = HttpMethod.GET),
-        )
-        onServer(http) {
-            auditedTable().insert(listOf(patient("Ada")))
+    fun `an unaudited sealed value holding audited fields is recorded whole`() = onServer {
+        val record = log(Appointment.serializer(), EntryChange(appointment, appointment.copy(payment = Payment.Card("4242")))).single()
 
-            val row = logged().single()
-            assertEquals(http.id.originId, row.requestId)
-            assertEquals(http.id.toExternal(), row.executionId)
-            assertEquals("http", row.initiatorKind)
-            assertTrue("patient" in row.initiator, row.initiator)
-        }
+        assertEquals(setOf("payment"), record.json.keys)
     }
 
-    /**
-     * The query the layer exists for: "everything that changed because of request X", in one indexed
-     * lookup rather than a walk of parent pointers.
-     */
     @Test
-    fun `an indirect mutation chains back to the root execution`() {
-        val root = id(701)
-        val nested = Execution.Task(
-            id = id(702),
-            parent = root,
-            rootExecution = root,
-            origin = root,
-            location = PathSegments(listOf("task", "cleanup")),
-        )
-        onServer(nested) {
-            auditedTable().insert(listOf(patient("Ada")))
-
-            val row = logged().single()
-            assertEquals(root.toExternal(), row.rootExecutionId)
-            assertEquals(root.toExternal(), row.causedBy)
-            assertEquals(nested.id.toExternal(), row.executionId)
-            assertEquals("task", row.initiatorKind)
-        }
+    fun `an unaudited embedded audited model is left to its own records`() = onServer {
+        val changed = appointment.copy(attending = Doctor(Uuid.random(), "House"))
+        assertEquals(emptyList(), log(Appointment.serializer(), EntryChange(appointment, changed)))
     }
 
-    // ===================== gating =====================
-
-    /** The decorator is meant to be passed on every model; an unaudited one must cost nothing. */
     @Test
-    fun `an unaudited model generates no rows`() = onServer {
-        val table = TestServer.mutationLog.mutationLogged(TestServer.plain())
-        table.insert(listOf(PlainThing(Uuid.random(), "x")))
-        table.deleteMany(Condition.Always)
+    fun `a typed id is unwrapped to its Uuid`() = onServer {
+        val record = log(Appointment.serializer(), EntryChange(appointment, null)).single()
 
-        assertEquals(emptyList(), logged())
-    }
-
-    /**
-     * A table whose declared type is not itself audited but whose children are must be refused. A row
-     * names one model, so this shape cannot be attributed — and quietly passing it through would
-     * leave every change to the audited model inside unrecorded and silent.
-     */
-    @Test
-    fun `a table that merely contains audited models is refused`() = onServer {
-        try {
-            TestServer.mutationLog.mutationLogged(TestServer.wrappers())
-            fail("a table containing audited models was silently left unlogged")
-        } catch (e: IllegalStateException) {
-            assertTrue("Patient" in (e.message ?: ""), "the contained model was not named: ${e.message}")
-        }
-    }
-
-    // ===================== failure behaviour =====================
-
-    /**
-     * The asymmetry with the layers above, and the one that has to be verified rather than asserted
-     * in a comment: the change has already committed by the time there is anything to record, so
-     * throwing would report failure for something that happened and invite a double-applying retry.
-     */
-    @OptIn(Unsafe::class)
-    @Test
-    fun `a mutation whose record cannot be written still happens`() = onServer { runtime ->
-        val underlying = TestServer.patients()
-        val table = MutationLogTable(
-            wraps = underlying,
-            modelId = { ModelTypeId(1) },
-            requestId = null,
-            executionId = randomExecutionId(),
-            causedBy = null,
-            rootExecutionId = randomExecutionId(),
-            attributedTo = OriginRecord.ID(randomExecutionId()),
-            initiatorKind = "direct",
-            initiator = "{}",
-            json = runtime.internalSerialization.json,
-            nowMillis = { 1L },
-            write = { throw RuntimeException("audit sink down") },
-            bulkDetail = BulkMutationDetail.RecordEveryRow,
-        )
-
-        val ada = patient("Ada")
-        table.insert(listOf(ada))
-        assertEquals(
-            listOf(ada),
-            underlying.find(Condition.Always).toList(),
-            "the insert was rolled back or refused because its record could not be written",
-        )
-
-        // And the upgraded path still hands back the right answer with the sink broken.
-        assertTrue(table.deleteOneIgnoringOld(condition { it._id eq ada._id }))
-        assertEquals(emptyList(), underlying.find(Condition.Always).toList())
-    }
-
-    // ===================== the row is readable =====================
-
-    /** A row is only useful if the model id resolves back through the registry the core owns. */
-    @Test
-    fun `the recorded model id resolves through the registry`() = onServer {
-        auditedTable().insert(listOf(patient("Ada")))
-
-        val row = logged().single()
-        // Keyed by the full serial name, which is what the walk records — not the class's short name.
-        assertEquals(TestServer.audit.registry.assignments.await().modelId(Patient.serializer().descriptor), row.modelType)
+        assertEquals(appointment._id.raw.raw, record.modelId)
     }
 }
+
+@Serializable
+@GenerateDataClassPaths
+@Audited
+data class Appointment(
+    override val _id: ID,
+    val note: String = "",
+    val billing: Billing = Billing(),
+    val attending: Doctor? = null,
+    val payment: Payment? = null,
+) : HasId<Appointment.ID> {
+    @Serializable
+    @JvmInline
+    value class ID(override val raw: UuidV7) : TypedId<UuidV7, ID>
+}
+
+@Serializable
+data class Billing(@Audited val account: String = "", val plan: String = "")

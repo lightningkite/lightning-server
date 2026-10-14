@@ -25,7 +25,7 @@ import com.lightningkite.services.database.insertOne
  * ## An audited model with no registry entry fails
  * The id is resolved per operation rather than once at wrap time, because `ModelInfo`'s `log` slot is
  * not suspending while the registry loads asynchronously; the operations themselves are suspending.
- * Resolution uses [AuditRegistry.Assignments.modelId], which **throws** when the model has no entry — the same
+ * Resolution uses [AuditRegistry.Assignments.modelType], which **throws** when the model has no entry — the same
  * fail-closed rule the disclosure log uses.
  *
  * That matters because the registry is populated by scanning **endpoints**, not tables (see

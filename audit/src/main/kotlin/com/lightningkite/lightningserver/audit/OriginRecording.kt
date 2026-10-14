@@ -1,26 +1,75 @@
 package com.lightningkite.lightningserver.audit
 
 import com.lightningkite.lightningserver.OverrideOnly
+import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.concurrent.forEachConcurrent
 import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.data.SerializableCache
+import com.lightningkite.lightningserver.data.get
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.HttpInterceptor
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
+import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.route
 import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ExecutionInterceptor
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.typed.registerTable
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.data.Unsafe
+import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.Table
 import com.lightningkite.services.database.UniqueViolationException
 import com.lightningkite.services.database.insertOne
+import com.lightningkite.services.database.serializerOrContextual
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlin.uuid.Uuid
+
+context(builder: ServerBuilder)
+public inline fun <reified REQUEST_INFO> OriginRecording(
+    database: Runtime<Database>,
+    tableName: String = "OriginRecord",
+    noinline info: suspend context(ServerRuntime) (Request<*>) -> REQUEST_INFO
+): OriginRecording<REQUEST_INFO> {
+    val serializer = serializerOrContextual<REQUEST_INFO>()
+    return OriginRecording(
+        database.registerTable(tableName, OriginRecord.serializer(serializer)),
+        serializer,
+        info
+    )
+}
+
+context(builder: ServerBuilder)
+public fun OriginRecording(
+    database: Runtime<Database>,
+    tableName: String = "OriginRecord"
+): OriginRecording<OriginRecord.StandardRequestInfo> =
+    OriginRecording(
+        database.registerTable(tableName, OriginRecord.serializer(OriginRecord.StandardRequestInfo.serializer())),
+        OriginRecord.StandardRequestInfo.serializer(),
+    ) { request ->
+        val auth = try {
+            request[Authentication.CacheKey]?.let { it.fromMasquerade ?: it }
+        } catch (e: Exception) {
+            currentCoroutineContext().ensureActive()
+            serverRuntime.logger.error(e) { "Could not determine auth of request for origin recording" }
+            null
+        }
+        OriginRecord.StandardRequestInfo(
+            subjectId = auth?.rawId?.let(Uuid::parseOrNull),
+            sessionId = auth?.sessionId?.let(Uuid::parseOrNull),
+            sourceIp = request.sourceIp,
+            engineRequestId = request.engineRequestId,
+            upstreamRequestId = request.upstreamRequestId,
+        )
+    }
 
 /**
  * Records the [OriginRecord]s other audit records reference lazily.

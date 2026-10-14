@@ -1,106 +1,150 @@
 package com.lightningkite.lightningserver.audit
 
-import com.lightningkite.lightningserver.runtime.Execution
+import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.logicalId
+import com.lightningkite.lightningserver.runtime.generateFromServerClock
+import com.lightningkite.services.data.Unsafe
+import com.lightningkite.services.data.UuidV7
+import com.lightningkite.services.database.EntryChange
+import com.lightningkite.services.database.HasId
+import com.lightningkite.services.database.Partial
+import com.lightningkite.services.database.SerializableProperty
+import com.lightningkite.services.database.nullElement
+import com.lightningkite.services.database.serializableProperties
+import com.lightningkite.services.database.toPartialEntry
 import com.lightningkite.services.database.Table
-import com.lightningkite.services.database.insertOne
+import com.lightningkite.services.database.partialOfDifference
+import com.lightningkite.services.database.postCreate
+import com.lightningkite.services.database.postRawChanges
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationStrategy
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.AbstractEncoder
+import kotlinx.serialization.modules.SerializersModule
+import kotlin.uuid.Uuid
 
-/**
- * Wraps a table so that every change it makes is recorded — when, and only when, its model is
- * audited.
- *
- * Pass it as a `ModelInfo`'s `log` parameter, alongside [DataAccessLog.dataAccessLogged] if both
- * layers are installed:
- *
- * ```kotlin
- * val patients = database.explicitModelInfo(
- *     // ...
- *     log = { audit.mutationLogged(it) },
- * )
- * ```
- *
- * ## Why it is safe to pass everywhere
- * A model without [Audited] is returned untouched, so the "is this audited" decision stays in the
- * annotation alone rather than being split between the annotation and a list of decorated tables.
- * Passing it on every model is the intended usage.
- *
- * ## An audited model with no registry entry fails
- * As with [DataAccessLog.dataAccessLogged], the id is resolved per operation through
- * [AuditRegistry.Assignments.modelId], which **throws** when the model has no entry — and the registry is
- * populated by scanning *endpoints*, not tables. An `@Audited` model no endpoint's serializer reaches
- * therefore has no id. Here that throw is caught by the fail-open guard rather than failing the call,
- * so the symptom is a loud log line and an unrecorded mutation rather than a rejected write. Make the
- * model reachable from an endpoint's serializer to log it at all.
- *
- * ## Where it sits
- * `ModelInfo` applies `log` below permissions and in **both** `table(auth)` and `table()`, so this
- * observes privileged internal writes — startup tasks, schedule ticks, one service writing another's
- * model — as well as user-facing ones.
- *
- * ## Failure
- * Fail-open: the change is already committed by the time there is anything to record, so a failed
- * audit write is logged loudly and the mutation stands. See [MutationLog].
- */
-@OptIn(ExperimentalSerializationApi::class)
-context(runtime: ServerRuntime)
-public fun <T : Any> MutationLog.mutationLogged(table: Table<T>): Table<T> {
-    val descriptor = table.serializer.descriptor
-    // Reachability, not a single annotation. `isAudited` inspects one descriptor, so gating on it
-    // would return a sealed parent's table — or any wrapper's — untouched even though its children
-    // are audited, and every change to them would go unrecorded in silence. `auditedModels()` walks.
-    val reachable = descriptor.auditedModels()
-    if (reachable.isEmpty()) return table
-    // The row names one model, so a table that merely *contains* audited data cannot be attributed.
-    // Fail loudly rather than pick one: inconsistent coverage hides the gap instead of failing on it,
-    // which is the same rule the registry applies to an unregistered model.
-    if (!descriptor.isAudited) throw IllegalStateException(
-        "Table \"" + descriptor.serialName + "\" is not itself @Audited but can contain audited " +
-            "models (" + reachable.keys.sorted().joinToString(", ") + "). A mutation record names " +
-            "one model, so this shape cannot be attributed and is refused rather than logged " +
-            "inconsistently."
-    )
-    val initiator = runtime.execution
-    val json = runtime.internalSerialization.json
-    return MutationLogTable(
-        wraps = table,
-        modelId = { registry.assignments.await().modelId(descriptor) },
-        // Exactly where a request record exists: a task or schedule tick is not part of a request,
-        // so this is null rather than an id that joins to nothing.
-        requestId = (initiator as? Execution.Requested)?.logicalId?.let { TODO("proper origin recording"); },
-        // The row that names who is responsible. Unlike `requestId` this is never null: a change
-        // made inside a task carries the anchor of whatever launched it, which is the only way an
-        // indirect change stays traceable to a person.
-        attributedTo = TODO("proper origin recording"),
-        executionId = initiator.id.toExternal(),
-        causedBy = initiator.parent?.toExternal(),
-        rootExecutionId = initiator.rootExecution.toExternal(),
-        initiatorKind = initiator.kind(json),
-        initiator = json.encodeToString(Execution.serializer(), initiator),
-        json = json,
-        nowMillis = { runtime.clock.now().toEpochMilliseconds() },
-        write = {
-            with(runtime) {
-                origins.flush()
-                mutations().insertOne(it)
-            }
-        },
-        bulkDetail = bulkDetail,
-    )
+context(serverRuntime: ServerRuntime)
+public fun <T : HasId<ID>, ID : Comparable<ID>> Table<T>.logAuditedFieldChanges(log: MutationLog): Table<T> =
+    postRawChanges { changes -> log.logAuditedFieldChanges(serializer, changes) }
+
+public class MutationLog(
+    private val origins: OriginRecording<*>,
+    private val registry: AuditRegistry,
+    public val table: Runtime<Table<MutationRecord>>,
+) {
+    context(runtime: ServerRuntime)
+    public suspend fun <T : Any> logAuditedFieldChanges(serializer: KSerializer<T>, changes: List<EntryChange<T>>) {
+        val type = registry.assignments.await().modelType(serializer.descriptor)
+
+        val logs = changes.mapNotNull { (old, new) ->
+            if (old == new) return@mapNotNull null
+            val item = new ?: old ?: return@mapNotNull null
+
+            val newData = auditedPartialOfDifference(serializer, old, new)
+
+            if (newData != null && newData.parts.isEmpty()) return@mapNotNull null
+
+            @OptIn(Unsafe::class) // SAFETY: flush is called later once we know we are actually inserting something
+            MutationRecord(
+                _id = MutationRecord.ID(UuidV7.generateFromServerClock()),
+                origin = origins.currentOrigin(),
+                modelType = type,
+                operation = when {
+                    old == null -> MutationRecord.Operation.Create
+                    new == null -> MutationRecord.Operation.Delete
+                    else -> MutationRecord.Operation.Modify
+                },
+                modelId = idOf(serializer, item),
+                data = newData?.let {
+                    runtime.internalSerialization.json.encodeToString(
+                        Partial.serializer(serializer),
+                        newData
+                    )
+                }
+            )
+        }
+
+        if (logs.isEmpty()) return
+
+        origins.flush()
+        table().insert(logs)
+    }
+
+    /**
+     * Returns the `_id` of [value], encoding only until it is found.
+     *
+     * @throws IllegalStateException if [value] has no `Uuid` `_id`.
+     */
+    context(runtime: ServerRuntime)
+    private fun <T> idOf(serializer: SerializationStrategy<T>, value: T): Uuid =
+        IdEncoder(runtime.internalSerialization.json.serializersModule)
+            .also { it.encodeSerializableValue(serializer, value) }
+            .id
+            ?: throw IllegalStateException("${serializer.descriptor.serialName} has no Uuid _id to record a mutation against.")
+
+    @OptIn(ExperimentalSerializationApi::class)
+    private class IdEncoder(override val serializersModule: SerializersModule) : AbstractEncoder() {
+        var id: Uuid? = null
+        private var inId = false
+
+        // Claude: returning false makes the encoder skip the element, so everything after the id is skipped.
+        override fun encodeElement(descriptor: SerialDescriptor, index: Int): Boolean {
+            if (id != null) return false
+            inId = descriptor.getElementName(index) == "_id"
+            return true
+        }
+
+        // Claude: value classes such as typed ids and UuidV7 pass their inner value through here, so the Uuid is caught however it is wrapped.
+        override fun <T> encodeSerializableValue(serializer: SerializationStrategy<T>, value: T) {
+            if (id != null) return
+            if (inId && value is Uuid) id = value
+            else super.encodeSerializableValue(serializer, value)
+        }
+
+        override fun encodeValue(value: Any) {}
+        override fun encodeNull() {}
+    }
 }
 
 /**
- * The `@SerialName` discriminator of this execution's concrete type — "http", "task", and so on.
+ * Returns a [Partial] of the [Audited] properties of [new] that differ from [old], or `null` if [new] is `null`.
  *
- * Read back out of the encoded form rather than matched against the subtypes in a `when`, so that the
- * value in the record is by construction the same string the serialized [Execution] carries. A `when`
- * would be a second copy of the discriminators, free to drift from the annotations.
+ * Works like [partialOfDifference], but leaves out properties that neither are marked [Audited] nor hold one.
+ * A nested class that is not [Audited] is compared property by property. A list, map or sealed value holding
+ * an audited property is included whole, since a [Partial] cannot describe part of one. A nested [Audited]
+ * model is left out, since it gets records of its own. When [old] is `null`, every audited property of [new]
+ * is included.
  */
 @OptIn(ExperimentalSerializationApi::class)
-private fun Execution.kind(json: Json): String =
-    json.encodeToJsonElement(Execution.serializer(), this)
-        .jsonObject.getValue(json.configuration.classDiscriminator).jsonPrimitive.content
+private fun <T> auditedPartialOfDifference(serializer: KSerializer<T>, old: T?, new: T?): Partial<T>? {
+    if (new == null) return null
+    @Suppress("UNCHECKED_CAST")
+    val unwrapped = (serializer.nullElement() ?: serializer) as KSerializer<T>
+    val descriptor = unwrapped.descriptor
+    val partial = Partial<T>()
+    for (property in unwrapped.serializableProperties!!) {
+        @Suppress("UNCHECKED_CAST")
+        property as SerializableProperty<T, Any?>
+        val oldValue = old?.let(property::get)
+        val newValue = property.get(new)
+        if (old != null && oldValue == newValue) continue
+
+        val index = descriptor.getElementIndex(property.name)
+        val type = descriptor.getElementDescriptor(index)
+        val isComposite = !type.isInline && (property.serializer.nullElement() ?: property.serializer).serializableProperties != null
+        when {
+            descriptor.isElementAudited(index) -> partial.parts[property] =
+                if (isComposite) partialOfDifference(property.serializer, oldValue, newValue) else newValue
+
+            type.isAudited || !type.containsAuditedFields() -> {}
+            isComposite && newValue != null ->
+                auditedPartialOfDifference(property.serializer, oldValue, newValue)!!
+                    .takeIf { it.parts.isNotEmpty() }
+                    ?.let { partial.parts[property] = it }
+
+            else -> partial.parts[property] = property.toPartialEntry(newValue)
+        }
+    }
+    return partial
+}
