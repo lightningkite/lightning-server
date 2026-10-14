@@ -29,6 +29,7 @@ import com.lightningkite.services.data.UuidV7
 import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
+import com.lightningkite.services.database.replaceOneById
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
@@ -38,6 +39,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -124,6 +126,10 @@ class AuthEventLogWiringTest {
     context(server: ServerRuntime)
     private suspend fun events() = TestServer.authEventLog.authEvents().find(Condition.Always).toList()
 
+    /** The one rejection row; setting up a real session also writes a [AuthEventRecord.Type.SessionCreated] row. */
+    context(server: ServerRuntime)
+    private suspend fun rejection() = events().single { it.type == AuthEventRecord.Type.AuthenticationFailed }
+
     /**
      * A refresh token naming a real session but carrying the wrong secret. The most interesting
      * rejection to record, because it is the one that means someone is guessing.
@@ -141,7 +147,7 @@ class AuthEventLogWiringTest {
         val response = engine.handleRoot(tokenExchange(token, userAgent = "probe/1.0"), testId(1))
         assertEquals(HttpStatus.Unauthorized, response.status)
 
-        val event = events().single()
+        val event = rejection()
         assertEquals(AuthEventRecord.Type.AuthenticationFailed, event.type)
         assertEquals("SecretMismatch", event.failureReason)
         assertEquals(sessionId, event.sessionId)
@@ -157,7 +163,7 @@ class AuthEventLogWiringTest {
 
         assertEquals(
             subjectId.toString(),
-            events().single().principal,
+            rejection().principal,
             "without the principal, the log cannot answer which account was being attacked",
         )
     }
@@ -169,7 +175,7 @@ class AuthEventLogWiringTest {
 
         engine.handleRoot(tokenExchange(token, userAgent = "probe/1.0"), testId(2))
 
-        val event = events().single()
+        val event = rejection()
         assertEquals("203.0.113.7", event.sourceIp)
         assertEquals("probe/1.0", event.userAgent)
     }
@@ -185,7 +191,7 @@ class AuthEventLogWiringTest {
 
         engine.handleRoot(tokenExchange(token, userAgent = null), testId(3))
 
-        val event = events().single()
+        val event = rejection()
         assertNull(event.userAgent, "an unsent user agent must not be recorded as an observed one")
         assertEquals("203.0.113.7", event.sourceIp)
     }
@@ -247,11 +253,43 @@ class AuthEventLogWiringTest {
 
         engine.handleRoot(tokenExchange(token, userAgent = "probe/1.0"), testId(4))
 
-        assertEquals(testId(4).originId, events().single().origin)
+        assertEquals(testId(4).originId, rejection().origin)
         val requests = TestServer.audit.originsTable().find(Condition.Always).toList()
         assertTrue(
             requests.any { it._id == testId(4).originId },
             "the auth event points at a request record that was never written",
         )
+    }
+
+    @Test
+    fun `creating a session is recorded`() = onServer {
+        val subjectId = Uuid.random()
+
+        val (session, _) = TestServer.sessions.newSession(subjectId)
+
+        val event = events().single()
+        assertEquals(AuthEventRecord.Type.SessionCreated, event.type)
+        assertEquals(subjectId.toString(), event.principal)
+        assertEquals(session._id, event.sessionId)
+    }
+
+    @Test
+    fun `terminating a session is recorded`() = onServer {
+        val (session, _) = TestServer.sessions.newSession(Uuid.random())
+
+        TestServer.sessions.sessionInfo.table().replaceOneById(session._id, session.copy(terminated = Clock.System.now()))
+
+        val event = events().single { it.type == AuthEventRecord.Type.SessionTerminated }
+        assertEquals(session.subjectId.toString(), event.principal)
+        assertEquals(session._id, event.sessionId)
+    }
+
+    @Test
+    fun `using a live session records nothing beyond its creation`() = onServer {
+        val (_, token) = TestServer.sessions.newSession(Uuid.random())
+
+        engine.handleRoot(tokenExchange(token.string), testId(6))
+
+        assertEquals(listOf(AuthEventRecord.Type.SessionCreated), events().map { it.type })
     }
 }

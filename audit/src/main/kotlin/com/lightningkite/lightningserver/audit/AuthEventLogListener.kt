@@ -26,38 +26,39 @@ public class AuthEventLogListener(
 
     context(runtime: ServerRuntime)
     override suspend fun onEvent(event: AuthEvent) {
-        @OptIn(Unsafe::class) // SAFETY: origins.flush() is called below once we know we are actually going to record the event. Some events are not recorded, so it needs to be done out of order.
-        val base = AuthEventRecord(
+        // SAFETY: origins.flush() runs below, before the record is inserted. It cannot run first, because some events are not recorded.
+        @OptIn(Unsafe::class)
+        fun recordOf(type: AuthEventRecord.Type, principal: String) = AuthEventRecord(
             _id = AuthEventRecord.ID(UuidV7.generateFromServerClock()),
             origin = origins.currentOrigin(),
-            type = AuthEventRecord.Type.AuthenticationFailed,
+            type = type,
+            principal = principal,
             sourceIp = event.request?.sourceIp,
             userAgent = event.request?.headers?.get(HttpHeader.UserAgent)?.root,
         )
+
         val record = when (event) {
             is AuthEvent.TokenRejected, is AuthEvent.ProofRejected -> return
-            is AuthEvent.SessionRejected -> base.copy(
-                type = AuthEventRecord.Type.AuthenticationFailed,
-                principal = event.principal,
+            is AuthEvent.SessionRejected -> recordOf(AuthEventRecord.Type.AuthenticationFailed, event.principal).copy(
                 sessionId = event.sessionId,
                 failureReason = event.reason.name,
             )
-            is AuthEvent.ProofCredentialRejected -> base.copy(
-                type = AuthEventRecord.Type.ProofRejected,
-                principal = event.principal,
+            is AuthEvent.SessionCreated -> recordOf(AuthEventRecord.Type.SessionCreated, event.principal).copy(
+                sessionId = event.sessionId,
+            )
+            is AuthEvent.SessionTerminated -> recordOf(AuthEventRecord.Type.SessionTerminated, event.principal).copy(
+                sessionId = event.sessionId,
+            )
+            is AuthEvent.ProofCredentialRejected -> recordOf(AuthEventRecord.Type.ProofRejected, event.principal).copy(
                 failureReason = event.reason.name,
                 method = event.method.via,
                 methodProperty = event.method.property,
             )
-            is AuthEvent.ProofAccepted -> base.copy(
-                type = AuthEventRecord.Type.ProofAccepted,
-                principal = event.principal,
+            is AuthEvent.ProofAccepted -> recordOf(AuthEventRecord.Type.ProofAccepted, event.principal).copy(
                 method = event.method.via,
                 methodProperty = event.method.property,
             )
-            is AuthEvent.ProofIssued -> base.copy(
-                type = AuthEventRecord.Type.ProofIssued,
-                principal = event.principal,
+            is AuthEvent.ProofIssued -> recordOf(AuthEventRecord.Type.ProofIssued, event.principal).copy(
                 method = event.method.via,
                 methodProperty = event.method.property,
             )

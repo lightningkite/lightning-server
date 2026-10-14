@@ -125,6 +125,28 @@ public sealed interface AuthEvent {
     }
 
     /**
+     * Represents the session [sessionId] of [principal] being created.
+     *
+     * For example, a user logs in after proving their password.
+     */
+    public data class SessionCreated(
+        val principal: String,
+        val sessionId: Uuid,
+        override val request: Request<*>? = null,
+    ) : AuthEvent
+
+    /**
+     * Represents the session [sessionId] of [principal] being ended, by termination or deletion.
+     *
+     * For example, a user logs out, or ends their session on a lost phone from their laptop.
+     */
+    public data class SessionTerminated(
+        val principal: String,
+        val sessionId: Uuid,
+        override val request: Request<*>? = null,
+    ) : AuthEvent
+
+    /**
      * Represents a credential presented to a proof endpoint for [principal] that was accepted.
      *
      * For a method that proves ownership of an address, such as an emailed PIN, [principal] is that

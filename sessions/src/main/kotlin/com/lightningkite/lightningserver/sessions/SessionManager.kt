@@ -11,6 +11,7 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
+import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.sessions.token.*
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.services.database.*
@@ -103,7 +104,21 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             serializer = Session.serializer(principal.subjectSerializer, principal.idSerializer),
             idSerializer = Uuid.serializer(),
             tableName = principal.name + "Session",
-            signals = { sessionSignals(it) },
+            signals = sessionSignals,
+            log = { table ->
+                table.postRawChanges { changes ->
+                    for ((old, new) in changes) {
+                        val wasLive = old != null && old.terminated == null
+                        val isLive = new != null && new.terminated == null
+                        if (!wasLive && isLive) {
+                            serverRuntime.reportAuthEvent(AuthEvent.SessionCreated(new.subjectId.toString(), new._id, this?.request))
+                        }
+                        if (wasLive && !isLive) {
+                            serverRuntime.reportAuthEvent(AuthEvent.SessionTerminated(old.subjectId.toString(), old._id, this?.request))
+                        }
+                    }
+                }
+            },
             permissions = {
                 val auth = this.authOrNull
                 val canUse: Condition<Session<SUBJECT, ID>> = when {

@@ -11,30 +11,22 @@ import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
 
 /**
- * One authentication event: the history that a session row's mutable state cannot provide.
+ * Represents one authentication event, such as a rejected session or an accepted proof.
  *
- * The distinction that makes this a separate layer rather than a column somewhere: a `Session` row
- * records that a session *exists*, not that a login *happened*. Everything the survey in
- * `plans/audit-logging.md` 7.1 found was last-write-wins state on a row, an ephemeral cache counter
- * deleted on the next success, or a debug `println`. None of those can be counted, ordered, or
- * alerted on.
+ * Unlike a `Session` row, which only shows that a session exists, these rows record each login and
+ * failed attempt, so they can be counted, ordered and alerted on.
  *
- * @property origin Joins to [OriginRecord], so an auth event and the disclosures made under the
- *   resulting session share one identifier.
- * @property principal Who the event is about — the subject id, as a string, since principals differ
- *   in key type across a deployment.
- * @property actor The principal that *caused* the event, when it differs from [principal] — an
- *   administrator terminating someone else's session, or a masquerade. Null when they are the same.
- * @property sourceIp Recorded only when actually observed. A placeholder here would read as a real
- *   origin, which is the mistake this system already made once (7.1, finding 3).
- * @property failureReason Why an attempt was rejected, for the failure event types. Populated from
- *   the `Reason` of the rejecting `AuthEvent` in the sessions module.
- * @property method How the attempt was made, for events that came from a particular mechanism — a
- *   proof method's `via` ("password", "totp", "email"). Null for the refresh-token path, which has
- *   only one mechanism. Without it "which account is being attacked" is answerable but "with what"
- *   is not, and those two call for different responses.
- * @property methodProperty The property [method] was applied to, where it has one — the `email` of
- *   an emailed PIN. Null for methods that identify the subject directly, such as a password.
+ * @property origin The request or other origin the event happened under, shared with the disclosures
+ *   made during it.
+ * @property principal The subject id the event is about, or the address for an address-based proof such as an emailed PIN.
+ * @property sessionId The session the event is about, for [Type.AuthenticationFailed], [Type.SessionCreated]
+ *   and [Type.SessionTerminated].
+ * @property sourceIp The IP address the attempt came from, or `null` if none was observed.
+ * @property userAgent The user agent the attempt sent, or `null` if none was observed.
+ * @property failureReason Why the attempt was rejected, for [Type.AuthenticationFailed] and [Type.ProofRejected].
+ * @property method The proof method's `via`, such as `"password"` or `"email"`, or `null` for a refresh token.
+ * @property methodProperty The property [method] was applied to, such as the `email` of an emailed PIN,
+ *   or `null` if the method identifies the subject directly.
  */
 @GenerateDataClassPaths
 @Serializable
@@ -42,8 +34,7 @@ public data class AuthEventRecord(
     override val _id: ID,
     @Index val origin: OriginRecord.ID,
     @Index val type: Type,
-    @Index val principal: String? = null,
-    val actor: String? = null,
+    @Index val principal: String,
     val sessionId: Uuid? = null,
     val sourceIp: String? = null,
     val userAgent: String? = null,
@@ -55,22 +46,29 @@ public data class AuthEventRecord(
     @JvmInline
     public value class ID(override val raw: UuidV7) : TypedId<UuidV7, ID>
 
-    /** What happened. */
+    /** Represents what kind of authentication event happened. */
     @Serializable
     public enum class Type {
-        /** A refresh token naming a real session was rejected. [failureReason] says why. */
+        /** A refresh token naming a real session was rejected for [failureReason]. */
         AuthenticationFailed,
+
+        /** A session was created, such as when a user logs in. */
+        SessionCreated,
+
+        /** A session was ended, such as when a user logs out. */
+        SessionTerminated,
 
         /** A proof (password, TOTP, WebAuthN, backup code, emailed PIN, OAuth) was accepted. */
         ProofAccepted,
 
-        /** A credential presented for a real account was rejected. [failureReason] says why. */
+        /** A credential presented for a real account was rejected for [failureReason]. */
         ProofRejected,
 
-        /** A proof was minted and sent to someone without any credential being presented, as with a magic link. */
+        /** A proof was sent to someone without any credential being presented, as with a magic link. */
         ProofIssued,
     }
 
+    /** Returns when the event happened, taken from the version 7 [_id]. */
     public val at: Instant
         get() = _id.timestamp()
 }
