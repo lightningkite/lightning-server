@@ -151,7 +151,7 @@ public class TimeBasedOTPProofEndpoints(
                 val subject = input.type
                 val handler = serverRuntime.server.principalTypes[subject]
                     ?: run {
-                        reportProofRejected(info, ProofFailureReason.MalformedRequest, request = request)
+                        serverRuntime.reportAuthEvent(AuthEvent.ProofRejected(info, AuthEvent.ProofRejected.Reason.MalformedRequest, request = request))
                         throw IllegalArgumentException("No subject $subject recognized")
                     }
                 // Normalize BEFORE building the rate-limit key: the key must be derived from the canonical
@@ -168,7 +168,7 @@ public class TimeBasedOTPProofEndpoints(
                         ?: run {
                             // No account resolved, so no principal to name. Recorded anyway: a run of these
                             // against different values is what enumeration looks like.
-                            reportProofRejected(info, ProofFailureReason.NoSuchSubject, request = request)
+                            serverRuntime.reportAuthEvent(AuthEvent.ProofRejected(info, AuthEvent.ProofRejected.Reason.NoSuchSubject, request = request))
                             throw BadRequestException("User ID and code do not match")
                         }
 
@@ -190,12 +190,12 @@ public class TimeBasedOTPProofEndpoints(
                         break
                     }
                     val matched = matching ?: run {
-                        reportProofRejected(
+                        serverRuntime.reportAuthEvent(AuthEvent.ProofCredentialRejected(
                             info,
-                            ProofFailureReason.SecretMismatch,
+                            AuthEvent.ProofCredentialRejected.Reason.SecretMismatch,
                             principal = subjectId,
                             request = request,
-                        )
+                        ))
                         throw BadRequestException("User ID and code do not match")
                     }
 
@@ -212,12 +212,12 @@ public class TimeBasedOTPProofEndpoints(
                     // is harmless here — it only confirms a code the caller already supplied was once valid — and
                     // a clear "wait for the next code" is far better UX than a misleading "does not match".
                     if (!claimed) {
-                        reportProofRejected(
+                        serverRuntime.reportAuthEvent(AuthEvent.ProofCredentialRejected(
                             info,
-                            ProofFailureReason.SecretAlreadyUsed,
+                            AuthEvent.ProofCredentialRejected.Reason.SecretAlreadyUsed,
                             principal = subjectId,
                             request = request,
-                        )
+                        ))
                         throw BadRequestException(
                             "That code was already used. Please wait for your authenticator to show a new code."
                         )
@@ -227,7 +227,7 @@ public class TimeBasedOTPProofEndpoints(
                         it.lastUsedAt assign now
                     })
 
-                    reportProofAccepted(info, principal = subjectId, request = request)
+                    serverRuntime.reportAuthEvent(AuthEvent.ProofAccepted(info, principal = subjectId, request = request))
                     proofSigner.await().makeProof(
                         property = input.property,
                         value = normalizedValue,

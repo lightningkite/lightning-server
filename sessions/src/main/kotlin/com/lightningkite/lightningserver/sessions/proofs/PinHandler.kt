@@ -51,11 +51,9 @@ public open class PinHandler(
     }
 
     /**
-     * The identifier a pending PIN was established for, or null when [key] is unknown or expired.
+     * Returns the identifier a pending PIN was established for, or `null` if [key] is unknown or expired.
      *
-     * Exists so that a failed [assert] can say *what* the attempt was against: the key on its own is a
-     * random UUID, which cannot be counted or alerted on. Reads the same entry [assert] consumes on
-     * success, without disturbing it.
+     * This reads the entry [assert] consumes without consuming it, so a failed [assert] can report what the attempt was against.
      */
     context(server: ServerRuntime)
     public suspend fun pendingTarget(key: String): String? = cache().get<String>(valueCacheKey(key))

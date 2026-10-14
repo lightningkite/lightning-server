@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
+import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.*
@@ -163,7 +164,7 @@ public class KnownDeviceProofEndpoints(
                 val id = input.substringBefore('/').let {
                     try { Uuid.parse(it) }
                     catch (e: IllegalArgumentException) {
-                        reportProofRejected(info, ProofFailureReason.MalformedRequest, request = request)
+                        serverRuntime.reportAuthEvent(AuthEvent.ProofRejected(info, AuthEvent.ProofRejected.Reason.MalformedRequest, request = request))
                         throw BadRequestException(
                             message = "Invalid known device identifier. ${e.message}",
                             data = it,
@@ -180,18 +181,18 @@ public class KnownDeviceProofEndpoints(
                     val active = modelInfo.table().get(id)
                         ?: run {
                             // The device id names no record, so there is no account behind it to name.
-                            reportProofRejected(info, ProofFailureReason.NoSuchSubject, request = request)
+                            serverRuntime.reportAuthEvent(AuthEvent.ProofRejected(info, AuthEvent.ProofRejected.Reason.NoSuchSubject, request = request))
                             throw BadRequestException("No such known device")
                         }
 
                     // Good: Uses constant-time checkAgainstHash to prevent timing attacks
                     if (!secret.checkAgainstHash(active.hash)) {
-                        reportProofRejected(
+                        serverRuntime.reportAuthEvent(AuthEvent.ProofCredentialRejected(
                             info,
-                            ProofFailureReason.SecretMismatch,
+                            AuthEvent.ProofCredentialRejected.Reason.SecretMismatch,
                             principal = active.subjectId,
                             request = request,
-                        )
+                        ))
                         throw BadRequestException("User ID and code do not match")
                     }
 
@@ -205,7 +206,7 @@ public class KnownDeviceProofEndpoints(
                         }
                     })
 
-                    reportProofAccepted(info, principal = active.subjectId, request = request)
+                    serverRuntime.reportAuthEvent(AuthEvent.ProofAccepted(info, principal = active.subjectId, request = request))
                     proofSigner.await().makeProof(
                         property = "${active.subjectType}/_id",
                         value = active.subjectId,

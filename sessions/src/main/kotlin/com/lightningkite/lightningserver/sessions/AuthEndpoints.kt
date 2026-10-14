@@ -27,39 +27,12 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
 
 /**
- * Provides a complete proof-based authentication system for user sessions.
+ * Provides proof-based authentication endpoints for sessions of [SUBJECT].
  *
- * This class implements a flexible authentication flow where users prove their identity through
- * one or more authentication methods (proofs). Each proof method has an associated strength value,
- * and users must accumulate sufficient proof strength to authenticate successfully.
+ * A user proves their identity with one or more proofs, each from a proof method with a strength. A session is created once the total strength of the proofs, counting only the strongest method for each property, reaches [requiredProofStrengthFor] the user, and the user receives a refresh token.
  *
- * ## Authentication Flow
- *
- * 1. User submits one or more proofs (e.g., password, email verification code, SMS code, biometric)
- * 2. System validates each proof and identifies the user
- * 3. System calculates total authentication strength from all valid proofs
- * 4. If total strength meets the required threshold, a session is created
- * 5. User receives a refresh token to maintain their session
- *
- * ## Proof System
- *
- * - Each proof method has a "strength" value indicating its security level
- * - Different properties (email, phone, etc.) can have multiple proof methods
- * - Required strength can vary per user based on security requirements
- * - Proofs have signatures to prevent tampering and expiration times
- *
- * ## Key Concepts
- *
- * - **Proof**: A signed piece of evidence that a user has verified a property (email, phone, password, etc.)
- * - **Proof Method**: A specific way to verify a property (e.g., email magic link, SMS PIN, password check)
- * - **Proof Strength**: A numeric value representing how secure a proof method is
- * - **Required Strength**: The minimum total strength needed to authenticate
- *
- * @param SUBJECT The type of user/entity being authenticated (must have an ID)
- * @param ID The type of the subject's unique identifier
- * @param principal Defines the type of principal being authenticated and how to fetch/manage users
- * @param database Runtime access to the database for session storage
- * @param tokenFormat Format for generating session tokens (defaults to PrivateTinyTokenFormat)
+ * @param principal Defines the type of principal being authenticated and how to fetch it.
+ * @param tokenFormat The format of generated session tokens.
  */
 public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     principal: PrincipalType<SUBJECT, ID>,
@@ -74,37 +47,17 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     }
 
     /**
-     * Determines the minimum proof strength required for the given subject to authenticate.
+     * Returns the minimum total proof strength [subject] needs to log in.
      *
-     * This abstract method allows customizing authentication requirements per user. For example:
-     * - Admin users might require higher strength (e.g., 200)
-     * - Regular users might require lower strength (e.g., 100)
-     * - Users with security flags might require multi-factor authentication
-     *
-     * The actual strength required will be capped at the maximum strength the user can possibly
-     * achieve with their established proof methods.
-     *
-     * @param subject The user attempting to authenticate
-     * @return The minimum total proof strength required for this user to log in
+     * The strength actually required is capped at the maximum the subject can reach with their established proof methods.
      */
     context(server: ServerRuntime)
     public abstract suspend fun requiredProofStrengthFor(subject: SUBJECT): Int
 
     /**
-     * Calculates the maximum possible proof strength a user can achieve with the given proof methods.
+     * Returns the maximum total strength reachable with [methods].
      *
-     * For each unique property (email, phone, etc.), only the strongest proof method counts toward
-     * the total. This prevents users from "stacking" multiple weak proofs for the same property.
-     *
-     * For example, if a user has:
-     * - Email password (strength 100)
-     * - Email magic link (strength 80)
-     * - Phone SMS code (strength 90)
-     *
-     * The max possible strength is 100 (email) + 90 (phone) = 190, not 270.
-     *
-     * @param methods The collection of proof methods available to the user
-     * @return The maximum total strength achievable
+     * Only the strongest method for each property counts, so email password (100), email magic link (80) and phone SMS (90) give 190, not 270.
      */
     private fun maxStrengthPossible(methods: Collection<ProofMethod>): Int =
         methods
@@ -153,15 +106,11 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     )
 
     /**
-     * Creates a new authenticated session if the user has provided sufficient proof strength.
+     * Returns a new session and its refresh token if [result] shows enough proof strength, or `null` otherwise.
      *
-     * This internal method is called after proofs have been validated. It respects session
-     * expiration limits from both the proof check result and the login request, using the
-     * more restrictive of the two.
+     * Each of the proofs in [request] is marked as used, so it cannot create another session. The session expires at the earlier of `maxExpiration` in [result] and the expiration in [request], where each is present.
      *
-     * @param request The login request containing session preferences (label, scopes, expiration)
-     * @param result The proof validation result including whether authentication succeeded
-     * @return A pair of (Session, RefreshToken) if authentication succeeded, null otherwise
+     * A proof that has already created a session fails with `proof-already-used` (400).
      */
     context(_: ServerRuntime)
     protected suspend fun newSession(
@@ -195,30 +144,14 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         )
     }
 
-    /** Deterministic SHA-256 fingerprint of a proof signature, used as a single-use cache key without
-     *  storing the raw signature (so a cache leak yields no replayable proof material). */
+    /** Returns a SHA-256 fingerprint of [signature], so the single-use cache key holds no replayable proof material. */
     private fun proofSignatureFingerprint(signature: String): String =
         Base64.UrlSafe.encode(MessageDigest.getInstance("SHA-256").digest(signature.encodeToByteArray()))
 
     /**
-     * GET /auth-requirements
+     * Returns the proof options and required strength the authenticated user must meet to re-authenticate.
      *
-     * Returns authentication requirements for the currently authenticated user.
-     *
-     * This endpoint is used when a user needs to re-authenticate (e.g., for a sensitive operation)
-     * or when they want to see what authentication methods are available to them.
-     *
-     * The endpoint returns:
-     * - A list of proof options (methods the user has established)
-     * - The required strength threshold they must meet
-     * - For each method, the associated property value (e.g., their email address, partially masked)
-     *
-     * **Authentication:** Requires an active session with the "auth:requirements" scope.
-     *
-     * **Response:** [AuthRequirements] containing available proof methods and required strength.
-     *
-     * @see AuthRequirements
-     * @see ProofOption
+     * Requires a session with the `auth:requirements` scope.
      */
     public val authRequirements: ApiHttpHandler<PathSpec0, SUBJECT, Unit, AuthRequirements> =
         path.path("auth-requirements").get bind explicitApiHttpHandler(
@@ -250,38 +183,9 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         )
 
     /**
-     * POST /login
+     * Logs in with a list of [Proof]s, returning a refresh token if their strength is sufficient and the proof options still needed otherwise.
      *
-     * Attempts to authenticate a user using a list of proofs.
-     *
-     * This is a simplified login endpoint that accepts only a list of proofs without additional
-     * options. For more control over session creation (expiration, label, scopes), use [login2] instead.
-     *
-     * **Authentication Flow:**
-     * 1. Client submits one or more signed proofs
-     * 2. System validates signatures and expiration
-     * 3. System identifies the user from the proofs
-     * 4. System calculates total proof strength
-     * 5. If strength is sufficient, creates a session and returns a refresh token
-     * 6. If insufficient, returns what additional proof methods are needed
-     *
-     * **Request Body:** List of [Proof] objects
-     *
-     * **Response:** [IdAndAuthMethods] containing:
-     * - The user's ID
-     * - Available proof options if more authentication is needed
-     * - Required strength threshold
-     * - Refresh token if authentication succeeded (null if more proofs needed)
-     *
-     * **Errors:**
-     * - `no-single-user` (404): Proofs don't uniquely identify a single user
-     * - `invalid-proof` (400): Proof signature is invalid
-     * - `irrelevant-proof` (400): Proof doesn't match the identified user
-     * - `expired-proof` (400): Proof has expired
-     * - `nonexistent-proof-method` (400): Proof method not recognized
-     *
-     * @see login2 For login with session customization options
-     * @see proofsCheck For checking authentication status without creating a session
+     * Use [login2] to also set the session's expiration, label or scopes. The errors are `no-single-user` (404) and `invalid-proof`, `irrelevant-proof`, `expired-proof`, `nonexistent-proof-method` and `proof-already-used` (400).
      */
     public val login: ApiHttpHandler<PathSpec0, HasId<*>?, List<Proof>, IdAndAuthMethods<ID>> =
         path.path("login").post bind explicitApiHttpHandler(
@@ -297,35 +201,9 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         )
 
     /**
-     * POST /login2
+     * Logs in like [login], with the session's expiration, label and scopes taken from the [LogInRequest].
      *
-     * Attempts to authenticate a user with full control over session parameters.
-     *
-     * This is the full-featured login endpoint that allows specifying session customization options
-     * such as expiration time, device label, and requested scopes.
-     *
-     * **Authentication Flow:**
-     * Same as [login], but with additional session customization:
-     * 1. Client submits proofs plus session preferences
-     * 2. System validates proofs and identifies user
-     * 3. If authentication succeeds, creates a session with the specified options
-     *
-     * **Request Body:** [LogInRequest] containing:
-     * - `proofs`: List of authentication proofs
-     * - `label`: Optional device/session label (e.g., "iPhone 12", "Chrome on Windows")
-     * - `expires`: Optional expiration time for the session
-     * - `scopes`: Optional set of permission scopes requested for the session
-     *
-     * **Response:** [IdAndAuthMethods] containing:
-     * - The user's ID
-     * - Available proof options if more authentication is needed
-     * - Required strength threshold
-     * - Refresh token if authentication succeeded (null if more proofs needed)
-     *
-     * **Errors:** Same as [login]
-     *
-     * @see login For simple login without session customization
-     * @see LogInRequest
+     * Fails with the same errors as [login].
      */
     public val login2: ApiHttpHandler<PathSpec0, HasId<*>?, LogInRequest, IdAndAuthMethods<ID>> =
         path.path("login2").post bind explicitApiHttpHandler(
@@ -348,40 +226,9 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         )
 
     /**
-     * POST /proofs-check
+     * Returns the status of a list of [Proof]s as a [ProofsCheckResult] without creating a session.
      *
-     * Validates proofs and returns authentication status WITHOUT creating a session.
-     *
-     * This endpoint is useful for:
-     * - Checking if proofs are valid before committing to a login
-     * - Multi-step authentication flows where you want to validate each step
-     * - Determining what additional proof methods are needed
-     * - UI flows that show progressive authentication status
-     *
-     * Unlike [login] and [login2], this endpoint never creates a session or returns a refresh token,
-     * even if the proofs are sufficient. It only validates and reports status.
-     *
-     * **Request Body:** List of [Proof] objects to validate
-     *
-     * **Response:** [ProofsCheckResult] containing:
-     * - `id`: The user ID identified by the proofs
-     * - `readyToLogIn`: Whether the proofs are sufficient to authenticate
-     * - `strengthRequired`: The required proof strength threshold
-     * - `options`: Available proof methods the user hasn't used yet
-     * - `maxExpiration`: Maximum session expiration time based on the proofs provided
-     *
-     * **Errors:** Same as [login]
-     *
-     * **Use Cases:**
-     * ```
-     * // Example: Two-factor authentication flow
-     * 1. User enters password -> proofsCheck returns readyToLogIn=false, shows SMS option
-     * 2. User enters SMS code -> proofsCheck returns readyToLogIn=true
-     * 3. Client calls login2 with both proofs to create session
-     * ```
-     *
-     * @see login For creating a session
-     * @see ProofsCheckResult
+     * Unlike [login] and [login2], this never returns a refresh token even when the proofs are sufficient, so it suits multi-step flows that validate each proof as it is entered. Fails with the same errors as [login].
      */
     public val proofsCheck: ApiHttpHandler<PathSpec0, HasId<*>?, List<Proof>, ProofsCheckResult<ID>> =
         path.path("proofs-check").post bind explicitApiHttpHandler(
@@ -461,23 +308,9 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         )
 
     /**
-     * REST endpoints for managing sessions at /sessions.
+     * Provides REST endpoints at `/sessions` for the authenticated user to list, read, update and delete their own sessions.
      *
-     * Provides full CRUD operations for user sessions:
-     * - **GET /sessions**: List all active sessions for the authenticated user
-     * - **GET /sessions/{id}**: Get details of a specific session
-     * - **DELETE /sessions/{id}**: Revoke/delete a specific session (logout from that device)
-     * - **PATCH /sessions/{id}**: Update session details (e.g., change label)
-     *
-     * This allows users to:
-     * - See all devices/locations they're logged in from
-     * - Revoke access from lost or stolen devices
-     * - Manage session labels for identification
-     *
-     * **Authentication:** Requires an active session (inherited from SessionManager)
-     *
-     * @see SessionManager For session creation and token management
-     * @see Session For session data model
+     * Deleting a session logs that device out.
      */
     public val sessions: ModelRestEndpoints<SUBJECT, Session<SUBJECT, ID>, Uuid> =
         path.path("sessions") include ModelRestEndpoints(info = sessionInfo)

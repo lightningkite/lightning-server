@@ -149,6 +149,7 @@ class DataAccessLogTest {
      * run. Everything else here checks that rows appear; this checks that the read does not happen
      * when they cannot.
      */
+    @OptIn(com.lightningkite.services.data.Unsafe::class)
     @Test
     fun `a query whose record cannot be written does not run`() = onServer { runtime ->
         var reads = 0

@@ -10,6 +10,7 @@ import kotlin.uuid.Uuid
 
 class RequestRecordTest {
 
+    @OptIn(Unsafe::class)
     private fun origin(id: ExecutionId) = OriginRecord(
         _id = OriginRecord.ID(id),
         root = id,

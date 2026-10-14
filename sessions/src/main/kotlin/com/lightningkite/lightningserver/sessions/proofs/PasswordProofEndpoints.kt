@@ -173,7 +173,7 @@ public class PasswordProofEndpoints(
                 val subject = input.type
                 val handler = serverRuntime.server.principalTypes.values.find { it.name == subject }
                     ?: run {
-                        reportProofRejected(info, ProofFailureReason.MalformedRequest, request = request)
+                        serverRuntime.reportAuthEvent(AuthEvent.ProofRejected(info, AuthEvent.ProofRejected.Reason.MalformedRequest, request = request))
                         throw BadRequestException("No subject $subject recognized")
                     }
                 // Normalize BEFORE building the rate-limit key: the key must be derived from the canonical
@@ -190,7 +190,7 @@ public class PasswordProofEndpoints(
                         ?: run {
                             // No account resolved, so no principal to name. Recorded anyway: a run of
                             // these against different values is what enumeration looks like.
-                            reportProofRejected(info, ProofFailureReason.NoSuchSubject, request = request)
+                            serverRuntime.reportAuthEvent(AuthEvent.ProofRejected(info, AuthEvent.ProofRejected.Reason.NoSuchSubject, request = request))
                             throw BadRequestException("User ID and code do not match")
                         }
 
@@ -200,12 +200,12 @@ public class PasswordProofEndpoints(
 
                     val matching = active.find { input.password.checkAgainstHash(it.hash) }
                         ?: run {
-                            reportProofRejected(
+                            serverRuntime.reportAuthEvent(AuthEvent.ProofCredentialRejected(
                                 info,
-                                ProofFailureReason.SecretMismatch,
+                                AuthEvent.ProofCredentialRejected.Reason.SecretMismatch,
                                 principal = subjectId,
                                 request = request,
-                            )
+                            ))
                             throw BadRequestException("User ID and code do not match")
                         }
 
@@ -213,7 +213,7 @@ public class PasswordProofEndpoints(
                         it.lastUsedAt assign now
                     })
 
-                    reportProofAccepted(info, principal = subjectId, request = request)
+                    serverRuntime.reportAuthEvent(AuthEvent.ProofAccepted(info, principal = subjectId, request = request))
                     proofSigner.await().makeProof(
                         property = input.property,
                         value = normalizedValue,

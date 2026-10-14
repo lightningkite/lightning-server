@@ -1,5 +1,8 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
+import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.sessions.reportAuthEvent
+import com.lightningkite.lightningserver.sessions.AuthEvent
 import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.NotFoundException
@@ -65,8 +68,8 @@ public abstract class PinBasedProofEndpoints(
             }
         )
 
-    context(_: ServerRuntime)
-    protected suspend fun issueProof(destination: String, request: Request<*>? = null): Proof {
+    context(server: ServerRuntime)
+    protected suspend fun issueProof(destination: String, request: Request<*>?): Proof {
         val proof = proofSigner.await().makeProof(
             property = property,
             value = destination,
@@ -78,7 +81,7 @@ public abstract class PinBasedProofEndpoints(
         // `request` is the request that asked for the link to be sent, where the caller has one —
         // which is the normal case, since a frontend triggers this. It carries the IP and user agent
         // of whoever asked, which is what an investigation into a misused link starts from.
-        reportProofIssued(info, principal = destination, request = request)
+        server.reportAuthEvent(AuthEvent.ProofIssued(info, principal = destination, request = request))
         return proof
     }
 
@@ -97,23 +100,19 @@ public abstract class PinBasedProofEndpoints(
                 val value = try {
                     pin.assert(input.key, input.password)
                 } catch (e: NotFoundException) {
-                    reportProofRejected(
-                        info,
-                        ProofFailureReason.SecretExpired,
-                        principal = target,
-                        request = request,
+                    serverRuntime.reportAuthEvent(
+                        if (target == null) AuthEvent.ProofRejected(info, AuthEvent.ProofRejected.Reason.NoSuchChallenge, request)
+                        else AuthEvent.ProofCredentialRejected(info, AuthEvent.ProofCredentialRejected.Reason.SecretExpired, target, request)
                     )
                     throw e
                 } catch (e: BadRequestException) {
-                    reportProofRejected(
-                        info,
-                        ProofFailureReason.SecretMismatch,
-                        principal = target,
-                        request = request,
+                    serverRuntime.reportAuthEvent(
+                        if (target == null) AuthEvent.ProofRejected(info, AuthEvent.ProofRejected.Reason.NoSuchChallenge, request)
+                        else AuthEvent.ProofCredentialRejected(info, AuthEvent.ProofCredentialRejected.Reason.SecretMismatch, target, request)
                     )
                     throw e
                 }
-                reportProofAccepted(info, principal = value, request = request)
+                serverRuntime.reportAuthEvent(AuthEvent.ProofAccepted(info, principal = value, request = request))
                 proofSigner.await().makeProof(
                     property = property,
                     value = value,

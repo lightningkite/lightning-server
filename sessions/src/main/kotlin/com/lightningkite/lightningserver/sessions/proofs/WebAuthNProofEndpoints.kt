@@ -1,5 +1,7 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
+import com.lightningkite.lightningserver.sessions.reportAuthEvent
+import com.lightningkite.lightningserver.sessions.AuthEvent
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.*
@@ -38,117 +40,16 @@ import kotlin.uuid.Uuid
 /**
  * Provides WebAuthn (passkey) registration and authentication as a [ProofMethod].
  *
- * WebAuthn replaces a shared secret with public-key cryptography: the authenticator — a platform
- * biometric sensor, a roaming security key, or a synced passkey provider — holds the private key and
- * signs a server-issued challenge. There is no secret to phish, reuse across sites, or recover from a
- * server breach. This class issues those challenges, verifies the responses with webauthn4j, stores
- * the results as [WebAuthNCredential], and mints a [Proof] that the subject's `AuthEndpoints` can
- * exchange for a session.
+ * A subject adds a passkey with [registerStart] and [registerFinish], which require a recent proof, then logs in with [start] and [prove] and exchanges the resulting [Proof] at `AuthEndpoints.login`. [info] has a strength of 10, and [prove] issues 20 when the authenticator verified the user, so requiring more than 10 demands verified presence.
  *
- * ## Registration flow
+ * [start] never looks a subject up from a bare identifier, so it does not reveal which accounts have passkeys. Without a proof it starts the discoverable flow, and with a proof it returns that subject's credential ids. A subject with only non-discoverable credentials must therefore authenticate with another method first.
  *
- * 1. Client calls [registerStart] and receives a challenge plus creation options
- * 2. Client hands those to `navigator.credentials.create()` (or the platform equivalent)
- * 3. Client calls [registerFinish] with the attested credential
- * 4. Server verifies it and stores a [WebAuthNCredential]
- *
- * Both endpoints require [proofMethodAuth], whose `maxAge` is 10 minutes: a passkey can only be added
- * by someone who authenticated *recently*, not merely by someone holding a long-lived session.
- *
- * ## Authentication flow
- *
- * 1. Client calls [start], optionally with a proof from another method, and receives a challenge
- * 2. Client hands it to `navigator.credentials.get()`
- * 3. Client calls [prove] with the assertion and receives a signed [Proof]
- * 4. Client submits that proof to `AuthEndpoints.login` to obtain a session
- *
- * Neither endpoint requires authentication, since this is how a subject logs in. [start] does
- * additionally accept an authenticated caller, for re-authentication and step-up.
- *
- * ## Strength
- *
- * [info] reports a strength of 10. An assertion whose authenticator data carries the UV (user
- * verified) flag — a biometric or PIN, not merely a presence tap — is upgraded to 20, so an
- * application can demand verified presence by requiring a threshold above 10.
- *
- * ## What binds an assertion to this application
- *
- * Three independent checks, all of which matter:
- *
- * - **rpId** — the authenticator signs `SHA-256(rpId)`, which a client cannot forge. This is what
- *   confines a credential to your domain rather than the whole web.
- * - **origin** — matched against [allowedOrigins]. rpId alone is *not* sufficient, because a browser
- *   will mint an assertion for an rpId from any origin whose effective domain is subordinate to it.
- * - **challenge** — server-generated from [SecureRandom], [challengeLength] bytes wide, single-use,
- *   and valid only for [expiration].
- *
- * Beyond that, a credential is scoped to one principal type: [prove] resolves the credential by id
- * *and* [WebAuthNCredential.subjectType], and labels the resulting proof with the type the credential
- * actually belongs to. A credential registered under one principal type can therefore never produce a
- * proof for another, even where two types share an id space.
- *
- * ## Account enumeration
- *
- * [start] never looks a subject up from a bare identifier. Without a proof it performs the
- * discoverable flow and reveals nothing about any account. With a proof it returns that subject's
- * credential ids, but a signed proof can only come from someone who already holds another factor for
- * the account. So the credential ids, their count, and their transports are never exposed to a
- * caller who merely knows an email address.
- *
- * This means a subject whose credentials are non-discoverable must use another method first (for
- * example a password or email code) and then their security key, as on most other sites. Discoverable
- * passkeys can still be used first, or on their own. A subject with only non-discoverable credentials
- * and no other established method has no way to reach their key, so make sure such subjects have
- * another method.
- *
- * [prove] reports one opaque error for an unknown credential and for a bad signature alike.
- *
- * ## Native mobile clients
- *
- * A native app does not report a web origin, so [allowedOrigins] needs its platform-specific form as
- * well: iOS reports `https://<rpId>` (authorized via Associated Domains), while Android reports
- * `android:apk-key-hash:<base64url SHA-256 of the app signing certificate>` (authorized via Digital
- * Asset Links). The Android value differs per signing key, so debug and release builds are separate
- * entries, and under Play App Signing it is the Google-managed key that counts. The platform checks
- * its own well-known file before it will produce an assertion at all, so serving `assetlinks.json` /
- * `apple-app-site-association` from the rpId domain is required in addition to listing the origin
- * here.
- *
- * @param database Runtime access to the database holding [WebAuthNCredential] records
- * @param cache Runtime access to the cache holding in-flight challenges
- * @param proofSigner Signs the [Proof] this method issues
- * @param proofExpiration How long an issued [Proof] remains valid
- * @param challengeLength Challenge size in bytes
- * @param expiration How long an issued challenge stays usable. Sent to the client as `timeout` AND
- *   enforced server-side as the challenge's cache lifetime, so the two cannot drift apart.
- * @param rpId The relying party id the credentials are scoped to — your registrable domain, or a
- *   subdomain if you do not need credentials shared across subdomains
- * @param allowedOrigins The exact origins permitted to create and use these credentials, e.g.
- *   `https://app.example.com`.
- *
- *   This MUST be an explicit allowlist. [rpId] alone is not sufficient: the browser will happily mint
- *   an assertion for an [rpId] from *any* origin whose effective domain is a subordinate of it, so
- *   with an [rpId] of `example.com` an XSS or subdomain takeover on `anything.example.com` can
- *   produce assertions the authenticator itself considers valid. The origin check is what narrows
- *   that back down to your application. See **Native mobile clients** above for the non-web forms.
- * @param registrationForUser Supplies the per-subject creation options (user entity, algorithms,
- *   authenticator selection, attestation preference) for [registerStart]. It receives the client's
- *   resident-key preference as a hint only. The residency the browser is asked for is the returned
- *   [WebAuthN.AuthenticatorSelectionOptions.residentKey], so return the hint there if you want to
- *   honor it.
- * @param proveOptions Supplies the per-request assertion options for [start]. It receives the
- *   subject id resolved from the request's proof (or the authenticated caller), or null for the
- *   discoverable flow.
- * @param webAuthnManager The verifier used for both registration and authentication.
- *
- *   The default performs **no attestation verification whatsoever**:
- *   [WebAuthnManager.createNonStrictWebAuthnManager] installs `NoneAttestationStatementVerifier` plus
- *   the `Null*` statement verifiers and both `Null*TrustworthinessVerifier`s. That is the right
- *   default for ordinary passkey logins, where attestation buys nothing, but it means setting
- *   [WebAuthN.Registration.RegistrationOptions.attestation] to [WebAuthN.Attestation.Direct] or
- *   [WebAuthN.Attestation.Enterprise] requests attestation from the authenticator and then ignores it
- *   — an authenticator allowlist built that way is decorative. Supply a strict [WebAuthnManager] with
- *   a `CertPathTrustworthinessVerifier` and a metadata source if you need to actually enforce one.
+ * @param rpId The relying party id the credentials are scoped to, typically your registrable domain.
+ * @param allowedOrigins The exact origins permitted to create and use these credentials, such as `https://app.example.com`. This must be an explicit allowlist, since browsers produce assertions for [rpId] from any subdomain. Native apps need their own form: `https://<rpId>` on iOS, and `android:apk-key-hash:<base64url SHA-256 of the signing certificate>` on Android, which differs per signing key. Each also requires its platform's association file to be served from the [rpId] domain.
+ * @param expiration How long an issued challenge stays usable, both as the `timeout` sent to the client and as its cache lifetime.
+ * @param registrationForUser Supplies the creation options for [registerStart]. The client's resident-key preference is only a hint, so return it in [WebAuthN.AuthenticatorSelectionOptions.residentKey] to honor it.
+ * @param proveOptions Supplies the assertion options for [start], given the subject id resolved from the request, or `null` for the discoverable flow.
+ * @param webAuthnManager The verifier for registration and authentication. The default performs no attestation verification, so requesting [WebAuthN.Attestation.Direct] or [WebAuthN.Attestation.Enterprise] has no effect. Supply a strict [WebAuthnManager] to enforce an authenticator allowlist.
  */
 public class WebAuthNProofEndpoints(
     database: Runtime<Database>,
@@ -170,12 +71,7 @@ public class WebAuthNProofEndpoints(
         sdkSettings.clientInterface = ProofClientEndpoints.WebAuthN::class.info()
     }
 
-    /**
-     * Identifies this method to `AuthEndpoints` and to clients choosing a login option.
-     *
-     * Strength 10 covers an ordinary user-presence assertion; [prove] reports 20 instead when the
-     * authenticator sets the UV flag.
-     */
+    /** Identifies this method to `AuthEndpoints` and to clients choosing a login option, with strength 10. */
     override val info: ProofMethodInfo = ProofMethodInfo(
         via = "WebAuthN",
         property = null,
@@ -189,18 +85,9 @@ public class WebAuthNProofEndpoints(
         }
 
     /**
-     * The [WebAuthNCredential] table and the permissions governing it.
+     * Describes the [WebAuthNCredential] table and its permissions.
      *
-     * Registration is the only way a credential is created and there is no deletion, so both `create`
-     * and `delete` are [Condition.Never] — a subject revokes a passkey by setting `disabledAt`.
-     *
-     * A subject may read their own credentials and an administrator may read any, with
-     * `attestationObject` and `transports` masked out. Writes are whitelisted rather than
-     * blacklisted: only `disabledAt` is self-service and only an administrator may set `expiresAt`.
-     * Everything else — `lastSignCount` above all, since it is the clone-detection counter — is
-     * server-maintained and must not be writable by the credential's owner.
-     *
-     * @see rest
+     * Credentials cannot be created or deleted through it, so a subject revokes a passkey by setting `disabledAt`. A subject may read their own credentials and an administrator any, with `attestationObject` and `transports` masked. Only `disabledAt` is writable by the subject, and only an administrator may set `expiresAt`.
      */
     public val modelInfo: ModelInfo<HasId<*>, WebAuthNCredential, String> = database.modelInfo(
         tableName = "WebAuthNCredential",
@@ -229,13 +116,7 @@ public class WebAuthNProofEndpoints(
         }
     )
 
-    /**
-     * REST endpoints under `/credentials` for listing, inspecting and revoking stored passkeys,
-     * governed by [modelInfo]'s permissions.
-     *
-     * Intended for a "your devices" management screen: a subject lists their own credentials and
-     * disables ones they no longer control.
-     */
+    /** Provides REST endpoints at `/credentials` for a subject to list and revoke their stored passkeys, governed by [modelInfo]. */
     public val rest: ModelRestEndpoints<HasId<*>, WebAuthNCredential, String> =
         path.path("credentials") include ModelRestEndpoints(modelInfo)
 
@@ -243,13 +124,7 @@ public class WebAuthNProofEndpoints(
     private fun challengeCacheKey(key: String): String =
         "webAuthN_challenge_${key}"
 
-    /**
-     * Server-side state for an in-flight [registerStart] challenge, held in the cache under a random
-     * id until [registerFinish] consumes it.
-     *
-     * Public only because it is serialized into the cache; it is not part of the HTTP surface and the
-     * challenge id, not this record, is what the client holds.
-     */
+    /** Holds the cached state of an in-flight [registerStart] challenge until [registerFinish] consumes it. */
     @Serializable
     public data class RegistrationCache(
         val challenge: String,
@@ -259,12 +134,9 @@ public class WebAuthNProofEndpoints(
     )
 
     /**
-     * Server-side state for an in-flight [start] challenge, held in the cache until [prove] consumes
-     * it. As with [RegistrationCache], this is cache state rather than API.
+     * Holds the cached state of an in-flight [start] challenge until [prove] consumes it.
      *
-     * [subjectType] scopes which credentials [prove] will accept, and [allowCredentials] records the
-     * ids offered to the client so the assertion can be held to them — empty means the discoverable
-     * (usernameless) flow, where any credential of that subject type is acceptable.
+     * [subjectType] limits which credentials [prove] accepts, and an empty [allowCredentials] means the discoverable flow, where any credential of that type is acceptable.
      */
     @Serializable
     public data class AuthenticationCache(
@@ -274,7 +146,7 @@ public class WebAuthNProofEndpoints(
         val allowCredentials: List<String>,
     )
 
-    /** A fresh base64url challenge of [challengeLength] random bytes from [SecureRandom]. */
+    /** Returns a base64url challenge of [challengeLength] random bytes from [SecureRandom]. */
     @OptIn(ExperimentalEncodingApi::class)
     private fun generate(): String {
         val bytes = ByteArray(challengeLength)
@@ -283,11 +155,9 @@ public class WebAuthNProofEndpoints(
     }
 
     /**
-     * Whether [subject] has at least one usable passkey, and therefore whether `AuthEndpoints` should
-     * offer this method as a login option for them.
+     * Returns `true` if [subject] has a passkey that is neither disabled nor expired, so `AuthEndpoints` should offer this method.
      *
-     * Counts only credentials that are neither disabled nor expired, and only those registered under
-     * this [principal]'s type.
+     * Only credentials registered under this [principal]'s type count.
      */
     context(server: ServerRuntime)
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> established(
@@ -303,10 +173,7 @@ public class WebAuthNProofEndpoints(
         }) != null
     }
 
-    /**
-     * The subject's usable credentials, in the shape the client passes to the browser as
-     * `excludeCredentials` (registration) or `allowCredentials` (authentication).
-     */
+    /** Returns the subject's usable credentials in the shape the browser expects for `excludeCredentials` or `allowCredentials`. */
     context(server: ServerRuntime)
     private suspend fun userCredentials(subjectId: String, subjectType: String): List<WebAuthN.ExistingCredential> =
         modelInfo.table()
@@ -324,30 +191,9 @@ public class WebAuthNProofEndpoints(
             .toList()
 
     /**
-     * POST /register-start
+     * Issues a challenge for creating a passkey on the calling subject's account, requiring [proofMethodAuth].
      *
-     * Issues a challenge for creating a new passkey on the calling subject's account.
-     *
-     * **Authentication:** [proofMethodAuth]. The 10-minute `maxAge` means the caller must have
-     * authenticated recently — adding a second factor is exactly the operation an attacker holding a
-     * stolen long-lived session would want.
-     *
-     * **Request Body:** [WebAuthN.GeneralPreference] — the client's *hint* for how strongly a
-     * discoverable (resident) credential is wanted. It is passed to [registrationForUser], and the
-     * [WebAuthN.AuthenticatorSelectionOptions.residentKey] it returns is what the browser is actually
-     * asked for. A client cannot override the server's choice.
-     *
-     * The `credProps` extension is requested unless the app configured it, so the browser reports
-     * whether the new credential is discoverable.
-     *
-     * **Response:** [WebAuthN.Registration.RegistrationResponse] — a `challengeId` to hand back to
-     * [registerFinish], plus the options for `navigator.credentials.create()`. `excludeCredentials`
-     * lists the subject's existing credentials so an authenticator that already holds one for this
-     * account declines rather than silently creating a duplicate.
-     *
-     * The challenge is cached for [expiration] under a random id and consumed exactly once.
-     *
-     * @see registerFinish
+     * The request is the client's resident-key preference, which is only a hint passed to [registrationForUser]. The response holds a `challengeId` for [registerFinish], valid for [expiration], and the options for `navigator.credentials.create()`, with `excludeCredentials` listing the subject's existing credentials.
      */
     @OptIn(ExperimentalEncodingApi::class)
     public val registerStart: ApiHttpHandler<PathSpec0, HasId<*>, WebAuthN.GeneralPreference, WebAuthN.Registration.RegistrationResponse> =
@@ -404,32 +250,9 @@ public class WebAuthNProofEndpoints(
         )
 
     /**
-     * POST /register-finish
+     * Verifies a newly created credential and stores it for the calling subject, requiring [proofMethodAuth].
      *
-     * Verifies a newly created credential and stores it against the calling subject.
-     *
-     * **Authentication:** [proofMethodAuth], as for [registerStart].
-     *
-     * **Request Body:** [WebAuthN.Registration.RegisterRequest] — the `challengeId` from
-     * [registerStart], a human-readable `displayName` for the credential ("YubiKey 5C", "Touch ID"),
-     * and the attested credential from the client.
-     *
-     * **Response:** empty on success.
-     *
-     * **Errors:**
-     * - `No Challenge available` (400): the challenge id is unknown, already used, expired, or the
-     *   challenge inside `clientDataJSON` does not match the one issued
-     * - `Cross-origin WebAuthN requests are not permitted` (400): `clientDataJSON` reports the call
-     *   came from a cross-origin context
-     * - `Failed to verify Authenticator` (400): webauthn4j rejected the attestation — bad signature,
-     *   wrong origin, wrong rpId, or user verification required but absent
-     * - `Credential ID does not match the attested credential` (400): the client sent an id other
-     *   than the one the authenticator attested to
-     *
-     * The stored `lastSignCount` is seeded from the attestation so clone detection has a baseline
-     * from the first use onward.
-     *
-     * @see registerStart
+     * Fails with 400 if the challenge is unknown, used, expired or mismatched, the request is cross-origin, webauthn4j rejects the attestation, or the credential id differs from the attested one.
      */
     @OptIn(ExperimentalEncodingApi::class)
     public val registerFinish: ApiHttpHandler<PathSpec0, HasId<*>, WebAuthN.Registration.RegisterRequest, Unit> =
@@ -539,37 +362,9 @@ public class WebAuthNProofEndpoints(
 
 
     /**
-     * POST /start
-     *
      * Issues a challenge for signing in with an existing passkey.
      *
-     * **Authentication:** optional. Unauthenticated is the login case. An authenticated caller of
-     * [WebAuthN.Authentication.StartRequest.type] is re-authenticating (step-up) and receives their own
-     * credential ids without needing a proof, since they are already signed in as that subject.
-     *
-     * **Request Body:** [WebAuthN.Authentication.StartRequest] — the principal type name, plus an
-     * optional [Proof] from another method.
-     *
-     * - Without a proof, this is the discoverable (usernameless) flow. No `allowCredentials` is
-     *   returned and the authenticator offers whichever passkey it holds for this rpId. No subject is
-     *   looked up, so nothing about any account is revealed.
-     * - With a proof, the subject is resolved from the proof's `property`/`value` and their credential
-     *   ids are returned. Non-discoverable authenticators need those ids to find the key. Requiring the
-     *   proof means the ids, their count, and their transports go only to a caller who already holds
-     *   another factor for the account, never to someone who merely knows an email address.
-     *
-     * **Response:** [WebAuthN.Authentication.StartResponse] — a `challengeId` to hand back to
-     * [prove], plus the options for `navigator.credentials.get()`.
-     *
-     * **Errors:**
-     * - `Invalid Subject Type` (400): no registered principal type has that name
-     * - `Invalid proof` (400): the proof is expired, has a bad signature, or names a proof method
-     *   this server does not have
-     * - `Proof does not identify a <type>` (400): the proof is valid but names no subject of that type
-     * - `Proof does not match the authenticated subject` (400): an authenticated caller supplied a
-     *   proof for someone else
-     *
-     * @see prove
+     * Authentication is optional. An authenticated caller is re-authenticating and receives their own credential ids, while an unauthenticated caller starts the discoverable flow, or receives the credential ids of the subject named by the optional [Proof] in the request. Fails with 400 if the subject type is unknown, or the proof is invalid, names no subject of that type, or belongs to someone other than the authenticated caller.
      */
     public val start: ApiHttpHandler<PathSpec0, HasId<*>?, WebAuthN.Authentication.StartRequest, WebAuthN.Authentication.StartResponse> =
         path.path("start").post bind ApiHttpHandler(
@@ -641,33 +436,9 @@ public class WebAuthNProofEndpoints(
 
 
     /**
-     * POST /prove
+     * Verifies an assertion and returns the [Proof] that `AuthEndpoints.login` exchanges for a session, requiring no authentication.
      *
-     * Verifies an assertion and issues the [Proof] that `AuthEndpoints.login` exchanges for a
-     * session.
-     *
-     * **Authentication:** none — this is how a subject logs in.
-     *
-     * **Request Body:** [WebAuthN.Authentication.ProveRequest] — the `challengeId` from [start] and
-     * the assertion from `navigator.credentials.get()`.
-     *
-     * **Response:** a [Proof] over `"<SubjectType>/_id"`, where the type and id both come from the
-     * stored credential rather than from anything the caller supplied. Strength is [info]'s 10, or
-     * 20 when the authenticator data carries the UV flag.
-     *
-     * **Errors:**
-     * - `Cross-origin WebAuthN requests are not permitted` (400)
-     * - `No Challenge available` (400): unknown, already-used or expired challenge id, or a challenge
-     *   mismatch
-     * - `Failed to verify Authenticator` (400): deliberately covers an unknown credential id, a
-     *   credential belonging to a different subject type, and a failed signature check alike, so the
-     *   three cannot be told apart
-     *
-     * On success the credential's `lastUsedAt` and `lastSignCount` are updated. A sign count that
-     * moves backwards indicates a cloned authenticator and is rejected by webauthn4j before this
-     * point, though only when the counts are non-zero — synced passkeys report zero and are exempt.
-     *
-     * @see start
+     * The proof names the subject type and id of the stored credential, not anything the caller supplied. Fails with 400 if the request is cross-origin or the challenge is unavailable, or with one indistinguishable error for an unknown credential, a credential of another subject type, or a bad signature.
      */
     @OptIn(ExperimentalEncodingApi::class)
     public val prove: ApiHttpHandler<PathSpec0, HasId<*>?, WebAuthN.Authentication.ProveRequest, Proof> =
@@ -692,12 +463,12 @@ public class WebAuthNProofEndpoints(
                     ?: run {
                         // The challenge is single-use and time-limited, so an unknown id is one that
                         // expired, was already spent, or was never issued. No subject is known yet.
-                        reportProofRejected(info, ProofFailureReason.SecretExpired, request = request)
+                        serverRuntime.reportAuthEvent(AuthEvent.ProofRejected(info, AuthEvent.ProofRejected.Reason.NoSuchChallenge, request = request))
                         throw BadRequestException("No Challenge available")
                     }
 
                 if (fromCache.challenge != WebAuthN.base64Decoder.decode(clientData.challenge).decodeToString()) {
-                    reportProofRejected(info, ProofFailureReason.SecretMismatch, request = request)
+                    serverRuntime.reportAuthEvent(AuthEvent.ProofRejected(info, AuthEvent.ProofRejected.Reason.NoSuchChallenge, request = request))
                     throw BadRequestException("No Challenge available")
                 }
 
@@ -717,7 +488,7 @@ public class WebAuthNProofEndpoints(
                     ?: run {
                         // The credential id is what identifies the account here, so an unknown one
                         // resolves no subject.
-                        reportProofRejected(info, ProofFailureReason.NoSuchSubject, request = request)
+                        serverRuntime.reportAuthEvent(AuthEvent.ProofRejected(info, AuthEvent.ProofRejected.Reason.NoSuchSubject, request = request))
                         // Deliberately the same opaque error the signature check below raises: an unknown credential
                         // id, a credential belonging to another subject, and a bad signature must not be told apart.
                         throw BadRequestException("Failed to verify Authenticator")
@@ -764,12 +535,12 @@ public class WebAuthNProofEndpoints(
                         /* authenticationParameters = */ authParams
                     )
                 } catch (e: VerificationException) {
-                    reportProofRejected(
+                    serverRuntime.reportAuthEvent(AuthEvent.ProofCredentialRejected(
                         info,
-                        ProofFailureReason.SecretMismatch,
+                        AuthEvent.ProofCredentialRejected.Reason.SecretMismatch,
                         principal = publicKeyCredential.subjectId,
                         request = request,
-                    )
+                    ))
                     throw BadRequestException("Failed to verify Authenticator")
                 }
 
@@ -793,7 +564,7 @@ public class WebAuthNProofEndpoints(
                     }
                 )
 
-                reportProofAccepted(info, principal = publicKeyCredential.subjectId, request = request)
+                serverRuntime.reportAuthEvent(AuthEvent.ProofAccepted(info, principal = publicKeyCredential.subjectId, request = request))
                 proofSigner.await().makeProof(
                     info = if (authData.authenticatorData?.isFlagUV == true) info.copy(strength = 20) else info,
                     property = "${publicKeyCredential.subjectType}/_id",

@@ -1132,7 +1132,7 @@ passed as strings so `core` does not own the taxonomy.
 *disclosure* — the guarded thing must not happen unless it was recorded, so they fail closed. An
 authentication event has already happened by the time it is reported, and is usually reported from a
 path that is itself rejecting something; throwing there would replace a clean "your login failed"
-with an unrelated server error and lose the original reason. So `AuthEventLogReporter` logs and
+with an unrelated server error and lose the original reason. So `AuthEventLogListener` logs and
 swallows write failures. The consequence, stated plainly: **an attacker who can make the audit
 database unavailable can make authentication events go unrecorded while authentication keeps
 working.** That is the opposite of the guarantee the other two layers give, and it is a choice, not

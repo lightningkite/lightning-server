@@ -5,229 +5,125 @@ import com.lightningkite.lightningserver.sessions.EstablishTotp
 import com.lightningkite.lightningserver.typed.LiveVersion
 
 /**
- * Sealed interface for different proof method client endpoints.
- * Each authentication method (SMS, Email, Password, etc.) implements this interface
- * to provide a consistent API for establishing and proving authentication credentials.
+ * Provides the client endpoints of a proof method, each of which can establish a credential and prove it.
  *
- * The authentication flow typically has two phases:
- * 1. Establishing credentials (requires existing authentication)
- * 2. Proving credentials (used during login)
+ * Establishing a credential requires existing authentication, while proving one is part of logging in.
  */
 public sealed interface ProofClientEndpoints {
-    /**
-     * Unique identifier for this authentication method (e.g., "sms", "email", "password").
-     */
+    /** Returns the identifier of this method, such as `sms`, `email` or `password`. */
     public val via: String
 
-    /**
-     * The user property this proof method verifies (e.g., "phone", "email").
-     * Null for methods that don't verify a specific user property (e.g., password, totp).
-     */
+    /** Returns the user property this method verifies, such as `phone` or `email`, or `null` if it verifies none, as with a password or TOTP. */
     public val property: String? get() = null
 
-    /**
-     * SMS-based authentication using phone number verification.
-     * Sends a PIN code via SMS that the user must enter to prove ownership.
-     */
+    /** Proves ownership of a phone number with a PIN sent by SMS. */
     @LiveVersion(LiveProofClientEndpoints.Sms::class)
     public interface Sms : ProofClientEndpoints {
         override val via: String get() = "sms"
         override val property: String? get() = "phone"
 
-        /**
-         * Begin SMS ownership verification by sending a PIN to the phone number.
-         *
-         * @param input Phone number to verify (e.g., "+15555551234")
-         * @return Temporary key/identifier to use when completing the proof
-         */
+        /** Sends a PIN to the phone number [input] and returns the temporary key to pass to [provePhoneOwnership]. */
         public suspend fun beginSmsOwnershipProof(input: String): String
 
-        /**
-         * Complete SMS ownership verification by providing the PIN received via SMS.
-         *
-         * @param input Contains the key from begin step and the PIN code
-         * @return Signed proof that can be used for authentication
-         */
+        /** Returns a signed [Proof] of phone ownership for the PIN and key in [input]. */
         public suspend fun provePhoneOwnership(input: FinishProof): Proof
     }
 
-    /**
-     * Email-based authentication using email address verification.
-     * Sends a magic link or PIN code via email that the user must use to prove ownership.
-     */
+    /** Proves ownership of an email address with a PIN or magic link sent by email. */
     @LiveVersion(LiveProofClientEndpoints.Email::class)
     public interface Email : ProofClientEndpoints {
         override val via: String get() = "email"
         override val property: String get() = "email"
 
-        /**
-         * Begin email ownership verification by sending a PIN/link to the email address.
-         * @param input Email address to verify
-         * @return Temporary key/identifier to use when completing the proof
-         */
+        /** Sends a PIN or link to the email address [input] and returns the temporary key to pass to [proveEmailOwnership]. */
         public suspend fun beginEmailOwnershipProof(input: String): String
 
-        /**
-         * Complete email ownership verification by providing the PIN/code received via email.
-         * @param input Contains the key from begin step and the verification code
-         * @return Signed proof that can be used for authentication
-         */
+        /** Returns a signed [Proof] of email ownership for the code and key in [input]. */
         public suspend fun proveEmailOwnership(input: FinishProof): Proof
     }
 
-    /**
-     * Time-based One-Time Password (TOTP) authentication using authenticator apps.
-     * Compatible with Google Authenticator, Authy, Microsoft Authenticator, etc.
-     */
+    /** Proves identity with a TOTP code from an authenticator app such as Google Authenticator, Authy or Microsoft Authenticator. */
     @LiveVersion(LiveProofClientEndpoints.TimeBasedOTP::class)
     public interface TimeBasedOTP : ProofClientEndpoints {
         override val via: String get() = "totp"
 
-        /**
-         * Prove authentication using a TOTP code from an authenticator app.
-         * @param input User identification and the 6-digit TOTP code
-         * @return Signed proof that can be used for authentication
-         */
+        /** Returns a signed [Proof] for the TOTP code in [input]. */
         public suspend fun proveOTP(input: IdentificationAndPassword): Proof
 
-        /**
-         * Establish TOTP for the authenticated user (requires existing auth).
-         * Returns a QR code URL or secret that can be added to an authenticator app.
-         * @param input TOTP configuration (label, etc.)
-         * @return QR code data URL or otpauth:// URL for the authenticator app
-         */
+        /** Returns the `otpauth://` URL or QR code data URL for adding a new TOTP secret for the authenticated user to an authenticator app. */
         public suspend fun establishOneTimePassword(input: EstablishTotp): String
 
-        /**
-         * Confirm TOTP setup by verifying a code from the newly configured authenticator.
-         * @param input The TOTP code from the authenticator app
-         */
+        /** Activates the TOTP secret for the authenticated user if [input] is a valid code from the newly configured authenticator app. */
         public suspend fun confirmOneTimePassword(input: String)
     }
 
-    /**
-     * Traditional password-based authentication.
-     */
+    /** Proves identity with a password. */
     @LiveVersion(LiveProofClientEndpoints.Password::class)
     public interface Password : ProofClientEndpoints {
         override val via: String get() = "password"
 
-        /**
-         * Authenticate using username and password.
-         * @param input User identification and password
-         * @return Signed proof that can be used for authentication
-         */
+        /** Returns a signed [Proof] for the identification and password in [input]. */
         public suspend fun provePasswordOwnership(input: IdentificationAndPassword): Proof
 
-        /**
-         * Set or change password for the authenticated user (requires existing auth).
-         * @param input New password and optional hint
-         */
+        /** Sets or changes the authenticated user's password. */
         public suspend fun establishPassword(input: EstablishPassword)
     }
 
-    /**
-     * Backup codes for account recovery when primary authentication methods are unavailable.
-     * Typically used as a fallback when TOTP device is lost or SMS is unavailable.
-     */
+    /** Proves identity with single-use backup codes, as a fallback when another method such as a TOTP device is unavailable. */
     @LiveVersion(LiveProofClientEndpoints.BackupCode::class)
     public interface BackupCode : ProofClientEndpoints {
         override val via: String get() = "backupcode"
 
-        /**
-         * Authenticate using a backup code (single-use).
-         * @param input User identification and backup code
-         * @return Signed proof that can be used for authentication
-         */
+        /** Returns a signed [Proof] for the backup code in [input], which can then not be used again. */
         public suspend fun proveBackupCode(input: IdentificationAndPassword): Proof
 
-        /**
-         * Generate new backup codes for the authenticated user (requires existing auth).
-         * Invalidates any previous backup codes.
-         * @return List of new backup codes that should be saved securely by the user
-         */
+        /** Returns new backup codes for the authenticated user, which invalidate any previous ones and should be saved securely. */
         public suspend fun resetCodes(): List<String>
 
-        /**
-         * Remove all backup codes for the authenticated user (requires existing auth).
-         */
+        /** Removes all backup codes of the authenticated user. */
         public suspend fun clearCodes()
 
-        /**
-         * Check if backup codes are currently established for the authenticated user.
-         * @return True if backup codes exist, false otherwise
-         */
+        /** Returns `true` if the authenticated user has backup codes. */
         public suspend fun established(): Boolean
     }
 
-    /**
-     * WebAuthn-based authentication using hardware keys or platform authenticators.
-     * Supports FIDO2 security keys, Touch ID, Face ID, Windows Hello, etc.
-     */
+    /** Proves identity with WebAuthn, using security keys or platform authenticators such as Touch ID, Face ID or Windows Hello. */
     @LiveVersion(LiveProofClientEndpoints.WebAuthNEndpoints::class)
     public interface WebAuthN : ProofClientEndpoints {
         override val via: String get() = "WebAuthN"
 
-        /**
-         * Start WebAuthn authentication by getting a challenge.
-         * @param input The principal type, plus an optional proof from another method identifying the subject
-         * @return Challenge and options for the WebAuthn authentication ceremony
-         */
+        /** Returns the challenge and options for a WebAuthn authentication ceremony, optionally identifying the subject with a proof from another method in [input]. */
         public suspend fun start(input: WebAuthN.Authentication.StartRequest): WebAuthN.Authentication.StartResponse
 
-        /**
-         * Complete WebAuthn authentication by verifying the signed challenge.
-         * @param input Challenge ID and signed credentials from the authenticator
-         * @return Signed proof that can be used for authentication
-         */
+        /** Returns a signed [Proof] for the challenge ID and authenticator assertion in [input]. */
         public suspend fun prove(input: WebAuthN.Authentication.ProveRequest): Proof
 
-        /**
-         * Start WebAuthn credential registration (requires existing auth).
-         * @param input Resident key preference
-         * @return Challenge and options for the WebAuthn registration ceremony
-         */
+        /** Returns the challenge and options for registering a WebAuthn credential for the authenticated user, given their resident key preference. */
         public suspend fun registerStart(input: WebAuthN.GeneralPreference): WebAuthN.Registration.RegistrationResponse
 
-        /**
-         * Complete WebAuthn credential registration (requires existing auth).
-         * @param input Challenge ID and attestation from the authenticator
-         */
+        /** Registers the credential attested in [input] for the authenticated user. */
         public suspend fun registerFinish(input: WebAuthN.Registration.RegisterRequest)
     }
 
-    /**
-     * Known device authentication ("Remember this device").
-     * Allows weaker authentication on previously trusted devices.
-     */
+    /** Allows weaker authentication on previously trusted devices. */
     @LiveVersion(LiveProofClientEndpoints.KnownDevice::class)
     public interface KnownDevice : ProofClientEndpoints {
         override val via: String get() = "known-device"
 
-        /**
-         * Get known device configuration (duration, strength).
-         * @return Configuration for known device proofs
-         */
+        /** Returns the duration and strength of known device proofs. */
         public suspend fun knownDeviceOptions(): KnownDeviceOptions
 
-        /**
-         * Authenticate using a known device secret.
-         * @param input Device secret obtained from establishKnownDevice
-         * @return Signed proof that can be used for authentication (with reduced strength)
-         */
+        /** Returns a signed [Proof], with reduced strength, for the device secret [input] from [establishKnownDevice]. */
         public suspend fun proveKnownDevice(input: String): Proof
 
         /**
-         * Legacy: Register this device as known for the authenticated user (requires existing auth).
-         * Prefer establishKnownDeviceV2 for new implementations.
-         * @return Device secret that should be stored securely on the client
+         * Registers this device as known for the authenticated user and returns the device secret, which the client must store securely.
+         *
+         * Prefer [establishKnownDeviceV2].
          */
         public suspend fun establishKnownDevice(): String
 
-        /**
-         * Register this device as known for the authenticated user (requires existing auth).
-         * @return Device secret and expiration time that should be stored securely on the client
-         */
+        /** Registers this device as known for the authenticated user and returns the device secret and its expiration, which the client must store securely. */
         public suspend fun establishKnownDeviceV2(): KnownDeviceSecretAndExpiration
     }
 }

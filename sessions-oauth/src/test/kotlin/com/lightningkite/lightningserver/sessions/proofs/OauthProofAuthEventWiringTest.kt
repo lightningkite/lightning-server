@@ -1,14 +1,13 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
-import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.auth.AuthEventReporter
-import com.lightningkite.lightningserver.auth.AuthEventType
-import com.lightningkite.lightningserver.auth.installAuthEventReporter
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.lightningserver.sessions.AuthEvent
+import com.lightningkite.lightningserver.sessions.AuthEventListener
+import com.lightningkite.lightningserver.sessions.install
 import com.lightningkite.lightningserver.sessions.proofs.oauth.*
 import com.lightningkite.services.cache.Cache
 import com.sun.net.httpserver.HttpServer
@@ -18,7 +17,7 @@ import org.junit.Test
 import java.net.InetSocketAddress
 import java.nio.charset.StandardCharsets
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.uuid.Uuid
 
 /**
@@ -29,30 +28,18 @@ import kotlin.uuid.Uuid
  * was recorded nowhere — the callback is a redirect target, not an authenticated endpoint, so no
  * other audit layer sees it either.
  *
- * A capturing reporter rather than the real audit log, because the point being proved here is that a
+ * A capturing listener rather than the real audit log, because the point being proved here is that a
  * real endpoint reaches the seam; `AuthEventLogTest` covers what the writer then does with it, and
  * pulling `audit` into this module's test classpath to re-prove that would buy nothing.
  */
 class OauthProofAuthEventWiringTest {
 
-    private class CapturingReporter : AuthEventReporter {
-        data class Event(val type: AuthEventType, val principal: String?, val method: String?, val detail: String?)
-
-        val events: MutableList<Event> = mutableListOf()
+    private class CapturingListener : AuthEventListener {
+        val events: MutableList<AuthEvent> = mutableListOf()
 
         context(runtime: ServerRuntime)
-        override suspend fun report(
-            type: AuthEventType,
-            principal: String?,
-            actor: String?,
-            sessionId: String?,
-            sourceIp: String?,
-            userAgent: String?,
-            detail: String?,
-            method: String?,
-            methodProperty: String?,
-        ) {
-            events += Event(type, principal, method, detail)
+        override suspend fun onEvent(event: AuthEvent) {
+            events += event
         }
     }
 
@@ -78,7 +65,7 @@ class OauthProofAuthEventWiringTest {
 
     private fun testServer(tokenUrl: String, profileEmail: String?) = object : ServerBuilder() {
         val cache = setting("cache", Cache.Settings("ram"))
-        val reporter = installAuthEventReporter(CapturingReporter())
+        val listener = install(CapturingListener())
 
         val provider = OauthProviderInfo(
             niceName = "TestProvider",
@@ -109,10 +96,9 @@ class OauthProofAuthEventWiringTest {
             server.test({}) {
                 execute { server.oauth.callback.handle(OauthCode(code = "auth-code-xyz", state = nonceFor(server.oauth.callback))) }
 
-                val event = server.reporter.events.single()
-                assertEquals(AuthEventType.ProofAccepted, event.type)
+                val event = assertIs<AuthEvent.ProofAccepted>(server.listener.events.single())
                 assertEquals("user@example.com", event.principal)
-                assertEquals("testprovider", event.method)
+                assertEquals("testprovider", event.method.via)
             }
         }
     }

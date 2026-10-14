@@ -14,56 +14,35 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
 /**
- * Atomically claims [cacheKey] for single use, returning `true` only for the very first caller.
+ * Returns `true` only for the first caller to claim [cacheKey], and `false` for every later one.
  *
- * Backed by [setIfNotExists], which is atomic on every backend (Redis `SET NX`, DynamoDB conditional
- * put, synchronized [com.lightningkite.services.cache.MapCache]). Concurrent callers therefore race
- * safely: exactly one receives `true`. This is the building block for making one-time secrets
- * (signed proofs, TOTP codes, WebAuthN challenges) single-use within their validity window — a plain
- * `get`-then-`set` would have a time-of-check/time-of-use race that lets two concurrent replays both
- * succeed.
+ * The claim is atomic on every backend, so concurrent callers race safely and exactly one wins. This makes one-time secrets such as signed proofs, TOTP codes and WebAuthN challenges single-use within their validity window.
  *
- * @param cacheKey Identifies the thing being consumed (must be derived from the secret, not the user).
- * @param ttl How long the claim is remembered; set to at least the remaining validity of the secret.
- * @return `true` if this caller claimed it (proceed), `false` if it was already consumed (reject).
+ * @param cacheKey Identifies the thing being consumed, and must be derived from the secret rather than the user.
+ * @param ttl How long the claim is remembered, at least the remaining validity of the secret.
  */
 context(server: ServerRuntime)
 public suspend fun Cache.claimOnce(cacheKey: String, ttl: Duration): Boolean =
     setIfNotExists(cacheKey, now(), ttl)
 
 /**
- * The rejection [constrainAttemptRate] raises when a key has run out of attempts.
+ * Represents the rejection [constrainAttemptRate] raises when a key has run out of attempts.
  *
- * A subclass rather than a plain [BadRequestException] so that a caller can tell "the limiter turned
- * this away" apart from "the credential was wrong", which look identical to the client on purpose but
- * are different security events. The status, detail and message are unchanged, so what the caller
- * receives is exactly what it was.
+ * It is a subclass of [BadRequestException] with the same status, detail and message, so callers can tell a rate-limited attempt from a wrong credential even though the client cannot.
  */
 public class TooManyAttemptsException(message: String) : BadRequestException(message = message)
 
 /**
- *  Tracks the number of action attempts against a given [cacheKey] and applies rate limiting with
- *  **exponential backoff** so that repeated abuse of the same key is punished progressively harder.
+ * Runs [action] against [cacheKey], denying it with exponential backoff once more than [count] attempts occur within [expires].
  *
- *  If more than [count] attempts occur within an [expires] time frame for the given [cacheKey],
- *  subsequent requests are denied for a block window. The first block lasts [blocked]; each time the
- *  limit is hit again the block doubles (`blocked * 2^level`), capped at [maxBlocked].
+ * The first block lasts [blocked], and each further time the limit is hit the block doubles, up to [maxBlocked]. The strike level is remembered for much longer than any block, so an attacker returning after a block lapses gets a longer one. A successful [action] clears the attempt counter and the strike level.
  *
- *  The "strike level" is persisted under a separate key (`"$cacheKey-level"`) with a memory TTL far
- *  longer than any single block window (proportional to [maxBlocked]). This is what defeats a slow
- *  "popcorn" brute force: even after a block window lapses and the attacker returns for a fresh batch
- *  of [count] attempts, the remembered strike level makes the next block much longer. A **successful**
- *  action clears both the attempt counter and the strike level, so legitimate users are never
- *  penalized for a later mistake.
- *
- *  @param cacheKey The key you want to rate limit actions against.
- *  @param count The number of attempts that can be made in the [expires] time frame.
- *  @param expires The time frame for allowed attempts. Starts on the first attempt and resets every [expires] time passed.
- *  @param blocked The base block time frame applied the first time the limit is hit (level 0). Should be greater than or equal to [expires].
- *  @param maxBlocked The maximum block window; the exponentially-growing block is capped here. Should be greater than or equal to [blocked].
- *  @param action The action you want to make against the [cacheKey]
- *
- *  @throws [BadRequestException] if attempt is denied.
+ * @param cacheKey The key to rate limit actions against.
+ * @param count The number of attempts allowed in the [expires] time frame.
+ * @param expires The time frame for allowed attempts, which starts on the first attempt.
+ * @param blocked The block time applied the first time the limit is hit, at least [expires].
+ * @param maxBlocked The maximum block time, at least [blocked].
+ * @throws BadRequestException if the attempt is denied.
  */
 context(server: ServerRuntime)
 public suspend inline fun <R> Cache.constrainAttemptRate(

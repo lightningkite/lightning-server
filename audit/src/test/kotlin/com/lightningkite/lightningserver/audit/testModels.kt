@@ -334,6 +334,7 @@ data class PlainThing(override val _id: Uuid, val value: String) : HasId<Uuid>
 data class PatientWrapper(override val _id: Uuid, val patient: Patient) : HasId<Uuid>
 
 /** The [OriginRecord] id that audit records made under this execution's origin join to. */
+@get:OptIn(com.lightningkite.services.data.Unsafe::class)
 internal val com.lightningkite.lightningserver.runtime.Execution.ID.originId: OriginRecord.ID
     get() = OriginRecord.ID(toExternal())
 

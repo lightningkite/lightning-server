@@ -7,40 +7,20 @@ import com.lightningkite.lightningserver.encryption.signer
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
+import com.lightningkite.services.data.PhoneNumber
 import com.lightningkite.services.data.toPhoneNumber
 import com.lightningkite.services.sms.SMS
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 
 /**
- * SMS-based authentication proof endpoint.
- * Allows users to prove ownership of a phone number by receiving and entering a PIN code via SMS.
+ * Provides endpoints for proving ownership of a phone number with a PIN or link sent by SMS.
  *
- * Typical flow:
- * 1. Client calls beginSmsOwnershipProof with a phone number
- * 2. Server sends a PIN code via SMS to that number
- * 3. Client receives the PIN from the user
- * 4. Client calls provePhoneOwnership with the temporary key and PIN
- * 5. Server validates the PIN and returns a signed Proof for authentication
+ * With a PIN, the client begins with a phone number, receives the PIN by SMS, and exchanges it with the temporary key for a signed [Proof]. Phone numbers are normalized by [normalize], and the method has a strength of 5. To send a link instead, call the second `send` overload, which embeds the [Proof] directly in the message.
  *
- * @param pin PIN handler for generating and validating PIN codes
- * @param sms SMS service for sending PIN codes
- * @param smsTemplate Template function to generate SMS text from PIN code
- * @param proofSigner Signer for creating cryptographically signed proofs
- * @param verifyPhone Optional validation function to check if phone should be allowed (e.g., country restrictions)
- *
- * Security considerations:
- * - PINs expire after a configurable duration (see PinHandler)
- * - SMS has higher strength (5) than email due to stricter verification
- * - Rate limiting should be applied to prevent SMS bombing
- * - Phone numbers are normalized to E.164 format (+[country][number])
- * - 10-digit US numbers are automatically prefixed with +1
- * - Use verifyPhone to block premium rate or international numbers if needed
- *
- * Cost considerations:
- * - SMS messages have per-message costs
- * - Implement rate limiting to prevent abuse and unexpected bills
- * - Consider blocking known VOIP and virtual phone number providers
+ * @param pin Generates and validates the PIN codes.
+ * @param smsTemplate Builds the SMS text from the PIN.
+ * @param verifyPhone Returns whether a number is allowed for PINs, such as to block premium rate or international numbers.
  */
 public class SmsProofEndpoints(
     pin: PinHandler,
@@ -67,23 +47,9 @@ public class SmsProofEndpoints(
     }
 
     /**
-     * Normalize phone numbers to E.164 format for consistent storage and comparison.
+     * Returns [to] in E.164 format, such as `+15551234567`.
      *
-     * Normalization rules:
-     * - Removes leading + if present
-     * - Removes extension (anything after 'x')
-     * - Keeps only digits
-     * - Adds + prefix
-     * - For 10-digit numbers (US), prepends country code 1
-     *
-     * Examples:
-     * - "+1-555-123-4567" → "+15551234567"
-     * - "555-123-4567" → "+15551234567"
-     * - "555.123.4567 x123" → "+15551234567"
-     * - "+44 20 7946 0958" → "+442079460958"
-     *
-     * @param to Phone number in various formats
-     * @return E.164 formatted phone number
+     * This removes any extension after `x`, keeps only the digits, and prepends `+`. A 10-digit number is assumed to be from the US and gets the country code `1`, so `555.123.4567 x123` becomes `+15551234567`.
      */
     override fun normalize(to: String): String = to
         .removePrefix("+")
@@ -96,13 +62,7 @@ public class SmsProofEndpoints(
             }
         }
 
-    /**
-     * Send a PIN code to the specified phone number via SMS.
-     * Only sends if verifyPhone returns true for the number.
-     *
-     * @param to Phone number to send PIN to (will be normalized)
-     * @param pin PIN code to include in the SMS
-     */
+    /** Sends [pin] by SMS to the phone number [to] using [smsTemplate], or sends nothing if [verifyPhone] rejects it. */
     context(_: ServerRuntime)
     override suspend fun send(to: String, pin: String) {
         if (verifyPhone(to))
@@ -110,14 +70,13 @@ public class SmsProofEndpoints(
     }
 
     /**
-     * As [send], naming the request that asked for the link to be sent.
+     * Sends the SMS that [content] builds from a newly issued [Proof] for [destination], such as a login link.
      *
-     * Pass the request wherever the caller has one. The proof is a bearer credential, so the audit
-     * record of its issuance is only as useful as the origin it names.
+     * The proof is issued without anyone presenting a credential, so whoever receives it can authenticate. Pass the [request] that asked for it, if any, so its origin can be audited if needed. Unlike the PIN overload, this does not apply [verifyPhone] or normalize [destination].
      */
     context(_: ServerRuntime)
-    public suspend fun send(destination: String, request: Request<*>?, content: (Proof) -> String) {
-        sms().send(destination.toPhoneNumber(), content(issueProof(destination, request)))
+    public suspend fun send(destination: PhoneNumber, request: Request<*>?, content: (Proof) -> String) {
+        sms().send(destination, content(issueProof(destination.raw, request)))
     }
 }
 

@@ -15,6 +15,7 @@ import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ExecutionInterceptor
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.websockets.*
+import com.lightningkite.services.data.Unsafe
 import com.lightningkite.services.database.Table
 import com.lightningkite.services.database.UniqueViolationException
 import com.lightningkite.services.database.insertOne
@@ -70,6 +71,7 @@ public class OriginRecording<REQUEST_INFO>(
         socketOriginSerializer,
     )
 
+    @OptIn(Unsafe::class) // SAFETY: This is where origins are minted, ids are created for records queued for insertion
     private val Execution.originId get() = OriginRecord.ID(origin.toExternal())
 
     /**
@@ -99,6 +101,14 @@ public class OriginRecording<REQUEST_INFO>(
         }
     }
 
+    @Unsafe("flush() must be called before anything using this id is recorded to the database.")
+    context(runtime: ServerRuntime)
+    internal fun currentOrigin(): OriginRecord.ID = runtime.execution.originId
+
+    /**
+     * [Flushes][flush] any queued origins on the execution, ensuring they are recorded to the
+     * database, then calls [withOrigin] with the id of the closest origin to this execution.
+     * */
     context(runtime: ServerRuntime)
     internal suspend inline fun <T> withCurrentOrigin(withOrigin: (OriginRecord.ID) -> T): T {
         flush() // we're referencing the origin, flush to make sure it's in the table

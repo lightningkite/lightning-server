@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.audit
 import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.data.Index
 import com.lightningkite.services.data.References
+import com.lightningkite.services.data.Unsafe
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.TypedId
 import kotlin.jvm.JvmInline
@@ -35,7 +36,9 @@ public data class OriginRecord<REQUEST_INFO>(
     @Serializable
     @JvmInline
     @References(OriginRecord::class)
-    public value class ID(override val raw: ExecutionId) : TypedId<ExecutionId, ID>
+    public value class ID @Unsafe(
+        "Origin IDs should only be minted once their record has been recorded in the database using flush() or withCurrentOrigin { ... }"
+    ) constructor(override val raw: ExecutionId) : TypedId<ExecutionId, ID>
 
     public val at: Instant
         get() = _id.raw.timestamp()

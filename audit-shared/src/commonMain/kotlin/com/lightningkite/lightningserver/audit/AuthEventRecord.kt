@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.audit
 
-import com.lightningkite.lightningserver.auth.AuthEventType
 import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.data.Index
 import com.lightningkite.services.data.UuidV7
@@ -9,6 +8,7 @@ import com.lightningkite.services.database.TypedId
 import kotlin.jvm.JvmInline
 import kotlin.time.Instant
 import kotlinx.serialization.Serializable
+import kotlin.uuid.Uuid
 
 /**
  * One authentication event: the history that a session row's mutable state cannot provide.
@@ -19,7 +19,7 @@ import kotlinx.serialization.Serializable
  * deleted on the next success, or a debug `println`. None of those can be counted, ordered, or
  * alerted on.
  *
- * @property requestId Joins to [OriginRecord], so an auth event and the disclosures made under the
+ * @property origin Joins to [OriginRecord], so an auth event and the disclosures made under the
  *   resulting session share one identifier.
  * @property principal Who the event is about — the subject id, as a string, since principals differ
  *   in key type across a deployment.
@@ -28,7 +28,7 @@ import kotlinx.serialization.Serializable
  * @property sourceIp Recorded only when actually observed. A placeholder here would read as a real
  *   origin, which is the mistake this system already made once (7.1, finding 3).
  * @property failureReason Why an attempt was rejected, for the failure event types. Populated from
- *   the `AuthFailureReason` or `ProofFailureReason` enum in the sessions module.
+ *   the `Reason` of the rejecting `AuthEvent` in the sessions module.
  * @property method How the attempt was made, for events that came from a particular mechanism — a
  *   proof method's `via` ("password", "totp", "email"). Null for the refresh-token path, which has
  *   only one mechanism. Without it "which account is being attacked" is answerable but "with what"
@@ -40,11 +40,11 @@ import kotlinx.serialization.Serializable
 @Serializable
 public data class AuthEventRecord(
     override val _id: ID,
-    @Index val requestId: OriginRecord.ID,
-    @Index val type: AuthEventType,
+    @Index val origin: OriginRecord.ID,
+    @Index val type: Type,
     @Index val principal: String? = null,
     val actor: String? = null,
-    val sessionId: String? = null,
+    val sessionId: Uuid? = null,
     val sourceIp: String? = null,
     val userAgent: String? = null,
     val failureReason: String? = null,
@@ -55,10 +55,23 @@ public data class AuthEventRecord(
     @JvmInline
     public value class ID(override val raw: UuidV7) : TypedId<UuidV7, ID>
 
-    /** When the event happened, derived from the version-7 [_id]. See [OriginRecord]. */
+    /** What happened. */
+    @Serializable
+    public enum class Type {
+        /** A refresh token naming a real session was rejected. [failureReason] says why. */
+        AuthenticationFailed,
+
+        /** A proof (password, TOTP, WebAuthN, backup code, emailed PIN, OAuth) was accepted. */
+        ProofAccepted,
+
+        /** A credential presented for a real account was rejected. [failureReason] says why. */
+        ProofRejected,
+
+        /** A proof was minted and sent to someone without any credential being presented, as with a magic link. */
+        ProofIssued,
+    }
+
     public val at: Instant
         get() = _id.timestamp()
-
-    public companion object
 }
 

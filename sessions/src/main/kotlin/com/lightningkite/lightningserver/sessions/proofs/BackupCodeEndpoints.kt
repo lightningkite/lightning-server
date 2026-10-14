@@ -1,5 +1,7 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
+import com.lightningkite.lightningserver.sessions.reportAuthEvent
+import com.lightningkite.lightningserver.sessions.AuthEvent
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.*
@@ -41,12 +43,9 @@ public data class BackupCodeSecret(
     val subjectType: String,
     val createdAt: Instant,
     /**
-     * When this code was redeemed, or null while it is still usable.
+     * Returns when this code was redeemed, or `null` while it is still usable.
      *
-     * Redeeming a code used to delete its row, which left no trace that the code had ever existed,
-     * let alone been used — the one event on this table an auditor is certain to ask about. The row
-     * is now retained and marked instead, and it is this field, not the row's absence, that makes a
-     * code single-use.
+     * The row is kept after redemption, so this field, not the row's absence, is what makes a code single-use.
      */
     val usedAt: Instant? = null,
 ) : HasId<Uuid>
@@ -199,7 +198,7 @@ public class BackupCodeEndpoints(
 
                 val handler = serverRuntime.server.principalTypes.values.find { it.name == subject }
                     ?: run {
-                        reportProofRejected(info, ProofFailureReason.MalformedRequest, request = request)
+                        serverRuntime.reportAuthEvent(AuthEvent.ProofRejected(info, AuthEvent.ProofRejected.Reason.MalformedRequest, request = request))
                         throw IllegalArgumentException("No subject $subject recognized")
                     }
 
@@ -217,7 +216,7 @@ public class BackupCodeEndpoints(
                         ?: run {
                             // No account resolved, so no principal to name. Recorded anyway: a run of these
                             // against different values is what enumeration looks like.
-                            reportProofRejected(info, ProofFailureReason.NoSuchSubject, request = request)
+                            serverRuntime.reportAuthEvent(AuthEvent.ProofRejected(info, AuthEvent.ProofRejected.Reason.NoSuchSubject, request = request))
                             throw BadRequestException("Invalid Backup Code")
                         }
 
@@ -231,12 +230,12 @@ public class BackupCodeEndpoints(
                     val normalizedCode = input.password.filter { it.isLetter() }.lowercase()
                     val match = secrets.find { normalizedCode == it.code }
                         ?: run {
-                            reportProofRejected(
+                            serverRuntime.reportAuthEvent(AuthEvent.ProofCredentialRejected(
                                 info,
-                                ProofFailureReason.SecretMismatch,
+                                AuthEvent.ProofCredentialRejected.Reason.SecretMismatch,
                                 principal = subjectId,
                                 request = request,
-                            )
+                            ))
                             throw BadRequestException("Invalid Backup Code")
                         }
 
@@ -248,16 +247,16 @@ public class BackupCodeEndpoints(
                         modification { it.usedAt assign now() },
                     )
                     if (claimed.old == null) {
-                        reportProofRejected(
+                        serverRuntime.reportAuthEvent(AuthEvent.ProofCredentialRejected(
                             info,
-                            ProofFailureReason.SecretAlreadyUsed,
+                            AuthEvent.ProofCredentialRejected.Reason.SecretAlreadyUsed,
                             principal = subjectId,
                             request = request,
-                        )
+                        ))
                         throw BadRequestException("Invalid Backup Code")
                     }
 
-                    reportProofAccepted(info, principal = subjectId, request = request)
+                    serverRuntime.reportAuthEvent(AuthEvent.ProofAccepted(info, principal = subjectId, request = request))
                     proofSigner.await().makeProof(
                         info = info.copy(strength = 10),
                         property = input.property,

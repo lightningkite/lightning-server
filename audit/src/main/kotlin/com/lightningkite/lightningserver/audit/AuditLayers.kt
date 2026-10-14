@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.audit
 
 import com.lightningkite.lightningserver.audit.disclosure.DisclosureLogInterceptor
-import com.lightningkite.lightningserver.auth.installAuthEventReporter
+import com.lightningkite.lightningserver.sessions.install
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.typed.DatabaseTableRegistration
 import com.lightningkite.lightningserver.typed.registerTable
@@ -84,7 +84,7 @@ public class AuthEventLog(private val core: AuditCore<*>) : ServerBuilder() {
 
     init {
         core.claim("AuthEventLog")
-        installAuthEventReporter(AuthEventLogReporter(core.origins, authEvents))
+        install(AuthEventLogListener(core.origins, authEvents))
     }
 }
 

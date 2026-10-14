@@ -13,6 +13,7 @@ plugins {
 dependencies {
     api(project(":core"))
     api(project(":typed"))
+    api(project(":sessions"))
     api(project(":audit-shared"))
     api(libs.services.database)
 
@@ -21,11 +22,6 @@ dependencies {
 
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)
-
-    // Test-only. The auth event log's whole point is that something else raises the events, so
-    // proving the seam is actually reached needs the module that raises them. `sessions` does not
-    // depend on `audit`, so this stays one-directional.
-    testImplementation(project(":sessions"))
 
     // The RealDb* tests run the audit records against a real Postgres rather than the in-memory
     // database the rest of this module's tests use. Zonky's embedded Postgres is used in preference

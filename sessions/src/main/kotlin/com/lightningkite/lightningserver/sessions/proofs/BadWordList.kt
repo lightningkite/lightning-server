@@ -1,10 +1,7 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
 /**
- * Why is this here?
- *
- * Sometimes, we need to randomly-generate identifiers for people to use with letters.  We can use this to prevent
- * some people from getting offended by the random selection.
+ * Lists words that randomly generated identifiers must not contain.
  *
  * Taken from https://www.cs.cmu.edu/~biglou/resources/bad-words.txt
  */
@@ -1400,8 +1397,6 @@ internal open class BadWordList private constructor(val words: Set<String>) {
 
     private val regex = Regex(words.joinToString(")|(", "(", ")"))
 
-    /**
-     * Returns true if there is a risk that [on] contains one of the words.
-     */
+    /** Returns `true` if [on] might contain one of the words. */
     fun detectParanoid(on: String): Boolean = regex.find(on.lowercase()) != null
 }

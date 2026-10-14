@@ -2,7 +2,6 @@
 
 package com.lightningkite.lightningserver.audit
 
-import com.lightningkite.lightningserver.auth.AuthEventType
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.auth.PrincipalType
@@ -46,9 +45,8 @@ import kotlin.uuid.Uuid
 /**
  * The auth event log's *wiring*, driven through a real rejected authentication.
  *
- * [AuthEventLogTest] calls the reporter directly, which proves the writer works and nothing at all
- * about whether anything ever calls it — the seam was shipped once with the call site passing its
- * free text into `sessionId`, and no test noticed. These go in through the refresh-token endpoint,
+ * [AuthEventLogTest] calls the listener directly, which proves the writer works and nothing at all
+ * about whether anything ever calls it. These go in through the refresh-token endpoint,
  * which is the flagship case for the seam existing: it is `noAuth` and rejects before any
  * authentication resolves, so no other audit layer can see the failure.
  */
@@ -137,27 +135,19 @@ class AuthEventLogWiringTest {
     }
 
     @Test
-    fun `a rejected refresh token reaches the reporter and lands in the table`() = onServer {
+    fun `a rejected refresh token reaches the listener and lands in the table`() = onServer {
         val (sessionId, token) = tokenWithWrongSecret()
 
         val response = engine.handleRoot(tokenExchange(token, userAgent = "probe/1.0"), testId(1))
         assertEquals(HttpStatus.Unauthorized, response.status)
 
         val event = events().single()
-        assertEquals(AuthEventType.AuthenticationFailed, event.type)
+        assertEquals(AuthEventRecord.Type.AuthenticationFailed, event.type)
         assertEquals("SecretMismatch", event.failureReason)
-        assertEquals(sessionId.toString(), event.sessionId)
+        assertEquals(sessionId, event.sessionId)
     }
 
-    /**
-     * The account the attempt was against. `AuthEventRecord` indexes this column precisely so that
-     * "when did this account start failing logins" is answerable, which is the question the layer
-     * exists for — and nothing checked that the call site fills it in. Mutation testing confirmed
-     * the gap: passing null for `principal` in `SessionManager.authFailed` left every test in
-     * `audit`, `sessions` and `typed` green. `AuthEventLogTest` asserts the field, but it calls the
-     * reporter directly, so it covers the writer and not the caller — the same split this file's
-     * header describes for `sessionId`.
-     */
+    /** The account the attempt was against, which `AuthEventRecord` indexes for "when did this account start failing logins". */
     @Test
     fun `the event names the account the attempt was against`() = onServer {
         val subjectId = Uuid.parse("00000000-0000-4000-8000-00000000beef")
@@ -223,12 +213,7 @@ class AuthEventLogWiringTest {
         )
     }
 
-    /**
-     * The amplification property itself, rather than one instance of it. This is the assertion that
-     * would have failed before `reachableWithoutCredentials` existed: the guard used to be a
-     * two-value list inside `authFailed`, and `NoSuchSession` was added to the enum afterwards
-     * without being added to the list.
-     */
+    /** The amplification property itself, rather than one instance of it. */
     @Test
     fun `spraying forged tokens cannot grow the audit table`() = onServer {
         repeat(25) { engine.handleRoot(tokenExchange(forgedToken()), testId(100 + it)) }
@@ -262,7 +247,7 @@ class AuthEventLogWiringTest {
 
         engine.handleRoot(tokenExchange(token, userAgent = "probe/1.0"), testId(4))
 
-        assertEquals(testId(4).originId, events().single().requestId)
+        assertEquals(testId(4).originId, events().single().origin)
         val requests = TestServer.audit.originsTable().find(Condition.Always).toList()
         assertTrue(
             requests.any { it._id == testId(4).originId },

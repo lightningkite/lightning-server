@@ -2,7 +2,6 @@
 
 package com.lightningkite.lightningserver.audit
 
-import com.lightningkite.lightningserver.auth.AuthEventType
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.HttpMethod
@@ -55,8 +54,7 @@ import kotlin.uuid.Uuid
  *
  * Same reasoning as [AuthEventLogWiringTest]: [AuthEventLogTest] proves the writer works and nothing
  * about whether anything calls it. These go in through `prove`, which is where credential *guessing*
- * happens — `SessionManager.authFailed` only ever saw refresh-token rejections, which are mostly
- * expired sessions.
+ * happens — the refresh-token path only sees session rejections, which are mostly expired sessions.
  *
  * ## What this file deliberately does not assume
  * Proof *issuance* and proof *acceptance* are different events. `Signer.makeProof` is reached both by
@@ -109,7 +107,7 @@ class ProofAuthEventWiringTest {
 
         /** Reaches the magic-link mint, which is `protected` on the base class. */
         context(_: ServerRuntime)
-        suspend fun mintMagicLink(destination: String): Proof = issueProof(destination)
+        suspend fun mintMagicLink(destination: String): Proof = issueProof(destination, request = null)
 
         /**
          * Stands in for an application's own "email me a login link" route.
@@ -225,7 +223,7 @@ class ProofAuthEventWiringTest {
         assertEquals(HttpStatus.BadRequest, response.status)
 
         val event = events().single()
-        assertEquals(AuthEventType.ProofRejected, event.type)
+        assertEquals(AuthEventRecord.Type.ProofRejected, event.type)
         assertEquals(victim._id.toString(), event.principal, "the log must say which account was attacked")
         assertEquals("SecretMismatch", event.failureReason)
         assertEquals("password", event.method)
@@ -260,24 +258,18 @@ class ProofAuthEventWiringTest {
         assertEquals("203.0.113.7", event.sourceIp)
     }
 
-    /**
-     * A guess at an account that does not exist. Recorded — a run of these against different
-     * addresses is what enumeration looks like — but with no principal, because none resolved and
-     * inventing one would make the row assert something that did not happen.
-     */
+    /** The rate limiter is keyed on the identifier, so each made-up address gets a fresh bucket. */
     @Test
-    fun `a failure against no account is still recorded, with no principal`() = onServer {
-        val response = engine.handleRoot(
-            post("/password/prove", identify("email", "nobody@example.com", "guess")),
-            testId(4),
-        )
-        assertEquals(HttpStatus.BadRequest, response.status)
+    fun `guesses at accounts that do not exist cannot grow the audit table`() = onServer {
+        repeat(25) {
+            val response = engine.handleRoot(
+                post("/password/prove", identify("email", "nobody$it@example.com", "guess")),
+                testId(100 + it),
+            )
+            assertEquals(HttpStatus.BadRequest, response.status)
+        }
 
-        val event = events().single()
-        assertEquals(AuthEventType.ProofRejected, event.type)
-        assertEquals("NoSuchSubject", event.failureReason)
-        assertNull(event.principal, "no account resolved, so there is no principal to name")
-        assertEquals("password", event.method)
+        assertEquals(emptyList(), events())
     }
 
     /** The other half: an accepted credential is an event too, and the one a rejection is counted against. */
@@ -293,30 +285,25 @@ class ProofAuthEventWiringTest {
         assertEquals(HttpStatus.OK, response.status)
 
         val event = events().single()
-        assertEquals(AuthEventType.ProofAccepted, event.type)
+        assertEquals(AuthEventRecord.Type.ProofAccepted, event.type)
         assertEquals(victim._id.toString(), event.principal)
         assertEquals("password", event.method)
         assertNull(event.failureReason)
     }
 
-    /**
-     * Once the limiter starts answering, the guesses stop reaching the credential check — and without
-     * this, stop leaving any trace, so "is this still going on?" becomes unanswerable at exactly the
-     * point it matters.
-     */
+    /** Every blocked attempt would otherwise write a row, so the limiter would cap guesses but not rows. */
     @Test
-    fun `attempts that continue past the rate limit are recorded`() = onServer {
+    fun `attempts past the rate limit are not recorded`() = onServer {
         val victim = user()
         TestServer.password.establish(ProofUser, victim._id, EstablishPassword("correct-horse"))
 
-        repeat(8) {
+        repeat(20) {
             engine.handleRoot(post("/password/prove", identify("email", victim.email, "nope")), testId(10 + it))
         }
 
-        assertTrue(
-            events().any { it.failureReason == "RateLimited" },
-            "a blocked attempt left no record, so a continuing attack looks like it stopped",
-        )
+        val events = events()
+        assertTrue(events.all { it.failureReason == "SecretMismatch" }, "recorded $events")
+        assertTrue(events.size < 20, "every blocked attempt was recorded")
     }
 
     // ---- TOTP --------------------------------------------------------------------------------
@@ -346,7 +333,7 @@ class ProofAuthEventWiringTest {
         )
 
         val event = events().single()
-        assertEquals(AuthEventType.ProofRejected, event.type)
+        assertEquals(AuthEventRecord.Type.ProofRejected, event.type)
         assertEquals(victim._id.toString(), event.principal)
         assertEquals("SecretMismatch", event.failureReason)
         assertEquals("totp", event.method)
@@ -363,8 +350,8 @@ class ProofAuthEventWiringTest {
         engine.handleRoot(post("/totp/prove", body), testId(22))
 
         val all = events()
-        assertEquals(1, all.count { it.type == AuthEventType.ProofAccepted })
-        val rejected = all.single { it.type == AuthEventType.ProofRejected }
+        assertEquals(1, all.count { it.type == AuthEventRecord.Type.ProofAccepted })
+        val rejected = all.single { it.type == AuthEventRecord.Type.ProofRejected }
         assertEquals("SecretAlreadyUsed", rejected.failureReason)
         assertEquals(victim._id.toString(), rejected.principal)
     }
@@ -389,7 +376,7 @@ class ProofAuthEventWiringTest {
         )
 
         val event = events().single()
-        assertEquals(AuthEventType.ProofRejected, event.type)
+        assertEquals(AuthEventRecord.Type.ProofRejected, event.type)
         assertEquals(victim._id.toString(), event.principal)
         assertEquals("SecretMismatch", event.failureReason)
         assertEquals("backupcode", event.method)
@@ -409,7 +396,7 @@ class ProofAuthEventWiringTest {
         )
 
         val event = events().single()
-        assertEquals(AuthEventType.ProofRejected, event.type)
+        assertEquals(AuthEventRecord.Type.ProofRejected, event.type)
         assertEquals(victim._id.toString(), event.principal)
         assertEquals("SecretMismatch", event.failureReason)
         assertEquals("known-device", event.method)
@@ -441,23 +428,19 @@ class ProofAuthEventWiringTest {
         engine.handleRoot(post("/pin/prove", finish(key, "ZZZZZZ")), testId(51))
 
         val event = events().single()
-        assertEquals(AuthEventType.ProofRejected, event.type)
+        assertEquals(AuthEventRecord.Type.ProofRejected, event.type)
         assertEquals("victim@example.com", event.principal)
         assertEquals("SecretMismatch", event.failureReason)
         assertEquals("testpin", event.method)
         assertEquals("email", event.methodProperty)
     }
 
-    /** An unknown or expired key names nothing: there is no pending attempt behind it to attribute. */
+    /** A random key reaches no attempt counter, so anyone can send these without limit. */
     @Test
-    fun `a PIN attempt against an unknown key is recorded with no principal`() = onServer {
+    fun `a PIN attempt against an unknown key is not recorded`() = onServer {
         engine.handleRoot(post("/pin/prove", finish(Uuid.random().toString(), "ZZZZZZ")), testId(52))
 
-        val event = events().single()
-        assertEquals(AuthEventType.ProofRejected, event.type)
-        assertEquals("SecretExpired", event.failureReason)
-        assertNull(event.principal)
-        assertEquals("testpin", event.method)
+        assertEquals(emptyList(), events())
     }
 
     @Test
@@ -469,7 +452,7 @@ class ProofAuthEventWiringTest {
         assertEquals(HttpStatus.OK, response.status)
 
         val event = events().single()
-        assertEquals(AuthEventType.ProofAccepted, event.type)
+        assertEquals(AuthEventRecord.Type.ProofAccepted, event.type)
         assertEquals("victim@example.com", event.principal)
         assertEquals("testpin", event.method)
     }
@@ -480,7 +463,7 @@ class ProofAuthEventWiringTest {
      * `ProofAccepted` would put a login in the log that never happened, and would make "how many
      * times did this account authenticate" wrong.
      *
-     * It *is* recorded, as [AuthEventType.ProofIssued]. The link is a bearer credential from the
+     * It *is* recorded, as [AuthEventRecord.Type.ProofIssued]. The link is a bearer credential from the
      * moment it exists, so an attacker who can cause one to be issued to an address they control
      * needs no credential at all — and the resulting login looks entirely ordinary. The issuance is
      * the only point at which that shows up.
@@ -491,7 +474,7 @@ class ProofAuthEventWiringTest {
 
         val event = events().single()
         assertEquals(
-            AuthEventType.ProofIssued,
+            AuthEventRecord.Type.ProofIssued,
             event.type,
             "minting a proof to mail to someone must not read as a presented credential being accepted",
         )
@@ -514,7 +497,7 @@ class ProofAuthEventWiringTest {
         engine.handleRoot(post("/pin/send-link", "\"victim@example.com\""), testId(20))
 
         val event = events().single()
-        assertEquals(AuthEventType.ProofIssued, event.type)
+        assertEquals(AuthEventRecord.Type.ProofIssued, event.type)
         assertEquals("victim@example.com", event.principal)
         assertEquals("203.0.113.7", event.sourceIp, "the log must name who asked for the link")
         assertEquals("probe/1.0", event.userAgent)
@@ -526,7 +509,7 @@ class ProofAuthEventWiringTest {
         engine.handleRoot(post("/pin/send-link", "\"victim@example.com\""), testId(21))
 
         val event = events().single()
-        assertEquals(testId(21).originId, event.requestId)
+        assertEquals(testId(21).originId, event.origin)
         val requests = TestServer.audit.originsTable().find(Condition.Always).toList()
         val row = requests.singleOrNull { it._id == testId(21).originId }
         assertEquals("203.0.113.7", row?.request?.sourceIp, "the issuance points at no request record")
@@ -542,20 +525,16 @@ class ProofAuthEventWiringTest {
         TestServer.pin.mintMagicLink("victim@example.com")
 
         val event = events().single()
-        assertEquals(AuthEventType.ProofIssued, event.type)
+        assertEquals(AuthEventRecord.Type.ProofIssued, event.type)
         assertNull(event.sourceIp, "a request-less issuance must not be given a fabricated origin")
         assertNull(event.userAgent, "a request-less issuance must not be given a fabricated user agent")
     }
 
     // ---- WebAuthN ----------------------------------------------------------------------------
 
-    /**
-     * The challenge is single-use and time-limited, so an unknown id is one that expired, was already
-     * spent, or was never issued. No subject is known at that point — the credential has not been
-     * looked at yet — so the row names none.
-     */
+    /** A random challenge id reaches no account or limiter, so anyone can send these without limit. */
     @Test
-    fun `a WebAuthN attempt with no live challenge is recorded`() = onServer {
+    fun `a WebAuthN attempt with no live challenge is not recorded`() = onServer {
         val clientData = Base64.encode(
             """{"challenge":"YWJj","origin":"https://example.com","crossOrigin":false,"type":"webauthn.get"}"""
                 .encodeToByteArray()
@@ -579,10 +558,6 @@ class ProofAuthEventWiringTest {
 
         engine.handleRoot(post("/webauthn/prove", body), testId(60))
 
-        val event = events().single()
-        assertEquals(AuthEventType.ProofRejected, event.type)
-        assertEquals("SecretExpired", event.failureReason)
-        assertNull(event.principal)
-        assertEquals("WebAuthN", event.method)
+        assertEquals(emptyList(), events())
     }
 }

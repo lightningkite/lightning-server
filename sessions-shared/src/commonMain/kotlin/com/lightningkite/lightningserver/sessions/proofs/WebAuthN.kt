@@ -16,33 +16,22 @@ import kotlin.time.Instant
 
 
 /**
- * Stored credential for WebAuthn (Web Authentication) authentication.
- * WebAuthn enables passwordless authentication using hardware security keys, biometrics, or platform authenticators.
+ * Represents a stored WebAuthn credential, which enables passwordless login with security keys, biometrics or platform authenticators.
  *
- * @property _id Credential ID (Base64 url-encoded), serves as unique identifier
- * @property subjectId ID of the user this credential belongs to
- * @property subjectType Type of subject (e.g., "User")
- * @property displayName Human-readable name for this credential (e.g., "YubiKey 5C", "Touch ID")
- * @property residentKey Best-effort record of whether this is a discoverable (resident) credential.
- *   WebAuthn has no signed residency flag, so this cannot be verified. It is taken from the client's
- *   `credProps` report when available, and otherwise inferred from [backupEligible] or from the
- *   registration requiring a discoverable credential. Treat it as a hint, not as a security property.
- * @property authenticatorAttachment Type of authenticator ("platform" for built-in, "cross-platform" for external)
- * @property attestationObject Base64 url-encoded attestation object containing public key and metadata
- * @property lastSignCount Counter from last authentication (used to detect cloned authenticators)
- * @property transports Available transport methods (USB, NFC, BLE, internal, hybrid)
- * @property establishedAt When this credential was registered
- * @property lastUsedAt Last time this credential was used for authentication
- * @property expiresAt Optional expiration time for the credential
- * @property disabledAt If set, this credential has been disabled
- * @property backupEligible The authenticator's signed BE flag: whether this credential can be synced to
- *   other devices (a synced passkey). It must never change, and webauthn4j rejects a login whose BE flag
- *   differs from this value. A synced passkey is discoverable in practice, but `false` implies nothing
- *   about residency. Null for credentials registered before this was recorded; filled in on next use.
- * @property backupState The authenticator's signed BS flag as of the last registration or login: whether
- *   the credential is currently backed up. Unlike [backupEligible], this may change over time.
+ * The sign count should increase on each use, and a decrease indicates a cloned authenticator.
  *
- * Security: The sign count should increment on each use. A decrease indicates credential cloning.
+ * @property _id The credential ID, base64url-encoded.
+ * @property subjectType The type of the subject, such as `User`.
+ * @property displayName A name for the user to recognize, such as `YubiKey 5C` or `Touch ID`.
+ * @property residentKey Whether this is probably a discoverable (resident) credential. WebAuthn has no signed residency flag, so this is taken from the client's `credProps` report if available and otherwise inferred, and should be treated as a hint, not as a security property.
+ * @property authenticatorAttachment `platform` for a built-in authenticator and `cross-platform` for an external one.
+ * @property attestationObject The base64url-encoded attestation object holding the public key and metadata.
+ * @property lastSignCount The counter from the last authentication.
+ * @property transports The available transports: USB, NFC, BLE, internal or hybrid.
+ * @property expiresAt When the credential expires, or `null` if it does not.
+ * @property disabledAt When the credential was disabled, or `null` if it is enabled.
+ * @property backupEligible The authenticator's signed BE flag, which says whether the credential can be synced to other devices. It never changes, and webauthn4j rejects a login whose flag differs. `false` implies nothing about residency, and `null` means the credential predates this field and is filled in on next use.
+ * @property backupState The authenticator's signed BS flag as of the last registration or login, which says whether the credential is currently backed up and may change over time.
  */
 @Serializable
 @GenerateDataClassPaths
@@ -68,28 +57,14 @@ public data class WebAuthNCredential(
 ) : HasId<String>
 
 
-/**
- * WebAuthn (Web Authentication API) models and utilities.
- * Implements W3C WebAuthn specification for passwordless authentication using public key cryptography.
- *
- * WebAuthn allows users to authenticate using:
- * - Hardware security keys (YubiKey, Titan)
- * - Platform authenticators (Touch ID, Face ID, Windows Hello)
- * - Cross-platform authenticators (USB, NFC, BLE devices)
- */
+/** Provides the models and utilities of the W3C WebAuthn specification, which authenticates with public key cryptography using security keys, platform authenticators such as Touch ID or Windows Hello, and cross-platform authenticators such as USB, NFC or BLE devices. */
 public object WebAuthN {
 
-    /**
-     * Base64 URL-safe encoder for WebAuthn data.
-     * Used for encoding binary data (challenges, credentials, signatures) for transmission.
-     */
+    /** Encodes binary WebAuthn data such as challenges, credentials and signatures as base64url. */
     @OptIn(ExperimentalEncodingApi::class)
     public val base64Encoder: Base64 = Base64.UrlSafe
 
-    /**
-     * Base64 URL-safe decoder with optional padding.
-     * Accepts both padded and unpadded Base64 strings per WebAuthn specification.
-     */
+    /** Decodes base64url WebAuthn data, with or without padding as the specification allows. */
     @OptIn(ExperimentalEncodingApi::class)
     public val base64Decoder: Base64 = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
 
@@ -195,13 +170,9 @@ public object WebAuthN {
     }
 
     /**
-     * Server-side authenticator requirements for a registration, returned from the app's
-     * `registrationForUser`.
+     * Holds the authenticator requirements for a registration, as returned from the app's `registrationForUser`.
      *
-     * @property residentKey Whether the new credential must be discoverable (resident). The server decides
-     *   this; the preference the client sends to `register-start` is only a hint passed to
-     *   `registrationForUser`. Use [GeneralPreference.Required] if you intend to rely on usernameless
-     *   login for every credential.
+     * @property residentKey Whether the new credential must be discoverable (resident). The server decides this, and the client's preference is only a hint, so use [GeneralPreference.Required] to rely on usernameless login for every credential.
      */
     @Serializable
     public data class AuthenticatorSelectionOptions(
@@ -456,14 +427,10 @@ public object WebAuthN {
         )
 
         /**
-         * Request body for starting a WebAuthn authentication ceremony.
+         * Starts a WebAuthn authentication ceremony.
          *
-         * @property type The principal type name to authenticate as (e.g. "User")
-         * @property proof A valid proof from another method, identifying the subject. Omit it for the
-         *   discoverable (usernameless) flow, where no credential ids are returned. Supply it when the
-         *   subject's authenticator needs its credential ids to find the key. The proof is required
-         *   because those ids, along with their count and transports, are only released to a caller
-         *   who has already shown they hold something tied to the account.
+         * @property type The principal type name to authenticate as, such as `User`.
+         * @property proof A valid proof from another method identifying the subject. Omit it for the discoverable (usernameless) flow, which returns no credential ids. Supply it when the authenticator needs its credential ids to find the key, which are only released to a caller who has shown they hold something tied to the account.
          */
         @Serializable
         public data class StartRequest(

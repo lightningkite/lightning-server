@@ -596,6 +596,7 @@ class MutationLogTest {
      * in a comment: the change has already committed by the time there is anything to record, so
      * throwing would report failure for something that happened and invite a double-applying retry.
      */
+    @OptIn(Unsafe::class)
     @Test
     fun `a mutation whose record cannot be written still happens`() = onServer { runtime ->
         val underlying = TestServer.patients()
