@@ -32,8 +32,14 @@ public class PasswordProofEndpoints(
     override val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
     override val proofExpiration: Duration = 1.hours,
     signals: (context(ServerRuntime) (Table<PasswordSecret>) -> Table<PasswordSecret>)? = null,
-    private val evaluatePassword: suspend context(ServerRuntime) (String) -> Unit = { },
+    private val evaluatePassword: suspend context(ServerRuntime) (NewPasswordInfo) -> Unit = { _ -> },
 ) : ServerBuilder(), DirectProofMethod {
+
+    public data class NewPasswordInfo(
+        public val password: String,
+        public val subjectId: String,
+        public val subjectType: String,
+    )
 
     init {
         proofMethodsRegistry.register(this)
@@ -62,7 +68,7 @@ public class PasswordProofEndpoints(
                 val table = signals?.invoke(serverRuntime, table) ?: table
                 table.interceptCreate {
                     // The hash property is the plain text password at this point. This intercept is what hashes the value.
-                    evaluatePassword(it.hash)
+                    evaluatePassword(NewPasswordInfo(it.hash, it.subjectId, it.subjectType))
                     if (it.hint?.contains(it.hash, true) == true)
                         throw BadRequestException("Hint cannot contain the password itself!")
                     it.copy(hash = it.hash.secureHash())
