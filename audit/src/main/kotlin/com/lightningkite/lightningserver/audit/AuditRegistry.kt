@@ -1,5 +1,7 @@
 package com.lightningkite.lightningserver.audit
 
+import com.lightningkite.lightningserver.concurrent.associate
+import com.lightningkite.lightningserver.concurrent.groupBy
 import com.lightningkite.lightningserver.definition.PreDeployTask
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
@@ -14,6 +16,7 @@ import com.lightningkite.services.database.all
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.serializer
 import kotlin.uuid.Uuid
@@ -116,8 +119,8 @@ public class AuditRegistry(
 
     context(server: Engine)
     internal suspend fun load(): Assignments = Assignments(
-        modelIds = models().all().toList().associate { it._id to it.modelId },
-        bitIndices = fields().all().toList()
+        modelIds = models().all().associate { it._id to it.modelId },
+        bitIndices = fields().all()
             .groupBy { it.modelId }
             .mapValues { (_, rows) -> rows.associate { it.fieldPath to it.fieldId } },
     )
@@ -206,7 +209,7 @@ public class AuditRegistry(
         // Claude: a value class around a Uuid, such as a TypedId, still stores sixteen bytes.
         var idDescriptor = descriptor.getElementDescriptor(idIndex)
         while (idDescriptor.isInline) idDescriptor = idDescriptor.getElementDescriptor(0)
-        if (idDescriptor.auditSerialName != serializer<Uuid>().descriptor.serialName) throw IllegalStateException(
+        if (idDescriptor.auditSerialName != Uuid.serializer().descriptor.serialName) throw IllegalStateException(
             "Audited model \"$serialName\" is keyed by ${descriptor.getElementDescriptor(idIndex).auditSerialName}, " +
                 "but auditing requires a Uuid _id, or a value class wrapping one. " +
                 "One disclosure row is written per record disclosed, so the id column has to stay " +

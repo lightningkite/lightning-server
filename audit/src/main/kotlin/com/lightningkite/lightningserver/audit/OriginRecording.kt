@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.audit
 
 import com.lightningkite.lightningserver.OverrideOnly
+import com.lightningkite.lightningserver.concurrent.forEachConcurrent
 import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.definition.Runtime
@@ -43,7 +44,7 @@ public class OriginRecording<REQUEST_INFO>(
     )
 
     private val contextKey = SerializableCache.Key<Execution, OriginQueue<REQUEST_INFO>>(
-        "com.lightningkite.lightningserver.audit.OriginRecordInterceptor",
+        "com.lightningkite.lightningserver.audit.OriginRecording",
         OriginQueue.serializer(requestInfoSerializer),
     )
 
@@ -65,7 +66,7 @@ public class OriginRecording<REQUEST_INFO>(
     // Claude: a socket's phases don't share an execution context, only the connect request, so the
     // origin waits there. Keyed per socket because a virtual sub-socket shares its carrier's cache.
     private fun socketKey(socketId: Execution.ID) = SerializableCache.Key<WebSocketConnectRequest<*>, SocketOrigin<REQUEST_INFO>>(
-        "com.lightningkite.lightningserver.audit.OriginRecordInterceptor/${socketId.raw.raw}",
+        "com.lightningkite.lightningserver.audit.OriginRecording/${socketId.raw.raw}",
         socketOriginSerializer,
     )
 
@@ -83,7 +84,7 @@ public class OriginRecording<REQUEST_INFO>(
         val context = runtime.execution.context
         var origins = context[contextKey] ?: OriginQueue()
         if (origins.queue.isNotEmpty()) {
-            origins.queue.forEachConcurrently(maxConcurrent = 5) {
+            origins.queue.forEachConcurrent(concurrent = 5) {
                 try {
                     table().insertOne(it)
                 } catch (_: UniqueViolationException) {
@@ -115,9 +116,9 @@ public class OriginRecording<REQUEST_INFO>(
     }
 
     /** Gets the origin cached on the request, checks if it was already written previously, and checks if it was written during [action] */
-    private inline fun <T> ServerRuntime.withSocketOrigin(
+    private suspend fun <T> ServerRuntime.withSocketOrigin(
         request: WebSocketConnectRequest<*>,
-        action: () -> T
+        action: suspend () -> T
     ): T {
         val context = this.execution.context
 
