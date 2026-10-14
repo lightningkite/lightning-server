@@ -113,17 +113,18 @@ public class PasswordProofEndpoints(
             hint = password.hint,
             establishedAt = now
         )
+        modelInfo.table().insertOne(secret)
         modelInfo.table().updateMany(
             condition {
                 Condition.And(
                     it.subjectId eq secret.subjectId,
                     it.subjectType eq secret.subjectType,
-                    it.establishedAt lt now
+                    it.establishedAt lt now,
+                    it._id neq secret._id,
                 )
             },
             modification { it.disabledAt assign now }
         )
-        modelInfo.table().insertOne(secret)
     }
 
     public val establish: ApiHttpHandler<PathSpec0, HasId<*>, EstablishPassword, Unit> =
