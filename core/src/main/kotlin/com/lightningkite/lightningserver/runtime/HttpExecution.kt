@@ -164,12 +164,14 @@ private suspend fun <PATH : PathSpec> Engine.executeHttp(
         var handledError: String? = null
         suspend fun handleError(e: Exception): HttpResponse {
             handledError = e::class.simpleName
-            return try {
+            val response = try {
                 instrument("exceptionHandler") { serverRuntime.server.exceptionHandler.handle(request, e) }
             } catch (_: Exception) {
                 handledError = "unhandled_exception"
                 HttpResponse(status = HttpStatus.InternalServerError)
             }
+            if (response.status.serverError) reportException(e)
+            return response
         }
 
         val response = try {
@@ -179,12 +181,10 @@ private suspend fun <PATH : PathSpec> Engine.executeHttp(
                 try {
                     dispatch(req)
                 } catch (e: Exception) {
-                    serverRuntime.logger.error(e) { "Exception in HTTP" }
                     handleError(e)
                 }
             }
         } catch (e: Exception) {
-            logger.error(e) { "Exception in HTTP interceptor chain" }
             handleError(e)
         }
 
@@ -198,7 +198,7 @@ private suspend fun <PATH : PathSpec> Engine.executeHttp(
     throw e
 } catch (e: Exception) {
     // Claude: the execution interceptors wrap the error handling above, so their own failures land here.
-    logger.error(e) { "Exception in execution interceptor chain" }
+    reportException(e)
     HttpResponse(status = HttpStatus.InternalServerError)
 }
 

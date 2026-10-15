@@ -31,7 +31,16 @@ import com.lightningkite.lightningserver.typed.ModelRestEndpoints
 import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.lightningserver.typed.AuthAccess
 import com.lightningkite.services.database.optics.*
+import com.lightningkite.lightningserver.definition.telemetrySettings
+import com.lightningkite.lightningserver.settings.set
+import com.lightningkite.services.Namespaced
 import com.lightningkite.services.database.*
+import com.lightningkite.services.telemetry.LogLevel
+import com.lightningkite.services.telemetry.TelemetryAttributes
+import com.lightningkite.services.telemetry.TelemetryBackend
+import com.lightningkite.services.telemetry.TelemetryKey
+import com.lightningkite.services.telemetry.TelemetryKeys
+import com.lightningkite.services.telemetry.TelemetryTrace
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -179,6 +188,81 @@ class SessionManagerTest {
                     accessLine.contains("SessionTestUser") && accessLine.contains(userId.toString()),
                     "access log should name the authenticated principal; was: $accessLine",
                 )
+            }
+        }
+    }
+
+    private object RecordingTelemetry : TelemetryBackend by TelemetryBackend.Noop {
+        val spans = mutableListOf<Pair<String, TelemetryAttributes>>()
+
+        init {
+            TelemetryBackend.Settings.register("recording") { _, _, _ -> this }
+        }
+
+        override suspend fun <T> span(
+            owner: Namespaced,
+            opName: String,
+            attributes: TelemetryAttributes,
+            dimensions: Set<TelemetryKey<*>>,
+            action: suspend (TelemetryTrace) -> T,
+        ): T {
+            var recorded = attributes
+            try {
+                return action(object : TelemetryTrace {
+                    override fun enrich(attributes: TelemetryAttributes) { recorded += attributes }
+                    override fun isLoggable(level: LogLevel): Boolean = false
+                    override fun log(level: LogLevel, message: String, attributes: TelemetryAttributes) {}
+                })
+            } finally {
+                synchronized(spans) { spans += opName to recorded }
+            }
+        }
+    }
+
+    @Test
+    fun `the caller's identity lands on the request span through any telemetry backend`() = runBlocking {
+        SessionTestUser.users.clear()
+        val userId = Uuid.random()
+        SessionTestUser.users[userId] = SessionTestUser(userId, "test@example.com")
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+
+            // Reads the authentication inside its own interceptor span, nested in the request span.
+            init {
+                registerBasicMediaTypeCoders()
+                install(AccessLogInterceptor())
+            }
+
+            val sessions = path.path("auth") include TestSessionManager(database = database)
+            val ping = path.path("ping").get bind HttpHandler<PathSpec0> { HttpResponse.plainText("pong") }
+        }.let { server ->
+            server.test({
+                RecordingTelemetry
+                telemetrySettings.set(TelemetryBackend.Settings(url = "recording"))
+            }) {
+                val (session, refreshToken) = execute { server.sessions.newSession(userId) }
+                val accessToken = server.sessions.tokenSimple.test(null, refreshToken.string)
+                synchronized(RecordingTelemetry.spans) { RecordingTelemetry.spans.clear() }
+
+                engine.handleRoot(
+                    HttpRequest(
+                        path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
+                        queryParameters = QueryParameters.EMPTY,
+                        headers = HttpHeaders { add(HttpHeader.Authorization, "Bearer $accessToken") },
+                        domain = "example.com",
+                        protocol = "https",
+                        sourceIp = "local",
+                    ),
+                    Execution.ID.generate(),
+                )
+
+                val spans = synchronized(RecordingTelemetry.spans) { RecordingTelemetry.spans.toList() }
+                val requestSpan = spans.singleOrNull { it.first.startsWith("GET ") }?.second
+                    ?: fail("Expected one request span; got ${spans.map { it.first }}")
+                assertEquals(userId.toString(), requestSpan[TelemetryKeys.User.id])
+                assertEquals(session._id.toString(), requestSpan[TelemetryKeys.Session.id])
+                assertEquals("access token", requestSpan[TelemetryKey.OfString("authorization.method")])
             }
         }
     }

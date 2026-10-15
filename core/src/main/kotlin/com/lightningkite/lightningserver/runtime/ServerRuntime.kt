@@ -13,6 +13,8 @@ import com.lightningkite.services.telemetry.TelemetryAttributes
 import com.lightningkite.services.telemetry.TelemetryTrace
 import com.lightningkite.services.telemetry.emptyTelemetryAttributes
 import com.lightningkite.services.telemetry.telemetryTrace
+import kotlinx.coroutines.withContext
+import kotlin.coroutines.EmptyCoroutineContext
 
 /**
  * An [Engine] performing work.
@@ -82,7 +84,10 @@ public suspend inline fun <T> Engine.execute(
     // SAFETY: The created runtime is immediately used and wrapped in the execution interceptors
     return with(ServerRuntime.create(this, invocation.execution)) {
         telemetryTrace(opName, attributes) { trace ->
-            server.compiledExecutionInterceptors.intercept(invocation) { serverRuntime.action(trace) }
+            val requestTrace = if (invocation is Invocation.Requested) RequestTrace(trace) else EmptyCoroutineContext
+            withContext(requestTrace) {
+                server.compiledExecutionInterceptors.intercept(invocation) { serverRuntime.action(trace) }
+            }
         }
     }
 }

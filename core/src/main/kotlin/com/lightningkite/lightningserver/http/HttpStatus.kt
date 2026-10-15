@@ -25,6 +25,9 @@ public value class HttpStatus(public val code: Int) {
      */
     public val success: Boolean get() = code / 100 == 2
 
+    /** True for 5xx: the server failed, so the error is ours to fix and gets reported. */
+    public val serverError: Boolean get() = code / 100 == 5
+
     public companion object {
         public val Continue: HttpStatus = HttpStatus(100)
         public val SwitchingProtocols: HttpStatus = HttpStatus(101)
