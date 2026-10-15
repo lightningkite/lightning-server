@@ -14,7 +14,6 @@ import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.EntryChange
 import com.lightningkite.services.database.HasId
-import com.lightningkite.services.database.TypedId
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
@@ -57,14 +56,14 @@ class MutationLogTest {
 
     /** Logs [changes] and returns every record written so far. */
     context(server: ServerRuntime)
-    private suspend fun <T : Any> log(serializer: KSerializer<T>, vararg changes: EntryChange<T>): List<AuditMutationRecord> {
+    private suspend fun <T : AuditedModel<*>> log(serializer: KSerializer<T>, vararg changes: EntryChange<T>): List<AuditMutationRecord> {
         TestServer.mutationLog.logAuditedFieldChanges(serializer, changes.toList())
         return TestServer.mutationLog.table().find(Condition.Always).toList()
     }
 
     private val AuditMutationRecord.json: JsonObject get() = Json.parseToJsonElement(data!!).jsonObject
 
-    private val ada = Patient(_id = Uuid.random(), name = "Ada", ssn = "111", address = Address("Main", "Provo"))
+    private val ada = Patient(_id = Patient.ID(Uuid.random()), name = "Ada", ssn = "111", address = Address("Main", "Provo"))
     private val appointment = Appointment(_id = Appointment.ID(UuidV7.generate()))
 
     // ===================== operations =====================
@@ -74,7 +73,7 @@ class MutationLogTest {
         val record = log(Patient.serializer(), EntryChange(null, ada)).single()
 
         assertEquals(AuditMutationRecord.Operation.Create, record.operation)
-        assertEquals(ada._id, record.modelId)
+        assertEquals(ada._id.raw, record.modelId)
         assertEquals(setOf("name", "ssn", "address", "phones", "doctor"), record.json.keys)
     }
 
@@ -91,7 +90,7 @@ class MutationLogTest {
         val record = log(Patient.serializer(), EntryChange(ada, null)).single()
 
         assertEquals(AuditMutationRecord.Operation.Delete, record.operation)
-        assertEquals(ada._id, record.modelId)
+        assertEquals(ada._id.raw, record.modelId)
         assertNull(record.data)
     }
 
@@ -107,10 +106,17 @@ class MutationLogTest {
 
     @Test
     fun `each change in a call gets its own record`() = onServer {
-        val bob = ada.copy(_id = Uuid.random(), name = "Bob")
+        val bob = ada.copy(_id = Patient.ID(Uuid.random()), name = "Bob")
         val records = log(Patient.serializer(), EntryChange(null, ada), EntryChange(null, bob))
 
-        assertEquals(setOf(ada._id, bob._id), records.map { it.modelId }.toSet())
+        assertEquals(setOf(ada._id.raw, bob._id.raw), records.map { it.modelId }.toSet())
+    }
+
+    @Test
+    fun `the record names the model by its id's asUuid`() = onServer {
+        val record = log(Appointment.serializer(), EntryChange(appointment, null)).single()
+
+        assertEquals(appointment._id.raw.raw, record.modelId)
     }
 
     @Test
@@ -166,7 +172,7 @@ class MutationLogTest {
 
     @Test
     fun `an embedded audited model records its audited fields`() = onServer {
-        val house = Doctor(Uuid.random(), "House")
+        val house = Doctor(Doctor.ID(Uuid.random()), "House")
         val added = log(Appointment.serializer(), EntryChange(appointment, appointment.copy(attending = house))).single()
         assertEquals(setOf("name"), added.json.getValue("attending").jsonObject.keys)
 
@@ -177,23 +183,15 @@ class MutationLogTest {
 
     @Test
     fun `a list of embedded audited models is recorded whole`() = onServer {
-        val changed = appointment.copy(consultants = listOf(Doctor(Uuid.random(), "Cuddy")))
+        val changed = appointment.copy(consultants = listOf(Doctor(Doctor.ID(Uuid.random()), "Cuddy")))
         val record = log(Appointment.serializer(), EntryChange(appointment, changed)).single()
 
         assertEquals(setOf("consultants"), record.json.keys)
-    }
-
-    @Test
-    fun `a typed id is unwrapped to its Uuid`() = onServer {
-        val record = log(Appointment.serializer(), EntryChange(appointment, null)).single()
-
-        assertEquals(appointment._id.raw.raw, record.modelId)
     }
 }
 
 @Serializable
 @GenerateDataClassPaths
-@Audited
 data class Appointment(
     override val _id: ID,
     val note: String = "",
@@ -201,10 +199,12 @@ data class Appointment(
     val attending: Doctor? = null,
     val consultants: List<Doctor> = listOf(),
     val payment: Payment? = null,
-) : HasId<Appointment.ID> {
+) : AuditedModel<Appointment.ID> {
     @Serializable
     @JvmInline
-    value class ID(override val raw: UuidV7) : TypedId<UuidV7, ID>
+    value class ID(override val raw: UuidV7) : AuditedModel.Id<UuidV7, ID> {
+        override val asUuid: Uuid get() = raw.raw
+    }
 }
 
 @Serializable

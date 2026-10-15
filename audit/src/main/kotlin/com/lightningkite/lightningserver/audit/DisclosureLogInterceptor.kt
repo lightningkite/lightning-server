@@ -129,12 +129,12 @@ public class DisclosureLogInterceptor(
         /** A `Partial` carries none of its model's annotations, so its model's descriptor stands in for it. */
         private var partialSource: SerialDescriptor? = null
 
-        /** The record whose `_id` is being written. It takes the first Uuid encoded, however deeply wrapped. */
+        /** The record whose `_id` is being written. */
         private var awaitingId: DisclosureBuilder? = null
 
         override fun <T> encodeSerializableValue(serializer: SerializationStrategy<T>, value: T) {
-            if (value is Uuid) awaitingId?.let {
-                it.id = value
+            if (value is AuditedModel.Id<*, *>) awaitingId?.let {
+                it.id = value.asUuid
                 awaitingId = null
             }
             (serializer as? PartialSerializer<*>)?.let { partialSource = it.source.descriptor }

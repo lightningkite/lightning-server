@@ -132,8 +132,6 @@ public class AuditRegistry(
      */
     context(server: Engine)
     internal suspend fun register(audited: List<SerialDescriptor>) {
-        audited.forEach(::requireUuidKeyed)
-
         val existing = load()
 
         val modelIds = existing.modelIds.toMutableMap()
@@ -156,7 +154,7 @@ public class AuditRegistry(
                     "Audited model \"$serialName\" has run out of field bits at \"$path\": " +
                         "${assigned.size} of ${FieldIdentifierSet.CAPACITY} are already assigned. Indices are never " +
                         "reused, so renamed and removed fields still hold theirs. Remove @Audited from " +
-                        "properties that do not need itemising, or mark a nested entity type @Audited so " +
+                        "properties that do not need itemising, or make a nested entity type an AuditedModel so " +
                         "it becomes its own disclosure record."
                 )
                 AuditFieldRegistration(
@@ -188,31 +186,5 @@ public class AuditRegistry(
                     "field bits. Indices are never reused, so this only grows."
             }
         }
-    }
-
-    /**
-     * An audited model must be keyed by a `Uuid`, or by value classes wrapping one.
-     *
-     * Without an `_id` a disclosure record could not say *which* record was disclosed. Requiring that id
-     * to be a `Uuid` is a storage decision: there is one disclosure row per record disclosed, so the
-     * identifier column is written more than anything else in the system and needs to stay sixteen
-     * bytes wide rather than a string a backend will index poorly.
-     */
-    private fun requireUuidKeyed(descriptor: SerialDescriptor) {
-        val serialName = descriptor.auditSerialName
-        val idIndex = (0 until descriptor.elementsCount).firstOrNull { descriptor.getElementName(it) == "_id" }
-            ?: throw IllegalStateException(
-                "Audited model \"$serialName\" has no _id field, so a disclosure record could not say " +
-                    "which record was disclosed. Give it an _id, or drop @Audited."
-            )
-        // Claude: a value class around a Uuid, such as a TypedId, still stores sixteen bytes.
-        var idDescriptor = descriptor.getElementDescriptor(idIndex)
-        while (idDescriptor.isInline) idDescriptor = idDescriptor.getElementDescriptor(0)
-        if (idDescriptor.auditSerialName != Uuid.serializer().descriptor.serialName) throw IllegalStateException(
-            "Audited model \"$serialName\" is keyed by ${descriptor.getElementDescriptor(idIndex).auditSerialName}, " +
-                "but auditing requires a Uuid _id, or a value class wrapping one. " +
-                "One disclosure row is written per record disclosed, so the id column has to stay " +
-                "sixteen bytes wide. Re-key the model, or drop @Audited."
-        )
     }
 }

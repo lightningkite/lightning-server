@@ -2,7 +2,6 @@ package com.lightningkite.lightningserver.audit
 
 import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.database.HasId
-import com.lightningkite.services.database.TypedId
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.jvm.JvmInline
@@ -10,9 +9,8 @@ import kotlin.uuid.Uuid
 
 @Serializable
 @GenerateDataClassPaths
-@Audited
 data class Patient(
-    override val _id: Uuid,
+    override val _id: ID,
     @Audited val name: String,
     @Audited val ssn: String,
     @Audited val address: Address? = null,
@@ -21,7 +19,13 @@ data class Patient(
     // Nothing beneath is itemised, so this whole subtree costs no bits.
     val tags: Map<String, String> = mapOf(),
     @Audited val doctor: Doctor? = null,
-) : HasId<Uuid>
+) : AuditedModel<Patient.ID> {
+    @Serializable
+    @JvmInline
+    value class ID(override val raw: Uuid) : AuditedModel.Id<Uuid, ID> {
+        override val asUuid: Uuid get() = raw
+    }
+}
 
 @Serializable
 data class Address(@Audited val street: String, val city: String)
@@ -31,8 +35,13 @@ data class Phone(@Audited val number: String, val label: String)
 
 /** Audited in its own right, so it must not consume bits of the model that carries it. */
 @Serializable
-@Audited
-data class Doctor(override val _id: Uuid, @Audited val name: String) : HasId<Uuid> {
+data class Doctor(override val _id: ID, @Audited val name: String) : AuditedModel<Doctor.ID> {
+    @Serializable
+    @JvmInline
+    value class ID(override val raw: Uuid) : AuditedModel.Id<Uuid, ID> {
+        override val asUuid: Uuid get() = raw
+    }
+
     /** Not audited, but has an `_id` of its own that must not be mistaken for its parent's. */
     @Serializable
     data class Ref(val _id: Uuid)
@@ -50,8 +59,13 @@ sealed class Payment {
 }
 
 @Serializable
-@Audited
-data class Order(override val _id: Uuid, @Audited val payment: Payment) : HasId<Uuid>
+data class Order(override val _id: ID, @Audited val payment: Payment) : AuditedModel<Order.ID> {
+    @Serializable
+    @JvmInline
+    value class ID(override val raw: Uuid) : AuditedModel.Id<Uuid, ID> {
+        override val asUuid: Uuid get() = raw
+    }
+}
 
 /** Two subclasses share an audited field name, so a path naming the wrong one is caught. */
 @Serializable
@@ -70,30 +84,44 @@ sealed interface Channel {
 }
 
 @Serializable
-@Audited
 data class Subscriber(
-    override val _id: Uuid,
+    override val _id: ID,
     @Audited val via: Channel,
     val fallbacks: List<Channel> = listOf(),
-) : HasId<Uuid>
+) : AuditedModel<Subscriber.ID> {
+    @Serializable
+    @JvmInline
+    value class ID(override val raw: Uuid) : AuditedModel.Id<Uuid, ID> {
+        override val asUuid: Uuid get() = raw
+    }
+}
 
 /** Each subclass is its own audited model, reached only through the sealed parent. */
 @Serializable
 sealed interface Visit {
     @Serializable
     @SerialName("Checkup")
-    @Audited
-    data class Checkup(override val _id: Uuid, @Audited val notes: String) : Visit, HasId<Uuid>
+    data class Checkup(override val _id: ID, @Audited val notes: String) : Visit, AuditedModel<Visit.Checkup.ID> {
+        @Serializable
+        @JvmInline
+        value class ID(override val raw: Uuid) : AuditedModel.Id<Uuid, ID> {
+            override val asUuid: Uuid get() = raw
+        }
+    }
 
     @Serializable
     @SerialName("Surgery")
-    @Audited
-    data class Surgery(override val _id: Uuid, @Audited val notes: String) : Visit, HasId<Uuid>
+    data class Surgery(override val _id: ID, @Audited val notes: String) : Visit, AuditedModel<Visit.Surgery.ID> {
+        @Serializable
+        @JvmInline
+        value class ID(override val raw: Uuid) : AuditedModel.Id<Uuid, ID> {
+            override val asUuid: Uuid get() = raw
+        }
+    }
 }
 
 /** Other Uuids, raw and wrapped, on both sides of `_id`, plus a nested audited record before it. */
 @Serializable
-@Audited
 data class Referencing(
     val before: Uuid,
     val typedBefore: TypedKeyed.ID,
@@ -103,76 +131,67 @@ data class Referencing(
     val typedAfter: TypedKeyed.ID,
     val nested: Doctor.Ref? = null,
     @Audited val value: String = "",
-) : HasId<Referencing.ID> {
+) : AuditedModel<Referencing.ID> {
     @Serializable
     @JvmInline
-    value class ID(override val raw: Uuid) : TypedId<Uuid, ID>
+    value class ID(override val raw: Uuid) : AuditedModel.Id<Uuid, ID> {
+        override val asUuid: Uuid get() = raw
+    }
 }
 
 @Serializable
 data class Node(@Audited val label: String = "", val child: Node? = null)
 
 @Serializable
-@Audited
-data class Tree(override val _id: Uuid, @Audited val root: Node = Node()) : HasId<Uuid>
-
-/** No `_id`, so no disclosure record could say which record was disclosed. */
-@Serializable
-@Audited
-data class Anonymous(@Audited val value: String)
-
-/** Keyed by a String, which is too wide for a table written to once per record disclosed. */
-@Serializable
-@Audited
-data class StringKeyed(override val _id: String, @Audited val value: String) : HasId<String>
-
-@Serializable
-@Audited
-data class TypedKeyed(override val _id: ID, @Audited val value: String) : HasId<TypedKeyed.ID> {
+data class Tree(override val _id: ID, @Audited val root: Node = Node()) : AuditedModel<Tree.ID> {
     @Serializable
     @JvmInline
-    value class ID(override val raw: Uuid) : TypedId<Uuid, ID>
-}
-
-/** Keyed by a value class around a [TypedKeyed.ID], so the Uuid is two wrappers down. */
-@Serializable
-@Audited
-data class DoublyTypedKeyed(val _id: Outer, @Audited val value: String) {
-    @Serializable
-    @JvmInline
-    value class Outer(val inner: TypedKeyed.ID)
+    value class ID(override val raw: Uuid) : AuditedModel.Id<Uuid, ID> {
+        override val asUuid: Uuid get() = raw
+    }
 }
 
 @Serializable
-@Audited
-data class TypedStringKeyed(override val _id: ID, @Audited val value: String) : HasId<TypedStringKeyed.ID> {
+data class TypedKeyed(override val _id: ID, @Audited val value: String) : AuditedModel<TypedKeyed.ID> {
     @Serializable
     @JvmInline
-    value class ID(override val raw: String) : TypedId<String, ID>
+    value class ID(override val raw: Uuid) : AuditedModel.Id<Uuid, ID> {
+        override val asUuid: Uuid get() = raw
+    }
 }
 
 /** Exercises descent into map *values*, whose path separator differs from a list's. */
 @Serializable
-@Audited
 data class Contact(
-    override val _id: Uuid,
+    override val _id: ID,
     val label: String = "",
     @Audited val numbers: Map<String, Phone> = mapOf(),
-) : HasId<Uuid>
+) : AuditedModel<Contact.ID> {
+    @Serializable
+    @JvmInline
+    value class ID(override val raw: Uuid) : AuditedModel.Id<Uuid, ID> {
+        override val asUuid: Uuid get() = raw
+    }
+}
 
 @Serializable
 enum class Severity { Low, High }
 
 @Serializable
-@Audited
 data class Reading(
-    override val _id: Uuid,
+    override val _id: ID,
     @Audited val severity: Severity? = null,
     @Audited val count: Int = 0,
     @Audited val flagged: Boolean = false,
     @Audited val code: Code = Code(0),
     @Audited val note: String? = null,
-) : HasId<Uuid> {
+) : AuditedModel<Reading.ID> {
+    @Serializable
+    @JvmInline
+    value class ID(override val raw: Uuid) : AuditedModel.Id<Uuid, ID> {
+        override val asUuid: Uuid get() = raw
+    }
+
     @Serializable
     @JvmInline
     value class Code(val raw: Int)
@@ -180,9 +199,8 @@ data class Reading(
 
 /** One audited field of every type, each defaulting to the most empty value that type allows. */
 @Serializable
-@Audited
 data class Emptiness(
-    override val _id: Uuid,
+    override val _id: ID,
     @Audited val boolean: Boolean = false,
     @Audited val byte: Byte = 0,
     @Audited val short: Short = 0,
@@ -200,7 +218,13 @@ data class Emptiness(
     @Audited val nullableString: String? = null,
     @Audited val nullableList: List<String>? = null,
     @Audited val nullableWrapped: Wrapped? = null,
-) : HasId<Uuid> {
+) : AuditedModel<Emptiness.ID> {
+    @Serializable
+    @JvmInline
+    value class ID(override val raw: Uuid) : AuditedModel.Id<Uuid, ID> {
+        override val asUuid: Uuid get() = raw
+    }
+
     @Serializable
     @JvmInline
     value class Wrapped(val raw: String)
@@ -240,31 +264,50 @@ data class Deep2(
 
 /** 144 itemised paths — deliberately past the 64 available to one model. */
 @Serializable
-@Audited
-data class Wide(override val _id: Uuid, val root: Deep2 = Deep2()) : HasId<Uuid>
+data class Wide(override val _id: ID, val root: Deep2 = Deep2()) : AuditedModel<Wide.ID> {
+    @Serializable
+    @JvmInline
+    value class ID(override val raw: Uuid) : AuditedModel.Id<Uuid, ID> {
+        override val asUuid: Uuid get() = raw
+    }
+}
 
 // Three shapes of the same audited model over time, sharing a serial name so that they share a
 // model id: fields added, then a field renamed.
 @Serializable
 @SerialName("Versioned")
-@Audited
-data class VersionedV1(override val _id: Uuid, @Audited val a: String) : HasId<Uuid>
+data class VersionedV1(override val _id: ID, @Audited val a: String) : AuditedModel<VersionedV1.ID> {
+    @Serializable
+    @JvmInline
+    value class ID(override val raw: Uuid) : AuditedModel.Id<Uuid, ID> {
+        override val asUuid: Uuid get() = raw
+    }
+}
 
 @Serializable
 @SerialName("Versioned")
-@Audited
-data class VersionedV2(override val _id: Uuid, @Audited val a: String, @Audited val b: String) : HasId<Uuid>
+data class VersionedV2(override val _id: ID, @Audited val a: String, @Audited val b: String) : AuditedModel<VersionedV2.ID> {
+    @Serializable
+    @JvmInline
+    value class ID(override val raw: Uuid) : AuditedModel.Id<Uuid, ID> {
+        override val asUuid: Uuid get() = raw
+    }
+}
 
 @Serializable
 @SerialName("Versioned")
-@Audited
-data class VersionedV3(override val _id: Uuid, @Audited val renamed: String, @Audited val b: String) : HasId<Uuid>
+data class VersionedV3(override val _id: ID, @Audited val renamed: String, @Audited val b: String) : AuditedModel<VersionedV3.ID> {
+    @Serializable
+    @JvmInline
+    value class ID(override val raw: Uuid) : AuditedModel.Id<Uuid, ID> {
+        override val asUuid: Uuid get() = raw
+    }
+}
 
 /** 50 itemised paths — past the 75% mark of the 64 available, but not past the ceiling. */
 @Serializable
-@Audited
 data class Roomy(
-    override val _id: Uuid,
+    override val _id: ID,
     @Audited val f0: String = "",
     @Audited val f1: String = "",
     @Audited val f2: String = "",
@@ -315,7 +358,13 @@ data class Roomy(
     @Audited val f47: String = "",
     @Audited val f48: String = "",
     @Audited val f49: String = "",
-) : HasId<Uuid>
+) : AuditedModel<Roomy.ID> {
+    @Serializable
+    @JvmInline
+    value class ID(override val raw: Uuid) : AuditedModel.Id<Uuid, ID> {
+        override val asUuid: Uuid get() = raw
+    }
+}
 
 /** Not audited, so the data access log must pass it through untouched. */
 @Serializable

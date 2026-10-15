@@ -10,8 +10,8 @@ import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.descriptors.elementDescriptors
 
-/** Whether this descriptor's *class* is marked [Audited], meaning its instances get their own records. */
-internal val SerialDescriptor.isAudited: Boolean get() = annotations.any { it is Audited }
+/** Whether this descriptor's class implements [AuditedModel], meaning its instances get their own records. */
+internal val SerialDescriptor.isAudited: Boolean get() = annotations.any { it is AuditedModelMarker }
 
 internal val SerialDescriptor.auditSerialName: String get() = serialName.removeSuffix("?")
 

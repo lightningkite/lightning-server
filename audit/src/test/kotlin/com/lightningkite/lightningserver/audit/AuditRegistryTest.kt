@@ -135,40 +135,6 @@ class AuditRegistryTest {
     }
 
     @Test
-    fun `an audited model with no id is rejected at deploy`() = onServer {
-        val failure = assertFailsWith<IllegalStateException> { deploy(Anonymous.serializer()) }
-        assertTrue("_id" in failure.message.orEmpty(), "the message should name what is missing; was ${failure.message}")
-    }
-
-    /**
-     * One disclosure row per record disclosed makes the id column the most-written column in the
-     * system, so a string key is rejected rather than quietly accepted.
-     */
-    @Test
-    fun `an audited model not keyed by Uuid is rejected at deploy`() = onServer {
-        val failure = assertFailsWith<IllegalStateException> { deploy(StringKeyed.serializer()) }
-        assertTrue(
-            "Uuid" in failure.message.orEmpty(),
-            "the message should name the required key type; was ${failure.message}",
-        )
-    }
-
-    @Test
-    fun `an audited model keyed by value classes around a Uuid is accepted at deploy`() = onServer {
-        deploy(TypedKeyed.serializer(), DoublyTypedKeyed.serializer())
-
-        val registry = registry()
-        assertEquals(setOf("value"), registry.fields(registry.modelType(TypedKeyed.serializer().descriptor)).keys)
-        assertEquals(setOf("value"), registry.fields(registry.modelType(DoublyTypedKeyed.serializer().descriptor)).keys)
-    }
-
-    @Test
-    fun `an audited model keyed by a value class around a String is rejected at deploy`() = onServer {
-        val failure = assertFailsWith<IllegalStateException> { deploy(TypedStringKeyed.serializer()) }
-        assertTrue("Uuid" in failure.message.orEmpty(), "the message should name the required key type; was ${failure.message}")
-    }
-
-    @Test
     fun `a model too wide for the available bits is rejected with the remedy`() = onServer {
         val failure = assertFailsWith<IllegalStateException> { deploy(Wide.serializer()) }
         assertTrue(
