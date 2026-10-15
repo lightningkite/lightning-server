@@ -768,15 +768,22 @@ rm -rf aws/ awscliv2.zip
     private fun StringBuilder.angieInstall() {
 
         fun outputServer(domain: String, includeUpgrade: Boolean): String = $$"""
+# Drop requests for any other host name or a bare IP
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+    ssl_reject_handshake on;
+    return 444;
+}
+
+# HTTP: redirect to HTTPS (Angie answers ACME challenges before this)
 server {
     listen 80;
     listen [::]:80;
     server_name $$domain;
-
-    location ~ ^.*$ {
-        add_header  X-Robots-Tag "noindex, nofollow, nosnippet, noarchive" always;
-        rewrite ^(.*) https://$$domain$1 permanent;
-    }
+    return 308 https://$host$request_uri;
 }
 
 server {
