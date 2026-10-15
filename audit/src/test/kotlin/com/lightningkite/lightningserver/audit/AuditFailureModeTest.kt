@@ -61,7 +61,10 @@ class AuditFailureModeTest {
             }
         }
 
-        val origins = OriginRecording(database).also { it.install() }
+        val origins = OriginRecording(
+            database.registerTable("OriginRecord", OriginRecord.serializer(OriginRecord.StandardRequestInfo.serializer())),
+            OriginRecording.RequestInfo.Standard
+        ).also { it.install() }
         val registry = path.path("registry") include AuditRegistry(
             database.registerTable("AuditModelRegistration", AuditModelRegistration.serializer()),
             database.registerTable("AuditFieldRegistration", AuditFieldRegistration.serializer()),

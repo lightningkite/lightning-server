@@ -24,13 +24,6 @@ context(runtime: ServerRuntime)
 public fun <T : AuditedModel<ID>, ID : AuditedModel.Id<*, ID>> Table<T>.logQueries(log: AuditQueryLog): Table<T> =
     AuditQueryLogTable(this, log, runtime)
 
-context(builder: ServerBuilder)
-public fun AuditQueryLog(
-    origins: OriginRecording<*>,
-    registry: AuditRegistry,
-    database: Runtime<Database>,
-): AuditQueryLog = AuditQueryLog(origins, registry, database.registerTable("AuditDataAccessRecord"))
-
 /**
  * Records queries against [AuditedModel]s as [AuditQueryRecord]s.
  *

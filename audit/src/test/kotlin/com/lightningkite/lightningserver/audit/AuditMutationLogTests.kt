@@ -14,7 +14,6 @@ import com.lightningkite.services.data.UuidV7
 import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.EntryChange
-import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
@@ -35,7 +34,10 @@ class MutationLogTest {
 
     object TestServer : ServerBuilder() {
         val database = setting("database", Database.Settings())
-        val origins = OriginRecording(database).also { it.install() }
+        val origins = OriginRecording(
+            database.registerTable("OriginRecord", OriginRecord.serializer(OriginRecord.StandardRequestInfo.serializer())),
+            OriginRecording.RequestInfo.Standard
+        ).also { it.install() }
         val registry = path.path("registry") include AuditRegistry(
             database.registerTable("AuditModelRegistration", AuditModelRegistration.serializer()),
             database.registerTable("AuditFieldRegistration", AuditFieldRegistration.serializer()),

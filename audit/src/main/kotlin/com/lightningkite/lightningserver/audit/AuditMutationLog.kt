@@ -35,16 +35,6 @@ context(serverRuntime: ServerRuntime)
 public fun <T : AuditedModel<ID>, ID : AuditedModel.Id<*, ID>> Table<T>.logAuditedFieldChanges(log: AuditMutationLog): Table<T> =
     postRawChanges { changes -> log.logAuditedFieldChanges(serializer, changes) }
 
-context(builder: ServerBuilder)
-public fun AuditMutationLog(
-    origins: OriginRecording<*>,
-    registry: AuditRegistry,
-    database: Runtime<Database>
-): AuditMutationLog = AuditMutationLog(
-    origins, registry,
-    database.registerTable("AuditMutationRecord")
-)
-
 /**
  * Records changes to [AuditedModel]s as [AuditMutationRecord]s.
  *

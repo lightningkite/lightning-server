@@ -33,29 +33,6 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
 
-context(builder: ServerBuilder)
-public inline fun <reified REQUEST_INFO> OriginRecording(
-    database: Runtime<Database>,
-    tableName: String = "OriginRecord",
-    noinline info: suspend context(ServerRuntime) (Request<*>) -> REQUEST_INFO
-): OriginRecording<REQUEST_INFO> {
-    val serializer = serializerOrContextual<REQUEST_INFO>()
-    return OriginRecording(
-        database.registerTable(tableName, OriginRecord.serializer(serializer)),
-        OriginRecording.RequestInfo(serializer, info)
-    )
-}
-
-context(builder: ServerBuilder)
-public fun OriginRecording(
-    database: Runtime<Database>,
-    tableName: String = "OriginRecord"
-): OriginRecording<OriginRecord.StandardRequestInfo> =
-    OriginRecording(
-        database.registerTable(tableName, OriginRecord.serializer(OriginRecord.StandardRequestInfo.serializer())),
-        OriginRecording.RequestInfo.Standard
-    )
-
 /**
  * Records the [OriginRecord]s other audit records reference lazily.
  *

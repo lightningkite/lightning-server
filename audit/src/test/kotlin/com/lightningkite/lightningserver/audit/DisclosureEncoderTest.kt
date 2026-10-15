@@ -42,7 +42,10 @@ class DisclosureEncoderTest {
 
         // Claude: constructed but not installed; the tests call it directly.
         val interceptor = AuditDisclosureLog(
-            OriginRecording(database),
+            OriginRecording(
+                database.registerTable("OriginRecord", OriginRecord.serializer(OriginRecord.StandardRequestInfo.serializer())),
+                OriginRecording.RequestInfo.Standard
+            ),
             registry,
             database.registerTable("AuditDisclosure", AuditDisclosureRecord.serializer()),
         )
