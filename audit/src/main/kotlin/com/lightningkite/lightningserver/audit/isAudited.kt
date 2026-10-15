@@ -15,33 +15,9 @@ internal val SerialDescriptor.isAudited: Boolean get() = annotations.any { it is
 
 internal val SerialDescriptor.auditSerialName: String get() = serialName.removeSuffix("?")
 
-
 /** Whether the property at [index] is marked [Audited], meaning it gets a bit of its own. */
 internal fun SerialDescriptor.isElementAudited(index: Int): Boolean =
     getElementAnnotations(index).any { it is Audited }
-
-
-/**
- * Every [Audited] model reachable through this descriptor, keyed by [auditSerialName].
- *
- * Finds audited models wherever they are: bare, in a `List`, as map values, nested inside a wrapper,
- * or as a sealed subclass. Open polymorphism and contextual serializers are opaque here — their
- * concrete types are not known statically — which is why an audited model that arrives at runtime
- * with no registry entry fails the request rather than being logged as unknown.
- */
-internal fun SerialDescriptor.auditedModels(): Map<String, SerialDescriptor> {
-    val found = LinkedHashMap<String, SerialDescriptor>()
-    val visited = HashSet<SerialDescriptor>()
-
-    fun walk(descriptor: SerialDescriptor) {
-        if (!visited.add(descriptor)) return
-        if (descriptor.isAudited) found[descriptor.auditSerialName] = descriptor
-        descriptor.auditChildren().forEach(::walk)
-    }
-
-    walk(this)
-    return found
-}
 
 internal fun SerialDescriptor.anythingAudited(): Boolean {
     val visited = HashSet<SerialDescriptor>()
