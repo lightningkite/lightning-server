@@ -17,7 +17,10 @@ import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.executePreDeployTasks
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
+import com.lightningkite.lightningserver.serialization.encoder
 import com.lightningkite.lightningserver.settings.set
+import com.lightningkite.lightningserver.websockets.WebSocketFrame
+import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.MetaEndpoints
 import com.lightningkite.services.cache.Cache
@@ -66,6 +69,14 @@ class DisclosureLogEndToEndTest {
             summary = "Patient",
             auth = noAuth,
             implementation = { _: Unit -> ada },
+        )
+
+        /** Pushes [ada] through the server's encoder whenever the client sends anything. */
+        val patientSocket = path.path("patient-socket") bind WebSocketHandler<PathSpec0, Unit>(
+            willConnect = { },
+            messageFromClient = {
+                send(MediaType.Application.Json.encoder!!.ws(MediaType.Application.Json, Patient.serializer(), ada))
+            },
         )
 
         val plain = path.path("plain").get bind ApiHttpHandler(
@@ -233,5 +244,20 @@ class DisclosureLogEndToEndTest {
         assertEquals(HttpStatus.OK, engine.handleRoot(request("/patient"), testId(6)).status)
 
         assertEquals(1, requests().count { it._id == testId(6).originId })
+    }
+
+    @Test
+    fun `a model pushed over a socket is recorded against the socket`() = runBlocking {
+        TestServer.test(settings = { database set Database.Settings(); cache set Cache.Settings() }) {
+            executePreDeployTasks()
+            val socket = TestServer.patientSocket.test()
+            socket.send(WebSocketFrame.Text("go"))
+
+            execute {
+                val disclosure = Reader().run { disclosures() }.single()
+                assertEquals(socket.request.socketId.originId, disclosure.origin)
+                assertEquals(TestServer.ada._id.asUuid, disclosure.recordId)
+            }
+        }
     }
 }

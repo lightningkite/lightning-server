@@ -30,6 +30,7 @@ import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.EntryChange
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.builtins.serializer
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
@@ -58,6 +59,30 @@ class AuditingBuilderTest {
             summary = "Patient",
             auth = noAuth,
             implementation = { _: Unit -> ada },
+        )
+    }
+
+    /** The same patient endpoint, audited with request info of the server's own choosing. */
+    object CustomServer : ServerBuilder() {
+        val database = setting("database", Database.Settings())
+
+        object Audit : AuditingBuilder<String>(
+            database,
+            OriginRecording.RequestInfo(String.serializer()) { request -> "from ${request.sourceIp}" },
+        ) {
+            val disclosures = install(AuditDisclosureLog())
+        }
+
+        val audit = path.path("audit") include Audit
+
+        init {
+            registerBasicMediaTypeCoders()
+        }
+
+        val patient = path.path("patient").get bind ApiHttpHandler(
+            summary = "Patient",
+            auth = noAuth,
+            implementation = { _: Unit -> TestServer.ada },
         )
     }
 
@@ -107,6 +132,27 @@ class AuditingBuilderTest {
     // SAFETY: A fixed, valid v7 id, so the records it keys can be asserted on by value.
     @OptIn(InternalLightningServerApi::class, Unsafe::class)
     private val requestId = Execution.ID(UuidV7.fromRaw(Uuid.parse("00000000-0000-7000-8000-000000000101")))
+
+    @OptIn(EngineApi::class)
+    @Test
+    fun `custom request info is recorded on the origin`() = runBlocking {
+        CustomServer.test(settings = { database set Database.Settings() }) {
+            executePreDeployTasks()
+            val request = HttpRequest<PathSpec>(
+                path = RawHttpEndpoint(asString = "/patient", method = HttpMethod.GET),
+                queryParameters = QueryParameters.EMPTY,
+                headers = HttpHeaders.EMPTY,
+                domain = "example.com",
+                protocol = "https",
+                sourceIp = "10.0.0.9",
+            )
+            assertEquals(HttpStatus.OK, engine.handleRoot(request, requestId).status)
+
+            execute {
+                assertEquals(listOf("from 10.0.0.9"), CustomServer.Audit.origins.table().find(Condition.Always).toList().map { it.request })
+            }
+        }
+    }
 
     @OptIn(EngineApi::class)
     @Test

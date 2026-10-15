@@ -162,6 +162,75 @@ class DataAccessLogTest {
         assertEquals(emptyList(), logged())
     }
 
+    @Test
+    fun `a partial find records the fields it asked for`() = onServer {
+        auditedTable().findPartial(setOf(Patient.path.ssn), Condition.Always).toList()
+
+        val row = logged().single()
+        assertEquals(AuditQueryRecord.Operation.Find, row.operation)
+        assertTrue(row.fields?.contains("ssn") == true, "the requested fields were not recorded: ${row.fields}")
+    }
+
+    @Test
+    fun `an aggregate records the aggregate and its field`() = onServer {
+        auditedTable().aggregate(Aggregate.Average, Condition.Always, Patient.path.visits)
+
+        val row = logged().single()
+        assertEquals(AuditQueryRecord.Operation.Aggregate, row.operation)
+        assertEquals("visits", row.groupBy)
+        assertTrue(row.aggregate?.contains("Average") == true, "the aggregate was not recorded: ${row.aggregate}")
+    }
+
+    @Test
+    fun `a group aggregate records its grouping, aggregate and field`() = onServer {
+        auditedTable().groupAggregate(Aggregate.Sum, Condition.Always, Patient.path.ssn, Patient.path.visits)
+
+        val row = logged().single()
+        assertEquals(AuditQueryRecord.Operation.GroupAggregate, row.operation)
+        assertEquals("ssn", row.groupBy)
+        assertTrue(row.aggregate?.let { "Sum" in it && "visits" in it } == true, "the aggregate was not recorded: ${row.aggregate}")
+    }
+
+    @Test
+    fun `a replace and an upsert are recorded`() = onServer {
+        val ada = patient()
+        val table = auditedTable()
+        table.replaceOneById(ada._id, ada)
+        table.upsertOneById(ada._id, ada)
+
+        assertEquals(
+            listOf(AuditQueryRecord.Operation.Replace, AuditQueryRecord.Operation.Update).sorted(),
+            logged().map { it.operation }.sorted(),
+        )
+    }
+
+    @Test
+    fun `the ignoring variants are recorded`() = onServer {
+        val ada = patient()
+        val table = auditedTable()
+        table.updateManyIgnoringResult(Condition.Always, modification { it.ssn assign "x" })
+        table.updateOneIgnoringResult(Condition.Always, modification { it.ssn assign "y" })
+        table.replaceOneIgnoringResult(Condition.Always, ada)
+        table.upsertOneIgnoringResult(condition { it._id eq ada._id }, modification { it.ssn assign "z" }, ada)
+        table.deleteOneIgnoringOld(Condition.Always)
+
+        assertEquals(
+            listOf(
+                AuditQueryRecord.Operation.Update, AuditQueryRecord.Operation.Update, AuditQueryRecord.Operation.Replace,
+                AuditQueryRecord.Operation.Update, AuditQueryRecord.Operation.Delete,
+            ).sorted(),
+            logged().map { it.operation }.sorted(),
+        )
+    }
+
+    @Test
+    fun `the origin a record names is written`() = onServer {
+        auditedTable().count(Condition.Always)
+
+        val origin = logged().single().origin
+        assertTrue(TestServer.origins.table().find(Condition.Always).toList().any { it._id == origin }, "the record names an origin with no row")
+    }
+
     // ===================== through ModelInfo =====================
 
     @Test

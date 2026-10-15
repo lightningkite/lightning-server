@@ -84,12 +84,13 @@ public class AuditRegistry(
             return modelIds[serialName] ?: throw IllegalStateException(
                 // Claude: an empty registry means assignment never ran, which needs a different fix.
                 if (modelIds.isEmpty()) "The audit registry is empty, so \"$serialName\" — and every other " +
-                    "audited model — has no entry. Bit assignment never ran. Check that AuditCore is " +
+                    "audited model — has no entry. Bit assignment never ran. Check that the AuditRegistry is " +
                     "included in the server definition, not merely constructed, and that pre-deploy tasks " +
                     "run before serving."
                 else
-                    "Audited model \"$serialName\" has no registry entry, so its disclosure cannot be recorded. " +
-                        "It reached a client through a serializer the deploy-time scan could not resolve statically."
+                    "Audited model \"$serialName\" has no registry entry, so nothing about it can be recorded. " +
+                        "The deploy-time scan registers the audited models that endpoints use, so either no endpoint " +
+                        "uses it or it is only reached through a serializer the scan cannot resolve statically."
             )
         }
 

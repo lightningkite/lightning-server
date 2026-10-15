@@ -19,6 +19,7 @@ data class Patient(
     // Nothing beneath is itemised, so this whole subtree costs no bits.
     val tags: Map<String, String> = mapOf(),
     @Audited val doctor: Doctor? = null,
+    val visits: Int = 0,
 ) : AuditedModel<Patient.ID> {
     @Serializable
     @JvmInline

@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.audit
 
+import com.lightningkite.lightningserver.audit.AuditMutationRecord.Operation
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.serverRuntime
@@ -14,6 +15,7 @@ import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.EntryChange
 import com.lightningkite.services.database.HasId
+import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
@@ -25,6 +27,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlin.jvm.JvmInline
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.uuid.Uuid
 
@@ -42,6 +45,11 @@ class MutationLogTest {
             registry,
             database.registerTable("AuditMutation", AuditMutationRecord.serializer()),
         )
+
+        val patients = database.registerTable("Patient", Patient.serializer())
+
+        /** Never registered, so a change to it cannot be recorded. */
+        val orders = database.registerTable("Order", Order.serializer())
     }
 
     private fun onServer(block: suspend context(ServerRuntime) () -> Unit) = runBlocking {
@@ -188,6 +196,91 @@ class MutationLogTest {
 
         assertEquals(setOf("consultants"), record.json.keys)
     }
+
+    @Test
+    fun `removing an embedded audited model records null`() = onServer {
+        val withHouse = appointment.copy(attending = Doctor(Doctor.ID(Uuid.random()), "House"))
+        val record = log(Appointment.serializer(), EntryChange(withHouse, appointment)).single()
+
+        assertEquals(JsonNull, record.json.getValue("attending"))
+    }
+
+    @Test
+    fun `an unaudited map holding audited fields is recorded whole`() = onServer {
+        val changed = appointment.copy(contacts = mapOf("home" to Phone("555", "h")))
+        val record = log(Appointment.serializer(), EntryChange(appointment, changed)).single()
+
+        assertEquals(setOf("contacts"), record.json.keys)
+    }
+
+    @Test
+    fun `a change that touches no audited field writes no origin`() = onServer {
+        log(Patient.serializer(), EntryChange(ada, ada.copy(tags = mapOf("a" to "b"))))
+
+        assertEquals(emptyList(), TestServer.origins.table().find(Condition.Always).toList())
+    }
+
+    // ===================== through a logged table =====================
+
+    context(server: ServerRuntime)
+    private fun loggedPatients() = TestServer.patients().logAuditedFieldChanges(TestServer.mutationLog)
+
+    context(server: ServerRuntime)
+    private suspend fun operations() = TestServer.mutationLog.table().find(Condition.Always).toList().map { it.operation }
+
+    @Test
+    fun `each write through a logged table is recorded as the operation it was`() = onServer {
+        val table = loggedPatients()
+        val bob = ada.copy(_id = Patient.ID(Uuid.random()), name = "Bob")
+
+        table.insertOne(ada)
+        table.updateOneById(ada._id, modification { it.ssn assign "222" })
+        table.replaceOneById(ada._id, ada.copy(name = "Ann"))
+        table.upsertOneById(bob._id, bob)
+        table.upsertOne(condition { it._id eq bob._id }, modification { it.ssn assign "333" }, bob)
+        table.deleteOneById(ada._id)
+        table.deleteMany(Condition.Always)
+
+        assertEquals(
+            listOf(Operation.Create, Operation.Modify, Operation.Modify, Operation.Create, Operation.Modify, Operation.Delete, Operation.Delete).groupingBy { it }.eachCount(),
+            operations().groupingBy { it }.eachCount(),
+        )
+    }
+
+    @Test
+    fun `the ignoring variants record every row and return what the table alone would`() = onServer {
+        val table = loggedPatients()
+        val bob = ada.copy(_id = Patient.ID(Uuid.random()), name = "Bob")
+        table.insert(listOf(ada, bob))
+
+        assertEquals(2, table.updateManyIgnoringResult(Condition.Always, modification { it.ssn assign "x" }))
+        assertEquals(false, table.updateOneIgnoringResult(condition { it.name eq "Nobody" }, modification { it.ssn assign "y" }))
+        assertEquals(true, table.deleteOneIgnoringOld(condition { it._id eq ada._id }))
+        assertEquals(1, table.deleteManyIgnoringOld(Condition.Always))
+
+        assertEquals(mapOf(Operation.Create to 2, Operation.Modify to 2, Operation.Delete to 2), operations().groupingBy { it }.eachCount())
+    }
+
+    @Test
+    fun `reads through a logged table record nothing`() = onServer {
+        val table = loggedPatients()
+        TestServer.patients().insertOne(ada)
+
+        table.find(Condition.Always).toList()
+        table.count(Condition.Always)
+
+        assertEquals(emptyList(), operations())
+    }
+
+    @Test
+    fun `a change to an unregistered model stands, but the caller sees the failure`() = onServer {
+        val order = Order(Order.ID(Uuid.random()), Payment.Card("4242"))
+
+        assertFailsWith<IllegalStateException> {
+            TestServer.orders().logAuditedFieldChanges(TestServer.mutationLog).insertOne(order)
+        }
+        assertEquals(listOf(order), TestServer.orders().find(Condition.Always).toList())
+    }
 }
 
 @Serializable
@@ -199,6 +292,7 @@ data class Appointment(
     val attending: Doctor? = null,
     val consultants: List<Doctor> = listOf(),
     val payment: Payment? = null,
+    val contacts: Map<String, Phone> = mapOf(),
 ) : AuditedModel<Appointment.ID> {
     @Serializable
     @JvmInline
