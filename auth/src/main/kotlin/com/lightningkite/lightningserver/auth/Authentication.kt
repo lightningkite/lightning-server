@@ -244,6 +244,10 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
         override val serializer: KSerializer<Authentication<*>?> =
             serializer(NothingSerializer()).nullable as KSerializer<Authentication<*>?>
 
+        // Claude: a sub-request or sub-socket shares its carrier's cache but may bring its own credential,
+        // so an anonymous carrier must not cache "anonymous" for it.
+        override val cachesNull: Boolean get() = false
+
         context(server: ServerRuntime)
         override suspend fun calculate(input: Request<*>): Authentication<*>? =
             server.server.authReaders.sortedByDescending { it.priority }.firstNotNullOfOrNull { reader ->

@@ -27,7 +27,7 @@ import kotlin.uuid.Uuid
 @Serializable
 public data class OriginRecord<REQUEST_INFO>(
     override val _id: ID,
-    @Index val parent: ExecutionId? = null, // may or may not be recorded in the table, the parent may not be an origin
+    @Index val parent: ExecutionId? = null, // the origin of the execution that started this one, or that execution itself if it had none
     @Index val root: ExecutionId, // may or may not be recorded. Websocket phases are often their own root.
     val kind: ExecutionKind,
     val location: String,

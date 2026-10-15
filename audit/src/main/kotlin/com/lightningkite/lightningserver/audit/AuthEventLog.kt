@@ -19,7 +19,8 @@ import com.lightningkite.services.database.insertOne
  *
  * [AuthEvent.TokenRejected] and [AuthEvent.ProofRejected] are not recorded. Both are raised before any
  * real session or account is involved, so anyone can produce them at will, and recording them would
- * let an unauthenticated caller flood the audit database. The request log still records each attempt.
+ * let an unauthenticated caller flood the audit database. They write no [OriginRecord] either, so such
+ * attempts only show up in the server's access log.
  */
 public class AuthEventLog(
     private val origins: OriginRecording<*>,

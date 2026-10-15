@@ -24,6 +24,7 @@ import com.lightningkite.services.data.Unsafe
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.Table
 import com.lightningkite.services.database.UniqueViolationException
+import com.lightningkite.services.database.get
 import com.lightningkite.services.database.insertOne
 import com.lightningkite.services.database.serializerOrContextual
 import kotlinx.coroutines.currentCoroutineContext
@@ -63,6 +64,9 @@ public fun OriginRecording(
  * Each execution captures its origin into its context, which child executions and tasks inherit, so a
  * touch anywhere down the chain writes every origin it descends from. An execution that never touches
  * writes nothing.
+ *
+ * [REQUEST_INFO] must compare by value, such as a data class: an origin id that is already recorded is
+ * accepted only if the recorded row equals the one being written.
  */
 public class OriginRecording<REQUEST_INFO>(
     public val table: Runtime<Table<OriginRecord<REQUEST_INFO>>>,
@@ -96,10 +100,12 @@ public class OriginRecording<REQUEST_INFO>(
 
     override val name: String = "OriginRecording"
 
+    /** @property current The origin of the execution holding this queue, inherited by everything it starts. */
     @Serializable
     private data class OriginQueue<REQUEST_INFO>(
         val queue: List<OriginRecord<REQUEST_INFO>> = emptyList(),
         val written: Set<OriginRecord.ID> = emptySet(),
+        val current: OriginRecord.ID? = null,
     )
 
     private val contextKey = SerializableCache.Key<Execution, OriginQueue<REQUEST_INFO>>(
@@ -137,7 +143,8 @@ public class OriginRecording<REQUEST_INFO>(
      *
      * Call before writing any audit record that references the execution's origin.
      *
-     * @throws IllegalStateException if the execution's origin was never captured.
+     * @throws IllegalStateException if the execution's origin was never captured, or if an origin with the
+     *   same id but different contents was already recorded.
      */
     context(runtime: ServerRuntime)
     internal suspend fun flush() {
@@ -147,11 +154,17 @@ public class OriginRecording<REQUEST_INFO>(
             origins.queue.forEachConcurrent(concurrent = 5) {
                 try {
                     table().insertOne(it)
-                } catch (_: UniqueViolationException) {
-                    /*Squish. This means the row was already recorded, likely by a child execution, that's fine.*/
+                } catch (e: UniqueViolationException) {
+                    // Claude: a child execution re-writing its parent's origin writes an identical row. A different
+                    // row means two requests share an id, as a misbehaving trusted request-id header can cause.
+                    if (table().get(it._id) != it) throw IllegalStateException(
+                        "Origin ${it._id} is already recorded with different contents, so two executions share one id. " +
+                            "Their audit records would be attributed to the same origin. Check the trusted request-id header.",
+                        e,
+                    )
                 }
             }
-            origins = OriginQueue(written = origins.written + origins.queue.map { it._id })
+            origins = origins.copy(queue = emptyList(), written = origins.written + origins.queue.map { it._id })
             context[contextKey] = origins
         }
         check(runtime.execution.originId in origins.written) {
@@ -177,8 +190,11 @@ public class OriginRecording<REQUEST_INFO>(
     private fun ServerRuntime.queueOrigin(row: OriginRecord<REQUEST_INFO>) {
         val context = execution.context
         val origins = context[contextKey] ?: OriginQueue()
-        if (row._id in origins.written || origins.queue.any { it._id == row._id }) return
-        context[contextKey] = origins.copy(queue = origins.queue + row)
+        if (row._id in origins.written || origins.queue.any { it._id == row._id }) {
+            context[contextKey] = origins.copy(current = row._id)
+            return
+        }
+        context[contextKey] = origins.copy(queue = origins.queue + row, current = row._id)
     }
 
     /** Gets the origin cached on the request, checks if it was already written previously, and checks if it was written during [action] */
@@ -189,12 +205,11 @@ public class OriginRecording<REQUEST_INFO>(
         val context = this.execution.context
 
         val origin = request.cache[socketKey(request.socketId)]?.also { origin ->
-            val current = context[contextKey] ?: OriginQueue()
-            if (origin.id in current.written || current.queue.any { it._id == origin.id }) return@also
-
-            context[contextKey] = when (val queued = origin.queued) {
-                null -> current.copy(written = current.written + origin.id) // add the origin to written origins, we know it was written before in a previous phase
-                else -> current.copy(queue = current.queue + queued)
+            val current = (context[contextKey] ?: OriginQueue()).copy(current = origin.id)
+            context[contextKey] = when {
+                origin.id in current.written || current.queue.any { it._id == origin.id } -> current
+                origin.queued == null -> current.copy(written = current.written + origin.id) // add the origin to written origins, we know it was written before in a previous phase
+                else -> current.copy(queue = current.queue + origin.queued)
             }
         }
 
@@ -226,7 +241,8 @@ public class OriginRecording<REQUEST_INFO>(
         }
         return OriginRecord(
             _id = runtime.execution.originId,
-            parent = execution.parent?.toExternal(),
+            // Claude: the parent's origin rather than the parent execution, which for a socket phase has no row.
+            parent = execution.context[contextKey]?.current?.raw ?: execution.parent?.toExternal(),
             root = execution.rootExecution.toExternal(),
             kind = kind,
             location = location,

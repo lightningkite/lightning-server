@@ -87,14 +87,14 @@ class DisclosureLogEndToEndTest {
     private fun testId(n: Int) =
         Execution.ID(UuidV7.fromRaw(Uuid.parse("00000000-0000-7000-8000-" + n.toString().padStart(12, '0'))))
 
-    private fun request(path: String, method: HttpMethod = HttpMethod.GET, body: String? = null) =
+    private fun request(path: String, method: HttpMethod = HttpMethod.GET, body: String? = null, sourceIp: String = "10.0.0.1") =
         HttpRequest<PathSpec>(
             path = RawHttpEndpoint(asString = path, method = method),
             queryParameters = QueryParameters.EMPTY,
             headers = HttpHeaders.EMPTY,
             domain = "example.com",
             protocol = "https",
-            sourceIp = "10.0.0.1",
+            sourceIp = sourceIp,
             body = body?.let { TypedData.text(it, MediaType.Application.Json) },
         )
 
@@ -161,13 +161,13 @@ class DisclosureLogEndToEndTest {
         assertNull(record.parent)
     }
 
+    /** Origins are recorded lazily, so a request that references nothing leaves nothing behind. */
     @Test
-    fun `a request that discloses nothing still gets a request record and no disclosures`() = onServer {
+    fun `a request that discloses nothing writes no records`() = onServer {
         engine.handleRoot(request("/plain"), testId(2))
 
         assertEquals(emptyList(), disclosures())
-        // TODO: OriginRecord no longer records an outcome; this only checks the row exists.
-        assertNotNull(requests().singleOrNull { it._id == testId(2).originId })
+        assertEquals(emptyList(), requests())
     }
 
     /**
@@ -184,8 +184,9 @@ class DisclosureLogEndToEndTest {
         }
     }
 
+    /** Only the sub-request that disclosed references an origin, so it and the carrier it descends from are recorded. */
     @Test
-    fun `each sub-request of a multiplexed request is recorded separately and parented`() = onServer {
+    fun `a disclosing sub-request of a multiplexed request is recorded, parented to the carrier`() = onServer {
         engine.handleRoot(
             request(
                 "/meta/bulk",
@@ -196,7 +197,7 @@ class DisclosureLogEndToEndTest {
         )
 
         val subs = requests().filter { it.parent == testId(4).toExternal() }
-        assertEquals(2, subs.size, "expected one request record per sub-request; saw ${requests().map { it._id }}")
+        assertEquals(1, subs.size, "expected a record for the disclosing sub-request only; saw ${requests().map { it._id }}")
         assertTrue(requests().any { it._id == testId(4).originId }, "the carrying request was not recorded")
 
         val disclosure = disclosures().single()
@@ -207,15 +208,15 @@ class DisclosureLogEndToEndTest {
     }
 
     /**
-     * A repeated trusted request id means a misconfigured proxy is about to merge two principals'
+     * A repeated trusted request id means a misconfigured proxy is about to merge two requests'
      * activity under one identifier. That has to be loud.
      */
     @Test
-    fun `a duplicate request id fails the request and discloses nothing`() = onServer {
+    fun `a duplicate request id from a different request fails the request and discloses nothing`() = onServer {
         val first = engine.handleRoot(request("/patient"), testId(5))
         assertEquals(HttpStatus.OK, first.status)
 
-        val second = engine.handleRoot(request("/patient"), testId(5))
+        val second = engine.handleRoot(request("/patient", sourceIp = "10.0.0.2"), testId(5))
 
         assertEquals(
             HttpStatus.InternalServerError,
@@ -223,5 +224,14 @@ class DisclosureLogEndToEndTest {
             "a repeated request id must not quietly merge two requests' activity",
         )
         assertEquals(1, disclosures().size, "the rejected request disclosed a record anyway")
+    }
+
+    /** An identical row is what a child execution re-writing its parent's origin produces, so it is accepted. */
+    @Test
+    fun `a duplicate request id with an identical origin is accepted`() = onServer {
+        assertEquals(HttpStatus.OK, engine.handleRoot(request("/patient"), testId(6)).status)
+        assertEquals(HttpStatus.OK, engine.handleRoot(request("/patient"), testId(6)).status)
+
+        assertEquals(1, requests().count { it._id == testId(6).originId })
     }
 }

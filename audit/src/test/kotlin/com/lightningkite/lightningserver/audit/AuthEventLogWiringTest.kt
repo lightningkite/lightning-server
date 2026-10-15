@@ -230,20 +230,12 @@ class AuthEventLogWiringTest {
         assertEquals(0, events().size, "forged tokens wrote audit rows")
     }
 
-    /**
-     * The other half of the trade: the attempt is not invisible, it is just recorded as a request
-     * rather than as an authentication event. Without this the mitigation above would be dropping
-     * the evidence rather than relocating it.
-     */
+    /** Origins are only written when something references them, so a forged attempt cannot grow that table either. */
     @Test
-    fun `a forged attempt is still visible in the request log`() = onServer {
+    fun `a forged attempt writes no origin record`() = onServer {
         engine.handleRoot(tokenExchange(forgedToken()), testId(6))
 
-        val requests = TestServer.audit.origins.table().find(Condition.Always).toList()
-        assertTrue(
-            requests.any { it._id == testId(6).originId },
-            "a forged attempt left no trace at all — it must still appear as a request",
-        )
+        assertEquals(emptyList(), TestServer.audit.origins.table().find(Condition.Always).toList())
     }
 
     /**

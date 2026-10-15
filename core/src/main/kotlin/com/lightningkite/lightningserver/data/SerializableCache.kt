@@ -100,6 +100,14 @@ public class SerializableCache<out SCOPE> private constructor(
          */
         context(server: ServerRuntime)
         public suspend fun calculate(input: INPUT): T
+
+        /**
+         * Whether a calculated `null` is cached like any other value.
+         *
+         * When `false`, a calculated `null` is returned without being cached, so the next retrieval calculates
+         * again. A `null` stored explicitly with `set` is still cached.
+         */
+        public val cachesNull: Boolean get() = true
     }
 
     private data class KeyAndResult<T>(val key: Key<*, T>, val result: Expiring<T>)
@@ -221,8 +229,15 @@ public class SerializableCache<out SCOPE> private constructor(
      * @return The cached or newly calculated value
      */
     context(server: ServerRuntime)
-    public suspend fun <INPUT, T> get(key: CalculatingKey<SCOPE, INPUT, T>, input: INPUT): T =
-        getOrPut(key) { key.calculate(input) }
+    public suspend fun <INPUT, T> get(key: CalculatingKey<SCOPE, INPUT, T>, input: INPUT): T {
+        if (key.cachesNull) return getOrPut(key) { key.calculate(input) }
+        // Claude: a calculated null is never stored here, so any cached entry, null included, was set on purpose.
+        retrieve(key)?.let { return it.value }
+        return calculating.getOrPut(key.id) { Mutex() }.withLock {
+            retrieve(key)?.let { return@withLock it.value }
+            key.calculate(input).also { if (it != null) cache(key, it) }
+        }
+    }
 
     /**
      * Checks if the cache contains a non-expired value for the given key.

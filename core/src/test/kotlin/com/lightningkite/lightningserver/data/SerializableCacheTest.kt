@@ -226,6 +226,47 @@ class SerializableCacheTest {
     }
 
     @Test
+    fun testNullIsRecalculatedWhenNotCached() {
+        TestServer.test(
+            settings = { generalSettings set GeneralServerSettings() }
+        ) {
+            runBlocking {
+                val cache = SerializableCache<Any?>()
+                var result: String? = null
+                var calculations = 0
+
+                val key = object : SerializableCache.CalculatingKey<Any?, Unit, String?> {
+                    override val id = "uncachedNull"
+                    override val serializer = String.serializer().nullable
+                    override val cachesNull = false
+
+                    context(server: ServerRuntime)
+                    override suspend fun calculate(input: Unit): String? {
+                        calculations++
+                        return result
+                    }
+                }
+
+                execute {
+                    assertNull(cache.get(key, Unit))
+                    assertNull(cache.get(key, Unit))
+                    assertEquals(2, calculations)
+
+                    result = "found"
+                    assertEquals("found", cache.get(key, Unit))
+                    result = "changed"
+                    assertEquals("found", cache.get(key, Unit))
+                    assertEquals(3, calculations)
+
+                    val explicit = SerializableCache<Any?>().apply { set(key, null) }
+                    assertNull(explicit.get(key, Unit))
+                    assertEquals(3, calculations)
+                }
+            }
+        }
+    }
+
+    @Test
     fun testConcurrentSetAndGet() {
         TestServer.test(
             settings = { generalSettings set GeneralServerSettings() }

@@ -488,8 +488,7 @@ class OriginRecordingTest {
         assertEquals("/multiplex", assertNotNull(rowFor(physical.request.socketId)).location)
         val subRow = assertNotNull(rowFor(sub.socketId))
         assertEquals("/socket", subRow.location)
-        assertEquals(sub.parent?.toExternal(), subRow.parent, "a virtual socket is parented to the phase that started it")
-        assertNotNull(subRow.parent)
+        assertEquals(physical.request.socketId.toExternal(), subRow.parent, "a virtual socket is parented to its carrier's origin")
     }
 
     @Test
