@@ -47,15 +47,17 @@ class DisclosureLogEndToEndTest {
     object TestServer : ServerBuilder() {
         val database = setting("database", Database.Settings())
         val cache = setting("cache", Cache.Settings())
-        val audit = path.path("audit") include AuditCore(database)
-        val disclosureLog = path.path("audit-disclosure") include DisclosureLog(audit)
+        object Audit : AuditingBuilder.WithStandardRequestInfo(database) {
+            val disclosures = install(AuditDisclosureLog())
+        }
+        val audit = path.path("audit") include Audit
 
         init {
             registerBasicMediaTypeCoders()
         }
 
         val ada = Patient(
-            _id = Uuid.parse("00000000-0000-0000-0000-0000000000a1"),
+            _id = Patient.ID(Uuid.parse("00000000-0000-0000-0000-0000000000a1")),
             name = "Ada",
             ssn = "secret",
         )
@@ -106,13 +108,13 @@ class DisclosureLogEndToEndTest {
 
     private class Reader {
         context(server: ServerRuntime)
-        suspend fun requests() = TestServer.audit.originsTable().find(Condition.Always).toList()
+        suspend fun requests() = TestServer.audit.origins.table().find(Condition.Always).toList()
 
         context(server: ServerRuntime)
-        suspend fun disclosures() = TestServer.disclosureLog.disclosures().find(Condition.Always).toList()
+        suspend fun disclosures() = TestServer.audit.disclosures.table().find(Condition.Always).toList()
 
         context(server: ServerRuntime)
-        suspend fun pathsOf(record: DisclosureRecord): Set<String> {
+        suspend fun pathsOf(record: AuditDisclosureRecord): Set<String> {
             val registry = TestServer.audit.registry.assignments.await()
             val byBit = registry.fields(record.recordType).entries.associate { it.value to it.key }
             return record.disclosed.map { byBit.getValue(it) }.toSet()
@@ -147,7 +149,7 @@ class DisclosureLogEndToEndTest {
 
         val disclosure = disclosures().single()
         assertEquals(testId(1).originId, disclosure.origin)
-        assertEquals(TestServer.ada._id, disclosure.recordId)
+        assertEquals(TestServer.ada._id.asUuid, disclosure.recordId)
         assertEquals(setOf("name", "ssn"), pathsOf(disclosure))
 
         val record = requests().single { it._id == testId(1).originId }

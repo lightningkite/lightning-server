@@ -22,7 +22,10 @@ import kotlinx.serialization.modules.SerializersModule
 import kotlin.uuid.Uuid
 
 /**
- * Writes one [DisclosureRecord] for every audited record that reaches a client.
+ * Writes one [AuditDisclosureRecord] for every audited record that reaches a client.
+ *
+ * Nothing is recorded until it is installed with `install` in a [ServerBuilder][com.lightningkite.lightningserver.definition.builder.ServerBuilder].
+ * Install it at most once, or every disclosure is recorded twice.
  *
  * ## Fail-closed
  *
@@ -59,10 +62,10 @@ import kotlin.uuid.Uuid
  * | A value class wrapping an empty value | no |
  * | A collection whose elements are all empty, such as `listOf("")` | yes |
  */
-public class DisclosureLogInterceptor(
-    private val registry: AuditRegistry,
+public class AuditDisclosureLog(
     private val origins: OriginRecording<*>,
-    private val table: Runtime<Table<DisclosureRecord>>,
+    private val registry: AuditRegistry,
+    public val table: Runtime<Table<AuditDisclosureRecord>>,
 ) : EncodingInterceptor {
     override val name: String = "DisclosureLog"
 
@@ -75,8 +78,8 @@ public class DisclosureLogInterceptor(
 
         val rows = origins.withCurrentOrigin { origin ->
             disclosures.map {
-                DisclosureRecord(
-                    _id = DisclosureRecord.ID(UuidV7.generateFromServerClock()),
+                AuditDisclosureRecord(
+                    _id = AuditDisclosureRecord.ID(UuidV7.generateFromServerClock()),
                     origin = origin,
                     recordType = it.model,
                     recordId = it.recordId,

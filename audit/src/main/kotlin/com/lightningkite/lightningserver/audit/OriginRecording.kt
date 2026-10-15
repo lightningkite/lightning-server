@@ -41,8 +41,7 @@ public inline fun <reified REQUEST_INFO> OriginRecording(
     val serializer = serializerOrContextual<REQUEST_INFO>()
     return OriginRecording(
         database.registerTable(tableName, OriginRecord.serializer(serializer)),
-        serializer,
-        info
+        OriginRecording.RequestInfo(serializer, info)
     )
 }
 
@@ -53,23 +52,8 @@ public fun OriginRecording(
 ): OriginRecording<OriginRecord.StandardRequestInfo> =
     OriginRecording(
         database.registerTable(tableName, OriginRecord.serializer(OriginRecord.StandardRequestInfo.serializer())),
-        OriginRecord.StandardRequestInfo.serializer(),
-    ) { request ->
-        val auth = try {
-            request[Authentication.CacheKey]?.let { it.fromMasquerade ?: it }
-        } catch (e: Exception) {
-            currentCoroutineContext().ensureActive()
-            serverRuntime.logger.error(e) { "Could not determine auth of request for origin recording" }
-            null
-        }
-        OriginRecord.StandardRequestInfo(
-            subjectId = auth?.rawId?.let(Uuid::parseOrNull),
-            sessionId = auth?.sessionId?.let(Uuid::parseOrNull),
-            sourceIp = request.sourceIp,
-            engineRequestId = request.engineRequestId,
-            upstreamRequestId = request.upstreamRequestId,
-        )
-    }
+        OriginRecording.RequestInfo.Standard
+    )
 
 /**
  * Records the [OriginRecord]s other audit records reference lazily.
@@ -81,10 +65,35 @@ public fun OriginRecording(
  * writes nothing.
  */
 public class OriginRecording<REQUEST_INFO>(
-    private val table: Runtime<Table<OriginRecord<REQUEST_INFO>>>,
-    public val requestInfoSerializer: KSerializer<REQUEST_INFO>,
-    private val getInfo: suspend context(ServerRuntime) (Request<*>) -> REQUEST_INFO
+    public val table: Runtime<Table<OriginRecord<REQUEST_INFO>>>,
+    public val info: RequestInfo<REQUEST_INFO>
 ) : ExecutionInterceptor, WebSocketInterceptor, HttpInterceptor {
+    public data class RequestInfo<T>(
+        val serializer: KSerializer<T>,
+        val getInfo: suspend context(ServerRuntime) (Request<*>) -> T
+    ) {
+        public companion object {
+            public val Standard: RequestInfo<OriginRecord.StandardRequestInfo> = RequestInfo(
+                OriginRecord.StandardRequestInfo.serializer(),
+            ) { request ->
+                val auth = try {
+                    request[Authentication.CacheKey]?.let { it.fromMasquerade ?: it }
+                } catch (e: Exception) {
+                    currentCoroutineContext().ensureActive()
+                    serverRuntime.logger.error(e) { "Could not determine auth of request for origin recording" }
+                    null
+                }
+                OriginRecord.StandardRequestInfo(
+                    subjectId = auth?.rawId?.let(Uuid::parseOrNull),
+                    sessionId = auth?.sessionId?.let(Uuid::parseOrNull),
+                    sourceIp = request.sourceIp,
+                    engineRequestId = request.engineRequestId,
+                    upstreamRequestId = request.upstreamRequestId,
+                )
+            }
+        }
+    }
+
     override val name: String = "OriginRecording"
 
     @Serializable
@@ -95,7 +104,7 @@ public class OriginRecording<REQUEST_INFO>(
 
     private val contextKey = SerializableCache.Key<Execution, OriginQueue<REQUEST_INFO>>(
         "com.lightningkite.lightningserver.audit.OriginRecording",
-        OriginQueue.serializer(requestInfoSerializer),
+        OriginQueue.serializer(info.serializer),
     )
 
     @Serializable
@@ -111,7 +120,7 @@ public class OriginRecording<REQUEST_INFO>(
 
     // Claude: built once because the cache compares keys by equality, and a generic class's
     // serializer is a fresh, unequal instance on every call.
-    private val socketOriginSerializer = SocketOrigin.serializer(requestInfoSerializer)
+    private val socketOriginSerializer = SocketOrigin.serializer(info.serializer)
 
     // Claude: a socket's phases don't share an execution context, only the connect request, so the
     // origin waits there. Keyed per socket because a virtual sub-socket shares its carrier's cache.
@@ -165,8 +174,6 @@ public class OriginRecording<REQUEST_INFO>(
     }
 
 
-
-
     private fun ServerRuntime.queueOrigin(row: OriginRecord<REQUEST_INFO>) {
         val context = execution.context
         val origins = context[contextKey] ?: OriginQueue()
@@ -192,7 +199,9 @@ public class OriginRecording<REQUEST_INFO>(
         }
 
         return if (origin?.queued == null) action() // nothing is queued for insertion, just run
-        else try { action() } finally {
+        else try {
+            action()
+        } finally {
             if (context[contextKey]?.written?.contains(origin.id) == true) {
                 // the origin was written during execution, we don't need to queue in the future
                 request.cache[socketKey(request.socketId)] = origin.markAsWritten()
@@ -221,7 +230,7 @@ public class OriginRecording<REQUEST_INFO>(
             root = execution.rootExecution.toExternal(),
             kind = kind,
             location = location,
-            request = request?.let { getInfo(it) }
+            request = request?.let { info.getInfo(it) }
         )
     }
 

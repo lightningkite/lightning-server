@@ -12,15 +12,18 @@ import com.lightningkite.services.database.Table
 import com.lightningkite.services.database.insertOne
 
 /**
- * Writes [AuthEvent]s to the audit database. Installed by [AuthEventLog].
+ * Writes [AuthEvent]s to the audit database.
+ *
+ * Nothing is recorded until it is installed with `install` in a [ServerBuilder][com.lightningkite.lightningserver.definition.builder.ServerBuilder].
+ * Install it at most once, or every event is recorded twice.
  *
  * [AuthEvent.TokenRejected] and [AuthEvent.ProofRejected] are not recorded. Both are raised before any
  * real session or account is involved, so anyone can produce them at will, and recording them would
  * let an unauthenticated caller flood the audit database. The request log still records each attempt.
  */
-public class AuthEventLogListener(
+public class AuthEventLog(
     private val origins: OriginRecording<*>,
-    private val table: Runtime<Table<AuthEventRecord>>,
+    public val table: Runtime<Table<AuthEventRecord>>,
 ) : AuthEventListener {
     override val name: String = "AuthEventLog"
 

@@ -45,6 +45,11 @@ public fun AuditMutationLog(
     database.registerTable("AuditMutationRecord")
 )
 
+/**
+ * Records changes to [AuditedModel]s as [AuditMutationRecord]s.
+ *
+ * It is not installed; wrap each table it should record with [logAuditedFieldChanges].
+ */
 public class AuditMutationLog(
     public val origins: OriginRecording<*>,
     public val registry: AuditRegistry,

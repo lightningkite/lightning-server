@@ -104,17 +104,17 @@ class OriginRecordingTest {
     /** Every origin row, except the pre-deploy ones every probe writes while deploying. */
     context(server: ServerRuntime)
     private suspend fun rows(): List<OriginRecord<OriginRecord.StandardRequestInfo>> =
-        OriginTestServer.audit.originsTable().find(Condition.Always).toList()
+        OriginTestServer.audit.origins.table().find(Condition.Always).toList()
             .filter { it.kind != OriginRecord.ExecutionKind.PreDeploy }
 
     context(server: ServerRuntime)
     private suspend fun rowFor(id: Execution.ID): OriginRecord<OriginRecord.StandardRequestInfo>? =
-        OriginTestServer.audit.originsTable().find(condition { it._id eq id.originId }).toList().singleOrNull()
+        OriginTestServer.audit.origins.table().find(condition { it._id eq id.originId }).toList().singleOrNull()
 
     /** Marks [id]'s row so that any later rewrite of it is visible. */
     context(server: ServerRuntime)
     private suspend fun tamper(id: Execution.ID) {
-        val changed = OriginTestServer.audit.originsTable().updateOne(
+        val changed = OriginTestServer.audit.origins.table().updateOne(
             condition { it._id eq id.originId },
             modification { it.kind assign TAMPERED },
         )
@@ -205,7 +205,7 @@ class OriginRecordingTest {
 
     @Test
     fun `a pre-deploy task records a pre-deploy origin`() = probe { engine ->
-        val all = OriginTestServer.audit.originsTable().find(Condition.Always).toList()
+        val all = OriginTestServer.audit.origins.table().find(Condition.Always).toList()
         val row = all.single { it.kind == OriginRecord.ExecutionKind.PreDeploy }
         assertTrue("touch-predeploy" in row.location, row.location)
     }
@@ -557,7 +557,8 @@ private object OriginTestServer : ServerBuilder() {
     val database = setting("database", Database.Settings())
     val cache = setting("cache", Cache.Settings())
 
-    val audit = path.path("audit") include AuditCore(database)
+    object Audit : AuditingBuilder.WithStandardRequestInfo(database)
+    val audit = path.path("audit") include Audit
 
     init {
         registerBasicMediaTypeCoders()
@@ -589,7 +590,7 @@ private object OriginTestServer : ServerBuilder() {
     val touchTamperTouch = path.path("touch-tamper-touch").get bind HttpHandler {
         note()
         touch()
-        audit.originsTable().updateOne(
+        audit.origins.table().updateOne(
             condition { it._id eq serverRuntime.execution.id.originId },
             modification { it.kind assign TAMPERED },
         )
@@ -603,7 +604,7 @@ private object OriginTestServer : ServerBuilder() {
         path.path("nest").path("parent-touches-tampers-then-child-touches").get bind HttpHandler {
             note()
             touch()
-            audit.originsTable().updateOne(
+            audit.origins.table().updateOne(
                 condition { it._id eq serverRuntime.execution.id.originId },
                 modification { it.kind assign TAMPERED },
             )

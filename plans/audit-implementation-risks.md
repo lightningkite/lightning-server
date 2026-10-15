@@ -210,7 +210,7 @@ availability problem — see #1.
   (`fullCondition`, `mask`) return metadata rather than data. That check should be repeated whenever
   `Table` gains a member, and nothing enforces it. A test that fails when an un-overridden data
   method appears would be worth more than the manual check.
-- **`DisclosureRecord` still does not carry `executionId`**, so a disclosure on a long-lived socket is
+- **`AuditDisclosureLog` still does not carry `executionId`**, so a disclosure on a long-lived socket is
   placed within the session rather than at a message. Its v7 id timestamps it to the millisecond,
   which in practice identifies the message, but that is inference rather than attribution.
 

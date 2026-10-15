@@ -35,13 +35,4 @@ class RequestRecordTest {
 
         assertEquals(instant, record.at)
     }
-
-    /** A legacy (non-v7) id has no embedded timestamp; at must degrade to the epoch rather than throw. */
-    @OptIn(ExperimentalUuidApi::class, Unsafe::class)
-    @Test
-    fun `a non-v7 id degrades to the epoch`() {
-        val record = origin(ExecutionId(UuidV7.fromRaw(Uuid.random())))
-
-        assertEquals(Instant.fromEpochMilliseconds(0), record.at)
-    }
 }

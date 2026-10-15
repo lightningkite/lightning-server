@@ -8,7 +8,7 @@ import kotlinx.serialization.SerialInfo
 import kotlin.uuid.Uuid
 
 /**
- * Marks a model as audited: every instance that reaches a client produces its own [DisclosureRecord], and its
+ * Marks a model as audited: every instance that reaches a client produces its own [AuditDisclosureRecord], and its
  * changes can be recorded as [AuditMutationRecord]s.
  *
  * Mark the fields worth itemising with [Audited]. A model with no such fields is still audited, but its
@@ -60,7 +60,7 @@ public interface AuditedModel<ID : AuditedModel.Id<*, ID>> : HasId<ID> {
 /**
  * Marks a property of an [AuditedModel] as itemized.
  *
- * A bit is reserved for the property, so each [DisclosureRecord] says whether it carried a value in what
+ * A bit is reserved for the property, so each [AuditDisclosureRecord] says whether it carried a value in what
  * the client received, and each [AuditMutationRecord] includes it when it changes. Itemizing is opt-in
  * because bits are a permanent, limited resource: indices are never reused, so every annotated property
  * costs capacity for good.

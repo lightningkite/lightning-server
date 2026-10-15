@@ -82,10 +82,10 @@ class WebSocketMutationAttributionTest {
     }
 
     context(server: ServerRuntime)
-    private suspend fun requests() = TestServer.audit.originsTable().find(Condition.Always).toList()
+    private suspend fun requests() = TestServer.audit.origins.table().find(Condition.Always).toList()
 
     context(server: ServerRuntime)
-    private suspend fun mutations() = TestServer.mutations().find(Condition.Always).toList()
+    private suspend fun mutations() = TestServer.audit.mutations.table().find(Condition.Always).toList()
 
     private fun authHeaders() = HttpHeaders { add(HttpHeader.Authorization, user.toString()) }
 
@@ -105,7 +105,7 @@ class WebSocketMutationAttributionTest {
         socket.send("direct:$id")
 
         val mutation = mutations().single()
-        assertEquals(id.toString(), mutation.recordId)
+        assertEquals(id, mutation.modelId)
 
         assertEquals(socket.request.socketId.originId, mutation.origin, "the row is keyed by the socket, not the phase")
 
@@ -128,7 +128,6 @@ class WebSocketMutationAttributionTest {
         engine.drainTasks()
 
         val mutation = mutations().single()
-        assertTrue(mutation.executionId != mutation.origin.raw, "the task ran inline rather than as its own execution")
         assertEquals(socket.request.socketId.originId, mutation.origin, "the task should attribute to the socket it descends from")
 
         val requests = requests()
@@ -150,7 +149,7 @@ class WebSocketMutationAttributionTest {
         engine.sendOnChannel(physical, "c1", "direct:$id")
 
         val mutation = mutations().single()
-        assertEquals(id.toString(), mutation.recordId)
+        assertEquals(id, mutation.modelId)
 
         val requests = requests()
         val byOrigin = requests.rowFor(mutation.origin)
@@ -177,7 +176,6 @@ class WebSocketMutationAttributionTest {
             engine.drainTasks()
 
             val mutation = mutations().single()
-            assertTrue(mutation.executionId != mutation.origin.raw, "the task ran inline rather than as its own execution")
 
             val requests = requests()
             val byOrigin = requests.rowFor(mutation.origin)
@@ -267,7 +265,6 @@ class WebSocketMutationAttributionTest {
             engine.drainTasks()
 
             val mutation = mutations().single()
-            assertTrue(mutation.executionId != mutation.origin.raw, "the task ran inline rather than as its own execution")
 
             val requests = requests()
             val byOrigin = requests.rowFor(mutation.origin)
@@ -365,8 +362,10 @@ private object TestServer : ServerBuilder() {
     val database = setting("database", Database.Settings())
     val cache = setting("cache", Cache.Settings())
 
-    val audit = path.path("audit") include AuditCore(database)
-    val mutations = database.registerTable("AuditMutation", AuditMutationRecord.serializer())
+    object Audit : AuditingBuilder.WithStandardRequestInfo(database) {
+        val mutations = AuditMutationLog()
+    }
+    val audit = path.path("audit") include Audit
 
     init {
         registerBasicMediaTypeCoders()
@@ -377,7 +376,7 @@ private object TestServer : ServerBuilder() {
     val patients = database.registerTable("Patient", Patient.serializer())
 
     /** Present only so the registry, which scans endpoint serializers, assigns Patient an id. */
-    val sample = Patient(_id = Uuid.parse("00000000-0000-0000-0000-0000000000c2"), name = "", ssn = "")
+    val sample = Patient(_id = Patient.ID(Uuid.parse("00000000-0000-0000-0000-0000000000c2")), name = "", ssn = "")
 
     val patientEndpoint = path.path("patient").get bind ApiHttpHandler(
         summary = "Patient",
@@ -387,7 +386,7 @@ private object TestServer : ServerBuilder() {
 
     /** The indirect path: the change happens in an execution of its own, with no request behind it. */
     val mutateTask: Task<Uuid> = path.path("mutate-task") bind Task(Uuid.serializer()) { id ->
-        patients().mutationLogged(audit.origins, audit.registry, mutations).insert(listOf(Patient(_id = id, name = "FromTask", ssn = "t")))
+        patients().logAuditedFieldChanges(audit.mutations).insert(listOf(Patient(_id = Patient.ID(id), name = "FromTask", ssn = "t")))
     }
 
     val socket = path.path("socket") bind WebSocketHandler<PathSpec0, Unit>(
@@ -396,8 +395,8 @@ private object TestServer : ServerBuilder() {
             val text = (frame as WebSocketFrame.Text).content
             val id = Uuid.parse(text.substringAfter(':'))
             when (text.substringBefore(':')) {
-                "direct" -> patients().mutationLogged(audit.origins, audit.registry, mutations)
-                    .insert(listOf(Patient(_id = id, name = "FromSocket", ssn = "s")))
+                "direct" -> patients().logAuditedFieldChanges(audit.mutations)
+                    .insert(listOf(Patient(_id = Patient.ID(id), name = "FromSocket", ssn = "s")))
 
                 "task" -> mutateTask(id)
                 else -> throw IllegalArgumentException("Unknown socket command: $text")

@@ -697,7 +697,7 @@ one. That is acceptable — in both cases the client learned nothing beyond the 
 
 ### 5.5.1 The layers are independently includable (resolved)
 
-`AuditCore` carries the request log and the bit registry; `DisclosureLog`, `DataAccessLog` and
+`AuditCore` carries the request log and the bit registry; `AuditDisclosureLog`, `DataAccessLog` and
 `AuthEventLog` and `AuditMutationLog` are separate modules a deployment includes or does not. There is
 deliberately **no all-in-one bundle**, because a helper that installs everything hides which layers a
 deployment is paying for, and the data access and mutation logs are far too voluminous to acquire by
@@ -865,7 +865,7 @@ needs it can follow. `origin` still names the socket, so the join to the request
 unchanged and one row per socket remains; `executionId` names the phase, so "which message caused
 this" is answerable by reading the record rather than by multiplying request records.
 
-`DisclosureRecord` does **not** yet carry it, and that is the remaining gap: a disclosure on a
+`AuditDisclosureLog` does **not** yet carry it, and that is the remaining gap: a disclosure on a
 long-lived socket can still only be placed within the session, though its own v7 `_id` now timestamps
 it to the millisecond, which in practice identifies the message. Adding the column is 16 bytes on the
 highest-volume table in the system and should be weighed against that.
@@ -876,8 +876,8 @@ The audit stream is a typed event stream with pluggable sinks, not a single log.
 *query*; an encrypted object store is unqueryable by design. Expect at minimum a queryable sink
 (Postgres or a SIEM) for investigation alongside the tamper-evident total-log as system of record.
 
-**Shipped:** the database sink, written by `DisclosureLogInterceptor` straight into the
-`DisclosureRecord` table. It catches nothing, so an extraction that cannot resolve a model, a record
+**Shipped:** the database sink, written by `AuditDisclosureLog` straight into the
+`AuditDisclosureLog` table. It catches nothing, so an extraction that cannot resolve a model, a record
 with no `_id`, or a sink that will not take the write all abort the send before the value is
 serialized.
 
@@ -1132,7 +1132,7 @@ passed as strings so `core` does not own the taxonomy.
 *disclosure* — the guarded thing must not happen unless it was recorded, so they fail closed. An
 authentication event has already happened by the time it is reported, and is usually reported from a
 path that is itself rejecting something; throwing there would replace a clean "your login failed"
-with an unrelated server error and lose the original reason. So `AuthEventLogListener` logs and
+with an unrelated server error and lose the original reason. So `AuthEventLog` logs and
 swallows write failures. The consequence, stated plainly: **an attacker who can make the audit
 database unavailable can make authentication events go unrecorded while authentication keeps
 working.** That is the opposite of the guarantee the other two layers give, and it is a choice, not

@@ -31,7 +31,11 @@ public fun AuditQueryLog(
     database: Runtime<Database>,
 ): AuditQueryLog = AuditQueryLog(origins, registry, database.registerTable("AuditDataAccessRecord"))
 
-/** Records queries against [AuditedModel]s as [AuditQueryRecord]s. Attach it to a table with [logQueries]. */
+/**
+ * Records queries against [AuditedModel]s as [AuditQueryRecord]s.
+ *
+ * It is not installed; wrap each table it should record with [logQueries].
+ */
 public class AuditQueryLog(
     public val origins: OriginRecording<*>,
     public val registry: AuditRegistry,

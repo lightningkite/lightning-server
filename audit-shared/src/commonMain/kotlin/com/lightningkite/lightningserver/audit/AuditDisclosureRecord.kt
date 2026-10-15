@@ -15,13 +15,13 @@ import kotlin.uuid.Uuid
 @IndexSet(fields = ["rt", "rid"], name = "DisclosureRecord_byRecord")
 @GenerateDataClassPaths
 @Serializable
-public data class DisclosureRecord(
+public data class AuditDisclosureRecord(
     override val _id: ID,
     @SerialName("o") @Index val origin: OriginRecord.ID,
     @SerialName("rt") val recordType: ModelTypeId,
     @SerialName("rid") val recordId: Uuid,
     @SerialName("d") val disclosed: FieldIdentifierSet,
-) : HasId<DisclosureRecord.ID> {
+) : HasId<AuditDisclosureRecord.ID> {
     @Serializable
     @JvmInline
     public value class ID(override val raw: UuidV7) : TypedId<UuidV7, ID>

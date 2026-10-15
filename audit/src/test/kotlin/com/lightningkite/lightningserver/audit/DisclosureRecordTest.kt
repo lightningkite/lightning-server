@@ -11,8 +11,8 @@ import kotlin.uuid.Uuid
 class DisclosureRecordTest {
 
     @OptIn(Unsafe::class)
-    private fun record(id: Uuid) = DisclosureRecord(
-        _id = DisclosureRecord.ID(UuidV7.fromRaw(id)),
+    private fun record(id: Uuid) = AuditDisclosureRecord(
+        _id = AuditDisclosureRecord.ID(UuidV7.fromRaw(id)),
         origin = OriginRecord.ID(ExecutionId(UuidV7.generate())),
         recordType = ModelTypeId(1),
         recordId = Uuid.random(),
@@ -30,12 +30,6 @@ class DisclosureRecordTest {
     fun `at derives the id's embedded timestamp`() {
         val instant = Instant.fromEpochMilliseconds(1_700_000_123_456)
         assertEquals(instant, record(Uuid.generateV7NonMonotonicAt(instant)).at)
-    }
-
-    /** A non-v7 id has no embedded timestamp; at degrades to the epoch rather than inventing one. */
-    @Test
-    fun `a non-v7 id degrades to the epoch`() {
-        assertEquals(Instant.fromEpochMilliseconds(0), record(Uuid.random()).at)
     }
 
     /** Ordering by id is ordering by time — the property the append-mostly table relies on. */

@@ -13,7 +13,7 @@ import kotlin.time.Instant
 /**
  * Represents one query against an [AuditedModel]: what the code asked for, under which origin.
  *
- * This catches reads that leak information without disclosing a record, which a [DisclosureRecord] cannot.
+ * This catches reads that leak information without disclosing a record, which a [AuditDisclosureRecord] cannot.
  * A `groupCount` over a sensitive field returns its distinct values, a `find` that matches nothing still
  * confirms a guess, and a sort with a moving `skip` walks values one at a time. Each shows up here as its
  * condition, ordering and paging.

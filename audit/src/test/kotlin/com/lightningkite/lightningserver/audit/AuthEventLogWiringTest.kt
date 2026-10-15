@@ -2,6 +2,7 @@
 
 package com.lightningkite.lightningserver.audit
 
+import com.lightningkite.lightningserver.sessions.install
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.auth.PrincipalType
@@ -88,8 +89,10 @@ class AuthEventLogWiringTest {
         val database = setting("database", Database.Settings())
         val cache = setting("cache", Cache.Settings())
 
-        val audit = path.path("audit") include AuditCore(database)
-        val authEventLog = path.path("audit-auth") include AuthEventLog(audit)
+        object Audit : AuditingBuilder.WithStandardRequestInfo(database) {
+            val authEvents = install(AuthEventLog())
+        }
+        val audit = path.path("audit") include Audit
 
         val sessions = path.path("auth") include WiringSessionManager(database)
 
@@ -124,7 +127,7 @@ class AuthEventLogWiringTest {
     }
 
     context(server: ServerRuntime)
-    private suspend fun events() = TestServer.authEventLog.authEvents().find(Condition.Always).toList()
+    private suspend fun events() = TestServer.audit.authEvents.table().find(Condition.Always).toList()
 
     /** The one rejection row; setting up a real session also writes a [AuthEventRecord.Type.SessionCreated] row. */
     context(server: ServerRuntime)
@@ -236,7 +239,7 @@ class AuthEventLogWiringTest {
     fun `a forged attempt is still visible in the request log`() = onServer {
         engine.handleRoot(tokenExchange(forgedToken()), testId(6))
 
-        val requests = TestServer.audit.originsTable().find(Condition.Always).toList()
+        val requests = TestServer.audit.origins.table().find(Condition.Always).toList()
         assertTrue(
             requests.any { it._id == testId(6).originId },
             "a forged attempt left no trace at all — it must still appear as a request",
@@ -254,7 +257,7 @@ class AuthEventLogWiringTest {
         engine.handleRoot(tokenExchange(token, userAgent = "probe/1.0"), testId(4))
 
         assertEquals(testId(4).originId, rejection().origin)
-        val requests = TestServer.audit.originsTable().find(Condition.Always).toList()
+        val requests = TestServer.audit.origins.table().find(Condition.Always).toList()
         assertTrue(
             requests.any { it._id == testId(4).originId },
             "the auth event points at a request record that was never written",

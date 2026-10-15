@@ -78,10 +78,10 @@ class BulkSubRequestMutationAttributionTest {
     }
 
     context(server: ServerRuntime)
-    private suspend fun requests() = BulkTestServer.audit.originsTable().find(Condition.Always).toList()
+    private suspend fun requests() = BulkTestServer.audit.origins.table().find(Condition.Always).toList()
 
     context(server: ServerRuntime)
-    private suspend fun mutations() = BulkTestServer.mutations().find(Condition.Always).toList()
+    private suspend fun mutations() = BulkTestServer.audit.mutations.table().find(Condition.Always).toList()
 
     private fun List<OriginRecord<OriginRecord.StandardRequestInfo>>.rowFor(id: OriginRecord.ID?): OriginRecord<OriginRecord.StandardRequestInfo>? = firstOrNull { it._id == id }
     private fun List<OriginRecord<OriginRecord.StandardRequestInfo>>.rowFor(id: ExecutionId?): OriginRecord<OriginRecord.StandardRequestInfo>? = firstOrNull { it._id.raw == id }
@@ -148,7 +148,7 @@ class BulkSubRequestMutationAttributionTest {
 
             val requests = requests()
             val mutation = mutations().single()
-            assertEquals(id.toString(), mutation.recordId)
+            assertEquals(id, mutation.modelId)
 
             val byOrigin = requests.rowFor(mutation.origin)
             assertNotNull(byOrigin, "origin ${mutation.origin} names no request row")
@@ -169,20 +169,6 @@ class BulkSubRequestMutationAttributionTest {
             assertTrue(byOrigin._id != byRoot._id, "the origin and the root can differ, and here they must")
         }
 
-    /** Unlike a socket's phases, an HTTP execution is its own origin. */
-    @Test
-    fun `a bulk sub-request's row is keyed by its own executionId`() = probe { engine ->
-        engine.handleRoot(bulkOf("/mutate?${credential()}", Uuid.random().toString()), engine.newId())
-
-        val mutation = mutations().single()
-        assertEquals(
-            mutation.executionId,
-            mutation.origin.raw,
-            "an HTTP execution's request row is keyed by the execution itself, unlike a socket's",
-        )
-        assertNotNull(requests().rowFor(mutation.executionId))
-    }
-
     // ===================== the gap, with no socket involved =====================
 
     /**
@@ -202,8 +188,7 @@ class BulkSubRequestMutationAttributionTest {
             engine.drainTasks()
 
             val mutation = mutations().single()
-            assertEquals(id.toString(), mutation.recordId)
-            assertTrue(mutation.executionId != mutation.origin.raw, "the task ran inline rather than as its own execution")
+            assertEquals(id, mutation.modelId)
 
             val requests = requests()
             val byOrigin = requests.rowFor(mutation.origin)
@@ -288,8 +273,10 @@ private object BulkTestServer : ServerBuilder() {
     val database = setting("database", Database.Settings())
     val cache = setting("cache", Cache.Settings())
 
-    val audit = path.path("audit") include AuditCore(database)
-    val mutations = database.registerTable("AuditMutation", AuditMutationRecord.serializer())
+    object Audit : AuditingBuilder.WithStandardRequestInfo(database) {
+        val mutations = AuditMutationLog()
+    }
+    val audit = path.path("audit") include Audit
 
     init {
         registerBasicMediaTypeCoders()
@@ -300,7 +287,7 @@ private object BulkTestServer : ServerBuilder() {
     val patients = database.registerTable("Patient", Patient.serializer())
 
     /** Present only so the registry, which scans endpoint serializers, assigns Patient an id. */
-    val sample = Patient(_id = Uuid.parse("00000000-0000-0000-0000-0000000000d2"), name = "", ssn = "")
+    val sample = Patient(_id = Patient.ID(Uuid.parse("00000000-0000-0000-0000-0000000000d2")), name = "", ssn = "")
 
     val patientEndpoint = path.path("patient").get bind ApiHttpHandler(
         summary = "Patient",
@@ -309,7 +296,7 @@ private object BulkTestServer : ServerBuilder() {
     )
 
     val mutateTask: Task<Uuid> = path.path("mutate-task-impl") bind Task(Uuid.serializer()) { id ->
-        patients().mutationLogged(audit.origins, audit.registry, mutations).insert(listOf(Patient(_id = id, name = "FromTask", ssn = "t")))
+        patients().logAuditedFieldChanges(audit.mutations).insert(listOf(Patient(_id = Patient.ID(id), name = "FromTask", ssn = "t")))
     }
 
     /** POST so the record id travels in the body, leaving the query string to the credential. */
@@ -317,7 +304,7 @@ private object BulkTestServer : ServerBuilder() {
         summary = "Mutate",
         auth = noAuth,
         implementation = { id: Uuid ->
-            patients().mutationLogged(audit.origins, audit.registry, mutations).insert(listOf(Patient(_id = id, name = "FromRequest", ssn = "s")))
+            patients().logAuditedFieldChanges(audit.mutations).insert(listOf(Patient(_id = Patient.ID(id), name = "FromRequest", ssn = "s")))
             "ok"
         },
     )

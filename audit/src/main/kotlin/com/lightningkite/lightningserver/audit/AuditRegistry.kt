@@ -14,9 +14,7 @@ import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.all
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlin.uuid.Uuid
 
 public typealias SerialName = String
 
@@ -24,7 +22,7 @@ public typealias SerialName = String
  * The permanent meaning of one model id.
  *
  * Never deleted. A model that stops being served keeps its id so that historical
- * [DisclosureRecord]s stay interpretable.
+ * [AuditDisclosureRecord]s stay interpretable.
  *
  * @property _id The model's serial name. Serial names are used rather than table names because a
  *   disclosure is observed with a serializer in hand and nothing else — the table a value came from

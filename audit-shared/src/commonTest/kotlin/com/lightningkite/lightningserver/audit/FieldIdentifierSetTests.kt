@@ -182,8 +182,8 @@ class FieldIdentifierSetTests {
     }
 
     @OptIn(Unsafe::class)
-    private fun record(vararg ids: Int) = DisclosureRecord(
-        _id = DisclosureRecord.ID(UuidV7.generate()),
+    private fun record(vararg ids: Int) = AuditDisclosureRecord(
+        _id = AuditDisclosureRecord.ID(UuidV7.generate()),
         origin = OriginRecord.ID(ExecutionId(UuidV7.generate())),
         recordType = ModelTypeId(0),
         recordId = Uuid.NIL,
@@ -193,13 +193,13 @@ class FieldIdentifierSetTests {
     /** Through the record's path, which is how real queries reach the set. */
     @Test
     fun `conditions on a record's disclosed fields match the records they should`() {
-        val all = condition<DisclosureRecord> { it.disclosed.containsAll(fieldIds(3, 40)) }
+        val all = condition<AuditDisclosureRecord> { it.disclosed.containsAll(fieldIds(3, 40)) }
         assertTrue(all(record(3, 40)))
         assertTrue(all(record(3, 40, 50)), "extra disclosed fields must not exclude a record")
         assertFalse(all(record(3)))
         assertFalse(all(record()))
 
-        val any = condition<DisclosureRecord> { it.disclosed.containsAny(fieldIds(3, 40)) }
+        val any = condition<AuditDisclosureRecord> { it.disclosed.containsAny(fieldIds(3, 40)) }
         assertTrue(any(record(40)))
         assertFalse(any(record(4, 41)))
         assertFalse(any(record()))

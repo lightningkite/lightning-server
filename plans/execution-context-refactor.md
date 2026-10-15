@@ -345,7 +345,7 @@ build on this, but none of them change here.
 Two things differ from the plan above, both deliberate:
 
 - **Stage 3 carried the initiator on the runtime and started minting at the seam**, which section 4
-  assigned to Stage 4. It was forced, not chosen: `DisclosureLogInterceptor` is reached through
+  assigned to Stage 4. It was forced, not chosen: `AuditDisclosureLog` is reached through
   `emitTypedOutput` from *inside handler bodies*, so a parameter would have to be added to
   `HttpHandler.handle` and thus to every endpoint handler in the framework and in user code. The
   runtime context is the only carrier already threaded to all three audit sites. Stage 4 therefore

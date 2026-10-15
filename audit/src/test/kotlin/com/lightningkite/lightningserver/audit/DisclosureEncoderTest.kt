@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.audit
 
-import com.lightningkite.lightningserver.audit.DisclosureLogInterceptor.Disclosure
+import com.lightningkite.lightningserver.audit.AuditDisclosureLog.Disclosure
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.serverRuntime
@@ -41,10 +41,10 @@ class DisclosureEncoderTest {
         )
 
         // Claude: constructed but not installed; the tests call it directly.
-        val interceptor = DisclosureLogInterceptor(
-            registry,
+        val interceptor = AuditDisclosureLog(
             OriginRecording(database),
-            database.registerTable("AuditDisclosure", DisclosureRecord.serializer()),
+            registry,
+            database.registerTable("AuditDisclosure", AuditDisclosureRecord.serializer()),
         )
     }
 

@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.audit
 
+import com.lightningkite.lightningserver.sessions.install
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.serverRuntime
@@ -19,14 +20,16 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.uuid.Uuid
 
-/** How [AuthEventLogListener] turns each kind of [AuthEvent] into an [AuthEventRecord]. */
+/** How [AuthEventLog] turns each kind of [AuthEvent] into an [AuthEventRecord]. */
 class AuthEventLogTest {
 
     object TestServer : ServerBuilder() {
         val database = setting("database", Database.Settings())
         val cache = setting("cache", Cache.Settings())
-        val audit = path.path("audit") include AuditCore(database)
-        val authEventLog = path.path("audit-auth") include AuthEventLog(audit)
+        object Audit : AuditingBuilder.WithStandardRequestInfo(database) {
+            val authEvents = install(AuthEventLog())
+        }
+        val audit = path.path("audit") include Audit
     }
 
     private fun onServer(block: suspend context(ServerRuntime) (ServerRuntime) -> Unit) = runBlocking {
@@ -36,7 +39,7 @@ class AuthEventLogTest {
     }
 
     context(server: ServerRuntime)
-    private suspend fun events() = TestServer.authEventLog.authEvents().find(Condition.Always).toList()
+    private suspend fun events() = TestServer.audit.authEvents.table().find(Condition.Always).toList()
 
     private val password = ProofMethodInfo(via = "password", property = "email")
 

@@ -2,6 +2,7 @@
 
 package com.lightningkite.lightningserver.audit
 
+import com.lightningkite.lightningserver.sessions.install
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.HttpMethod
@@ -135,8 +136,10 @@ class ProofAuthEventWiringTest {
         val database = setting("database", Database.Settings())
         val cache = setting("cache", Cache.Settings())
 
-        val audit = path.path("audit") include AuditCore(database)
-        val authEventLog = path.path("audit-auth") include AuthEventLog(audit)
+        object Audit : AuditingBuilder.WithStandardRequestInfo(database) {
+            val authEvents = install(AuthEventLog())
+        }
+        val audit = path.path("audit") include Audit
 
         val password = path.path("password") include PasswordProofEndpoints(database, cache)
         val totp = path.path("totp") include TimeBasedOTPProofEndpoints(database, cache)
@@ -199,7 +202,7 @@ class ProofAuthEventWiringTest {
     }
 
     context(server: ServerRuntime)
-    private suspend fun events() = TestServer.authEventLog.authEvents().find(Condition.Always).toList()
+    private suspend fun events() = TestServer.audit.authEvents.table().find(Condition.Always).toList()
 
     private fun user(email: String = "victim@example.com"): ProofUser =
         ProofUser(Uuid.random(), email).also { ProofUser.users[it._id] = it }
@@ -510,7 +513,7 @@ class ProofAuthEventWiringTest {
 
         val event = events().single()
         assertEquals(testId(21).originId, event.origin)
-        val requests = TestServer.audit.originsTable().find(Condition.Always).toList()
+        val requests = TestServer.audit.origins.table().find(Condition.Always).toList()
         val row = requests.singleOrNull { it._id == testId(21).originId }
         assertEquals("203.0.113.7", row?.request?.sourceIp, "the issuance points at no request record")
     }
