@@ -81,9 +81,18 @@ internal fun SerialDescriptor.anythingAudited(): Boolean {
  */
 internal fun SerialDescriptor.auditFieldPaths(): List<String> = FieldPathWalk().also { it.members(this, "") }.paths
 
-/** Whether a value of this type holds any [Audited] property, not counting those of nested [Audited] models. */
-internal fun SerialDescriptor.containsAuditedFields(): Boolean =
-    FieldPathWalk().also { it.descend(this, "") }.paths.isNotEmpty()
+/** Whether a value of this type holds any [Audited] property, including those of nested [Audited] models. */
+internal fun SerialDescriptor.containsAuditedFields(): Boolean {
+    val visited = HashSet<SerialDescriptor>()
+
+    fun check(descriptor: SerialDescriptor): Boolean {
+        if (!visited.add(descriptor)) return false
+        return (0 until descriptor.elementsCount).any(descriptor::isElementAudited) ||
+            descriptor.auditChildren().any(::check)
+    }
+
+    return check(this)
+}
 
 /**
  * Mutual recursion between "list the members of this structure" and "descend into one member",
@@ -103,7 +112,7 @@ private class FieldPathWalk {
         }
     }
 
-    fun descend(descriptor: SerialDescriptor, path: String) {
+    private fun descend(descriptor: SerialDescriptor, path: String) {
         // An audited model beneath an audited model is a separate record, not more bits on the parent.
         if (descriptor.isAudited) return
         if (!ancestry.add(descriptor)) return

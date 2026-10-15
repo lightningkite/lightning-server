@@ -289,7 +289,7 @@ private object BulkTestServer : ServerBuilder() {
     val cache = setting("cache", Cache.Settings())
 
     val audit = path.path("audit") include AuditCore(database)
-    val mutations = database.registerTable("AuditMutation", MutationRecord.serializer())
+    val mutations = database.registerTable("AuditMutation", AuditMutationRecord.serializer())
 
     init {
         registerBasicMediaTypeCoders()

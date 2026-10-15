@@ -698,7 +698,7 @@ one. That is acceptable — in both cases the client learned nothing beyond the 
 ### 5.5.1 The layers are independently includable (resolved)
 
 `AuditCore` carries the request log and the bit registry; `DisclosureLog`, `DataAccessLog` and
-`AuthEventLog` and `MutationLog` are separate modules a deployment includes or does not. There is
+`AuthEventLog` and `AuditMutationLog` are separate modules a deployment includes or does not. There is
 deliberately **no all-in-one bundle**, because a helper that installs everything hides which layers a
 deployment is paying for, and the data access and mutation logs are far too voluminous to acquire by
 reflex. Naming each layer at its point of inclusion is also what

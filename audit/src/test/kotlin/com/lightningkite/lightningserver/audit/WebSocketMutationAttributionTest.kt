@@ -59,7 +59,7 @@ import kotlin.uuid.Uuid
 /**
  * Can a change made under a WebSocket be traced back to a person?
  *
- * Turning a [MutationRecord] into a person means looking up its `origin` in [OriginRecord] and
+ * Turning a [AuditMutationRecord] into a person means looking up its `origin` in [OriginRecord] and
  * reading `subjectId`. For HTTP that join is trivially sound — the row is keyed by the request's own
  * execution id. For a socket it is not obvious: [OriginRecording] keys the row by the
  * *socket* id rather than by the phase execution that wrote the change, and a virtual socket
@@ -366,7 +366,7 @@ private object TestServer : ServerBuilder() {
     val cache = setting("cache", Cache.Settings())
 
     val audit = path.path("audit") include AuditCore(database)
-    val mutations = database.registerTable("AuditMutation", MutationRecord.serializer())
+    val mutations = database.registerTable("AuditMutation", AuditMutationRecord.serializer())
 
     init {
         registerBasicMediaTypeCoders()

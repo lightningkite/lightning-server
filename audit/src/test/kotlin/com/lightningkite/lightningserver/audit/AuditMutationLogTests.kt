@@ -38,10 +38,10 @@ class MutationLogTest {
             database.registerTable("AuditModelRegistration", AuditModelRegistration.serializer()),
             database.registerTable("AuditFieldRegistration", AuditFieldRegistration.serializer()),
         )
-        val mutationLog = MutationLog(
-            database.registerTable("AuditMutation", MutationRecord.serializer()),
+        val mutationLog = AuditMutationLog(
             origins,
             registry,
+            database.registerTable("AuditMutation", AuditMutationRecord.serializer()),
         )
     }
 
@@ -57,12 +57,12 @@ class MutationLogTest {
 
     /** Logs [changes] and returns every record written so far. */
     context(server: ServerRuntime)
-    private suspend fun <T : Any> log(serializer: KSerializer<T>, vararg changes: EntryChange<T>): List<MutationRecord> {
+    private suspend fun <T : Any> log(serializer: KSerializer<T>, vararg changes: EntryChange<T>): List<AuditMutationRecord> {
         TestServer.mutationLog.logAuditedFieldChanges(serializer, changes.toList())
         return TestServer.mutationLog.table().find(Condition.Always).toList()
     }
 
-    private val MutationRecord.json: JsonObject get() = Json.parseToJsonElement(data!!).jsonObject
+    private val AuditMutationRecord.json: JsonObject get() = Json.parseToJsonElement(data!!).jsonObject
 
     private val ada = Patient(_id = Uuid.random(), name = "Ada", ssn = "111", address = Address("Main", "Provo"))
     private val appointment = Appointment(_id = Appointment.ID(UuidV7.generate()))
@@ -73,7 +73,7 @@ class MutationLogTest {
     fun `a create records every audited field and nothing else`() = onServer {
         val record = log(Patient.serializer(), EntryChange(null, ada)).single()
 
-        assertEquals(MutationRecord.Operation.Create, record.operation)
+        assertEquals(AuditMutationRecord.Operation.Create, record.operation)
         assertEquals(ada._id, record.modelId)
         assertEquals(setOf("name", "ssn", "address", "phones", "doctor"), record.json.keys)
     }
@@ -82,7 +82,7 @@ class MutationLogTest {
     fun `a modify records only the audited fields that changed`() = onServer {
         val record = log(Patient.serializer(), EntryChange(ada, ada.copy(ssn = "222", tags = mapOf("a" to "b")))).single()
 
-        assertEquals(MutationRecord.Operation.Modify, record.operation)
+        assertEquals(AuditMutationRecord.Operation.Modify, record.operation)
         assertEquals(setOf("ssn"), record.json.keys)
     }
 
@@ -90,7 +90,7 @@ class MutationLogTest {
     fun `a delete is recorded without data`() = onServer {
         val record = log(Patient.serializer(), EntryChange(ada, null)).single()
 
-        assertEquals(MutationRecord.Operation.Delete, record.operation)
+        assertEquals(AuditMutationRecord.Operation.Delete, record.operation)
         assertEquals(ada._id, record.modelId)
         assertNull(record.data)
     }
@@ -165,9 +165,22 @@ class MutationLogTest {
     }
 
     @Test
-    fun `an unaudited embedded audited model is left to its own records`() = onServer {
-        val changed = appointment.copy(attending = Doctor(Uuid.random(), "House"))
-        assertEquals(emptyList(), log(Appointment.serializer(), EntryChange(appointment, changed)))
+    fun `an embedded audited model records its audited fields`() = onServer {
+        val house = Doctor(Uuid.random(), "House")
+        val added = log(Appointment.serializer(), EntryChange(appointment, appointment.copy(attending = house))).single()
+        assertEquals(setOf("name"), added.json.getValue("attending").jsonObject.keys)
+
+        val withHouse = appointment.copy(attending = house)
+        val renamed = log(Appointment.serializer(), EntryChange(withHouse, withHouse.copy(attending = house.copy(name = "Wilson")))).single { it._id != added._id }
+        assertEquals(setOf("name"), renamed.json.getValue("attending").jsonObject.keys)
+    }
+
+    @Test
+    fun `a list of embedded audited models is recorded whole`() = onServer {
+        val changed = appointment.copy(consultants = listOf(Doctor(Uuid.random(), "Cuddy")))
+        val record = log(Appointment.serializer(), EntryChange(appointment, changed)).single()
+
+        assertEquals(setOf("consultants"), record.json.keys)
     }
 
     @Test
@@ -186,6 +199,7 @@ data class Appointment(
     val note: String = "",
     val billing: Billing = Billing(),
     val attending: Doctor? = null,
+    val consultants: List<Doctor> = listOf(),
     val payment: Payment? = null,
 ) : HasId<Appointment.ID> {
     @Serializable

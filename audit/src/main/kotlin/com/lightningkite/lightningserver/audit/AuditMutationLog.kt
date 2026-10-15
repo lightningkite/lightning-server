@@ -1,10 +1,13 @@
 package com.lightningkite.lightningserver.audit
 
 import com.lightningkite.lightningserver.definition.Runtime
+import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.generateFromServerClock
+import com.lightningkite.lightningserver.typed.registerTable
 import com.lightningkite.services.data.Unsafe
 import com.lightningkite.services.data.UuidV7
+import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.EntryChange
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.Partial
@@ -14,7 +17,6 @@ import com.lightningkite.services.database.serializableProperties
 import com.lightningkite.services.database.toPartialEntry
 import com.lightningkite.services.database.Table
 import com.lightningkite.services.database.partialOfDifference
-import com.lightningkite.services.database.postCreate
 import com.lightningkite.services.database.postRawChanges
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
@@ -24,36 +26,79 @@ import kotlinx.serialization.encoding.AbstractEncoder
 import kotlinx.serialization.modules.SerializersModule
 import kotlin.uuid.Uuid
 
+/**
+ * Returns this table wrapped so that every change it makes to an [Audited] field is recorded in [log].
+ *
+ * Each change is recorded after it is made, through [AuditMutationLog.logAuditedFieldChanges]. The
+ * `…IgnoringResult` and `…IgnoringOld` calls run as their effect-returning equivalents so the changed rows can
+ * be recorded.
+ *
+ * The model must be [Audited] and registered in the [AuditRegistry] passed to [log]. The registry registers
+ * the audited models used by the server's endpoints when pre-deploy tasks run, so a model that no endpoint
+ * uses has no entry. Changes to an unregistered model throw [IllegalStateException] *after* the change has been
+ * made, so the change stands but the caller sees a failure.
+ *
+ * @throws IllegalArgumentException if [T] is not marked as [@Audited][Audited]
+ * @throws IllegalStateException if [T] is marked as `@Audited` but is not registered in the audit registry
+ */
 context(serverRuntime: ServerRuntime)
-public fun <T : HasId<ID>, ID : Comparable<ID>> Table<T>.logAuditedFieldChanges(log: MutationLog): Table<T> =
-    postRawChanges { changes -> log.logAuditedFieldChanges(serializer, changes) }
+public fun <T : HasId<ID>, ID : Comparable<ID>> Table<T>.logAuditedFieldChanges(log: AuditMutationLog): Table<T> {
+    require(serializer.descriptor.isAudited) {
+        "Only @Audited models can be tracked using `logAuditedFieldChanges`"
+    }
+    return postRawChanges { changes -> log.logAuditedFieldChanges(serializer, changes) }
+}
 
-public class MutationLog(
-    private val origins: OriginRecording<*>,
-    private val registry: AuditRegistry,
-    public val table: Runtime<Table<MutationRecord>>,
+context(builder: ServerBuilder)
+public fun AuditMutationLog(
+    origins: OriginRecording<*>,
+    registry: AuditRegistry,
+    database: Runtime<Database>
+): AuditMutationLog = AuditMutationLog(
+    origins, registry,
+    database.registerTable("AuditMutationRecord")
+)
+
+public class AuditMutationLog(
+    public val origins: OriginRecording<*>,
+    public val registry: AuditRegistry,
+    public val table: Runtime<Table<AuditMutationRecord>>,
 ) {
+    /**
+     * Records each of [changes] that touches an [Audited] field of [T] as one [AuditMutationRecord] under the
+     * current origin.
+     *
+     * A create records every audited field of the new value, a modify records only the audited fields that
+     * changed, and a delete records no data. A change that touches no audited field is not recorded. Audited
+     * fields of nested classes are recorded too, including those of embedded [Audited] models.
+     *
+     * The current origin is written to the [OriginRecording] only if at least one record is written.
+     *
+     * @throws IllegalStateException if [T] has no entry in the [AuditRegistry], which happens when it is not marked as [@Audited][Audited], or no endpoint
+     *   uses it, or if a changed value has no `Uuid` `_id`.
+     */
     context(runtime: ServerRuntime)
-    public suspend fun <T : Any> logAuditedFieldChanges(serializer: KSerializer<T>, changes: List<EntryChange<T>>) {
+    public suspend fun <T : HasId<*>> logAuditedFieldChanges(serializer: KSerializer<T>, changes: List<EntryChange<T>>) {
         val type = registry.assignments.await().modelType(serializer.descriptor)
 
         val logs = changes.mapNotNull { (old, new) ->
             if (old == new) return@mapNotNull null
             val item = new ?: old ?: return@mapNotNull null
 
-            val newData = auditedPartialOfDifference(serializer, old, new)
+            val newData = partialOfAuditedDifference(serializer, old, new)
 
+            // null means the value was deleted, we want to record that, 
             if (newData != null && newData.parts.isEmpty()) return@mapNotNull null
 
             @OptIn(Unsafe::class) // SAFETY: flush is called later once we know we are actually inserting something
-            MutationRecord(
-                _id = MutationRecord.ID(UuidV7.generateFromServerClock()),
+            AuditMutationRecord(
+                _id = AuditMutationRecord.ID(UuidV7.generateFromServerClock()),
                 origin = origins.currentOrigin(),
                 modelType = type,
                 operation = when {
-                    old == null -> MutationRecord.Operation.Create
-                    new == null -> MutationRecord.Operation.Delete
-                    else -> MutationRecord.Operation.Modify
+                    old == null -> AuditMutationRecord.Operation.Create
+                    new == null -> AuditMutationRecord.Operation.Delete
+                    else -> AuditMutationRecord.Operation.Modify
                 },
                 modelId = idOf(serializer, item),
                 data = newData?.let {
@@ -77,8 +122,8 @@ public class MutationLog(
      * @throws IllegalStateException if [value] has no `Uuid` `_id`.
      */
     context(runtime: ServerRuntime)
-    private fun <T> idOf(serializer: SerializationStrategy<T>, value: T): Uuid =
-        IdEncoder(runtime.internalSerialization.json.serializersModule)
+    private fun <T : HasId<*>> idOf(serializer: SerializationStrategy<T>, value: T): Uuid =
+        IdEncoder(runtime.internalSerialization.serializersModule)
             .also { it.encodeSerializableValue(serializer, value) }
             .id
             ?: throw IllegalStateException("${serializer.descriptor.serialName} has no Uuid _id to record a mutation against.")
@@ -111,13 +156,11 @@ public class MutationLog(
  * Returns a [Partial] of the [Audited] properties of [new] that differ from [old], or `null` if [new] is `null`.
  *
  * Works like [partialOfDifference], but leaves out properties that neither are marked [Audited] nor hold one.
- * A nested class that is not [Audited] is compared property by property. A list, map or sealed value holding
- * an audited property is included whole, since a [Partial] cannot describe part of one. A nested [Audited]
- * model is left out, since it gets records of its own. When [old] is `null`, every audited property of [new]
- * is included.
+ * A nested class, including an embedded [Audited] model, is compared property by property. A list, map or
+ * sealed value holding an audited property is included whole, since a [Partial] cannot describe part of one.
+ * When [old] is `null`, every audited property of [new] is included.
  */
-@OptIn(ExperimentalSerializationApi::class)
-private fun <T> auditedPartialOfDifference(serializer: KSerializer<T>, old: T?, new: T?): Partial<T>? {
+private fun <T> partialOfAuditedDifference(serializer: KSerializer<T>, old: T?, new: T?): Partial<T>? {
     if (new == null) return null
     @Suppress("UNCHECKED_CAST")
     val unwrapped = (serializer.nullElement() ?: serializer) as KSerializer<T>
@@ -137,9 +180,9 @@ private fun <T> auditedPartialOfDifference(serializer: KSerializer<T>, old: T?, 
             descriptor.isElementAudited(index) -> partial.parts[property] =
                 if (isComposite) partialOfDifference(property.serializer, oldValue, newValue) else newValue
 
-            type.isAudited || !type.containsAuditedFields() -> {}
+            !type.containsAuditedFields() -> {}
             isComposite && newValue != null ->
-                auditedPartialOfDifference(property.serializer, oldValue, newValue)!!
+                partialOfAuditedDifference(property.serializer, oldValue, newValue)!!
                     .takeIf { it.parts.isNotEmpty() }
                     ?.let { partial.parts[property] = it }
 
