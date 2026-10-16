@@ -16,7 +16,7 @@ Each release groups entries under:
 
 ### API
 
-- Added `ClientTelemetryEndpoints` (typed): `POST ingest` takes a `TelemetryBatch` recorded by a client app (e.g. KiteUI) and hands it to the server's telemetry backend, so client builds carry no telemetry credentials. Mount with `path.path("telemetry") module ClientTelemetryEndpoints()`. Anonymous callers are accepted; `user.id` comes from the caller's authentication and client-sent `user.*` attributes are dropped. Batches over 2000 records, owner/metric names not matching `[A-Za-z][A-Za-z0-9_.-]{0,63}`, and names past 500 distinct per process are rejected with 400.
+- Added `ClientTelemetryEndpoints` (typed): `POST ingest` takes a `TelemetryBatch` recorded by a client app (e.g. KiteUI) and hands it to the server's telemetry backend, so client builds carry no telemetry credentials. Mount with `path.path("telemetry") module ClientTelemetryEndpoints()`. Anonymous callers are accepted; `user.id` comes from the caller's authentication and client-sent `user.*` attributes are dropped. Rejected with 400: batches over 2000 records, records over 128 attributes, malformed trace/span ids, owner/metric/attribute names not matching `[A-Za-z][A-Za-z0-9_.-]{0,63}`, and names past 1000 distinct per process (the backend keeps state per name). The client's `traceparent` links traces but doesn't decide server-side sampling.
 - Added `Session.authenticatedAt: Instant?` and an `authenticatedAt` parameter on `SessionManager.newSession` (defaults to now). `Session.toAuth()` now uses it for `Authentication.issuedAt`, falling back to `createdAt` when it is null (sessions stored before this release). It is nullable so Postgres can add the column to an existing session table.
 
 ### Behavior

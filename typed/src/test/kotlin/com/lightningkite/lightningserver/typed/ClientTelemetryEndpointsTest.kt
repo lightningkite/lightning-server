@@ -122,9 +122,28 @@ class ClientTelemetryEndpointsTest {
     }
 
     @Test
-    fun distinctOwnersAreCapped() = withServer {
+    fun malformedAttributeKeyIsRejected() = withServer {
+        val bad = span("screen").copy(attributes = telemetryAttributesOf(TelemetryKey.OfString("\u001b[31mfake") to "x"))
+        assertFailsWith<BadRequestException> { TestServer.telemetry.ingest.test(null, batch(bad)) }
+    }
+
+    @Test
+    fun tooManyAttributesOnARecordIsRejected() = withServer {
+        val wide = span("screen").copy(attributes = TelemetryAttributes(List(129) { TelemetryKey.OfString("key$it") to "x" }))
+        assertFailsWith<BadRequestException> { TestServer.telemetry.ingest.test(null, batch(wide)) }
+    }
+
+    @Test
+    fun malformedIdsAreRejected() = withServer {
+        assertFailsWith<BadRequestException> { TestServer.telemetry.ingest.test(null, batch(span("screen").copy(traceId = "not-hex"))) }
+        assertFailsWith<BadRequestException> { TestServer.telemetry.ingest.test(null, batch(span("screen").copy(parentSpanId = "123"))) }
+    }
+
+    @Test
+    fun distinctNamesAreCapped() = withServer {
         val ingest = TestServer.cappedTelemetry.ingest
-        ingest.test(null, batch(*Array(500) { span("owner$it") }))
+        // 998 owners plus the batch's two attribute keys (service.name, app.screen.name) reach the 1000 cap.
+        ingest.test(null, batch(*Array(998) { span("owner$it") }))
         assertFailsWith<BadRequestException> { ingest.test(null, batch(span("one-more"))) }
         ingest.test(null, batch(span("owner0"))) // already-known names keep working
     }
