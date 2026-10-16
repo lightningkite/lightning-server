@@ -18,7 +18,9 @@ import com.lightningkite.services.aws.AwsConnections
 import com.lightningkite.services.get
 import io.github.oshai.kotlinlogging.KLogger
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -187,8 +189,8 @@ public open class AwsAdapter(server: ServerDefinition) : EngineBase(server), Req
         }
         logger.info { "beforeCheckpoint() - Preparing all connections..." }
         runBlocking {
-            settings.allGoals().entries.forEachConcurrent {
-                (it.value as? Service)?.let {
+            for (entry in settings.allGoals().entries) launch(Dispatchers.IO) {
+                (entry.value as? Service)?.let {
                     logger.debug { "Initially connecting to ${it.name}..." }
                     it.connect()
                     logger.debug { "Initially connected to ${it.name}. Now disconnecting..." }
@@ -203,8 +205,8 @@ public open class AwsAdapter(server: ServerDefinition) : EngineBase(server), Req
     override fun afterRestore(context: org.crac.Context<out Resource>?) {
         logger.info { "afterRestore() - opening all connections" }
         runBlocking {
-            settings.allGoals().entries.forEachConcurrent {
-                (it.value as? Service)?.let {
+            for (entry in settings.allGoals().entries) launch(Dispatchers.IO) {
+                (entry.value as? Service)?.let {
                     logger.debug { "Connecting ${it.name}..." }
                     it.connect()
                     logger.debug { "Connected ${it.name}." }
