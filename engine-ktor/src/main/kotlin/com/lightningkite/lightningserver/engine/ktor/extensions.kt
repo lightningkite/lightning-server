@@ -6,7 +6,12 @@ import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
-import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
+import com.lightningkite.lightningserver.pathing.RawWebSocketPath
+import com.lightningkite.lightningserver.runtime.Engine
+import com.lightningkite.lightningserver.runtime.EngineBase
+import com.lightningkite.lightningserver.runtime.Execution
+import com.lightningkite.lightningserver.websockets.WebSocketClose
+import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
 import io.ktor.http.*
@@ -14,7 +19,7 @@ import io.ktor.server.application.*
 import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.util.*
-import kotlinx.io.asSource
+import io.ktor.websocket.CloseReason
 
 /**
  * Converts a Ktor ContentType to a Lightning Server MediaType.
@@ -33,23 +38,23 @@ internal fun Headers.adapt(): HttpHeaders = HttpHeaders(flattenEntries())
  * Extracts the real client IP from the configured proxy header if available.
  * Falls back to the origin remote address if the header is not present.
  */
-context(server: ServerRuntimeBase)
-internal suspend fun ApplicationCall.adapt(maxBody: Long): HttpRequest<PathSpec> {
+context(server: EngineBase)
+internal suspend fun ApplicationCall.adaptHttpRequest(maxBody: Long): Pair<HttpRequest<PathSpec>, Execution.ID> {
     val adaptedHeaders = request.headers.adapt()
     val identity = adaptedHeaders.requestIdentity(ktorRunConfig().requestIdHeader) {
         server.logger.warn { "Request ID header for proxy '${ktorRunConfig().requestIdHeader}' was missing from the request." }
     }
-    return HttpRequest(
+    val adapted = HttpRequest(
         path = RawHttpEndpoint(request.path().decodeURLPart(), HttpMethod(request.httpMethod.value)),
         queryParameters = QueryParameters(request.queryParameters.flattenEntries()),
         headers = adaptedHeaders,
-        requestId = identity.requestId,
         upstreamRequestId = identity.upstreamRequestId,
         domain = request.origin.serverHost,
         protocol = request.origin.scheme,
-        sourceIp = ktorRunConfig().realIpHeader?.let {
-            request.header(it)
-                ?: run { server.logger.warn { "Real IP address header for proxy '$it' was missing from the request." }; null }
+        sourceIp = ktorRunConfig().realIpHeader?.let { realIp ->
+            request.header(realIp).also {
+                if (it == null) server.logger.warn { "Real IP address header for proxy '$it' was missing from the request." }
+            }
         } ?: request.origin.remoteAddress,
         body = run {
             // TODO: Add MultiPart support
@@ -57,7 +62,7 @@ internal suspend fun ApplicationCall.adapt(maxBody: Long): HttpRequest<PathSpec>
             // it yields the event loop instead of blocking it (the original receiveStream()+runBlocking path could
             // deadlock the event loop on slow/segmented bodies). maxBody is enforced during the suspending read.
             val declaredLength = request.contentLength()
-            TypedData.suspending(
+            TypedData.suspendingSource(
                 // declaredLength lets the source reject a body that ends before its declared Content-Length (A1).
                 source = KtorChannelSuspendingSource(receiveChannel(), maxBody, declaredLength),
                 mediaType = request.contentType().adapt(),
@@ -65,7 +70,47 @@ internal suspend fun ApplicationCall.adapt(maxBody: Long): HttpRequest<PathSpec>
             )
         },
     )
+    return adapted to identity.requestId
 }
+
+context(engine: Engine)
+internal fun ApplicationCall.adaptWebSocketConnectRequest(): WebSocketConnectRequest<PathSpec> {
+    val runConfig = ktorRunConfig()
+
+    val queryParams = QueryParameters(
+        // TODO: Remove this fugly hack. It's around for backwards compatibility.
+        request.queryParameters.flattenEntries()
+            .flatMap {
+                if (it.first == "path" && it.second.contains('?')) {
+                    listOf(it.first to it.second.substringBefore('?')) +
+                            QueryParameters.parse(
+                                it.second.substringAfter('?')
+                            ).entries
+                } else
+                    listOf(it)
+            }
+    )
+
+    val adaptedHeaders = request.headers.adapt()
+    val identity = adaptedHeaders.requestIdentity(runConfig.requestIdHeader) {
+        engine.logger.warn { "Request ID header for proxy '${runConfig.requestIdHeader}' was missing from the request." }
+    }
+    return WebSocketConnectRequest(
+        path = RawWebSocketPath(queryParams["path"] ?: request.path().decodeURLPart()),
+        socketId = identity.requestId,
+        queryParameters = queryParams,
+        headers = adaptedHeaders,
+        upstreamRequestId = identity.upstreamRequestId,
+        domain = request.origin.serverHost,
+        protocol = request.origin.scheme,
+        sourceIp = runConfig.realIpHeader?.let {
+            request.header(it)
+                ?: run { engine.logger.warn { "Real IP address header for proxy '$it' was missing from the request." }; null }
+        } ?: request.origin.remoteAddress,
+    )
+}
+
+internal fun WebSocketClose.adapt(): CloseReason = CloseReason(code = code.code, message = message ?: code.name)
 
 // TODO: Implement MultiPart support - the code below is a partial implementation that needs completion
 

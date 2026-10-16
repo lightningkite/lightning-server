@@ -16,10 +16,14 @@ settings pipeline, the on-instance deploy script, and the user-data fragments.
 ## Module structure
 
 ```
-deploy-aws-ec2/src/main/kotlin/com/lightningkite/lightningserver/terraform/awsec2/
+deploy-aws-ec2/src/main/kotlin/com/lightningkite/lightningserver/terraform/aws/ec2/
 ├── TerraformAwsEc2BuilderBase.kt      # Shared config, deployment resources, user-data fragments
 ├── TerraformAwsSingleEc2Builder.kt    # Single instance + Angie/Let's Encrypt + Elastic IP
 ├── TerraformAwsScalingEc2Builder.kt   # ALB + ACM + Auto Scaling Group + golden AMI
+├── ImageComponent.kt                  # Image Builder components, including STIG hardening
+├── VpcInfoTerraformManaged.kt         # VPC created by this Terraform
+├── VpcInfoExisting.kt                 # VPC that already exists
+├── otel-collector-ec2.kt              # On-instance OpenTelemetry collectors (X-Ray, Grafana Cloud)
 └── extensions.kt                      # IAM path helper
 ```
 
@@ -44,9 +48,9 @@ object MyDeployment : TerraformAwsSingleEc2Builder<Server>(Server) {
     override val applicationVpc = AwsVpc.Default
 
     override fun Server.settings() {
-        database.need.mongoDbAtlas(...)
-        cache.need.awsElasticacheMemcached(...)
-        files.need.awsS3(...)
+        database.awsDocumentDb(kmsKey = KmsKeySource.AwsManaged)
+        cache.awsDynamoDb()
+        files.awsS3Bucket()
     }
 }
 ```
@@ -142,7 +146,7 @@ object MyScaledDeployment : TerraformAwsScalingEc2Builder<Server>(Server) {
     override val instanceArchitecture = CPUArchitecture.Arm
 
     // Must provide private subnets + NAT egress (Default VPC is not sufficient).
-    override val applicationVpc = VpcInfoTFManaged(
+    override val applicationVpc = terraformManagedVPC(
         ipPrefix = "10.0",
         availabilityZones = listOf("us-west-2a", "us-west-2b", "us-west-2c"),
         natGateway = AwsVpc.NatGateway.Single,
@@ -155,9 +159,9 @@ object MyScaledDeployment : TerraformAwsScalingEc2Builder<Server>(Server) {
     override val scalingRequestsPerTarget = 400   // optional: scale on requests/instance too
 
     override fun Server.settings() {
-        database.need.mongoDbAtlas(...)
-        cache.need.awsElasticacheRedis(...)    // distributed cache REQUIRED
-        files.need.awsS3(...)
+        database.awsDocumentDb(kmsKey = KmsKeySource.AwsManaged)
+        cache.awsElasticacheRedis()            // distributed cache REQUIRED
+        files.awsS3Bucket()
     }
 }
 ```

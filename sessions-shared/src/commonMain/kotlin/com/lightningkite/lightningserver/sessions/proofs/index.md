@@ -33,7 +33,7 @@ Core proof data models:
 
 ### OtpHashAlgorithm.kt
 
-Enum defining HMAC algorithms for TOTP:
+`TotpHashAlgorithm`, the HMAC algorithms for TOTP:
 
 - **SHA1** - Recommended default, universally compatible
 - **SHA256** - Limited compatibility (experimental)
@@ -49,7 +49,8 @@ Complete WebAuthn (Web Authentication API) implementation:
     - **Authentication** - Models for authentication ceremony
     - Enums for algorithm support, attestation preferences, transports, etc.
 
-Supports FIDO2 security keys, Touch ID, Face ID, Windows Hello, and other WebAuthn authenticators.
+Supports FIDO2 security keys, Touch ID, Face ID, Windows Hello, and other WebAuthn authenticators. The server-side
+endpoints are in the `sessions-webauthn` module.
 
 ### AuthClientEndpoints.kt
 
@@ -84,8 +85,8 @@ HTTP client implementation of AuthClientEndpoints using the Fetcher abstraction.
 
 HTTP client implementations for all ProofClientEndpoints interfaces.
 
-## Sub-packages
+## Related Modules
 
-### oauth/
-
-OAuth 2.0 models and support (see `oauth/index.md`)
+- **sessions-totp** and **sessions-webauthn** - The server-side TOTP and WebAuthn proof endpoints, each in its own
+  module so an application only takes on their dependencies when it uses them
+- **sessions-oauth-shared** - OAuth 2.0 models

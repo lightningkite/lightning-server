@@ -3,8 +3,6 @@ package com.lightningkite.lightningserver.serialization
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.services.data.*
-import kotlinx.io.Buffer
-import kotlinx.io.readByteArray
 import kotlinx.serialization.*
 
 /**
@@ -34,8 +32,8 @@ public interface MediaTypeDecoder {
      * @param parameters The media type parameters to check
      * @return true if this decoder can handle the parameters, false otherwise
      */
-    public context(runtime: ServerRuntime)
-    fun accepts(parameters: Map<String, String>): Boolean = true
+    context(runtime: ServerRuntime)
+    public fun accepts(parameters: Map<String, String>): Boolean = true
 
     /**
      * Deserializes typed data into a Kotlin object.
@@ -44,21 +42,21 @@ public interface MediaTypeDecoder {
      * @param serializer The deserialization strategy for type T
      * @return The deserialized object
      */
-    public context(runtime: ServerRuntime)
-    suspend operator fun <T> invoke(content: TypedData, serializer: DeserializationStrategy<T>): T
+    context(runtime: ServerRuntime)
+    public suspend fun <T> decode(content: TypedData, serializer: DeserializationStrategy<T>): T
 
     /**
      * Deserializes a WebSocket frame into a Kotlin object.
      *
-     * Default implementation converts the frame to [TypedData] and delegates to [invoke].
+     * Default implementation converts the frame to [TypedData] and delegates to [decode].
      *
      * @param content The WebSocket frame to deserialize
      * @param serializer The deserialization strategy for type T
      * @return The deserialized object
      */
-    public context(runtime: ServerRuntime)
-    suspend operator fun <T> invoke(content: WebSocketFrame, serializer: DeserializationStrategy<T>): T =
-        invoke(
+    context(runtime: ServerRuntime)
+    public suspend fun <T> decode(content: WebSocketFrame, serializer: DeserializationStrategy<T>): T =
+        decode(
             when (content) {
                 is WebSocketFrame.Binary -> TypedData(Data.Bytes(content.content), mediaType)
                 is WebSocketFrame.Text -> TypedData(Data.Text(content.content), mediaType)
@@ -90,8 +88,8 @@ public interface MediaTypeEncoder {
      * @param parameters The media type parameters to check
      * @return true if this encoder can handle the parameters, false otherwise
      */
-    public context(runtime: ServerRuntime)
-    fun accepts(parameters: Map<String, String>): Boolean = true
+    context(runtime: ServerRuntime)
+    public fun accepts(parameters: Map<String, String>): Boolean = true
 
     /**
      * Serializes a Kotlin object to typed data.
@@ -101,8 +99,8 @@ public interface MediaTypeEncoder {
      * @param value The value to serialize
      * @return The serialized typed data
      */
-    public context(runtime: ServerRuntime)
-    suspend operator fun <T> invoke(mediaType: MediaType, serializer: SerializationStrategy<T>, value: T): TypedData
+    context(runtime: ServerRuntime)
+    public suspend fun <T> encode(mediaType: MediaType, serializer: SerializationStrategy<T>, value: T): TypedData
 
     /**
      * Serializes a Kotlin object to a WebSocket frame.
@@ -115,23 +113,19 @@ public interface MediaTypeEncoder {
      * @param value The value to serialize
      * @return The WebSocket frame
      */
-    public context(runtime: ServerRuntime)
-    suspend fun <T> ws(mediaType: MediaType, serializer: SerializationStrategy<T>, value: T): WebSocketFrame =
-        invoke(mediaType, serializer, value).let {
-            when (it.data) {
-                is Data.Text -> WebSocketFrame.Text(it.text())
-                else -> {
-                    val buffer = Buffer()
-                    it.write(buffer)
-                    WebSocketFrame.Binary(buffer.readByteArray())
-                }
+    context(runtime: ServerRuntime)
+    public suspend fun <T> ws(mediaType: MediaType, serializer: SerializationStrategy<T>, value: T): WebSocketFrame =
+        encode(mediaType, serializer, value).let {
+            when (val data = it.data) {
+                is Data.Text -> WebSocketFrame.Text(data.data)
+                else -> WebSocketFrame.Binary(data.bytes())
             }
         }
 
     /**
      * Serializes a Kotlin object for streaming responses.
      *
-     * Default implementation delegates to [invoke]. Implementations may override this
+     * Default implementation delegates to [encode]. Implementations may override this
      * to provide more efficient streaming behavior.
      *
      * @param mediaType The target media type
@@ -139,9 +133,9 @@ public interface MediaTypeEncoder {
      * @param value The value to serialize
      * @return The serialized typed data suitable for streaming
      */
-    public context(runtime: ServerRuntime)
-    suspend fun <T> streaming(mediaType: MediaType, serializer: KSerializer<T>, value: T): TypedData =
-        invoke(mediaType, serializer, value)
+    context(runtime: ServerRuntime)
+    public suspend fun <T> streaming(mediaType: MediaType, serializer: KSerializer<T>, value: T): TypedData =
+        encode(mediaType, serializer, value)
 }
 
 /**
@@ -153,8 +147,8 @@ public interface MediaTypeEncoder {
  */
 public interface MediaTypeCoder : MediaTypeDecoder, MediaTypeEncoder {
     override val priority: Float get() = 0f
-    override context(runtime: ServerRuntime)
-    fun accepts(parameters: Map<String, String>): Boolean = true
+    context(runtime: ServerRuntime)
+    override fun accepts(parameters: Map<String, String>): Boolean = true
 }
 
 /*

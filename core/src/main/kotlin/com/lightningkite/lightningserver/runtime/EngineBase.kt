@@ -1,5 +1,8 @@
+@file:OptIn(EngineApi::class)
+
 package com.lightningkite.lightningserver.runtime
 
+import com.lightningkite.lightningserver.EngineApi
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -9,7 +12,7 @@ import com.lightningkite.services.SharedResources
 import kotlinx.coroutines.*
 
 /**
- * Base implementation of [ServerRuntime] providing common functionality.
+ * Base implementation of [Engine] providing common functionality.
  *
  * This abstract class handles:
  * - Settings initialization and management (including automatic addition of system settings)
@@ -19,16 +22,16 @@ import kotlinx.coroutines.*
  * - Startup task execution with dependency resolution
  *
  * Subclasses should implement:
- * - [ServerRuntime.sendWebSocketSubscriptionMessage]
- * - [ServerRuntime.Task.invoke]
- * - [ServerRuntime.serverId]
- * - [ServerRuntime.serverVersion]
+ * - [Engine.sendWebSocketSubscriptionMessage]
+ * - [Engine.Task.invoke]
+ * - [Engine.serverId]
+ * - [Engine.serverVersion]
  * - HTTP request handling (typically via an engine)
  * - Scheduled task execution
  *
  * @param server The server definition to run
  */
-public abstract class ServerRuntimeBase(override val server: ServerDefinition) : ServerRuntime {
+public abstract class EngineBase(override val server: ServerDefinition) : Engine {
     /**
      * Settings manager with automatically included system settings.
      *
@@ -118,7 +121,7 @@ public abstract class ServerRuntimeBase(override val server: ServerDefinition) :
      * @throws Exception if any startup task fails
      */
     protected suspend fun runStartupTasks(): Unit =
-        runTaskGraph(server.startupTasks, { it.dependencies }) { location, task -> task.executeWithMetrics(location) }
+        runTaskGraph(server.startupTasks, { it.dependencies }) { _, task -> task.executeWithMetrics() }
 
     /**
      * Executes all pre-deploy tasks respecting their dependency order, failing fast.
@@ -131,11 +134,11 @@ public abstract class ServerRuntimeBase(override val server: ServerDefinition) :
      * @throws Exception if any pre-deploy task fails
      */
     protected suspend fun runPreDeployTasks(): Unit =
-        runTaskGraph(server.preDeployTasks, { it.dependencies() }) { location, task -> task.executeWithMetrics(location) }
+        runTaskGraph(server.preDeployTasks, { it.dependencies() }) { _, task -> task.executeWithMetrics() }
 }
 
 /*
- * TODO: API Recommendations for ServerRuntimeBase.kt
+ * TODO: API Recommendations for EngineBase.kt
  *
  * 2. The runStartupTasks() method launches all tasks concurrently but doesn't limit concurrency.
  *    For servers with many startup tasks, this could create resource contention.

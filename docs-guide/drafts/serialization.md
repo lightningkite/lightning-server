@@ -27,7 +27,7 @@ import kotlinx.serialization.modules.*
 
 ## Registering the Built-In Coders
 
-Typed endpoints (see [Typed Endpoints](typed-endpoints.md)) call `registerBasicMediaTypeCoders()`
+Typed endpoints (see [Typed Endpoints](../guide/typed-endpoints.md)) call `registerBasicMediaTypeCoders()`
 for you.  If you use raw `HttpHandler`s and want the same content negotiation, add the
 call yourself in your `ServerBuilder`'s `init {}` block:
 
@@ -307,7 +307,7 @@ recommended in production.
 
 ## What's Next
 
-- **Files** — how to declare `PublicFileSystem.Settings()`, wire a file system backend,
+- **Files** — how to declare `ExternalFileSystem.Settings()`, wire a file system backend,
   and configure `UploadEarlyEndpoint` for your server (see the files draft chapter).
 - **Typed Endpoints** — typed endpoints call `registerBasicMediaTypeCoders()` and use
   `parse`/`toTypedData` automatically; you usually only need to read this chapter when

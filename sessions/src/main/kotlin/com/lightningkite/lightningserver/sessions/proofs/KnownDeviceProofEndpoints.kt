@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
+import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.*
@@ -11,7 +12,6 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.sessions.*
-import com.lightningkite.lightningserver.sessions.proofs.extensions.constrainAttemptRate
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.typed.sdk.*
@@ -163,9 +163,9 @@ public class KnownDeviceProofEndpoints(
             implementation = { input: String ->
                 val now = now()
                 val id = input.substringBefore('/').let {
-                    try {
-                        Uuid.parse(it)
-                    } catch (e: IllegalArgumentException) {
+                    try { Uuid.parse(it) }
+                    catch (e: IllegalArgumentException) {
+                        serverRuntime.reportAuthEvent(AuthEvent.ProofRejected(info, AuthEvent.ProofRejected.Reason.MalformedRequest, request = request))
                         throw BadRequestException(
                             message = "Invalid known device identifier. ${e.message}",
                             data = it,
@@ -174,15 +174,28 @@ public class KnownDeviceProofEndpoints(
                     }
                 }
                 val secret = input.substringAfter('/')
-                cache().constrainAttemptRate(
-                    cacheKey = "known-devices-count-${id}"
+                cache().constrainProofAttemptRate(
+                    cacheKey = "known-devices-count-${id}",
+                    method = info,
+                    request = request,
                 ) {
                     val active = modelInfo.table().get(id)
-                        ?: throw BadRequestException("No such known device")
+                        ?: run {
+                            // The device id names no record, so there is no account behind it to name.
+                            serverRuntime.reportAuthEvent(AuthEvent.ProofRejected(info, AuthEvent.ProofRejected.Reason.NoSuchSubject, request = request))
+                            throw BadRequestException("No such known device")
+                        }
 
                     // Good: Uses constant-time checkAgainstHash to prevent timing attacks
-                    if (!secret.checkAgainstHash(active.hash))
+                    if (!secret.checkAgainstHash(active.hash)) {
+                        serverRuntime.reportAuthEvent(AuthEvent.ProofCredentialRejected(
+                            info,
+                            AuthEvent.ProofCredentialRejected.Reason.SecretMismatch,
+                            principal = active.subjectId,
+                            request = request,
+                        ))
                         throw BadRequestException("User ID and code do not match")
+                    }
 
                     // Lazy migration: if using old slow PBKDF2 hash, upgrade to fast SHA-256 hash
                     val shouldMigrate = active.hash.isSlowHash()
@@ -194,6 +207,7 @@ public class KnownDeviceProofEndpoints(
                         }
                     })
 
+                    serverRuntime.reportAuthEvent(AuthEvent.ProofAccepted(info, principal = active.subjectId, request = request))
                     proofSigner.await().makeProof(
                         property = "${active.subjectType}/_id",
                         value = active.subjectId,

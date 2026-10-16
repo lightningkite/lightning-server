@@ -2,8 +2,10 @@ package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.services.database.HasId
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
@@ -65,7 +67,8 @@ class ScopesTests {
         test: context(ServerRuntime) (Authentication<*>) -> Unit,
     ) {
         Server.test({}) {
-            test(Authentication(User, Uuid.random(), sessionId = null, scopes = scopes))
+            val auth = Authentication(User, Uuid.random(), sessionId = null, scopes = scopes)
+            runBlocking { execute { test(auth) } }
         }
     }
 

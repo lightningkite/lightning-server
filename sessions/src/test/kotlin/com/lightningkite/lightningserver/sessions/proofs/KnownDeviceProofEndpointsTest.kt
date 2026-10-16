@@ -10,7 +10,9 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.encryption.SecretBasis
 import com.lightningkite.lightningserver.encryption.signer
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.sessions.proofs.extensions.verify
 import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.services.cache.Cache
@@ -73,6 +75,7 @@ class KnownDeviceProofEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -86,14 +89,14 @@ class KnownDeviceProofEndpointsTest {
         }.let { server ->
             server.test({}) {
                 // Establish a known device
-                val result = server.knownDevice.establish(TestUser, userId, "Chrome on Mac / 127.0.0.1")
+                val result = execute { server.knownDevice.establish(TestUser, userId, "Chrome on Mac / 127.0.0.1") }
 
                 // Should return a secret in format "uuid/uuid"
                 assertNotNull(result.secret)
                 assertTrue(result.secret.contains("/"))
 
                 // Check that the secret was stored
-                val secrets = server.knownDevice.modelInfo.table().find(Condition.Always).toList()
+                val secrets = execute { server.knownDevice.modelInfo.table().find(Condition.Always).toList() }
                 assertEquals(1, secrets.size)
 
                 val secret = secrets.first()
@@ -118,6 +121,7 @@ class KnownDeviceProofEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -130,7 +134,7 @@ class KnownDeviceProofEndpointsTest {
         }.let { server ->
             server.test({}) {
                 // First establish a known device
-                val established = server.knownDevice.establish(TestUser, userId, "Test Device")
+                val established = execute { server.knownDevice.establish(TestUser, userId, "Test Device") }
 
                 // Now prove with the secret
                 val proof = server.knownDevice.prove.test(null, established.secret)
@@ -161,6 +165,7 @@ class KnownDeviceProofEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -173,7 +178,7 @@ class KnownDeviceProofEndpointsTest {
         }.let { server ->
             server.test({}) {
                 // Establish a known device
-                val established = server.knownDevice.establish(TestUser, userId, "Test Device")
+                val established = execute { server.knownDevice.establish(TestUser, userId, "Test Device") }
 
                 // Try to prove with wrong secret (same id, wrong secret)
                 val secretId = established.secret.substringBefore('/')
@@ -198,6 +203,7 @@ class KnownDeviceProofEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -228,6 +234,7 @@ class KnownDeviceProofEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -259,6 +266,7 @@ class KnownDeviceProofEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -291,6 +299,7 @@ class KnownDeviceProofEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -303,9 +312,13 @@ class KnownDeviceProofEndpointsTest {
         }.let { server ->
             server.test({}) {
                 // Establish multiple devices
-                val device1 = server.knownDevice.establish(TestUser, userId, "Chrome on Mac")
-                val device2 = server.knownDevice.establish(TestUser, userId, "Safari on iPhone")
-                val device3 = server.knownDevice.establish(TestUser, userId, "Firefox on Windows")
+                val (device1, device2, device3) = execute {
+                    listOf(
+                        server.knownDevice.establish(TestUser, userId, "Chrome on Mac"),
+                        server.knownDevice.establish(TestUser, userId, "Safari on iPhone"),
+                        server.knownDevice.establish(TestUser, userId, "Firefox on Windows"),
+                    )
+                }
 
                 // All secrets should be different
                 assertNotEquals(device1.secret, device2.secret)
@@ -323,7 +336,7 @@ class KnownDeviceProofEndpointsTest {
                 assertEquals(userId.toString(), proof3.value)
 
                 // Check that 3 secrets were stored
-                val secrets = server.knownDevice.modelInfo.table().find(Condition.Always).toList()
+                val secrets = execute { server.knownDevice.modelInfo.table().find(Condition.Always).toList() }
                 assertEquals(3, secrets.size)
             }
         }
@@ -343,6 +356,7 @@ class KnownDeviceProofEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -355,8 +369,8 @@ class KnownDeviceProofEndpointsTest {
         }.let { server ->
             server.test({}) {
                 // Even after establishing a device, established() returns false
-                server.knownDevice.establish(TestUser, userId, "Test Device")
-                assertFalse(server.knownDevice.established(TestUser, user))
+                execute { server.knownDevice.establish(TestUser, userId, "Test Device") }
+                assertFalse(execute { server.knownDevice.established(TestUser, user) })
             }
         }
     }
@@ -374,6 +388,7 @@ class KnownDeviceProofEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -385,7 +400,7 @@ class KnownDeviceProofEndpointsTest {
             )
         }.let { server ->
             server.test({}) {
-                val established = server.knownDevice.establish(TestUser, userId, "Test Device")
+                val established = execute { server.knownDevice.establish(TestUser, userId, "Test Device") }
 
                 // First prove
                 val proof1 = server.knownDevice.prove.test(null, established.secret)
@@ -414,6 +429,7 @@ class KnownDeviceProofEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -444,6 +460,7 @@ class KnownDeviceProofEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -455,11 +472,11 @@ class KnownDeviceProofEndpointsTest {
             )
         }.let { server ->
             server.test({}) {
-                val established = server.knownDevice.establish(TestUser, userId, "Test Device")
+                val established = execute { server.knownDevice.establish(TestUser, userId, "Test Device") }
                 val rawSecret = established.secret.substringAfter('/')
 
                 // The hash stored in the database should not be the plaintext secret
-                val allSecrets = server.knownDevice.modelInfo.table().find(Condition.Always).toList()
+                val allSecrets = execute { server.knownDevice.modelInfo.table().find(Condition.Always).toList() }
                 assertEquals(1, allSecrets.size)
                 val stored = allSecrets.first()
                 assertNotEquals(rawSecret, stored.hash)
@@ -484,6 +501,7 @@ class KnownDeviceProofEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -495,8 +513,12 @@ class KnownDeviceProofEndpointsTest {
             )
         }.let { server ->
             server.test({}) {
-                val device1 = server.knownDevice.establish(TestUser, userId1, "User 1 Device")
-                val device2 = server.knownDevice.establish(TestUser, userId2, "User 2 Device")
+                val (device1, device2) = execute {
+                    listOf(
+                        server.knownDevice.establish(TestUser, userId1, "User 1 Device"),
+                        server.knownDevice.establish(TestUser, userId2, "User 2 Device"),
+                    )
+                }
 
                 // User 1's device should prove as user 1
                 val proof1 = server.knownDevice.prove.test(null, device1.secret)

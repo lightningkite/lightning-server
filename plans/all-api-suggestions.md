@@ -488,7 +488,7 @@ require { it.fetch().emailVerified }
 - [ ] **`HttpHandler.kt:89`** What response is sent to the client?
 - [ ] **`HttpHandler.kt:90`** Are resources cleaned up properly?
 
-### `core/src/main/kotlin/com/lightningkite/lightningserver/http/ExceptionHttpHandler.kt`
+### `../core/src/main/kotlin/com/lightningkite/lightningserver/http/HttpExceptionHandler.kt`
 
 - [ ] **`ExceptionHttpHandler.kt:59`** TODO: API Recommendations for ExceptionHttpHandler.kt
 - [ ] **`ExceptionHttpHandler.kt:60`** Add lifecycle hooks for exception logging/monitoring before response generation:
@@ -574,19 +574,19 @@ require { it.fetch().emailVerified }
 - [ ] **`parse.kt:219`** The toString() implementation uses deprecated URLEncoder.encode(String, Charset). While it
   still works, consider updating to URLEncoder.encode(String, String) with "UTF-8".
 
-### `core/src/main/kotlin/com/lightningkite/lightningserver/http/DefaultExceptionHttpHandler.kt`
+### `core/src/main/kotlin/com/lightningkite/lightningserver/http/ExceptionHttpHandler.Default.kt`
 
-- [ ] **`DefaultExceptionHttpHandler.kt:60`** TODO: API Recommendations for DefaultExceptionHttpHandler.kt
-- [ ] **`DefaultExceptionHttpHandler.kt:61`** The handler doesn't log exceptions - consider adding logging here for all
+- [ ] **`ExceptionHttpHandler.Default.kt:60`** TODO: API Recommendations for ExceptionHttpHandler.Default.kt
+- [ ] **`ExceptionHttpHandler.Default.kt:61`** The handler doesn't log exceptions - consider adding logging here for all
   unhandled exceptions to ensure errors are captured even if monitoring/logging interceptors aren't configured.
-- [ ] **`DefaultExceptionHttpHandler.kt:63`** Stack traces in debug mode could expose sensitive information (file paths,
+- [ ] **`ExceptionHttpHandler.Default.kt:63`** Stack traces in debug mode could expose sensitive information (file paths,
   internal logic). Consider sanitizing or limiting stack trace depth even in debug mode.
-- [ ] **`DefaultExceptionHttpHandler.kt:65`** The generic error message in production ("An unknown error occurred")
+- [ ] **`ExceptionHttpHandler.Default.kt:65`** The generic error message in production ("An unknown error occurred")
   isn't helpful for debugging. Consider including a correlation ID that maps to server-side logs.
-- [ ] **`DefaultExceptionHttpHandler.kt:67`** No special handling for common exception types like
+- [ ] **`ExceptionHttpHandler.Default.kt:67`** No special handling for common exception types like
   IllegalArgumentException, NullPointerException. These could be mapped to 400 Bad Request instead of 500 Internal
   Server Error when appropriate.
-- [ ] **`DefaultExceptionHttpHandler.kt:69`** The toTypedData call could fail if the Accept header specifies an
+- [ ] **`ExceptionHttpHandler.Default.kt:69`** The toTypedData call could fail if the Accept header specifies an
   unsupported format. Consider wrapping this in a try-catch and falling back to JSON or plain text.
 
 ### `core/src/main/kotlin/com/lightningkite/lightningserver/http/HttpHeaderValue.kt`

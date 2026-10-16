@@ -7,7 +7,9 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.encryption.HS256
 import com.lightningkite.lightningserver.encryption.SecretBasis
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.services.database.HasId
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
@@ -50,6 +52,7 @@ class PublicTinyTokenFormatTest {
 
     object TestServer : ServerBuilder() {
         init {
+            registerBasicMediaTypeCoders()
             register(TestUser)
             register(OtherUser)
         }
@@ -78,14 +81,14 @@ class PublicTinyTokenFormatTest {
                 scopes = setOf(GrantedScope.root)
             )
 
-            val token = format.create(TestUser, auth)
+            val token = execute { format.create(TestUser, auth) }
             assertNotNull(token)
 
             // Token should start with tt/principal name followed by /
             assert(token.startsWith("tt/TestUser/")) { "Token should start with tt/principal name" }
 
             // Read back the token
-            val readAuth = format.read(TestUser, token)
+            val readAuth = execute { format.read(TestUser, token) }
             assertNotNull(readAuth, "Should be able to read back the token")
             assertEquals(userId, readAuth.id)
             assertEquals("test-session-123", readAuth.sessionId)
@@ -110,8 +113,8 @@ class PublicTinyTokenFormatTest {
                 scopes = scopes
             )
 
-            val token = format.create(TestUser, auth)
-            val readAuth = format.read(TestUser, token)
+            val token = execute { format.create(TestUser, auth) }
+            val readAuth = execute { format.read(TestUser, token) }
 
             assertNotNull(readAuth)
             assertEquals(scopes, readAuth.scopes)
@@ -135,10 +138,10 @@ class PublicTinyTokenFormatTest {
                 scopes = setOf(GrantedScope.root)
             )
 
-            val token = expiredFormat.create(TestUser, auth)
+            val token = execute { expiredFormat.create(TestUser, auth) }
 
             assertFailsWith<TokenException>("Expired token should throw") {
-                expiredFormat.read(TestUser, token)
+                execute { expiredFormat.read(TestUser, token) }
             }
         }
     }
@@ -156,10 +159,10 @@ class PublicTinyTokenFormatTest {
                 scopes = setOf(GrantedScope.root)
             )
 
-            val token = format.create(TestUser, auth)
+            val token = execute { format.create(TestUser, auth) }
 
             // Token starts with "tt/TestUser/" so reading as OtherUser should return null
-            val result = format.read(OtherUser, token)
+            val result = execute { format.read(OtherUser, token) }
             assertNull(result, "Token for different principal type should return null")
         }
     }
@@ -188,11 +191,11 @@ class PublicTinyTokenFormatTest {
                 scopes = setOf(GrantedScope.root)
             )
 
-            val token1 = format1.create(TestUser, auth)
+            val token1 = execute { format1.create(TestUser, auth) }
 
             // Token signed with key1 should not verify with key2
             assertFailsWith<TokenException>("Token from different key should fail verification") {
-                format2.read(TestUser, token1)
+                execute { format2.read(TestUser, token1) }
             }
         }
     }
@@ -211,8 +214,8 @@ class PublicTinyTokenFormatTest {
                 scopes = setOf(GrantedScope.root)
             )
 
-            val token = format.create(TestUser, auth)
-            val readAuth = format.read(TestUser, token)
+            val token = execute { format.create(TestUser, auth) }
+            val readAuth = execute { format.read(TestUser, token) }
 
             assertNotNull(readAuth)
             assertEquals(sessionId, readAuth.sessionId)

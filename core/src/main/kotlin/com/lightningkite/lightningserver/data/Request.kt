@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.data
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 
 /**
@@ -13,9 +14,14 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
  *
  * This is typically implemented by the framework and passed to endpoint handlers.
  *
+ * What is *not* here is any identifier of ours: correlation lives on
+ * [com.lightningkite.lightningserver.runtime.ServerRuntime.execution], because a task or a schedule
+ * tick has no request to hang it on. The two identifiers that remain below are wire-level facts
+ * about the caller and the gateway, not identifiers the server minted.
+ *
  * @param PATH The path specification type for this request
  */
-public abstract class Request<out PATH : PathSpec> : HasContextualPath<PATH>, Caching {
+public abstract class Request<out PATH : PathSpec> : HasContextualPath<PATH>, Caching<Request<*>> {
     /** The resolved path information for this request. */
     public abstract val path: HasContextualPath<PATH>
 
@@ -35,29 +41,28 @@ public abstract class Request<out PATH : PathSpec> : HasContextualPath<PATH>, Ca
     public abstract val sourceIp: String
 
     /**
-     * Server-controlled identifier correlating this request across every log the server writes.
-     *
-     * Never derived from an untrusted caller — see
-     * [com.lightningkite.lightningserver.http.requestIdentity] for how engines resolve it.
-     */
-    public abstract val requestId: String
-
-    /**
-     * The [requestId] of the request that dispatched this one, for sub-requests of a multiplexed
-     * request, or null for a request that arrived directly from a client.
-     */
-    public abstract val parentRequestId: String?
-
-    /**
      * An identifier the caller supplied that was not trusted, kept for diagnostics only.
      * Never used for correlation.
      */
     public abstract val upstreamRequestId: String?
 
-    context(serverRuntime: ServerRuntime)
+    /**
+     * The identifier the gateway or proxy in front of the server minted for this request, or null
+     * when the engine has none. Trusted — it comes from our own infrastructure rather than the
+     * caller — and kept only so a record can be joined back to that gateway's own access log, which
+     * is why it is a `String`: it is the gateway's identifier, in whatever shape the gateway uses.
+     */
+    public abstract val engineRequestId: String?
+
+    context(engine: Engine)
     override val pathInContext: ResolvedPath<PATH>
         get() = path.pathInContext
+
+    public typealias CacheKey<PATH, T> = SerializableCache.CalculatingKey<Request<PATH>, Request<PATH>, T>
 }
+
+context(_: Engine)
+public val <PATH : PathSpec> Request<PATH>.pathSpec: PATH get() = pathInContext.pathSpec
 
 /**
  * Retrieves or calculates a cached value for this request.
@@ -69,7 +74,7 @@ public abstract class Request<out PATH : PathSpec> : HasContextualPath<PATH>, Ca
  * @return The cached or newly calculated value
  */
 context(server: ServerRuntime)
-public suspend operator fun <T> Request<*>.get(key: SerializableCache.CalculatingKey<Request<*>, T>): T {
+public suspend operator fun <T, PATH : PathSpec> Request<PATH>.get(key: Request.CacheKey<*, T>): T {
     return cache.get(key, this)
 }
 

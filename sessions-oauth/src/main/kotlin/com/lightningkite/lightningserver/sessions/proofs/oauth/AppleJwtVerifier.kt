@@ -20,18 +20,9 @@ import kotlin.time.Instant
 import dev.whyoleg.cryptography.algorithms.SHA256 as CryptoSHA256
 
 /**
- * Verifies Apple ID tokens (JWTs) with proper signature validation.
+ * Verifies the `id_token` JWT that Sign in with Apple returns.
  *
- * Apple Sign In returns an `id_token` which is a JWT that must be cryptographically verified
- * before trusting its contents. This verifier:
- * - Fetches Apple's public keys from their JWKS endpoint
- * - Caches the keys for performance
- * - Verifies JWT signature using RSA
- * - Validates issuer, audience, and expiration claims
- *
- * **Security:**
- * This implementation prevents token forgery by verifying the cryptographic signature
- * using Apple's public keys, unlike manual base64 decoding which is vulnerable to attacks.
+ * This checks the signature against Apple's public keys, which are fetched from their JWKS endpoint and cached, and validates the issuer, audience and expiration claims.
  *
  * @see <a href="https://developer.apple.com/documentation/sign_in_with_apple/sign_in_with_apple_rest_api/verifying_a_user">Apple Documentation</a>
  */
@@ -63,10 +54,7 @@ public object AppleJwtVerifier {
         val e: String,     // RSA exponent (base64url)
     )
 
-    /**
-     * Fetches Apple's current public keys from their JWKS endpoint and converts them to signers.
-     * Results are cached for 24 hours to reduce network calls.
-     */
+    /** Returns signers for Apple's current public keys, fetched from their JWKS endpoint and cached for 24 hours. */
     context(runtime: ServerRuntime)
     private suspend fun getApplePublicKeys(): Map<String, Signer> {
         val now = now()
@@ -91,13 +79,11 @@ public object AppleJwtVerifier {
     }
 
     /**
-     * Verifies an Apple ID token and extracts the claims.
+     * Returns the claims of [idToken] after verifying it.
      *
-     * @param idToken The JWT id_token from Apple's OAuth response
-     * @param expectedAudience The expected audience (your app's client ID)
-     * @return The verified JWT claims
-     * @throws JwtSignatureException if signature verification fails
-     * @throws BadRequestException if token is malformed or validation fails
+     * @param expectedAudience Your app's client ID.
+     * @throws JwtSignatureException if signature verification fails.
+     * @throws BadRequestException if the token is malformed or fails validation.
      */
     @OptIn(ExperimentalEncodingApi::class)
     context(runtime: ServerRuntime)
@@ -171,9 +157,7 @@ public object AppleJwtVerifier {
         return claims
     }
 
-    /**
-     * Creates an RSA signature verifier from Apple's public key.
-     */
+    /** Returns a signature verifier for Apple's RSA public key. */
     @OptIn(ExperimentalEncodingApi::class)
     context(runtime: ServerRuntime)
     private fun createRsaVerifier(key: ApplePublicKey): Signer {
@@ -208,11 +192,7 @@ public object AppleJwtVerifier {
         }
     }
 
-    /**
-     * Constructs a DER-encoded RSA public key in SPKI/X.509 format from modulus and exponent.
-     *
-     * Format: SEQUENCE { SEQUENCE { OID rsaEncryption, NULL }, BIT STRING { SEQUENCE { INTEGER n, INTEGER e } } }
-     */
+    /** Returns the DER-encoded SPKI (X.509) RSA public key for the modulus [n] and exponent [e]. */
     private fun constructRsaPublicKeyDer(n: ByteArray, e: ByteArray): ByteArray {
         // RSA encryption OID: 1.2.840.113549.1.1.1
         val rsaOid = byteArrayOf(0x2A, 0x86.toByte(), 0x48, 0x86.toByte(), 0xF7.toByte(), 0x0D, 0x01, 0x01, 0x01)

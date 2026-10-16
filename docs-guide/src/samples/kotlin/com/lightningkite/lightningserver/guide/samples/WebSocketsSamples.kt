@@ -119,10 +119,10 @@ fun broadcastWsTest() = BroadcastServer.testBlocking(settings = {}) {
     ws1.onMessageSent = { received.add("ws1:${it.text}") }
     ws2.onMessageSent = { received.add("ws2:${it.text}") }
 
-    // Send via the HTTP endpoint. sendWebSocketSubscriptionMessage is dispatched
+    // Publish as the test's own work. sendWebSocketSubscriptionMessage is dispatched
     // synchronously in the test runtime, so both connections receive the frame
     // before the next line executes.
-    BroadcastServer.announcementTopic.send("hello everyone")
+    execute { BroadcastServer.announcementTopic.send("hello everyone") }
 
     check(received.contains("ws1:hello everyone"))
     check(received.contains("ws2:hello everyone"))

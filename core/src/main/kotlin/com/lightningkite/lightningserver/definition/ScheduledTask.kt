@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.definition
 
+import com.lightningkite.lightningserver.OverrideOnly
 import com.lightningkite.lightningserver.data.CronPattern
 import com.lightningkite.lightningserver.data.Schedule
 import com.lightningkite.lightningserver.runtime.ServerRuntime
@@ -36,6 +37,7 @@ public interface ScheduledTask {
     public val schedule: Schedule
     public val timeout: Duration get() = 5.minutes
 
+    @OverrideOnly
     context(server: ServerRuntime)
     public suspend fun execute()
 }
@@ -59,6 +61,7 @@ public fun ScheduledTask(
         override val schedule: Schedule = schedule
         override val timeout: Duration = timeout
 
+        @OverrideOnly
         context(server: ServerRuntime)
         override suspend fun execute() {
             handler()
@@ -84,6 +87,7 @@ public fun ScheduledTask(
         override val schedule: Schedule = Schedule.Frequency(frequency)
         override val timeout: Duration = timeout
 
+        @OverrideOnly
         context(server: ServerRuntime)
         override suspend fun execute() {
             handler()
@@ -111,6 +115,7 @@ public fun ScheduledTask(
         override val schedule: Schedule = Schedule.Daily(timeOfDay, timeZone)
         override val timeout: Duration = timeout
 
+        @OverrideOnly
         context(server: ServerRuntime)
         override suspend fun execute() {
             handler()
@@ -139,6 +144,7 @@ public fun ScheduledTask(
         override val schedule: Schedule = Schedule.Cron(cron, timeZone)
         override val timeout: Duration = timeout
 
+        @OverrideOnly
         context(server: ServerRuntime)
         override suspend fun execute() {
             handler()

@@ -16,10 +16,9 @@ import kotlin.uuid.Uuid
  * - References to other models (author)
  * - File uploads (cover image)
  * - Timestamps and enums
- * - Type-safe query DSL with GenerateDataClassPaths
+ * - Type-safe query DSL with Queryable
  */
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 @AdminTableColumns(["title", "author", "status", "createdAt"])
 @Description("A blog post with title, content, author, and publishing status.")
 data class BlogPost(

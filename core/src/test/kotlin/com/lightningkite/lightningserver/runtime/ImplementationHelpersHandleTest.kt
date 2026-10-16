@@ -1,3 +1,5 @@
+@file:OptIn(com.lightningkite.lightningserver.EngineApi::class)
+
 package com.lightningkite.lightningserver.runtime
 
 import com.lightningkite.lightningserver.HttpMethod
@@ -132,16 +134,16 @@ class ImplementationHelpersHandleTest {
             }
         ) {
             runBlocking {
-                val resp = serverRuntime.handle(
-                    HttpRequest<PathSpec>(
+                val resp = engine.handleRoot(
+                    HttpRequest(
                         path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
                         headers = HttpHeaders.EMPTY,
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
-                        requestId = generateRequestId(),
-                    )
+                    ),
+                    Execution.ID.generate(),
                 )
                 assertEquals(HttpStatus.OK, resp.status)
                 assertNotNull(resp.body)
@@ -155,16 +157,16 @@ class ImplementationHelpersHandleTest {
     @Test
     fun test_blocking_runs_suspend_body_without_run_blocking() {
         TestServer.testBlocking(settings = {}) {
-            val resp = serverRuntime.handle(
-                HttpRequest<PathSpec>(
+            val resp = engine.handleRoot(
+                HttpRequest(
                     path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
                     queryParameters = QueryParameters.EMPTY,
                     headers = HttpHeaders.EMPTY,
                     domain = "example.com",
                     protocol = "https",
                     sourceIp = "local",
-                    requestId = generateRequestId(),
-                )
+                ),
+                Execution.ID.generate(),
             )
             assertEquals(HttpStatus.OK, resp.status)
             assertEquals("pong", resp.body!!.text())
@@ -187,7 +189,7 @@ class ImplementationHelpersHandleTest {
             }
         ) {
             runBlocking {
-                val resp = serverRuntime.handle(
+                val resp = engine.handleRoot(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.HEAD),
                         queryParameters = QueryParameters.EMPTY,
@@ -195,8 +197,8 @@ class ImplementationHelpersHandleTest {
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
-                        requestId = generateRequestId(),
-                    )
+                    ),
+                    Execution.ID.generate(),
                 )
                 // On success, translation should set NoContent and remove body
                 assertEquals(HttpStatus.NoContent, resp.status)
@@ -221,7 +223,7 @@ class ImplementationHelpersHandleTest {
             }
         ) {
             runBlocking {
-                val resp = serverRuntime.handle(
+                val resp = engine.handleRoot(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.OPTIONS),
                         queryParameters = QueryParameters.EMPTY,
@@ -231,8 +233,8 @@ class ImplementationHelpersHandleTest {
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
-                        requestId = generateRequestId(),
-                    )
+                    ),
+                    Execution.ID.generate(),
                 )
                 // Should be NoContent with Access-Control-Allow-Methods including GET, POST, HEAD
                 assertEquals(HttpStatus.NoContent, resp.status)
@@ -261,7 +263,7 @@ class ImplementationHelpersHandleTest {
             }
         ) {
             runBlocking {
-                val resp = serverRuntime.handle(
+                val resp = engine.handleRoot(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/slash", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
@@ -269,8 +271,8 @@ class ImplementationHelpersHandleTest {
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
-                        requestId = generateRequestId(),
-                    )
+                    ),
+                    Execution.ID.generate(),
                 )
                 // Expect a redirect with Location header pointing to alternate form
                 assertEquals(HttpStatus.TemporaryRedirect, resp.status)
@@ -298,7 +300,7 @@ class ImplementationHelpersHandleTest {
             }
         ) {
             runBlocking {
-                val resp = serverRuntime.handle(
+                val resp = engine.handleRoot(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/slash/", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
@@ -306,8 +308,8 @@ class ImplementationHelpersHandleTest {
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
-                        requestId = generateRequestId(),
-                    )
+                    ),
+                    Execution.ID.generate(),
                 )
                 // Should succeed directly, NOT redirect (which would cause infinite loop)
                 assertEquals(HttpStatus.OK, resp.status, "Request to /slash/ should succeed directly")
@@ -332,7 +334,7 @@ class ImplementationHelpersHandleTest {
             }
         ) {
             runBlocking {
-                val resp = serverRuntime.handle(
+                val resp = engine.handleRoot(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
@@ -340,8 +342,8 @@ class ImplementationHelpersHandleTest {
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
-                        requestId = generateRequestId(),
-                    )
+                    ),
+                    Execution.ID.generate(),
                 )
                 // Expect a redirect with Location header pointing to alternate form
                 println(resp)
@@ -366,7 +368,7 @@ class ImplementationHelpersHandleTest {
             }
         ) {
             runBlocking {
-                val resp = serverRuntime.handle(
+                val resp = engine.handleRoot(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
@@ -374,8 +376,8 @@ class ImplementationHelpersHandleTest {
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
-                        requestId = generateRequestId(),
-                    )
+                    ),
+                    Execution.ID.generate(),
                 )
                 // Expect a redirect with Location header pointing to alternate form
                 println(resp)
@@ -407,16 +409,16 @@ class ImplementationHelpersHandleTest {
         // regardless of which engine runs it.
         TestServer.test(settings = {}) {
             runBlocking {
-                val resp = serverRuntime.handle(
-                    HttpRequest<PathSpec>(
+                val resp = engine.handleRoot(
+                    HttpRequest(
                         path = RawHttpEndpoint(asString = "/slow", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
                         headers = HttpHeaders.EMPTY,
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
-                        requestId = generateRequestId(),
-                    )
+                    ),
+                    Execution.ID.generate(),
                 )
                 assertEquals(HttpStatus.ServiceUnavailable, resp.status)
             }
@@ -431,16 +433,16 @@ class ImplementationHelpersHandleTest {
         // 404) is invisible to client JS.
         TestServer.test(settings = {}) {
             runBlocking {
-                val resp = serverRuntime.handle(
-                    HttpRequest<PathSpec>(
+                val resp = engine.handleRoot(
+                    HttpRequest(
                         path = RawHttpEndpoint(asString = "/boom", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
                         headers = HttpHeaders { add(HttpHeader.Origin, "https://example.com") },
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
-                        requestId = generateRequestId(),
-                    )
+                    ),
+                    Execution.ID.generate(),
                 )
                 assertEquals(HttpStatus.NotFound, resp.status)
                 assertEquals(
@@ -464,8 +466,12 @@ class ImplementationHelpersHandleTest {
 
         init {
             install(com.lightningkite.lightningserver.cors.CorsInterceptor(setting("cors", cors)))
-            install(HttpConnectionInterceptor { _, _ ->
-                throw HttpStatusException(
+            install(object : HttpInterceptor {
+                context(runtime: ServerRuntime)
+                override suspend fun <PATH : PathSpec> intercept(
+                    request: HttpRequest<PATH>,
+                    cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
+                ): HttpResponse = throw HttpStatusException(
                     status = HttpStatus.TooManyRequests,
                     detail = "boom-interceptor",
                     message = "Simulated interceptor failure.",
@@ -482,16 +488,16 @@ class ImplementationHelpersHandleTest {
         // see a normal response back from their continuation and still post-process it.
         InterceptorFailureTestServer.test(settings = {}) {
             runBlocking {
-                val resp = serverRuntime.handle(
-                    HttpRequest<PathSpec>(
+                val resp = engine.handleRoot(
+                    HttpRequest(
                         path = RawHttpEndpoint(asString = "/anything", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
                         headers = HttpHeaders { add(HttpHeader.Origin, "https://example.com") },
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
-                        requestId = generateRequestId(),
-                    )
+                    ),
+                    Execution.ID.generate(),
                 )
                 assertEquals(HttpStatus.TooManyRequests, resp.status)
                 assertEquals(
@@ -508,16 +514,16 @@ class ImplementationHelpersHandleTest {
         // This test server installs SecurityHeadersInterceptor: an https response must carry nosniff and HSTS.
         TestServer.test(settings = {}) {
             runBlocking {
-                val resp = serverRuntime.handle(
-                    HttpRequest<PathSpec>(
+                val resp = engine.handleRoot(
+                    HttpRequest(
                         path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
                         headers = HttpHeaders.EMPTY,
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
-                        requestId = generateRequestId(),
-                    )
+                    ),
+                    Execution.ID.generate(),
                 )
                 assertEquals("nosniff", resp.headers[HttpHeader.XContentTypeOptions]?.root)
                 assertEquals(
@@ -534,16 +540,16 @@ class ImplementationHelpersHandleTest {
         // HSTS must never be sent over plain http (per the HSTS spec), but nosniff still applies.
         TestServer.test(settings = {}) {
             runBlocking {
-                val resp = serverRuntime.handle(
-                    HttpRequest<PathSpec>(
+                val resp = engine.handleRoot(
+                    HttpRequest(
                         path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
                         headers = HttpHeaders.EMPTY,
                         domain = "example.com",
                         protocol = "http",
                         sourceIp = "local",
-                        requestId = generateRequestId(),
-                    )
+                    ),
+                    Execution.ID.generate(),
                 )
                 assertEquals("nosniff", resp.headers[HttpHeader.XContentTypeOptions]?.root)
                 assertNull(
@@ -560,16 +566,16 @@ class ImplementationHelpersHandleTest {
         // them too.
         TestServer.test(settings = {}) {
             runBlocking {
-                val resp = serverRuntime.handle(
-                    HttpRequest<PathSpec>(
+                val resp = engine.handleRoot(
+                    HttpRequest(
                         path = RawHttpEndpoint(asString = "/boom", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
                         headers = HttpHeaders.EMPTY,
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
-                        requestId = generateRequestId(),
-                    )
+                    ),
+                    Execution.ID.generate(),
                 )
                 assertEquals(HttpStatus.NotFound, resp.status)
                 assertEquals("nosniff", resp.headers[HttpHeader.XContentTypeOptions]?.root)
@@ -586,16 +592,16 @@ class ImplementationHelpersHandleTest {
     fun fast_handler_completes_within_its_timeout() {
         TestServer.test(settings = {}) {
             runBlocking {
-                val resp = serverRuntime.handle(
-                    HttpRequest<PathSpec>(
+                val resp = engine.handleRoot(
+                    HttpRequest(
                         path = RawHttpEndpoint(asString = "/fast", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
                         headers = HttpHeaders.EMPTY,
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
-                        requestId = generateRequestId(),
-                    )
+                    ),
+                    Execution.ID.generate(),
                 )
                 assertEquals(HttpStatus.OK, resp.status)
                 assertEquals("quick", resp.body?.text())
@@ -619,7 +625,7 @@ class ImplementationHelpersHandleTest {
             }
         ) {
             runBlocking {
-                val resp = serverRuntime.handle(
+                val resp = engine.handleRoot(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
@@ -629,8 +635,8 @@ class ImplementationHelpersHandleTest {
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
-                        requestId = generateRequestId(),
-                    )
+                    ),
+                    Execution.ID.generate(),
                 )
                 // Small payload should not be compressed even if gzip is accepted
                 assertNull(resp.headers[HttpHeader.ContentEncoding])
@@ -655,7 +661,7 @@ class ImplementationHelpersHandleTest {
             }
         ) {
             runBlocking {
-                val resp = serverRuntime.handle(
+                val resp = engine.handleRoot(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/bigstream", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
@@ -665,8 +671,8 @@ class ImplementationHelpersHandleTest {
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
-                        requestId = generateRequestId(),
-                    )
+                    ),
+                    Execution.ID.generate(),
                 )
                 assertEquals(HttpStatus.OK, resp.status)
                 // Should have content-encoding: gzip and body compressed
@@ -684,7 +690,7 @@ class ImplementationHelpersHandleTest {
         // The blocking Data.Source path must stream-compress (no full-body buffering) and still produce valid gzip.
         TestServer.test(settings = {}) {
             runBlocking {
-                val resp = serverRuntime.handle(
+                val resp = engine.handleRoot(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/bigsource", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
@@ -692,8 +698,8 @@ class ImplementationHelpersHandleTest {
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
-                        requestId = generateRequestId(),
-                    )
+                    ),
+                    Execution.ID.generate(),
                 )
                 assertEquals(HttpStatus.OK, resp.status)
                 assertEquals("gzip", resp.headers[HttpHeader.ContentEncoding]?.root)

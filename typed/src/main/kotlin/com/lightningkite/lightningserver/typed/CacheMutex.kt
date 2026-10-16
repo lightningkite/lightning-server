@@ -9,16 +9,16 @@ import kotlinx.serialization.builtins.serializer
 
 private class CacheMutex(
     val key: String,
-    val server: ServerRuntime,
     val pubSub: PubSub,
     val cache: Cache,
 ) {
-    constructor(
-        key: String,
-        server: ServerRuntime,
-        pubSub: Runtime<PubSub>,
-        cache: Runtime<Cache>,
-    ) : this(key, server, context(server) { pubSub() }, context(server) { cache() })
+    companion object {
+        // Constructors can't take context parameters, so this factory takes the ServerRuntime's
+        // place: everywhere else a ServerRuntime is context, never a stored or passed parameter.
+        context(server: ServerRuntime)
+        operator fun invoke(key: String, pubSub: Runtime<PubSub>, cache: Runtime<Cache>): CacheMutex =
+            CacheMutex(key, context(server) { pubSub() }, context(server) { cache() })
+    }
 
     private fun channel() = pubSub.get(key, Unit.serializer())
 

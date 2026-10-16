@@ -4,6 +4,8 @@ import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.runtime.ExecutionInterceptor
+import com.lightningkite.lightningserver.runtime.compileAndInstrument
 import com.lightningkite.lightningserver.serialization.*
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.data.*
@@ -36,11 +38,11 @@ public data class ServerDefinition(
         public val annotationValidators: Runtime<AnnotationValidators>,
 
         public val endpoints: PathSpecMap<ServerPathEndpoints>,
-        public val httpConnectionInterceptors: List<HttpConnectionInterceptor>,
-        public val httpLogicalInterceptors: List<HttpLogicalInterceptor>,
-        public val webSocketConnectionInterceptors: List<WebSocketConnectionInterceptor>,
-        public val webSocketLogicalInterceptors: List<WebSocketLogicalInterceptor>,
-        public val exceptionHandler: ExceptionHttpHandler = DefaultExceptionHttpHandler,
+        public val executionInterceptors: List<ExecutionInterceptor>,
+        public val httpInterceptors: List<HttpInterceptor>,
+        public val webSocketInterceptors: List<WebSocketInterceptor>,
+        public val encodingInterceptors: List<EncodingInterceptor>,
+        public val exceptionHandler: HttpExceptionHandler = HttpExceptionHandler.Default,
 
         public val startupTasks: Map<PathSpec0, StartupTask>,
         public val preDeployTasks: Map<PathSpec0, PreDeployTask>,
@@ -65,34 +67,33 @@ public data class ServerDefinition(
     public val annotationValidators: Runtime<AnnotationValidators> get() = flattened.annotationValidators
 
     public val endpoints: PathSpecMap<ServerPathEndpoints> get() = flattened.endpoints
-    /** Interceptors wrapping the whole physical request. See [HttpConnectionInterceptor]. */
-    public val httpConnectionInterceptors: List<HttpConnectionInterceptor> get() = flattened.httpConnectionInterceptors
-    public val compiledHttpConnectionInterceptors: HttpInterceptor by lazy { httpConnectionInterceptors.compileAndInstrument() }
 
-    /** Interceptors wrapping each logical request, sub-requests included. See [HttpLogicalInterceptor]. */
-    public val httpLogicalInterceptors: List<HttpLogicalInterceptor> get() = flattened.httpLogicalInterceptors
-    public val compiledHttpLogicalInterceptors: HttpInterceptor by lazy { httpLogicalInterceptors.compileAndInstrument() }
-    /** Interceptors wrapping the physical socket. See [WebSocketConnectionInterceptor]. */
-    public val webSocketConnectionInterceptors: List<WebSocketConnectionInterceptor> get() = flattened.webSocketConnectionInterceptors
-    public val compiledWebSocketConnectionInterceptors: WebSocketInterceptor by lazy { webSocketConnectionInterceptors.compileAndInstrument() }
+    /** Interceptors wrapping every execution the server runs, of every kind. See [ExecutionInterceptor]. */
+    public val executionInterceptors: List<ExecutionInterceptor> get() = flattened.executionInterceptors
 
-    /** Interceptors wrapping every logical socket, virtual ones included. See [WebSocketLogicalInterceptor]. */
-    public val webSocketLogicalInterceptors: List<WebSocketLogicalInterceptor> get() = flattened.webSocketLogicalInterceptors
-    public val compiledWebSocketLogicalInterceptors: WebSocketInterceptor by lazy { webSocketLogicalInterceptors.compileAndInstrument() }
+    /** Everything that wants to hear about authentication events. Empty unless a module installs one. */
+    public val compiledExecutionInterceptors: ExecutionInterceptor by lazy { executionInterceptors.compileAndInstrument() }
+
+    /** Interceptors wrapping every logical request, sub-requests included. See [HttpInterceptor]. */
+    public val httpInterceptors: List<HttpInterceptor> get() = flattened.httpInterceptors
+    public val compiledHttpInterceptors: HttpInterceptor by lazy { httpInterceptors.compileAndInstrument() }
+
+    /** Interceptors wrapping every logical socket, virtual ones included. See [WebSocketInterceptor]. */
+    public val webSocketInterceptors: List<WebSocketInterceptor> get() = flattened.webSocketInterceptors
+    public val compiledWebSocketInterceptors: WebSocketInterceptor by lazy { webSocketInterceptors.compileAndInstrument() }
 
     /**
-     * Wraps a handler for a socket a client just opened, applying both chains in the right order:
-     * connection-scoped outside, logical-scoped inside.
-     *
-     * The physical socket is itself a logical socket, so it gets both. A virtual socket multiplexed
-     * inside it gets only [compiledWebSocketLogicalInterceptors] — the connection-scoped decisions were
-     * already made about the one real socket carrying it.
+     * Wraps a handler for a socket a client just opened. The same chain wraps a virtual socket
+     * multiplexed inside it; see [WebSocketInterceptor] for how an interceptor narrows itself to the
+     * physical connection.
      */
     public fun <PATH : PathSpec, T> interceptIncomingSocket(
         handler: WebSocketHandler<PATH, T>,
-    ): WebSocketHandler<PATH, T> = compiledWebSocketConnectionInterceptors
-        .intercept(compiledWebSocketLogicalInterceptors.intercept(handler))
-    public val exceptionHandler: ExceptionHttpHandler get() = flattened.exceptionHandler
+    ): WebSocketHandler<PATH, T> = compiledWebSocketInterceptors.intercept(handler)
+    /** Everything called before [mediaTypeEncoders] encode a value. See [EncodingInterceptor]. */
+    public val encodingInterceptors: List<EncodingInterceptor> get() = flattened.encodingInterceptors
+
+    public val exceptionHandler: HttpExceptionHandler get() = flattened.exceptionHandler
 
     public val startupTasks: Map<PathSpec0, StartupTask> get() = flattened.startupTasks
     public val preDeployTasks: Map<PathSpec0, PreDeployTask> get() = flattened.preDeployTasks
@@ -117,10 +118,10 @@ public data class ServerDefinition(
         internalSerializersModule = Runtime.Cached(internalSerializersModule),
         externalSerializersModule = Runtime.Cached(externalSerializersModule),
         annotationValidators = Runtime.Cached(annotationValidators),
-        httpConnectionInterceptors = httpConnectionInterceptors.toSealedList(),
-        httpLogicalInterceptors = httpLogicalInterceptors.toSealedList(),
-        webSocketConnectionInterceptors = webSocketConnectionInterceptors.toSealedList(),
-        webSocketLogicalInterceptors = webSocketLogicalInterceptors.toSealedList(),
+        executionInterceptors = executionInterceptors.toSealedList(),
+        httpInterceptors = httpInterceptors.toSealedList(),
+        webSocketInterceptors = webSocketInterceptors.toSealedList(),
+        encodingInterceptors = encodingInterceptors.toSealedList(),
         endpoints = endpoints.toSealedPathSpecMap(),
         schedules = schedules.toSealedMap(),
         tasks = tasks.toSealedMap(),
@@ -129,7 +130,11 @@ public data class ServerDefinition(
         settingOverrides = settingOverrides.toSealedMap(),
         extensions = extensions.sealed(),
         mediaTypeDecoders = mediaTypeDecoders.toSealedMap(),
-        mediaTypeEncoders = mediaTypeEncoders.toSealedMap(),
+        // Claude: wrapped here, once, so no encoder found through the server skips the observers.
+        mediaTypeEncoders = (
+            if (encodingInterceptors.isEmpty()) mediaTypeEncoders
+            else mediaTypeEncoders.mapValues { (_, encoders) -> encoders.map(::ObservedEncoder) }
+        ).toSealedMap(),
         exceptionHandler = exceptionHandler,
         startupTasks = startupTasks.toSealedMap().also {
             // Validate startup task dependencies for circular references
@@ -180,10 +185,10 @@ public data class ServerDefinition(
             internalSerializersModule = { flattenedModuleItems.fold(thisLayer.internalSerializersModule()) { acc, module -> acc + module.internalSerializersModule() } },
             externalSerializersModule = { flattenedModuleItems.fold(thisLayer.externalSerializersModule()) { acc, module -> acc + module.externalSerializersModule() } },
             annotationValidators = { flattenedModuleItems.fold(thisLayer.annotationValidators()) { acc, module -> acc + module.annotationValidators() } },
-            httpConnectionInterceptors = flattenList { it.httpConnectionInterceptors },
-            httpLogicalInterceptors = flattenList { it.httpLogicalInterceptors },
-            webSocketConnectionInterceptors = flattenList { it.webSocketConnectionInterceptors },
-            webSocketLogicalInterceptors = flattenList { it.webSocketLogicalInterceptors },
+            executionInterceptors = flattenList { it.executionInterceptors },
+            httpInterceptors = flattenList { it.httpInterceptors },
+            webSocketInterceptors = flattenList { it.webSocketInterceptors },
+            encodingInterceptors = flattenList { it.encodingInterceptors },
             endpoints = buildPathSpecMap { // We want to be able to override existing entries here, but we'll have to check for duplicate registration manually.
                 putAll(thisLayer.endpoints)
                 for ((modPath, map) in flattenedModules.mapItems { it.endpoints })

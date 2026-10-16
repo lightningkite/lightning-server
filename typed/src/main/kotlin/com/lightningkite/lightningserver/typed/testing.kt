@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.auth.Authentication
+import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
@@ -98,29 +99,41 @@ import com.lightningkite.services.database.HasId
 //        with(it.server) { didConnect() }
 //    }
 //}
+// Runs the endpoint as a direct call from the test, through validation, its own auth requirement, the
+// HTTP interceptors and encoding interceptors. [presented] stands in for whatever the request's
+// credentials would have resolved to, so the requirement is checked against it as it would be for a
+// real request.
+context(test: TestRunner<*>)
+private suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PATH, USER, INPUT, OUTPUT>.testWith(
+    path: RawHttpEndpoint<PATH>,
+    presented: Authentication<*>?,
+    input: INPUT,
+): OUTPUT {
+    val request = HttpRequest(
+        path,
+        queryParameters = QueryParameters.EMPTY,
+        headers = HttpHeaders(),
+        domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
+        protocol = generalSettings().publicUrl.substringBefore("://"),
+        sourceIp = "localhost",
+        cache = SerializableCache<HttpRequest<*>>().apply { set(Authentication.CacheKey, presented) },
+        body = TypedData.text(
+            test.externalSerialization.json.encodeToString(inputType, input),
+            MediaType.Application.Json
+        ),
+    )
+    return test.execute { handleWithMetrics(request, input) }
+}
+
 context(test: TestRunner<*>)
 public suspend fun <USER : HasId<*>, INPUT, OUTPUT> ApiHttpHandler<PathSpec0, USER, INPUT, OUTPUT>.test(
     auth: Authentication<USER>,
     input: INPUT,
 ): OUTPUT {
-    return handle(
-        access = HttpAccess(
-            HttpRequest(
-                RawHttpEndpoint(location.path, method = location.method),
-                queryParameters = QueryParameters.EMPTY,
-                headers = HttpHeaders(),
-                domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
-                protocol = generalSettings().publicUrl.substringBefore("://"),
-                sourceIp = "localhost",
-                requestId = generateRequestId(),
-                body = TypedData.text(
-                    test.externalSerialization.json.encodeToString(inputType, input),
-                    MediaType.Application.Json
-                ),
-            ),
-            auth,
-        ),
-        input
+    return testWith(
+        RawHttpEndpoint(location.path, method = location.method),
+        auth,
+        input,
     )
 }
 
@@ -130,24 +143,10 @@ public suspend fun <USER : HasId<*>, INPUT, OUTPUT, A> ApiHttpHandler<PathSpec1<
     auth: Authentication<USER>,
     input: INPUT,
 ): OUTPUT {
-    return handle(
-        access = HttpAccess(
-            HttpRequest(
-                RawHttpEndpoint(location.path, path1, method = location.method),
-                queryParameters = QueryParameters.EMPTY,
-                headers = HttpHeaders(),
-                domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
-                protocol = generalSettings().publicUrl.substringBefore("://"),
-                sourceIp = "localhost",
-                requestId = generateRequestId(),
-                body = TypedData.text(
-                    test.externalSerialization.json.encodeToString(inputType, input),
-                    MediaType.Application.Json
-                ),
-            ),
-            auth,
-        ),
-        input
+    return testWith(
+        RawHttpEndpoint(location.path, path1, method = location.method),
+        auth,
+        input,
     )
 }
 
@@ -158,24 +157,10 @@ public suspend fun <USER : HasId<*>, INPUT, OUTPUT, A, B> ApiHttpHandler<PathSpe
     auth: Authentication<USER>,
     input: INPUT,
 ): OUTPUT {
-    return handle(
-        access = HttpAccess(
-            HttpRequest(
-                RawHttpEndpoint(location.path, path1, path2, method = location.method),
-                queryParameters = QueryParameters.EMPTY,
-                headers = HttpHeaders(),
-                domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
-                protocol = generalSettings().publicUrl.substringBefore("://"),
-                sourceIp = "localhost",
-                requestId = generateRequestId(),
-                body = TypedData.text(
-                    test.externalSerialization.json.encodeToString(inputType, input),
-                    MediaType.Application.Json
-                ),
-            ),
-            auth,
-        ),
-        input
+    return testWith(
+        RawHttpEndpoint(location.path, path1, path2, method = location.method),
+        auth,
+        input,
     )
 }
 
@@ -187,24 +172,10 @@ public suspend fun <USER : HasId<*>, INPUT, OUTPUT, A, B, C> ApiHttpHandler<Path
     auth: Authentication<USER>,
     input: INPUT,
 ): OUTPUT {
-    return handle(
-        access = HttpAccess(
-            HttpRequest(
-                RawHttpEndpoint(location.path, path1, path2, path3, method = location.method),
-                queryParameters = QueryParameters.EMPTY,
-                headers = HttpHeaders(),
-                domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
-                protocol = generalSettings().publicUrl.substringBefore("://"),
-                sourceIp = "localhost",
-                requestId = generateRequestId(),
-                body = TypedData.text(
-                    test.externalSerialization.json.encodeToString(inputType, input),
-                    MediaType.Application.Json
-                ),
-            ),
-            auth,
-        ),
-        input
+    return testWith(
+        RawHttpEndpoint(location.path, path1, path2, path3, method = location.method),
+        auth,
+        input,
     )
 }
 
@@ -213,24 +184,10 @@ context(test: TestRunner<*>) public suspend fun <USER : HasId<*>, INPUT, OUTPUT>
     auth: Authentication<USER>?,
     input: INPUT,
 ): OUTPUT {
-    return handle(
-        access = HttpAccess(
-            HttpRequest(
-                RawHttpEndpoint(location.path, method = location.method),
-                queryParameters = QueryParameters.EMPTY,
-                headers = HttpHeaders(),
-                domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
-                protocol = generalSettings().publicUrl.substringBefore("://"),
-                sourceIp = "localhost",
-                requestId = generateRequestId(),
-                body = TypedData.text(
-                    test.externalSerialization.json.encodeToString(inputType, input),
-                    MediaType.Application.Json
-                ),
-            ),
-            auth,
-        ),
-        input
+    return testWith(
+        RawHttpEndpoint(location.path, method = location.method),
+        auth,
+        input,
     )
 }
 
@@ -240,24 +197,10 @@ context(test: TestRunner<*>) public suspend fun <USER : HasId<*>, INPUT, OUTPUT,
     auth: Authentication<USER>?,
     input: INPUT,
 ): OUTPUT {
-    return handle(
-        access = HttpAccess(
-            HttpRequest(
-                RawHttpEndpoint(location.path, path1, method = location.method),
-                queryParameters = QueryParameters.EMPTY,
-                headers = HttpHeaders(),
-                domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
-                protocol = generalSettings().publicUrl.substringBefore("://"),
-                sourceIp = "localhost",
-                requestId = generateRequestId(),
-                body = TypedData.text(
-                    test.externalSerialization.json.encodeToString(inputType, input),
-                    MediaType.Application.Json
-                ),
-            ),
-            auth,
-        ),
-        input
+    return testWith(
+        RawHttpEndpoint(location.path, path1, method = location.method),
+        auth,
+        input,
     )
 }
 
@@ -268,24 +211,10 @@ context(test: TestRunner<*>) public suspend fun <USER : HasId<*>, INPUT, OUTPUT,
     auth: Authentication<USER>?,
     input: INPUT,
 ): OUTPUT {
-    return handle(
-        access = HttpAccess(
-            HttpRequest(
-                RawHttpEndpoint(location.path, path1, path2, method = location.method),
-                queryParameters = QueryParameters.EMPTY,
-                headers = HttpHeaders(),
-                domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
-                protocol = generalSettings().publicUrl.substringBefore("://"),
-                sourceIp = "localhost",
-                requestId = generateRequestId(),
-                body = TypedData.text(
-                    test.externalSerialization.json.encodeToString(inputType, input),
-                    MediaType.Application.Json
-                ),
-            ),
-            auth,
-        ),
-        input
+    return testWith(
+        RawHttpEndpoint(location.path, path1, path2, method = location.method),
+        auth,
+        input,
     )
 }
 
@@ -297,23 +226,9 @@ context(test: TestRunner<*>) public suspend fun <USER : HasId<*>, INPUT, OUTPUT,
     auth: Authentication<USER>?,
     input: INPUT,
 ): OUTPUT {
-    return handle(
-        access = HttpAccess(
-            HttpRequest(
-                RawHttpEndpoint(location.path, path1, path2, path3, method = location.method),
-                queryParameters = QueryParameters.EMPTY,
-                headers = HttpHeaders(),
-                domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
-                protocol = generalSettings().publicUrl.substringBefore("://"),
-                sourceIp = "localhost",
-                requestId = generateRequestId(),
-                body = TypedData.text(
-                    test.externalSerialization.json.encodeToString(inputType, input),
-                    MediaType.Application.Json
-                ),
-            ),
-            auth,
-        ),
-        input
+    return testWith(
+        RawHttpEndpoint(location.path, path1, path2, path3, method = location.method),
+        auth,
+        input,
     )
 }

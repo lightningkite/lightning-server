@@ -28,7 +28,7 @@ on that intersection.
 | **Endpoint style** | `@RestController` + `@GetMapping` / `@PostMapping` | `ServerBuilder` object with `path.method bind ApiHttpHandler(...)` | LS endpoints are stored as values — directly testable |
 | **Dependency injection** | `@Autowired` / constructor injection via IoC container | Direct Kotlin object access; services injected via `context(server: ServerRuntime)` | LS has no DI container |
 | **Configuration** | `application.yml` / `@ConfigurationProperties` | `settings.json` auto-generated on first run; `setting("key", Default)` in code | LS defaults are Kotlin types, not YAML strings |
-| **Data models / ORM** | Spring Data JPA — `@Entity` + `JpaRepository<T, ID>` | `@Serializable data class T : HasId<ID>` + `@GenerateDataClassPaths`; query DSL via `condition {}` / `modification {}` | LS default backend is MongoDB; partial Postgres support exists |
+| **Data models / ORM** | Spring Data JPA — `@Entity` + `JpaRepository<T, ID>` | `@Queryable data class T : HasId<ID>`; query DSL via `condition {}` / `modification {}` | LS default backend is MongoDB; partial Postgres support exists |
 | **Migrations** | Flyway / Liquibase required for every schema change | Not required for MongoDB (schemaless) | Adding fields to a model is zero-effort in LS |
 | **Auto-CRUD** | Spring Data REST `@RepositoryRestResource` | `ModelRestEndpoints` (generates 8 endpoints: query, get, insert, update, delete, count, bulk upsert, bulk delete) | LS also generates typed client SDKs for the CRUD surface |
 | **Auto-admin panel** | None built-in (community projects exist) | Via `lightning-server-kiteui` companion package | Both auto-generate from model definitions |
@@ -108,7 +108,7 @@ directly in tests and internal server-to-server calls — no HTTP mock needed.
 ### Data Access
 
 Spring Data JPA requires interface declarations; the framework generates implementations at runtime via
-reflection.  Lightning Server uses a type-safe query DSL generated at compile time from `@GenerateDataClassPaths`.
+reflection.  Lightning Server uses a type-safe query DSL generated at compile time from `@Queryable`.
 
 ```java
 // Spring — illustrative
@@ -120,8 +120,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
 ```kotlin
 // Lightning Server — illustrative
-@Serializable
-@GenerateDataClassPaths   // generates compile-time query paths
+@Queryable   // generates compile-time query paths
 data class User(
     override val _id: Uuid = Uuid.random(),
     val email: String,
@@ -265,11 +264,11 @@ public void dailyReport() { ... }
 // Lightning Server — illustrative
 object Server : ServerBuilder() {
 
-    val cleanup = schedule("cleanup", Schedule.Frequency(15.minutes)) {
+    val cleanup = path.path("schedules").path("cleanup") bind ScheduledTask(schedule = Schedule.Frequency(15.minutes)) {
         // runs every 15 minutes; engine handles distributed locking
     }
 
-    val dailyReport = schedule("daily-report", Schedule.Daily(LocalTime(12, 0))) {
+    val dailyReport = path.path("schedules").path("daily-report") bind ScheduledTask(schedule = Schedule.Daily(LocalTime(12, 0))) {
         // runs once per day at noon
     }
 
@@ -297,7 +296,7 @@ public CompletableFuture<Void> sendWelcomeEmail(String userId) { ... }
 // Lightning Server — illustrative
 object Server : ServerBuilder() {
 
-    val sendWelcomeEmail = task("send-welcome-email") { userId: Uuid ->
+    val sendWelcomeEmail = path.path("tasks").path("send-welcome-email") bind Task { userId: Uuid ->
         val user = userTable().get(userId) ?: return@task
         email().send(welcomeEmail(user))
     }
@@ -397,7 +396,7 @@ If you're porting a Spring Boot service to Lightning Server, the largest concept
 | `@Autowired` injects the dependency | You call `database()` / `cache()` / `email()` directly |
 | `@Cacheable` / `@CacheEvict` annotates a method | You write `cache().get(key) ?: ...` / `cache().set(key, ...)` |
 | Method-name conventions generate JPA queries | You write `condition { it.field eq value }` |
-| `@Scheduled` annotates a component method | You declare `schedule("name", Schedule.Frequency(...)) { }` |
+| `@Scheduled` annotates a component method | You declare `path.path("schedules").path("name") bind ScheduledTask(schedule = Schedule.Frequency(...)) { }` |
 | Profiles (`dev`, `prod`) switch configurations | You deploy different `settings.json` files |
 
 There is no annotation processor discovering your classes; add an endpoint and it appears because you added it.

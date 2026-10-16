@@ -40,7 +40,7 @@ import kotlin.time.Duration.Companion.seconds
 class KtorReliabilityTest {
 
     object TestServer : ServerBuilder() {
-        // Required so the central 408 timeout error body can be serialized by DefaultExceptionHttpHandler.
+        // Required so the central 408 timeout error body can be serialized by ExceptionHttpHandler.Default.
         init { registerBasicMediaTypeCoders() }
 
         val slow = path.path("slow").get bind HttpHandler<PathSpec0>(timeout = 500.milliseconds) {

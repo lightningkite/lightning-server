@@ -12,38 +12,38 @@ built-in file functions.
 
 ## Declaring the need for a file system
 
-Add a setting whose value is a `PublicFileSystem`:
+Add a setting whose value is a `ExternalFileSystem`:
 
 ```kotlin
-import com.lightningkite.services.files.PublicFileSystem
+import com.lightningkite.services.files.ExternalFileSystem
 
 object Server : ServerBuilder() {
-    val files = setting("files", PublicFileSystem.Settings())
+    val files = setting("files", ExternalFileSystem.Settings())
 }
 ```
 
 To make additional backends available, reference them in an `init` block so their loaders register themselves:
 
 ```kotlin
-import com.lightningkite.services.files.s3.S3PublicFileSystem
+import com.lightningkite.services.files.s3.S3ExternalFileSystem
 
 object Server : ServerBuilder() {
-    init { S3PublicFileSystem }
-    val files = setting("files", PublicFileSystem.Settings())
+    init { S3ExternalFileSystem }
+    val files = setting("files", ExternalFileSystem.Settings())
 }
 ```
 
-Like every service, the setting resolves to a `Runtime<PublicFileSystem>`. You invoke it inside a
-`ServerRuntime` context (for example, within a handler) to get the live `PublicFileSystem`.
+Like every service, the setting resolves to a `Runtime<ExternalFileSystem>`. You invoke it inside a
+`ServerRuntime` context (for example, within a handler) to get the live `ExternalFileSystem`.
 
 ## Accessing files
 
-`FileObject` is the internal handle used to read and write files. Get one from the file system's `root` and
+`ExternalFile` is the internal handle used to read and write files. Get one from the file system's `root` and
 navigate with `then`:
 
 ```kotlin
 import com.lightningkite.services.data.TypedData
-import com.lightningkite.MediaType
+import com.lightningkite.services.data.MediaType
 
 val root = files().root
 
@@ -73,9 +73,9 @@ println(testFile.signedUrl)
 
 ### `FileSystemEndpoints`
 
-`FileSystemEndpoints` exposes HEAD/GET/PUT handlers for a `PublicFileSystem`, including HTTP Range support on GET
+`FileSystemEndpoints` exposes HEAD/GET/PUT handlers for a `ExternalFileSystem`, including HTTP Range support on GET
 for partial/resumable downloads. GET streams the bytes, HEAD returns metadata, and PUT accepts an upload to a
-signed upload URL (only the local `KotlinxIoPublicFileSystem` accepts server-generated uploads this way; S3/Azure
+signed upload URL (only the local `KotlinxIoExternalFileSystem` accepts server-generated uploads this way; S3/Azure
 sign their own upload URLs).
 
 ```kotlin
@@ -98,15 +98,14 @@ Performing an HTTP PUT of the file's contents to that URL writes the file. Uploa
 
 Two types work together:
 
-- `FileObject` is the internal read/write handle. It never leaves the server.
+- `ExternalFile` is the internal read/write handle. It never leaves the server.
 - `ServerFile` (`com.lightningkite.services.files.ServerFile`) is a serializable wrapper around a URL string.
   It is what you store in models and send over your API.
 
 ```kotlin
 import com.lightningkite.services.files.ServerFile
 
-@GenerateDataClassPaths
-@Serializable
+@Queryable
 data class Post(
     override val _id: Uuid = Uuid.random(),
     val title: String,
@@ -114,11 +113,11 @@ data class Post(
 ) : HasId<Uuid>
 ```
 
-You move between the two by resolving the `ServerFile`'s location against the file system:
+You move between the two with the conversion properties:
 
 ```kotlin
-val obj = files().root.then(post.coverImage!!.location) // ServerFile -> FileObject
-val ref = ServerFile(obj.url)                            // FileObject -> ServerFile
+val obj = post.coverImage!!.externalFile  // ServerFile -> ExternalFile (needs an Engine in context)
+val ref = obj.serverFile                  // ExternalFile -> ServerFile
 ```
 
 ### Security
@@ -141,7 +140,7 @@ import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
 import com.lightningkite.lightningserver.definition.Runtime
 
 object Server : ServerBuilder() {
-    val files = setting("files", PublicFileSystem.Settings())
+    val files = setting("files", ExternalFileSystem.Settings())
     val database = setting("database", Database.Settings())
 
     // Register ONCE. See the warning below.
@@ -207,7 +206,7 @@ Use a local filesystem folder:
 ```kotlin
 // Server.kt
 object Server : ServerBuilder() {
-    init { S3PublicFileSystem }
+    init { S3ExternalFileSystem }
 }
 ```
 

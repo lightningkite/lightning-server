@@ -9,7 +9,9 @@ import com.lightningkite.lightningserver.encryption.SecretBasis
 import com.lightningkite.lightningserver.encryption.signer
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.TestRunner
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.sessions.EstablishTotp
 import com.lightningkite.lightningserver.sessions.TotpSecret
 import com.lightningkite.lightningserver.sessions.proofs.extensions.code
@@ -95,6 +97,7 @@ class TimeBasedOTPProofEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -107,8 +110,6 @@ class TimeBasedOTPProofEndpointsTest {
             )
         }.let { server ->
             server.test({}) {
-                val table = server.totpEndpoints.modelInfo.table()
-
                 // Insert a TOTP secret with known values
                 val totpSecret = TotpSecret(
                     subjectId = TestUser.idString(userId),
@@ -122,7 +123,7 @@ class TimeBasedOTPProofEndpointsTest {
                     establishedAt = Clock.System.now(),
                     lastUsedAt = Clock.System.now() // Mark as established
                 )
-                table.insert(listOf(totpSecret))
+                execute { server.totpEndpoints.modelInfo.table().insert(listOf(totpSecret)) }
 
                 // Generate the current valid code
                 val currentCode = totpSecret.code
@@ -157,6 +158,7 @@ class TimeBasedOTPProofEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -169,8 +171,6 @@ class TimeBasedOTPProofEndpointsTest {
             )
         }.let { server ->
             server.test({}) {
-                val table = server.totpEndpoints.modelInfo.table()
-
                 // Insert a TOTP secret
                 val totpSecret = TotpSecret(
                     subjectId = TestUser.idString(userId),
@@ -184,7 +184,7 @@ class TimeBasedOTPProofEndpointsTest {
                     establishedAt = Clock.System.now(),
                     lastUsedAt = Clock.System.now()
                 )
-                table.insert(listOf(totpSecret))
+                execute { server.totpEndpoints.modelInfo.table().insert(listOf(totpSecret)) }
 
                 // Try with an invalid code
                 assertFailsWith<BadRequestException>("Invalid TOTP code should be rejected") {
@@ -213,6 +213,7 @@ class TimeBasedOTPProofEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -225,7 +226,6 @@ class TimeBasedOTPProofEndpointsTest {
             )
         }.let { server ->
             server.test({}) {
-                val table = server.totpEndpoints.modelInfo.table()
                 val totpSecret = TotpSecret(
                     subjectId = TestUser.idString(userId),
                     subjectType = TestUser.name,
@@ -238,7 +238,7 @@ class TimeBasedOTPProofEndpointsTest {
                     establishedAt = Clock.System.now(),
                     lastUsedAt = Clock.System.now()
                 )
-                table.insert(listOf(totpSecret))
+                execute { server.totpEndpoints.modelInfo.table().insert(listOf(totpSecret)) }
 
                 val input = IdentificationAndPassword(
                     type = "TestUser",
@@ -271,6 +271,7 @@ class TimeBasedOTPProofEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -283,10 +284,8 @@ class TimeBasedOTPProofEndpointsTest {
             )
         }.let { server ->
             server.test({}) {
-                val table = server.totpEndpoints.modelInfo.table()
-
                 // Before inserting, should return false
-                assertFalse(server.totpEndpoints.established(TestUser, user))
+                assertFalse(execute { server.totpEndpoints.established(TestUser, user) })
 
                 // Insert a TOTP secret WITHOUT lastUsedAt (not yet confirmed)
                 val totpSecret = TotpSecret(
@@ -301,10 +300,10 @@ class TimeBasedOTPProofEndpointsTest {
                     establishedAt = Clock.System.now(),
                     lastUsedAt = null // Not yet used/confirmed
                 )
-                table.insert(listOf(totpSecret))
+                execute { server.totpEndpoints.modelInfo.table().insert(listOf(totpSecret)) }
 
                 // Should still return false because lastUsedAt is null
-                assertFalse(server.totpEndpoints.established(TestUser, user))
+                assertFalse(execute { server.totpEndpoints.established(TestUser, user) })
 
                 // After confirming (which sets lastUsedAt), should return true
                 @Suppress("UNCHECKED_CAST")
@@ -312,7 +311,7 @@ class TimeBasedOTPProofEndpointsTest {
                 server.totpEndpoints.confirm.test(auth, totpSecret.code)
 
                 // Now should return true
-                assertTrue(server.totpEndpoints.established(TestUser, user))
+                assertTrue(execute { server.totpEndpoints.established(TestUser, user) })
             }
         }
     }
@@ -329,6 +328,7 @@ class TimeBasedOTPProofEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -341,8 +341,6 @@ class TimeBasedOTPProofEndpointsTest {
             )
         }.let { server ->
             server.test({}) {
-                val table = server.totpEndpoints.modelInfo.table()
-
                 // Insert a disabled TOTP secret
                 val totpSecret = TotpSecret(
                     subjectId = TestUser.idString(userId),
@@ -357,7 +355,7 @@ class TimeBasedOTPProofEndpointsTest {
                     lastUsedAt = Clock.System.now(),
                     disabledAt = Clock.System.now()  // Disabled
                 )
-                table.insert(listOf(totpSecret))
+                execute { server.totpEndpoints.modelInfo.table().insert(listOf(totpSecret)) }
 
                 // Try with a valid code for the disabled secret
                 val currentCode = totpSecret.code
@@ -446,6 +444,7 @@ class TimeBasedOTPProofEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -458,8 +457,6 @@ class TimeBasedOTPProofEndpointsTest {
             )
         }.let { server ->
             server.test({}) {
-                val table = server.totpEndpoints.modelInfo.table()
-
                 // Insert TOTP secrets for both users
                 val totpSecret1 = TotpSecret(
                     subjectId = TestUser.idString(userId1),
@@ -485,7 +482,7 @@ class TimeBasedOTPProofEndpointsTest {
                     establishedAt = Clock.System.now(),
                     lastUsedAt = Clock.System.now()
                 )
-                table.insert(listOf(totpSecret1, totpSecret2))
+                execute { server.totpEndpoints.modelInfo.table().insert(listOf(totpSecret1, totpSecret2)) }
 
                 // User1's code should work for user1
                 val code1 = totpSecret1.code
@@ -543,6 +540,7 @@ class TimeBasedOTPProofEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -555,22 +553,24 @@ class TimeBasedOTPProofEndpointsTest {
             )
         }.let { server ->
             server.test({}) {
-                server.totpEndpoints.modelInfo.table().insert(
-                    listOf(
-                        TotpSecret(
-                            subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name,
-                            secretBase32 = testSecretBase32,
-                            label = "test",
-                            issuer = "TestApp",
-                            period = 30.seconds,
-                            digits = 6,
-                            algorithm = TotpHashAlgorithm.SHA1,
-                            establishedAt = Clock.System.now(),
-                            lastUsedAt = Clock.System.now()
+                execute {
+                    server.totpEndpoints.modelInfo.table().insert(
+                        listOf(
+                            TotpSecret(
+                                subjectId = TestUser.idString(userId),
+                                subjectType = TestUser.name,
+                                secretBase32 = testSecretBase32,
+                                label = "test",
+                                issuer = "TestApp",
+                                period = 30.seconds,
+                                digits = 6,
+                                algorithm = TotpHashAlgorithm.SHA1,
+                                establishedAt = Clock.System.now(),
+                                lastUsedAt = Clock.System.now()
+                            )
                         )
                     )
-                )
+                }
 
                 // Five distinct case variants that all normalize to "test@example.com". The default limit
                 // is 5 attempts; five failing attempts across these variants must fill ONE shared bucket.
@@ -620,6 +620,7 @@ class TimeBasedOTPProofEndpointsTest {
 
             init {
                 register(TestUser)
+                registerBasicMediaTypeCoders()
             }
 
             val totpEndpoints = path.path("auth").path("totp") include TimeBasedOTPProofEndpoints(
@@ -641,7 +642,7 @@ class TimeBasedOTPProofEndpointsTest {
                 assertFalse("Work Phone" in label)
 
                 // The user's own name for the secret is still what gets stored
-                val stored = server.totpEndpoints.modelInfo.table().find(Condition.Always).toList().single()
+                val stored = execute { server.totpEndpoints.modelInfo.table().find(Condition.Always).toList() }.single()
                 assertEquals("Work Phone", stored.label)
             }
         }
@@ -660,6 +661,7 @@ class TimeBasedOTPProofEndpointsTest {
 
             init {
                 register(TestUser)
+                registerBasicMediaTypeCoders()
             }
 
             val totpEndpoints = path.path("auth").path("totp") include TimeBasedOTPProofEndpoints(
@@ -687,6 +689,7 @@ class TimeBasedOTPProofEndpointsTest {
 
         init {
             register(TestUser)
+            registerBasicMediaTypeCoders()
         }
 
         val totpEndpoints = path.path("auth").path("totp") include TimeBasedOTPProofEndpoints(
@@ -721,7 +724,7 @@ class TimeBasedOTPProofEndpointsTest {
                 establishedAt = Clock.System.now(),
                 lastUsedAt = Clock.System.now(),
             )
-            server.totpEndpoints.modelInfo.table().insert(listOf(existing))
+            execute { server.totpEndpoints.modelInfo.table().insert(listOf(existing)) }
 
             @Suppress("UNCHECKED_CAST")
             block(server, TestUser.testAuth(user) as Authentication<HasId<*>>, existing)
@@ -739,7 +742,7 @@ class TimeBasedOTPProofEndpointsTest {
     )
 
     context(_: TestRunner<*>)
-    private suspend fun ReplacementServer.secrets() = totpEndpoints.modelInfo.table().find(Condition.Always).toList()
+    private suspend fun ReplacementServer.secrets() = execute { totpEndpoints.modelInfo.table().find(Condition.Always).toList() }
 
     @Test
     fun `an abandoned replacement leaves the confirmed secret working`() = withConfirmedSecret { server, auth, existing ->

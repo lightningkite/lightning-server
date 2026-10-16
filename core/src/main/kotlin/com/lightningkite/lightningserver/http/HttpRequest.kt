@@ -43,10 +43,9 @@ public data class HttpRequest<PATH : PathSpec>(
     override val domain: String,
     override val protocol: String,
     override val sourceIp: String,
-    override val requestId: String,
-    override val parentRequestId: String? = null,
     override val upstreamRequestId: String? = null,
-    override val cache: SerializableCache = SerializableCache(),
+    override val engineRequestId: String? = null,
+    override val cache: SerializableCache<HttpRequest<*>> = SerializableCache(),
     @Transient public val body: TypedData? = null,
 ) : Request<PATH>() {
     /**
@@ -66,10 +65,9 @@ public data class HttpRequest<PATH : PathSpec>(
         domain: String = this.domain,
         protocol: String = this.protocol,
         sourceIp: String = this.sourceIp,
-        requestId: String = this.requestId,
-        parentRequestId: String? = this.parentRequestId,
         upstreamRequestId: String? = this.upstreamRequestId,
-        cache: SerializableCache = this.cache,
+        engineRequestId: String? = this.engineRequestId,
+        cache: SerializableCache<HttpRequest<*>> = this.cache,
         body: TypedData? = this.body,
     ): HttpRequest<PATH2> = HttpRequest(
         path = path,
@@ -78,9 +76,8 @@ public data class HttpRequest<PATH : PathSpec>(
         domain = domain,
         protocol = protocol,
         sourceIp = sourceIp,
-        requestId = requestId,
-        parentRequestId = parentRequestId,
         upstreamRequestId = upstreamRequestId,
+        engineRequestId = engineRequestId,
         cache = cache,
         body = body,
     )
@@ -88,20 +85,19 @@ public data class HttpRequest<PATH : PathSpec>(
     /**
      * Derives a sub-request of this one, as dispatched by a multiplexed request such as `/meta/bulk`.
      *
-     * The sub-request gets its own [requestId] with [parentRequestId] pointing back here, so each
-     * logical request is independently attributable while remaining joinable to the request that
-     * carried it.
+     * Named separately from [copyWithNewPathType] so that a caller has to say which of the two it
+     * means: the sub-request is a distinct logical request, and the execution will change along with it.
      */
     public fun <PATH2 : PathSpec> subRequest(
         path: RawHttpEndpoint<PATH2>,
         queryParameters: QueryParameters = this.queryParameters,
+        headers: HttpHeaders = this.headers,
         body: TypedData? = this.body,
     ): HttpRequest<PATH2> = copyWithNewPathType(
         path = path,
         queryParameters = queryParameters,
+        headers = headers,
         body = body,
-        requestId = generateRequestId(),
-        parentRequestId = this.requestId,
     )
 }
 

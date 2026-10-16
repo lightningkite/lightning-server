@@ -4,7 +4,9 @@ package com.lightningkite.lightningserver.sessions.proofs
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.services.cache.Cache
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
@@ -17,6 +19,8 @@ import kotlin.time.Duration.Companion.minutes
 class PinHandlerTest {
 
     object TestServer : ServerBuilder() {
+        init { registerBasicMediaTypeCoders() }
+
         val cache = setting("cache", Cache.Settings("ram"))
     }
 
@@ -84,13 +88,13 @@ class PinHandlerTest {
         TestServer.test({}) {
             val handler = createPinHandler()
 
-            val result = handler.establish("user@example.com")
+            val result = execute { handler.establish("user@example.com") }
             assertNotNull(result.pin)
             assertNotNull(result.key)
             assertEquals(6, result.pin.length)
 
             // Assert with correct PIN should return the identifier
-            val identifier = handler.assert(result.key, result.pin)
+            val identifier = execute { handler.assert(result.key, result.pin) }
             assertEquals("user@example.com", identifier)
         }
     }
@@ -100,13 +104,13 @@ class PinHandlerTest {
         TestServer.test({}) {
             val handler = createPinHandler()
 
-            val result = handler.establish("user@example.com")
+            val result = execute { handler.establish("user@example.com") }
 
             // Generate a different PIN
             val wrongPin = "WRONG1"
 
             assertFailsWith<BadRequestException>("Wrong PIN should throw BadRequestException") {
-                handler.assert(result.key, wrongPin)
+                execute { handler.assert(result.key, wrongPin) }
             }
         }
     }
@@ -118,7 +122,7 @@ class PinHandlerTest {
 
             // Use a non-existent key
             assertFailsWith<NotFoundException>("Expired/invalid key should throw NotFoundException") {
-                handler.assert("nonexistent-key", "ABCDEF")
+                execute { handler.assert("nonexistent-key", "ABCDEF") }
             }
         }
     }
@@ -128,13 +132,13 @@ class PinHandlerTest {
         TestServer.test({}) {
             val handler = createPinHandler(maxAttempts = 3)
 
-            val result = handler.establish("user@example.com")
+            val result = execute { handler.establish("user@example.com") }
             val wrongPin = "WRONG1"
 
             // Make 3 failed attempts (maxAttempts)
             repeat(2) {
                 try {
-                    handler.assert(result.key, wrongPin)
+                    execute { handler.assert(result.key, wrongPin) }
                 } catch (_: BadRequestException) {
                     // Expected
                 }
@@ -142,7 +146,7 @@ class PinHandlerTest {
 
             // The 3rd attempt should expire the PIN
             assertFailsWith<NotFoundException>("After max attempts, PIN should be expired") {
-                handler.assert(result.key, wrongPin)
+                execute { handler.assert(result.key, wrongPin) }
             }
         }
     }
@@ -153,10 +157,10 @@ class PinHandlerTest {
             // Default characters are uppercase only
             val handler = createPinHandler()
 
-            val result = handler.establish("user@example.com")
+            val result = execute { handler.establish("user@example.com") }
 
             // Should work with lowercase version of the PIN
-            val identifier = handler.assert(result.key, result.pin.lowercase())
+            val identifier = execute { handler.assert(result.key, result.pin.lowercase()) }
             assertEquals("user@example.com", identifier)
         }
     }
@@ -168,10 +172,10 @@ class PinHandlerTest {
             val mixedChars = ('A'..'Z').toList() + ('a'..'z').toList()
             val handler = createPinHandler(availableCharacters = mixedChars)
 
-            val result = handler.establish("user@example.com")
+            val result = execute { handler.establish("user@example.com") }
 
             // The exact PIN should work
-            val identifier = handler.assert(result.key, result.pin)
+            val identifier = execute { handler.assert(result.key, result.pin) }
             assertEquals("user@example.com", identifier)
         }
     }
@@ -181,15 +185,15 @@ class PinHandlerTest {
         TestServer.test({}) {
             val handler = createPinHandler()
 
-            val result = handler.establish("user@example.com")
+            val result = execute { handler.establish("user@example.com") }
 
             // First assertion should succeed
-            val identifier = handler.assert(result.key, result.pin)
+            val identifier = execute { handler.assert(result.key, result.pin) }
             assertEquals("user@example.com", identifier)
 
             // Second assertion should fail (PIN consumed)
             assertFailsWith<NotFoundException>("PIN should be consumed after use") {
-                handler.assert(result.key, result.pin)
+                execute { handler.assert(result.key, result.pin) }
             }
         }
     }
@@ -199,7 +203,7 @@ class PinHandlerTest {
         TestServer.test({}) {
             val handler = createPinHandler()
 
-            val results = (1..10).map { handler.establish("user$it@example.com") }
+            val results = execute { (1..10).map { handler.establish("user$it@example.com") } }
 
             // All keys should be unique
             val keys = results.map { it.key }
@@ -257,13 +261,13 @@ class PinHandlerTest {
         TestServer.test({}) {
             val handler = createPinHandler(maxAttempts = 5)
 
-            val result = handler.establish("user@example.com")
+            val result = execute { handler.establish("user@example.com") }
             val wrongPin = "WRONG1"
 
             // Make 4 failed attempts (one less than max)
             repeat(4) {
                 try {
-                    handler.assert(result.key, wrongPin)
+                    execute { handler.assert(result.key, wrongPin) }
                 } catch (_: BadRequestException) {
                     // Expected
                 }
@@ -277,7 +281,7 @@ class PinHandlerTest {
             // After 4 failed attempts, we're at 4 attempts
             // The next attempt will be the 5th, which is >= 5, so it will fail
             assertFailsWith<NotFoundException>("5th attempt should expire the PIN") {
-                handler.assert(result.key, result.pin)
+                execute { handler.assert(result.key, result.pin) }
             }
         }
     }
@@ -287,8 +291,9 @@ class PinHandlerTest {
         TestServer.test({}) {
             val handler = createPinHandler()
 
-            val result1 = handler.establish("same@example.com")
-            val result2 = handler.establish("same@example.com")
+            val (result1, result2) = execute {
+                listOf(handler.establish("same@example.com"), handler.establish("same@example.com"))
+            }
 
             assertNotEquals(result1.key, result2.key, "Different establish calls should produce different keys")
         }

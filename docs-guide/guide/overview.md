@@ -44,6 +44,14 @@ scheduled task body, or a `.test {}` block.  That is why you can call `cache()`,
 `auth.fetch()`, and similar service accessors anywhere in those contexts without threading a
 parameter through your code.
 
+You will also see `context(engine: Engine)` on parts of the API.  An `Engine` is the process-wide
+server — settings, serialization, telemetry, task dispatch — and a `ServerRuntime` is an engine
+running one execution, carrying an `Execution` that says what started that execution.  Since every
+`ServerRuntime` is an `Engine`, anything declaring `context(Engine)` is callable from a handler body
+too; the distinction matters when you write your own declarations.  Take a `ServerRuntime` when the
+work is done on someone's behalf, and an `Engine` when it is not — boot, settings resolution, SDK
+generation.
+
 If you call a context-requiring function outside of one of these provided contexts — e.g. during
 object initialization — the compiler will tell you a required context is missing.  The fix is
 always to move the call inside a handler, task, test, or other framework-managed scope.
@@ -136,7 +144,7 @@ See: [Services & Settings](services.md)
 ### Authentication
 
 `PrincipalType<SUBJECT, ID>` is the bridge between a model and the auth system.  Endpoints
-declare `authOptions = UserAuth.require()` to require a bearer token; handlers access the
+declare `auth = UserAuth.require()` to require a bearer token; handlers access the
 authenticated subject via `auth.fetch()`.
 
 See: [Authentication & Sessions](auth.md)
@@ -152,7 +160,7 @@ See: [Proof & Session Authentication](proof-session.md)
 ### Database & Query DSL
 
 `Database` is a service abstraction over MongoDB, Postgres, and in-memory / JSON-file backends.
-Models annotated with `@GenerateDataClassPaths` get a compile-time query DSL — `condition {}`,
+Models annotated with `@Queryable` get a compile-time query DSL — `condition {}`,
 `modification {}` — that prevents typos and field-rename drift.
 
 See: [Database](database.md)

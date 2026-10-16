@@ -12,7 +12,7 @@ import kotlinx.serialization.builtins.serializer
  * Registry of media type encoders.
  *
  * Maintains a mapping from media types to their encoder implementations. Multiple encoders
- * can be registered for the same media type and are sorted by priority (lower values first).
+ * can be registered for the same media type and are sorted by priority (highest first).
  *
  * Implements Map interface for read access while providing mutation methods for registration.
  */
@@ -29,7 +29,7 @@ public class MediaTypeEncoderRegistry(
     public fun register(encoder: MediaTypeEncoder) {
         registry.getOrPut(encoder.mediaType, ::ArrayList).apply {
             add(encoder)
-            sortBy { it.priority }
+            sortByDescending { it.priority }
         }
     }
 
@@ -40,7 +40,10 @@ public class MediaTypeEncoderRegistry(
      */
     public fun include(encoders: Map<MediaType, List<MediaTypeEncoder>>) {
         for ((type, encoders) in encoders) {
-            registry.getOrPut(type, ::ArrayList).addAll(encoders)
+            registry.getOrPut(type, ::ArrayList).apply {
+                addAll(encoders)
+                sortByDescending { it.priority }
+            }
         }
     }
 }
@@ -49,7 +52,7 @@ public class MediaTypeEncoderRegistry(
  * Registry of media type decoders.
  *
  * Maintains a mapping from media types to their decoder implementations. Multiple decoders
- * can be registered for the same media type and are sorted by priority (lower values first).
+ * can be registered for the same media type and are sorted by priority (highest first).
  *
  * Implements Map interface for read access while providing mutation methods for registration.
  */
@@ -66,7 +69,7 @@ public class MediaTypeDecoderRegistry(
     public fun register(decoder: MediaTypeDecoder) {
         registry.getOrPut(decoder.mediaType, ::ArrayList).apply {
             add(decoder)
-            sortBy { it.priority }
+            sortByDescending { it.priority }
         }
     }
 
@@ -77,7 +80,10 @@ public class MediaTypeDecoderRegistry(
      */
     public fun include(decoders: Map<MediaType, List<MediaTypeDecoder>>) {
         for ((type, decoders) in decoders) {
-            registry.getOrPut(type, ::ArrayList).addAll(decoders)
+            registry.getOrPut(type, ::ArrayList).apply {
+                addAll(decoders)
+                sortByDescending { it.priority }
+            }
         }
     }
 }
@@ -85,7 +91,7 @@ public class MediaTypeDecoderRegistry(
 /**
  * Finds an encoder for this media type.
  *
- * Returns the first encoder that accepts this media type's parameters.
+ * Returns the highest-priority encoder that accepts this media type's parameters.
  *
  * @return The encoder, or null if none found
  */
@@ -115,17 +121,16 @@ public val List<MediaType>.encoder: Pair<MediaType, MediaTypeEncoder>?
  */
 context(serverRuntime: ServerRuntime)
 public val defaultEncoder: Pair<MediaType, MediaTypeEncoder>
-    get() = (serverRuntime.server.mediaTypeEncoders.values.asSequence().flatten().maxByOrNull { it.priority }
-        .let {
-            it
-                ?: throw IllegalStateException("No encoders found - you need to register some media coders.  Try adding `init { registerBasicMediaTypeCoders() }` to your server builder.")
-        }
-        .let { it.mediaType to it })
+    get() = serverRuntime.server.mediaTypeEncoders.values.asSequence()
+        .flatten()
+        .maxByOrNull { it.priority }
+        ?.let { it.mediaType to it }
+        ?: throw IllegalStateException("No encoders found - you need to register some media coders.  Try adding `init { registerBasicMediaTypeCoders() }` to your server builder.")
 
 /**
  * Finds a decoder for this media type.
  *
- * Returns the first decoder that accepts this media type's parameters.
+ * Returns the highest-priority decoder that accepts this media type's parameters.
  *
  * @return The decoder, or null if none found
  */
@@ -147,7 +152,7 @@ public suspend fun <T> TypedData.parse(serializer: DeserializationStrategy<T>): 
     val format = mediaType.decoder
         ?: throw BadRequestException("No media type decoder found supporting $mediaType")
     return try {
-        format(this, serializer)
+        format.decode(this, serializer)
     } catch (e: SerializationException) {
         throw BadRequestException(e.message ?: "Unknown formatting error", cause = e.cause)
     }
@@ -175,7 +180,7 @@ public suspend inline fun <reified T> T.toTypedData(accepts: List<MediaType>): T
 context(serverRuntime: ServerRuntime)
 public suspend fun <T> T.toTypedData(accepts: List<MediaType>, serializer: SerializationStrategy<T>): TypedData {
     val (type, format) = accepts.encoder ?: defaultEncoder
-    return format(type, serializer, this)
+    return format.encode(type, serializer, this)
 }
 
 /**

@@ -8,7 +8,8 @@ import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.path
-import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
+import com.lightningkite.lightningserver.runtime.EngineBase
+import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.lightningserver.settings.*
 import com.lightningkite.lightningserver.websockets.*
@@ -17,7 +18,9 @@ import com.lightningkite.services.aws.AwsConnections
 import com.lightningkite.services.get
 import io.github.oshai.kotlinlogging.KLogger
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -41,7 +44,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 private val awsApiGatewayWsEndpointSetting = ServerSetting("awsApiGatewayWsEndpointSetting", "", String.serializer())
 
-public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(server), RequestStreamHandler, Resource {
+public open class AwsAdapter(server: ServerDefinition) : EngineBase(server), RequestStreamHandler, Resource {
 
     internal val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.engine.awsserverless")
     internal var preventLambdaTimeoutReuse: Boolean = false
@@ -162,8 +165,8 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
             .build()
     }
 
-    override suspend fun <T> Task<T>.invoke(input: T) {
-        tasks.launchTask(location, this, input)
+    override suspend fun <T> dispatchTask(task: Task<T>, input: T, from: Execution) {
+        tasks.launchTask(task.location, task, input, from)
     }
 
     override val serverId: String
@@ -172,7 +175,7 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
         get() = System.getenv("AWS_LAMBDA_FUNCTION_VERSION") ?: "Unknown"
 
     override suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(event: WebSocketSubscriptionMessage<PATH, T>) {
-        ws.publish(event.path(), event.topic.type, event.value)
+        ws.publish(event.topicPath(), event.topic.type, event.value)
     }
 
     override val directWebSocketSender: DirectWebSocketSender = object : DirectWebSocketSender {
@@ -188,8 +191,8 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
         }
         logger.info { "beforeCheckpoint() - Preparing all connections..." }
         runBlocking {
-            settings.allGoals().entries.forEachConcurrent {
-                (it.value as? Service)?.let {
+            for (entry in settings.allGoals().entries) launch(Dispatchers.IO) {
+                (entry.value as? Service)?.let {
                     logger.debug { "Initially connecting to ${it.name}..." }
                     it.connect()
                     logger.debug { "Initially connected to ${it.name}. Now disconnecting..." }
@@ -204,8 +207,8 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
     override fun afterRestore(context: org.crac.Context<out Resource>?) {
         logger.info { "afterRestore() - opening all connections" }
         runBlocking {
-            settings.allGoals().entries.forEachConcurrent {
-                (it.value as? Service)?.let {
+            for (entry in settings.allGoals().entries) launch(Dispatchers.IO) {
+                (entry.value as? Service)?.let {
                     logger.debug { "Connecting ${it.name}..." }
                     it.connect()
                     logger.debug { "Connected ${it.name}." }

@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.demo
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.demo.endpoints.AuthExamplesEndpoints
 import com.lightningkite.lightningserver.http.HttpStatus
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.runBlocking
@@ -16,7 +17,7 @@ class AuthExamplesEndpointsTest {
     @Test
     fun whoAmIReturnsTheCallersOwnIdentity() = runBlocking {
         TestHelper.testServer {
-            val user = Server.userInfo.table().insertOne(User(email = "whoami@example.com"))!!
+            val user = execute { Server.userInfo.table().insertOne(User(email = "whoami@example.com"))!! }
             val auth = Authentication(Server.UserAuth, id = user._id, sessionId = null)
 
             val result = AuthExamplesEndpoints.whoAmI.test(auth, Unit)
@@ -27,10 +28,13 @@ class AuthExamplesEndpointsTest {
         }
     }
 
-    // whoAmI requires auth: AuthRequirement<User> (non-optional), so .test() only accepts a real
-    // Authentication<User> - there is no way to even construct an unauthenticated call to it
-    // through the typed test helper. That's the point: the requirement is enforced by the type
-    // system, not just checked at runtime.
+    // whoAmI types its caller as a non-nullable User, so an unauthenticated call to it cannot be
+    // written: `.test(null, Unit)` does not compile. That is a property of this endpoint's signature
+    // and does not generalise — every endpoint beside it types callers as `HasId<*>?`, where a null
+    // call compiles fine and is refused at runtime by the AuthRequirement instead.
+    //
+    // Deliberately left as a comment rather than dressed up as a test: "this does not compile" is not
+    // something a test can assert, so a test claiming to prove it would be proving something else.
 
     @Test
     fun greetIsGenericForAnonymousCallers() = runBlocking {
@@ -43,7 +47,7 @@ class AuthExamplesEndpointsTest {
     @Test
     fun greetIsPersonalForLoggedInCallers() = runBlocking {
         TestHelper.testServer {
-            val user = Server.userInfo.table().insertOne(User(email = "greet@example.com"))!!
+            val user = execute { Server.userInfo.table().insertOne(User(email = "greet@example.com"))!! }
             val auth = Authentication(Server.UserAuth, id = user._id, sessionId = null)
 
             val result = AuthExamplesEndpoints.greet.test(auth, Unit)
@@ -52,10 +56,19 @@ class AuthExamplesEndpointsTest {
         }
     }
 
+    /**
+     * The rejection here comes from the **handler body**, not from the endpoint's [AuthRequirement].
+     *
+     * `adminOnly` requires only `UserAuth.require()` — any logged-in caller satisfies it — and then
+     * reads `isSuperUser` itself and throws. So this and its sibling below cover a role check, which
+     * is a normal and legitimate thing to demonstrate; they are named for that rather than for
+     * authorization, because a reader copying from the demo module should be able to tell which of
+     * the two mechanisms they are looking at.
+     */
     @Test
-    fun adminOnlyRejectsNonAdminsWith403() = runBlocking {
+    fun adminOnlyRejectsALoggedInNonAdminFromItsHandlerBody() = runBlocking {
         TestHelper.testServer {
-            val user = Server.userInfo.table().insertOne(User(email = "regular@example.com"))!!
+            val user = execute { Server.userInfo.table().insertOne(User(email = "regular@example.com"))!! }
             val auth = Authentication(Server.UserAuth, id = user._id, sessionId = null)
 
             val exception = assertFailsWith<com.lightningkite.lightningserver.HttpStatusException> {
@@ -65,10 +78,13 @@ class AuthExamplesEndpointsTest {
         }
     }
 
+    /** As above: the caller clears the requirement either way, and the body's role check admits them. */
     @Test
-    fun adminOnlyAllowsSuperUsers() = runBlocking {
+    fun adminOnlyAdmitsALoggedInSuperUserFromItsHandlerBody() = runBlocking {
         TestHelper.testServer {
-            val admin = Server.userInfo.table().insertOne(User(email = "admin@example.com", isSuperUser = true))!!
+            val admin = execute {
+                Server.userInfo.table().insertOne(User(email = "admin@example.com", isSuperUser = true))!!
+            }
             val auth = Authentication(Server.UserAuth, id = admin._id, sessionId = null)
 
             val result = AuthExamplesEndpoints.adminOnly.test(auth, Unit)
@@ -85,10 +101,13 @@ class AuthExamplesEndpointsTest {
     @Test
     fun aStrangerSeesAnotherUsersHashedPasswordMasked() = runBlocking {
         TestHelper.testServer {
-            val target = Server.userInfo.table().insertOne(
-                User(email = "target@example.com", hashedPassword = "super-secret-hash")
-            )!!
-            val stranger = Server.userInfo.table().insertOne(User(email = "stranger@example.com"))!!
+            val (target, stranger) = execute {
+                val target = Server.userInfo.table().insertOne(
+                    User(email = "target@example.com", hashedPassword = "super-secret-hash")
+                )!!
+                val stranger = Server.userInfo.table().insertOne(User(email = "stranger@example.com"))!!
+                target to stranger
+            }
             val strangerAuth = Authentication(Server.UserAuth, id = stranger._id, sessionId = null)
 
             val seenByStranger = Server.UserEndpoints.rest.detail.test(target._id, strangerAuth, Unit)

@@ -7,7 +7,9 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.encryption.SecretBasis
 import com.lightningkite.lightningserver.encryption.cipher
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.services.database.HasId
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
@@ -50,6 +52,7 @@ class PrivateTinyTokenFormatTest {
 
     object TestServer : ServerBuilder() {
         init {
+            registerBasicMediaTypeCoders()
             register(TestUser)
             register(OtherUser)
         }
@@ -78,14 +81,14 @@ class PrivateTinyTokenFormatTest {
                 scopes = setOf(GrantedScope.root)
             )
 
-            val token = format.create(TestUser, auth)
+            val token = execute { format.create(TestUser, auth) }
             assertNotNull(token)
 
             // Token should start with principal name followed by /
             assert(token.startsWith("TestUser/")) { "Token should start with principal name" }
 
             // Read back the token
-            val readAuth = format.read(TestUser, token)
+            val readAuth = execute { format.read(TestUser, token) }
             assertNotNull(readAuth, "Should be able to read back the token")
             assertEquals(userId, readAuth.id)
             assertEquals("test-session-123", readAuth.sessionId)
@@ -111,8 +114,8 @@ class PrivateTinyTokenFormatTest {
                 scopes = scopes
             )
 
-            val token = format.create(TestUser, auth)
-            val readAuth = format.read(TestUser, token)
+            val token = execute { format.create(TestUser, auth) }
+            val readAuth = execute { format.read(TestUser, token) }
 
             assertNotNull(readAuth)
             assertEquals(scopes, readAuth.scopes)
@@ -136,10 +139,10 @@ class PrivateTinyTokenFormatTest {
                 scopes = setOf(GrantedScope.root)
             )
 
-            val token = expiredFormat.create(TestUser, auth)
+            val token = execute { expiredFormat.create(TestUser, auth) }
 
             assertFailsWith<TokenException>("Expired token should throw") {
-                expiredFormat.read(TestUser, token)
+                execute { expiredFormat.read(TestUser, token) }
             }
         }
     }
@@ -157,10 +160,10 @@ class PrivateTinyTokenFormatTest {
                 scopes = setOf(GrantedScope.root)
             )
 
-            val token = format.create(TestUser, auth)
+            val token = execute { format.create(TestUser, auth) }
 
             // Token starts with "TestUser/" so reading as OtherUser should return null
-            val result = format.read(OtherUser, token)
+            val result = execute { format.read(OtherUser, token) }
             assertNull(result, "Token for different principal type should return null")
         }
     }
@@ -189,11 +192,11 @@ class PrivateTinyTokenFormatTest {
                 scopes = setOf(GrantedScope.root)
             )
 
-            val token1 = format1.create(TestUser, auth)
+            val token1 = execute { format1.create(TestUser, auth) }
 
             // Token encrypted with key1 should not decrypt with key2
             assertFailsWith<TokenException>("Token from different key should fail decryption") {
-                format2.read(TestUser, token1)
+                execute { format2.read(TestUser, token1) }
             }
         }
     }
@@ -211,7 +214,7 @@ class PrivateTinyTokenFormatTest {
                 scopes = setOf(GrantedScope.root)
             )
 
-            val token = format.create(TestUser, auth)
+            val token = execute { format.create(TestUser, auth) }
 
             // Tamper with the encrypted part (after the /)
             val prefix = token.substringBefore('/') + "/"
@@ -226,7 +229,7 @@ class PrivateTinyTokenFormatTest {
             val tamperedToken = prefix + tamperedEncrypted.joinToString("")
 
             assertFailsWith<TokenException>("Tampered token should throw") {
-                format.read(TestUser, tamperedToken)
+                execute { format.read(TestUser, tamperedToken) }
             }
         }
     }
@@ -245,8 +248,8 @@ class PrivateTinyTokenFormatTest {
                 scopes = setOf(GrantedScope.root)
             )
 
-            val token = format.create(TestUser, auth)
-            val readAuth = format.read(TestUser, token)
+            val token = execute { format.create(TestUser, auth) }
+            val readAuth = execute { format.read(TestUser, token) }
 
             assertNotNull(readAuth)
             assertEquals(sessionId, readAuth.sessionId)
@@ -266,8 +269,8 @@ class PrivateTinyTokenFormatTest {
                 scopes = setOf(GrantedScope.root)
             )
 
-            val token = format.create(TestUser, auth)
-            val readAuth = format.read(TestUser, token)
+            val token = execute { format.create(TestUser, auth) }
+            val readAuth = execute { format.read(TestUser, token) }
 
             assertNotNull(readAuth)
             assertNull(readAuth.sessionId)
@@ -287,7 +290,7 @@ class PrivateTinyTokenFormatTest {
             )
 
             for (malformed in malformedTokens) {
-                val result = format.read(TestUser, malformed)
+                val result = execute { format.read(TestUser, malformed) }
                 assertNull(result, "Malformed token '$malformed' should return null")
             }
         }
@@ -306,8 +309,8 @@ class PrivateTinyTokenFormatTest {
                 scopes = setOf(GrantedScope.root)
             )
 
-            val token = oneMinuteFormat.create(TestUser, auth)
-            val readAuth = oneMinuteFormat.read(TestUser, token)
+            val token = execute { oneMinuteFormat.create(TestUser, auth) }
+            val readAuth = execute { oneMinuteFormat.read(TestUser, token) }
 
             assertNotNull(readAuth)
             // The PrivateTinyTokenFormat sets expiration on the auth copy
@@ -336,15 +339,15 @@ class PrivateTinyTokenFormatTest {
                 scopes = setOf(GrantedScope.root)
             )
 
-            val token1 = format1.create(TestUser, auth)
-            val token2 = format2.create(TestUser, auth)
+            val token1 = execute { format1.create(TestUser, auth) }
+            val token2 = execute { format2.create(TestUser, auth) }
 
             // Same auth, different cipher variants should produce different tokens
             assert(token1 != token2) { "Different cipher variants should produce different tokens" }
 
             // And they shouldn't be readable by each other
             assertFailsWith<TokenException>("Token from variant1 should not decrypt with variant2") {
-                format2.read(TestUser, token1)
+                execute { format2.read(TestUser, token1) }
             }
         }
     }

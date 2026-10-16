@@ -3,7 +3,7 @@ package com.lightningkite.lightningserver.notifications.subscriptions
 import com.lightningkite.lightningserver.notifications.Frequency
 import com.lightningkite.lightningserver.notifications.ScheduledSendMethods
 import com.lightningkite.lightningserver.notifications.events.UserEventType
-import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.Serializable
@@ -33,8 +33,7 @@ public typealias SerializedCondition = String
  * @property sms SMS delivery frequency, or null to disable SMS notifications
  * @property inApp In-app notification delivery frequency, defaults to immediate
  */
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 public data class NotificationEventSubscription<UID : Comparable<UID>>(
     override val _id: UserEventType<UID>,
     val requestedFilter: SerializedCondition,
@@ -61,8 +60,7 @@ public data class NotificationEventSubscription<UID : Comparable<UID>>(
  * @property sms SMS delivery frequency, or null to disable SMS notifications
  * @property inApp In-app notification delivery frequency, defaults to immediate
  */
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 public data class NotificationSendMethods<UID : Comparable<UID>>(
     override val _id: UserEventType<UID>,
     override val email: Frequency?,

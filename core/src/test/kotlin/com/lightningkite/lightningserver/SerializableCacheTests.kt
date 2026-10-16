@@ -3,7 +3,8 @@ package com.lightningkite.lightningserver
 import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.engine
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.serializerOrContextual
 import kotlinx.coroutines.runBlocking
@@ -16,11 +17,11 @@ class SerializableCacheTests {
 
     @Test
     fun testSerialization() {
-        val cache = SerializableCache()
+        val cache = SerializableCache<Unit>()
 
         var calculated = false
 
-        val key = object : SerializableCache.CalculatingKey<Int, String> {
+        val key = object : SerializableCache.CalculatingKey<Any?, Int, String> {
             override val id: String = "key"
             override val serializer: KSerializer<String> = String.serializer()
 
@@ -34,23 +35,23 @@ class SerializableCacheTests {
 
         runBlocking {
             Server.test({}) {
-                // need a runtime for caching
+                execute {
+                    val str = cache.get(key, 5)
 
-                val str = cache.get(key, 5)
+                    val serialized = json.encodeToString(cache)
+                    val deserialized = json.decodeFromString<SerializableCache<Unit>>(serialized)
 
-                val serialized = json.encodeToString(cache)
-                val deserialized = json.decodeFromString<SerializableCache>(serialized)
-
-                deserialized.get(key, 5)
+                    deserialized.get(key, 5)
+                }
             }
         }
     }
 
     @Test
     fun disallowsDuplicateKeys() {
-        val cache = SerializableCache()
+        val cache = SerializableCache<Unit>()
 
-        val key = object : SerializableCache.CalculatingKey<Int, String> {
+        val key = object : SerializableCache.CalculatingKey<Any?, Int, String> {
             override val id: String = "key"
             override val serializer: KSerializer<String> = String.serializer()
 
@@ -58,7 +59,7 @@ class SerializableCacheTests {
             override suspend fun calculate(input: Int): String = input.toString()
         }
 
-        val key2 = object : SerializableCache.CalculatingKey<Int, String> {
+        val key2 = object : SerializableCache.CalculatingKey<Any?, Int, String> {
             override val id: String = "key"
             override val serializer: KSerializer<String> = String.serializer()
 
@@ -68,29 +69,29 @@ class SerializableCacheTests {
 
         runBlocking {
             Server.test({}) {
-                // need a runtime for caching
+                execute {
+                    cache.get(key, 5)
 
-                cache.get(key, 5)
-
-                var thrown = false
-                try {
-                    cache.get(key2, 5)
-                } catch (_: IllegalStateException) {
-                    thrown = true
+                    var thrown = false
+                    try {
+                        cache.get(key2, 5)
+                    } catch (_: IllegalStateException) {
+                        thrown = true
+                    }
+                    if (!thrown) throw Exception("Did not fail as expected")
                 }
-                if (!thrown) throw Exception("Did not fail as expected")
             }
         }
     }
 
-    private inline fun <reified T : Any> Key(id: String) = object : SerializableCache.Key<T> {
+    private inline fun <reified T : Any> Key(id: String) = object : SerializableCache.Key<Any?, T> {
         override val id: String = id
         override val serializer: KSerializer<T> = serializerOrContextual<T>()
     }
 
     @Test
     fun stringRepr() {
-        val cache = SerializableCache()
+        val cache = SerializableCache<Unit>()
 
         val str = Key<String>("str")
         val int = Key<Int>("int")
@@ -104,9 +105,9 @@ class SerializableCacheTests {
 
                 println("Before serialization: $cache")
 
-                val serialized = serverRuntime.internalSerialization.json.encodeToString(cache)
+                val serialized = engine.internalSerialization.json.encodeToString(cache)
                 val deserialized =
-                    serverRuntime.internalSerialization.json.decodeFromString<SerializableCache>(serialized)
+                    engine.internalSerialization.json.decodeFromString<SerializableCache<Unit>>(serialized)
 
                 println("After serialization: $deserialized")
 

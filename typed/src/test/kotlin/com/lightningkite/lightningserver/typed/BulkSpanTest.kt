@@ -1,3 +1,5 @@
+@file:OptIn(com.lightningkite.lightningserver.EngineApi::class)
+
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.HttpMethod
@@ -7,8 +9,9 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.telemetrySettings
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
-import com.lightningkite.lightningserver.runtime.handle
-import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.Execution
+import com.lightningkite.lightningserver.runtime.engine
+import com.lightningkite.lightningserver.runtime.handleRoot
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
@@ -133,15 +136,14 @@ class BulkSpanTest {
             }
         ) {
             runBlocking {
-                serverRuntime.handle(
-                    HttpRequest<PathSpec>(
+                engine.handleRoot(
+                    HttpRequest(
                         path = RawHttpEndpoint(asString = "/meta/bulk", method = HttpMethod.POST),
                         queryParameters = QueryParameters.EMPTY,
                         headers = HttpHeaders.EMPTY,
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
-                        requestId = generateRequestId(),
                         body = TypedData.text(
                             """
                             {
@@ -151,7 +153,8 @@ class BulkSpanTest {
                             """.trimIndent(),
                             MediaType.Application.Json,
                         ),
-                    )
+                    ),
+                    Execution.ID.generate(),
                 )
             }
 

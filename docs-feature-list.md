@@ -1,5 +1,9 @@
 # LightningServer feature list
 
+> **Outdated:** This list describes an earlier version of Lightning Server (`ServerPath`, `runServer`, `loadSettings`)
+> and does not match the current API. See [docs/modules.md](docs/modules.md) and the
+> [guide](docs-guide/guide/first-endpoint.md) instead.
+
 LightningServer is chock-full of useful features. This list is designed to be used as a reference for those already
 familiar with the library.
 

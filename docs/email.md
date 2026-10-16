@@ -1,7 +1,5 @@
 # Email
 
-Last updated January 2025 (`version-5`)
-
 Email's built in like many of the other service types a server can depend on.
 
 ## Declaring the need for an email sender
@@ -23,7 +21,7 @@ object Server : ServerBuilder() {
 ```kotlin
 import com.lightningkite.services.email.Email
 import com.lightningkite.services.email.EmailAddressWithName
-import com.lightningkite.toEmailAddress
+import com.lightningkite.services.data.toEmailAddress
 
 email().send(Email(
     subject = "Hello world",
@@ -31,3 +29,18 @@ email().send(Email(
     html = "<h1>Hello world!</h1>"
 ))
 ```
+
+## Available Backends
+
+The default, `console`, prints emails instead of sending them, and `test` keeps them in memory for assertions in unit
+tests:
+
+```json5
+// settings.json
+{
+  "email": { "url": "console" }
+}
+```
+
+The service-abstractions email modules also register `smtp`, `ses` (Amazon SES), `sendgrid`, and `mailgun` for sending.
+As with databases and caches, reference the implementation's class in your server so its URL scheme is registered.

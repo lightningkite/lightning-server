@@ -37,6 +37,18 @@ import kotlinx.coroutines.CancellationException
  *     }
  * }
  * ```
+ *
+ * ## Scope
+ * An interceptor runs for every *logical* request, including each sub-request of a multiplexed
+ * request such as `/meta/bulk`. That is the scope access logging, auditing and rate limiting need.
+ *
+ * A concern tied to the connection or the wire format — CORS, compression, security headers — should
+ * run only once per physical request, and narrows itself with
+ * [com.lightningkite.lightningserver.runtime.isRoot]:
+ *
+ * ```kotlin
+ * if (!runtime.execution.isRoot()) return cont(request)
+ * ```
  */
 public interface HttpInterceptor {
     /**
@@ -53,57 +65,24 @@ public interface HttpInterceptor {
      * @return The HTTP response (potentially modified by this interceptor)
      */
     context(runtime: ServerRuntime)
-    public suspend fun intercept(
-        request: HttpRequest<*>,
-        cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
+    public suspend fun <PATH : PathSpec> intercept(
+        request: HttpRequest<PATH>,
+        cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
     ): HttpResponse
 
     /**
      * The compiled chain for "nothing installed" — it passes requests straight through.
-     *
-     * This is chain machinery, not something to install: an interceptor is installed as a
-     * [HttpConnectionInterceptor] or a [HttpLogicalInterceptor], and a no-op of either kind would do
-     * nothing but cost a span. [compileAndInstrument] drops these rather than wrapping them.
      */
     public object NoOp : HttpInterceptor {
         context(runtime: ServerRuntime)
-        override suspend fun intercept(
-            request: HttpRequest<*>,
-            cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
+        override suspend fun <PATH : PathSpec> intercept(
+            request: HttpRequest<PATH>,
+            cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
         ): HttpResponse {
             return cont(request)
         }
     }
 }
-
-
-/**
- * An interceptor that runs once per physical HTTP request, outside routing.
- *
- * Correct for concerns tied to the connection or the wire format — CORS, compression, security
- * headers — where running once per logical request would duplicate work or corrupt the response.
- *
- * ```kotlin
- * val timing = HttpConnectionInterceptor { request, cont ->
- *     val start = TimeSource.Monotonic.markNow()
- *     cont(request).also { println("${'$'}{request.path} took ${'$'}{start.elapsedNow()}") }
- * }
- * ```
- */
-public fun interface HttpConnectionInterceptor : HttpInterceptor
-
-/**
- * An interceptor that runs for every logical request, including each sub-request of a multiplexed
- * request such as `/meta/bulk`.
- *
- * Correct for concerns that describe what was actually done — access logging, auditing, rate
- * limiting — where seeing only the outer request would report a single hit on `/meta/bulk` no matter
- * how much was done inside it.
- *
- * An implementation must tolerate running several times within one physical request, and should
- * attribute its work to [HttpRequest.requestId] rather than assuming one request per connection.
- */
-public fun interface HttpLogicalInterceptor : HttpInterceptor
 
 /**
  * Wraps the intercept call with instrumentation for performance monitoring, and recovers from
@@ -131,9 +110,9 @@ public fun interface HttpLogicalInterceptor : HttpInterceptor
  * @return The HTTP response
  */
 context(server: ServerRuntime)
-public suspend inline fun HttpInterceptor.interceptInstrumented(
-    request: HttpRequest<*>,
-    noinline action: suspend ServerRuntime.(HttpRequest<*>) -> HttpResponse,
+public suspend inline fun <PATH : PathSpec> HttpInterceptor.interceptInstrumented(
+    request: HttpRequest<PATH>,
+    noinline action: suspend ServerRuntime.(HttpRequest<PATH>) -> HttpResponse,
 ): HttpResponse {
     return try {
         instrument(name) {
@@ -154,16 +133,15 @@ public suspend inline fun HttpInterceptor.interceptInstrumented(
 /**
  * One link of a compiled chain, wrapping [interceptor] in its own instrumentation span.
  *
- * These are plain anonymous objects rather than SAM lambdas because [HttpInterceptor] itself is not a
- * functional interface — only the two installable kinds are, and a compiled chain is neither of them.
+ * A plain anonymous object rather than a SAM lambda because it overrides [HttpInterceptor.name] too.
  */
 private fun instrumentedLink(interceptor: HttpInterceptor): HttpInterceptor = object : HttpInterceptor {
     override val name: String get() = interceptor.name
 
     context(runtime: ServerRuntime)
-    override suspend fun intercept(
-        request: HttpRequest<*>,
-        cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
+    override suspend fun <PATH : PathSpec> intercept(
+        request: HttpRequest<PATH>,
+        cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
     ): HttpResponse = interceptor.interceptInstrumented(request, cont)
 }
 
@@ -172,9 +150,9 @@ private fun composeLinks(outer: HttpInterceptor, inner: HttpInterceptor): HttpIn
     override val name: String get() = "${outer.name} -> ${inner.name}"
 
     context(runtime: ServerRuntime)
-    override suspend fun intercept(
-        request: HttpRequest<*>,
-        cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
+    override suspend fun <PATH : PathSpec> intercept(
+        request: HttpRequest<PATH>,
+        cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
     ): HttpResponse = outer.intercept(request) { inner.interceptInstrumented(it, cont) }
 }
 
@@ -184,10 +162,6 @@ private fun composeLinks(outer: HttpInterceptor, inner: HttpInterceptor): HttpIn
  * The first interceptor in the list executes first, followed by each subsequent interceptor, and
  * finally the actual handler. [HttpInterceptor.NoOp] entries are dropped rather than wrapped, since
  * a chain link around a pass-through only costs a span.
- *
- * Accepts any list of interceptors so the same machinery serves both the connection-scoped and the
- * logical-request-scoped chain; which interceptors reach which chain is settled at installation by
- * their type.
  *
  * @return A single HttpInterceptor representing the entire chain
  */

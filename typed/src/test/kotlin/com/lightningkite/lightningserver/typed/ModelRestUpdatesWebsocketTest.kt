@@ -4,16 +4,17 @@ import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.GeneralServerSettings
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
+import com.lightningkite.lightningserver.runtime.engine
 import com.lightningkite.lightningserver.runtime.send
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.lightningserver.websockets.text
-import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import kotlin.test.*
 
@@ -41,7 +42,7 @@ class ModelRestUpdatesWebSocketTest {
             database set Database.Settings()
         }) {
             val socket = TestServer.ws.webSocket.test()
-            val json = socket.server.externalSerialization.json
+            val json = engine.externalSerialization.json
 
             // Send a condition from client: Always
             val cond: Condition<Sample> = Condition.Always
@@ -64,7 +65,7 @@ class ModelRestUpdatesWebSocketTest {
 
             // Now simulate a change via the model info's change listener by inserting a model
             val inserted = Sample("1", "A")
-            TestServer.info.table().insert(listOf(inserted))
+            execute { TestServer.info.table().insert(listOf(inserted)) }
 
             val afterInsert = last as WebSocketFrame.Text
             val updates = json.decodeFromString(
@@ -76,7 +77,7 @@ class ModelRestUpdatesWebSocketTest {
 
             // Simulate a removal via direct topic send
             val removalChanges = CollectionChanges(listOf(EntryChange(old = inserted, new = null)))
-            TestServer.ws.generalTopic.send(removalChanges)
+            execute { TestServer.ws.generalTopic.send(removalChanges) }
 
             val afterRemove = last as WebSocketFrame.Text
             val removal = json.decodeFromString(
@@ -94,7 +95,7 @@ class ModelRestUpdatesWebSocketTest {
             database set Database.Settings()
         }) {
             val socket = TestServer.ws.webSocket.test()
-            val json = socket.server.externalSerialization.json
+            val json = engine.externalSerialization.json
 
             var count = 0
             socket.onMessageSent = { count++ }
@@ -111,7 +112,7 @@ class ModelRestUpdatesWebSocketTest {
                     EntryChange(old = Sample("3", "Y"), new = null)
                 )
             )
-            TestServer.ws.generalTopic.send(changes)
+            execute { TestServer.ws.generalTopic.send(changes) }
             assertEquals(1, count) // still only the echo
         }
     }
@@ -123,7 +124,7 @@ class ModelRestUpdatesWebSocketTest {
             auth = noAuth,
             permissions = { ModelPermissions.allowAll() }
         )
-        val ws = path.path("keyed").path("updates") include ModelRestUpdatesWebSocket(info, Sample_name)
+        val ws = path.path("keyed").path("updates") include ModelRestUpdatesWebSocket(info, Sample.name)
 
         init {
             registerBasicMediaTypeCoders()
@@ -143,12 +144,14 @@ class ModelRestUpdatesWebSocketTest {
             database set Database.Settings()
         }) {
             val rowCount = 5
-            KeyedServer.info.table().insert(
-                (1..rowCount).map { Sample(_id = it.toString(), name = "shared", note = "before") }
-            )
+            execute {
+                KeyedServer.info.table().insert(
+                    (1..rowCount).map { Sample(_id = it.toString(), name = "shared", note = "before") }
+                )
+            }
 
             val socket = KeyedServer.ws.webSocket.test()
-            val json = socket.server.externalSerialization.json
+            val json = engine.externalSerialization.json
 
             // An Equal condition on the key is what lets the server shard onto the hash topic.
             val narrowed: Condition<Sample> = condition { it.name eq "shared" }
@@ -160,10 +163,12 @@ class ModelRestUpdatesWebSocketTest {
             socket.onMessageSent = { frames++ }
 
             // One database write touching every row, all of which share the key value "shared".
-            KeyedServer.info.table().updateMany(
-                condition { it.name eq "shared" },
-                modification { it.note assign "after" }
-            )
+            execute {
+                KeyedServer.info.table().updateMany(
+                    condition { it.name eq "shared" },
+                    modification { it.note assign "after" }
+                )
+            }
 
             assertEquals(
                 1,
@@ -184,7 +189,7 @@ class ModelRestUpdatesWebSocketTest {
             database set Database.Settings()
         }) {
             val socket = TestServer.ws.webSocket.test()
-            val json = socket.server.externalSerialization.json
+            val json = engine.externalSerialization.json
 
             val always: Condition<Sample> = Condition.Always
             socket.send(WebSocketFrame.Text(json.encodeToString(Condition.serializer(Sample.serializer()), always)))
@@ -194,7 +199,7 @@ class ModelRestUpdatesWebSocketTest {
 
             val big = "x".repeat(50000)
             val changes = CollectionChanges((1..6).map { i -> EntryChange<Sample>(null, Sample(i.toString(), big)) })
-            TestServer.ws.generalTopic.send(changes)
+            execute { TestServer.ws.generalTopic.send(changes) }
 
             val upd = json.decodeFromString(
                 CollectionUpdates.serializer(Sample.serializer(), String.serializer()),
@@ -211,7 +216,7 @@ class ModelRestUpdatesWebSocketTest {
             database set Database.Settings()
         }) {
             val socket = TestServer.ws.webSocket.test()
-            val json = socket.server.externalSerialization.json
+            val json = engine.externalSerialization.json
 
             val always: Condition<Sample> = Condition.Always
             val frameText = json.encodeToString(Condition.serializer(Sample.serializer()), always)
@@ -221,7 +226,7 @@ class ModelRestUpdatesWebSocketTest {
             socket.onMessageSent = { last = it }
 
             val changes = CollectionChanges((1..6000).map { i -> EntryChange<Sample>(null, Sample(i.toString(), "X")) })
-            TestServer.ws.generalTopic.send(changes)
+            execute { TestServer.ws.generalTopic.send(changes) }
 
             val got = last as WebSocketFrame.Text
             val upd =
@@ -231,6 +236,5 @@ class ModelRestUpdatesWebSocketTest {
     }
 }
 
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class Sample(override val _id: String, val name: String, val note: String = "") : HasId<String>

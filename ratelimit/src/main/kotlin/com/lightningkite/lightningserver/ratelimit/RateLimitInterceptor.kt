@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.ratelimit
 
 import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.LSError
+import com.lightningkite.lightningserver.OverrideOnly
 import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.http.*
@@ -83,16 +84,16 @@ public class RateLimitInterceptor(
     private val settings: Runtime<RateLimitSettings?>,
     private val cache: Runtime<Cache>,
     private val requestLimits: suspend context(ServerRuntime) (Request<*>) -> RequestLimits?,
-) : HttpLogicalInterceptor, WebSocketLogicalInterceptor {
+) : HttpInterceptor, WebSocketInterceptor {
 
     private val logger = KotlinLogging.logger("com.lightningkite.lightningserver.ratelimit")
 
     override val name: String = "RateLimit"
 
     context(runtime: ServerRuntime)
-    override suspend fun intercept(
-        request: HttpRequest<*>,
-        cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
+    override suspend fun <PATH : PathSpec> intercept(
+        request: HttpRequest<PATH>,
+        cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
     ): HttpResponse {
         val settings = settings() ?: return cont(request)
 
@@ -115,6 +116,7 @@ public class RateLimitInterceptor(
 
     override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> {
         return object : WebSocketHandler<PATH, T> by handler {
+            @OverrideOnly
             context(serverRuntime: ServerRuntime)
             override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
                 val settings = settings() ?: return handler.willConnect(request)

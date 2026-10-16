@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.settings
 
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.engine
 import com.lightningkite.lightningserver.runtime.test.test
 import kotlinx.serialization.Serializable
 import org.junit.Test
@@ -167,7 +167,7 @@ class ServerSettingsTest {
     @Test
     fun testSettingOverrides() {
         TestServer.test({}) {
-            println("Got ${serverRuntime.settings.overrides.size} overrides")
+            println("Got ${engine.settings.overrides.size} overrides")
             assertEquals("A", a())
             assertEquals("A", b()) // should defer to 'a' as configured in the server
         }

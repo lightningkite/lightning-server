@@ -8,7 +8,9 @@ import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.encryption.*
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.sessions.*
 import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.services.cache.Cache
@@ -71,6 +73,7 @@ class PasswordProofEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -83,12 +86,14 @@ class PasswordProofEndpointsTest {
         }.let { server ->
             server.test({}) {
                 // Use the direct establish function instead of the endpoint
-                server.passwordProof.establish(TestUser, userId, EstablishPassword("mySecurePassword123"))
+                execute { server.passwordProof.establish(TestUser, userId, EstablishPassword("mySecurePassword123")) }
 
                 // Verify password secret was created
-                val secrets = server.passwordProof.modelInfo.table()
-                    .find(condition<PasswordSecret> { it.subjectId eq userId.toString() })
-                    .firstOrNull()
+                val secrets = execute {
+                    server.passwordProof.modelInfo.table()
+                        .find(condition<PasswordSecret> { it.subjectId eq userId.toString() })
+                        .firstOrNull()
+                }
 
                 assertNotNull(secrets)
                 assertEquals(userId.toString(), secrets.subjectId)
@@ -110,6 +115,7 @@ class PasswordProofEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -123,12 +129,14 @@ class PasswordProofEndpointsTest {
             server.test({}) {
                 // Try to establish with hint containing the password
                 assertFailsWith<BadRequestException>("Hint containing password should be rejected") {
-                    server.passwordProof.establish(
-                        TestUser, userId, EstablishPassword(
-                            password = "secretPassword",
-                            hint = "My hint is secretPassword"
+                    execute {
+                        server.passwordProof.establish(
+                            TestUser, userId, EstablishPassword(
+                                password = "secretPassword",
+                                hint = "My hint is secretPassword"
+                            )
                         )
-                    )
+                    }
                 }
             }
         }
@@ -146,6 +154,7 @@ class PasswordProofEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -158,7 +167,7 @@ class PasswordProofEndpointsTest {
         }.let { server ->
             server.test({}) {
                 // First establish password
-                server.passwordProof.establish(TestUser, userId, EstablishPassword("correctPassword"))
+                execute { server.passwordProof.establish(TestUser, userId, EstablishPassword("correctPassword")) }
 
                 // Now prove with correct password
                 val proof = server.passwordProof.prove.test(
@@ -190,6 +199,7 @@ class PasswordProofEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -202,7 +212,7 @@ class PasswordProofEndpointsTest {
         }.let { server ->
             server.test({}) {
                 // First establish password
-                server.passwordProof.establish(TestUser, userId, EstablishPassword("correctPassword"))
+                execute { server.passwordProof.establish(TestUser, userId, EstablishPassword("correctPassword")) }
 
                 // Try to prove with wrong password
                 assertFailsWith<BadRequestException>("Wrong password should be rejected") {
@@ -231,6 +241,7 @@ class PasswordProofEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -243,12 +254,14 @@ class PasswordProofEndpointsTest {
         }.let { server ->
             server.test({}) {
                 val password = "myPlaintextPassword"
-                server.passwordProof.establish(TestUser, userId, EstablishPassword(password))
+                val secret = execute {
+                    server.passwordProof.establish(TestUser, userId, EstablishPassword(password))
 
-                // Get the stored secret
-                val secret = server.passwordProof.modelInfo.table()
-                    .find(condition<PasswordSecret> { it.subjectId eq userId.toString() })
-                    .firstOrNull()
+                    // Get the stored secret
+                    server.passwordProof.modelInfo.table()
+                        .find(condition<PasswordSecret> { it.subjectId eq userId.toString() })
+                        .firstOrNull()
+                }
 
                 assertNotNull(secret)
                 // Hash should not equal plaintext
@@ -271,6 +284,7 @@ class PasswordProofEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -282,11 +296,13 @@ class PasswordProofEndpointsTest {
             )
         }.let { server ->
             server.test({}) {
-                // Establish first password
-                server.passwordProof.establish(TestUser, userId, EstablishPassword("oldPassword"))
+                execute {
+                    // Establish first password
+                    server.passwordProof.establish(TestUser, userId, EstablishPassword("oldPassword"))
 
-                // Establish new password
-                server.passwordProof.establish(TestUser, userId, EstablishPassword("newPassword"))
+                    // Establish new password
+                    server.passwordProof.establish(TestUser, userId, EstablishPassword("newPassword"))
+                }
 
                 // Old password should no longer work
                 assertFailsWith<BadRequestException>("Old password should be disabled") {
@@ -326,6 +342,7 @@ class PasswordProofEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -337,7 +354,7 @@ class PasswordProofEndpointsTest {
             )
         }.let { server ->
             server.test({}) {
-                server.passwordProof.establish(TestUser, userId, EstablishPassword("password123"))
+                execute { server.passwordProof.establish(TestUser, userId, EstablishPassword("password123")) }
 
                 // Prove with uppercase email
                 val proof = server.passwordProof.prove.test(
@@ -368,6 +385,7 @@ class PasswordProofEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -380,13 +398,13 @@ class PasswordProofEndpointsTest {
         }.let { server ->
             server.test({}) {
                 // Before establishing, should return false
-                assertFalse(server.passwordProof.established(TestUser, user))
+                assertFalse(execute { server.passwordProof.established(TestUser, user) })
 
                 // Establish password
-                server.passwordProof.establish(TestUser, userId, EstablishPassword("password"))
+                execute { server.passwordProof.establish(TestUser, userId, EstablishPassword("password")) }
 
                 // After establishing, should return true
-                assertTrue(server.passwordProof.established(TestUser, user))
+                assertTrue(execute { server.passwordProof.established(TestUser, user) })
             }
         }
     }
@@ -405,6 +423,7 @@ class PasswordProofEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -422,13 +441,13 @@ class PasswordProofEndpointsTest {
             server.test({}) {
                 // Short password should be rejected
                 assertFailsWith<BadRequestException>("Short password should be rejected") {
-                    server.passwordProof.establish(TestUser, userId, EstablishPassword("short"))
+                    execute { server.passwordProof.establish(TestUser, userId, EstablishPassword("short")) }
                 }
                 assertTrue(evaluationCalled)
 
                 // Long enough password should work
                 evaluationCalled = false
-                server.passwordProof.establish(TestUser, userId, EstablishPassword("longEnoughPassword"))
+                execute { server.passwordProof.establish(TestUser, userId, EstablishPassword("longEnoughPassword")) }
                 assertTrue(evaluationCalled)
             }
         }
@@ -451,6 +470,7 @@ class PasswordProofEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -462,7 +482,7 @@ class PasswordProofEndpointsTest {
             )
         }.let { server ->
             server.test({}) {
-                server.passwordProof.establish(TestUser, userId, EstablishPassword("correctPassword"))
+                execute { server.passwordProof.establish(TestUser, userId, EstablishPassword("correctPassword")) }
 
                 // Five distinct case variants that all normalize to "test@example.com". The default limit
                 // is 5 attempts; five failing attempts across these variants must fill ONE shared bucket.

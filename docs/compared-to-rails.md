@@ -61,8 +61,7 @@ Post.where(author: current_user).published.recent
 **Lightning Server:**
 
 ```kotlin
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class Post(
     override val _id: Uuid = Uuid.random(),
     @MaxLength(100) val title: String,
@@ -79,7 +78,7 @@ fun Query<Post>.recent() = sort(Post::createdAt.descending()).take(10)
 posts.find(condition { it.authorId eq currentUser._id }).published().recent()
 ```
 
-The `@GenerateDataClassPaths` annotation enables the type-safe query DSL. Typos in field names become compile errors,
+The `@Queryable` annotation enables the type-safe query DSL. Typos in field names become compile errors,
 not runtime bugs.
 
 ### Database Migrations
@@ -90,12 +89,15 @@ not runtime bugs.
 
 1. **MongoDB is schemaless** - Add fields to your Kotlin model, and they just work
 2. **Postgres changes are typically additive** - New nullable columns don't require migration files
-3. **Data migrations** - When you need to transform existing data, use scheduled tasks:
+3. **Data migrations** - When you need to transform existing data, use a pre-deploy task, which runs once per deploy
+   before any instance serves:
 
 ```kotlin
-// One-time data migration as a scheduled task
-val migrateData = schedule("migrate-posts-2025-01", Schedule.Frequency(Duration.INFINITE)) {
-    posts.updateMany(
+// Data migration as a pre-deploy task; write it so that running it again is harmless
+val migrateData = path.path("predeploy").path("migrate-posts-2025-01") bind PreDeployTask(
+    dependencies = { listOf(postTable.preDeployTask) },
+) {
+    postTable().updateMany(
         condition { it.newField eq null },
         modification { it.newField assign "default" }
     )
@@ -161,9 +163,9 @@ val posts = postTable()
         // After successful insertion
         notificationService.notifySubscribers(value)
     }
-    .postChange { value ->
+    .postChange { old, new ->
         // After successful update
-        cache.invalidate("post:${value._id}")
+        cache().remove("post:${new._id}")
     }
     .postDelete { value ->
         // After successful deletion
@@ -187,8 +189,7 @@ Available lifecycle hooks:
 **Lightning Server:** No code generation needed. Define your model and use `ModelRestEndpoints`:
 
 ```kotlin
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 @AdminTableColumns(["title", "author", "createdAt"])
 data class Post(
     override val _id: Uuid = Uuid.random(),
@@ -245,7 +246,7 @@ SendWelcomeEmailJob.perform_later(user)
 **Lightning Server async tasks:**
 
 ```kotlin
-val sendWelcomeEmail = task("send-welcome-email") { userId: Uuid ->
+val sendWelcomeEmail = path.path("tasks").path("send-welcome-email") bind Task { userId: Uuid ->
     val user = users.findOne(condition { it._id eq userId })!!
     email().send(Email(
         subject = "Welcome!",
@@ -279,12 +280,12 @@ end
 
 ```kotlin
 // Every 15 minutes
-val cleanup = schedule("cleanup", Schedule.Frequency(15.minutes)) {
+val cleanup = path.path("schedules").path("cleanup") bind ScheduledTask(schedule = Schedule.Frequency(15.minutes)) {
     expiredSessions.deleteMany(condition { it.expiresAt lt Clock.System.now() })
 }
 
 // Daily at 3 AM in a specific timezone
-val dailyReport = schedule("daily-report", Schedule.Daily(
+val dailyReport = path.path("schedules").path("daily-report") bind ScheduledTask(schedule = Schedule.Daily(
     time = LocalTime(3, 0),
     zone = TimeZone.of("America/Denver")
 )) {
@@ -292,7 +293,7 @@ val dailyReport = schedule("daily-report", Schedule.Daily(
 }
 
 // Complex cron pattern (weekdays at 9 AM and 5 PM)
-val businessHoursTask = schedule("business-hours", Schedule.Cron(
+val businessHoursTask = path.path("schedules").path("business-hours") bind ScheduledTask(schedule = Schedule.Cron(
     cron = CronPattern(
         minutes = listOf(0),
         hours = listOf(9, 17),
@@ -433,9 +434,9 @@ Deploy different `settings.json` files per environment. The URL scheme determine
 
 ```kotlin
 // Development-only endpoint for quick queries
-val devQuery = path.path("dev").path("query").post.api(
+val devQuery = path.path("dev").path("query").post bind ApiHttpHandler(
     summary = "Dev query",
-    authOptions = AdminAuth.require(),  // Protect this!
+    auth = AdminAuth.require(),  // Protect this!
     implementation = { query: String ->
         // Execute and return results
     }

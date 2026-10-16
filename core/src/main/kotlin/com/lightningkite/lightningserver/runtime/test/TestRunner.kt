@@ -1,11 +1,22 @@
+@file:OptIn(EngineApi::class)
+
 package com.lightningkite.lightningserver.runtime.test
 
+import com.lightningkite.lightningserver.EngineApi
+import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
+import com.lightningkite.lightningserver.runtime.EngineBase
+import com.lightningkite.lightningserver.runtime.execute
+import com.lightningkite.lightningserver.runtime.disconnectAndCloseAsRoot
+import com.lightningkite.lightningserver.runtime.executeInlineWithMetrics
+import com.lightningkite.lightningserver.runtime.location
+import com.lightningkite.lightningserver.runtime.messageFromClientAsRoot
+import com.lightningkite.lightningserver.runtime.messageFromSubscriptionAsRoot
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.SettingContext
@@ -50,7 +61,20 @@ import kotlin.time.Clock
 public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.test() instead.") constructor(
     public val serverBuilder: SERVER,
     private val clockGet: () -> Clock = { Clock.System },  // TODO: always use mock clock, build in advancement features
-) : ServerRuntimeBase(serverBuilder.build()) {
+) : EngineBase(serverBuilder.build()) {
+
+    /**
+     * Runs [action] as the test's own work, in a new [Execution.Direct] passed through the server's
+     * execution interceptors.
+     *
+     * Use this for anything the test does itself that needs a [ServerRuntime], such as setting up
+     * data. Calls made through the `.test()` helpers do not need it: they run as the engine would.
+     */
+    @OptIn(InternalLightningServerApi::class)
+    public suspend inline fun <T> execute(crossinline action: suspend context(ServerRuntime) () -> T): T =
+        // A test has no server-side execution behind it, so it mints Execution.Direct; see its
+        // documentation for why that hole exists.
+        execute("test", Execution.Direct(Execution.ID.generate())) { action(this) }
 
     public companion object {
         internal val logger = KotlinLogging.logger("com.lightningkite.lightningserver.TestRunner")
@@ -62,14 +86,12 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
     override val clock: Clock
         get() = clockGet()
 
-    private val settingsCache = HashMap<ServerSetting<*, *>, Any?>()
-
     private val subscriptions =
         ConcurrentHashMap<WebSocketSubscriptionRequest<*, *>, ArrayList<suspend (WebSocketSubscriptionMessage<*, *>) -> Unit>>()
 
     override suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(event: WebSocketSubscriptionMessage<PATH, T>) {
         val subscribers =
-            subscriptions[WebSocketSubscriptionRequest(topic = event.topic, rawPathArguments = event.rawPathArguments)]
+            subscriptions[WebSocketSubscriptionRequest(event)]
 //        /*logger.debug*/run { "'${event.path()}': ${event.value} (${subscribers?.size ?: 0} subscribers)" }.let(::println)
         subscribers?.forEach {
             it(event)
@@ -82,8 +104,9 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
      * Unlike production runtimes, tasks don't run in the background but complete
      * immediately, making tests deterministic.
      */
-    override suspend fun <T> Task<T>.invoke(input: T) {
-        this.executeInline(input)
+    override suspend fun <T> dispatchTask(task: Task<T>, input: T, from: Execution) {
+        @OptIn(InternalLightningServerApi::class)
+        task.executeInlineWithMetrics(input, from)
     }
 
     /**
@@ -110,6 +133,8 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
      * @param currentState The current connection state (mutable for inspection)
      * @param name Display name for debug output (default: "Client")
      */
+    // Every phase is run with the runner as the engine, as the network would trigger it in production,
+    // rather than nested inside whatever the test happens to be doing when it calls send()/close().
     public inner class TestWebSocket<PATH : PathSpec, STORAGE>(
         private val handler: WebSocketHandler<PATH, STORAGE>,
         public val request: WebSocketConnectRequest<PATH>,
@@ -119,24 +144,21 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
         public var onMessageSent: (frame: WebSocketFrame) -> Unit = {}
         public suspend fun close() {
             /*logger.debug*/run { "$name --> <close>" }.let(::println)
-            server.close(WebSocketClose.NORMAL)
-            server.clean()
+            with(this@TestRunner) { handler.disconnectAndCloseAsRoot(this@TestWebSocket.server, WebSocketClose.NORMAL) }
         }
 
         public suspend fun send(frame: WebSocketFrame) {
             /*logger.debug*/run { "$name --> '$frame'" }.let(::println)
-            with(server) {
-                handler.messageFromClient(frame)
-                flush()
-            }
+            with(this@TestRunner) { handler.messageFromClientAsRoot(this@TestWebSocket.server, frame) }
+            server.flush()
         }
 
         public val server: ServerSide = ServerSide()
 
-        public inner class ServerSide() : WebSocketConnection<PATH, STORAGE>, ServerRuntime by this@TestRunner {
+        public inner class ServerSide() : WebSocketConnection<PATH, STORAGE> {
             private val changeQueue = ArrayList<(STORAGE) -> STORAGE>()
             private val sub: suspend (WebSocketSubscriptionMessage<*, *>) -> Unit = {
-                handler.messageFromSubscription(it)
+                with(this@TestRunner) { handler.messageFromSubscriptionAsRoot(this@ServerSide, it) }
                 flush()
             }
 
@@ -145,12 +167,15 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
             override val request: WebSocketConnectRequest<PATH>
                 get() = this@TestWebSocket.request
 
+            context(server: ServerRuntime)
             override suspend fun repullState(): STORAGE = currentState
 
+            context(server: ServerRuntime)
             override suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE) {
                 changeQueue.add(modification)
             }
 
+            context(server: ServerRuntime)
             override suspend fun updateStateImmediately(modification: (STORAGE) -> STORAGE): STORAGE {
                 while (changeQueue.isNotEmpty()) {
                     this@TestWebSocket.currentState = changeQueue.removeFirst()(currentState)
@@ -166,26 +191,33 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
             }
 
             private val topics = HashSet<WebSocketSubscriptionRequest<*, *>>()
+            context(server: ServerRuntime)
             override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) {
                 if (topics.add(topic)) {
                     subscriptions.getOrPut(topic) { ArrayList() }.add(sub)
                 }
             }
 
+            context(server: ServerRuntime)
             override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) {
                 if (topics.remove(topic)) {
                     subscriptions.getOrPut(topic) { ArrayList() }.remove(sub)
                 }
             }
 
+            context(server: ServerRuntime)
             override suspend fun send(frame: WebSocketFrame) {
                 /*logger.debug*/run { "$name <-- '$frame'" }.let(::println)
                 onMessageSent(frame)
             }
 
+            context(server: ServerRuntime)
             override suspend fun close(reason: WebSocketClose) {
+                // Transport teardown only. The disconnect phase is run by whoever ends the socket (see
+                // [TestWebSocket.close], whose disconnectAndCloseAsRoot ends here); running it from here would
+                // re-enter it, since disconnect handlers close the connection themselves.
                 /*logger.debug*/run { "$name <-- <close>" }.let(::println)
-                handler.disconnect(reason)
+                clean()
             }
 
             internal fun clean() {

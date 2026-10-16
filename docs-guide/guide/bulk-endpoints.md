@@ -31,14 +31,16 @@ All examples in this chapter use the following imports:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/BulkEndpointsSamples.kt#bulk-imports -->
 ```kotlin
+import com.lightningkite.lightningserver.EngineApi
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
-import com.lightningkite.lightningserver.runtime.handle
-import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.Execution
+import com.lightningkite.lightningserver.runtime.engine
+import com.lightningkite.lightningserver.runtime.handleRoot
 import com.lightningkite.lightningserver.runtime.test.testBlocking
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.typed.*
@@ -164,7 +166,7 @@ bulk request to fail.
 ### Testing the bulk endpoint
 
 Because the bulk handler dispatches sub-requests through the registered route table, you
-must exercise it through the full HTTP pipeline (`serverRuntime.handle()`), not through
+must exercise it through the full HTTP pipeline (`engine.handleRoot()`), not through
 the typed `ApiHttpHandler.test()` helper — the typed helper calls the handler lambda
 directly and bypasses the router, so sub-request path lookups would fail.
 
@@ -173,25 +175,24 @@ directly and bypasses the router, so sub-request path lookups would fail.
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/BulkEndpointsSamples.kt#bulk-test -->
 ```kotlin
+// handleRoot is engine API: the test stands in for the engine receiving this request.
+@OptIn(EngineApi::class)
 fun bulkTest() = BulkServer.testBlocking(settings = {}) {
-    // Drive /meta/bulk through the full HTTP pipeline so the framework can resolve
-    // sub-request paths via the registered route table.  ApiHttpHandler.test() would
-    // bypass routing and cannot match sub-request paths, so we use serverRuntime.handle().
-    val response = serverRuntime.handle(
-        HttpRequest<PathSpec>(
-            path = RawHttpEndpoint(asString = "/meta/bulk", method = HttpMethod.POST),
-            queryParameters = QueryParameters.EMPTY,
-            headers = HttpHeaders.EMPTY,
-            domain = "example.com",
-            protocol = "https",
-            sourceIp = "local",
-            requestId = generateRequestId(),
-            body = TypedData.text(
-                """{"ping":{"path":"/ping","method":"GET"},"gone":{"path":"/missing","method":"GET"}}""",
-                MediaType.Application.Json,
-            ),
-        )
+    // Drive /meta/bulk through the full HTTP pipeline, as an engine would, so the framework
+    // can resolve sub-request paths via the registered route table.
+    val request = HttpRequest<PathSpec>(
+        path = RawHttpEndpoint(asString = "/meta/bulk", method = HttpMethod.POST),
+        queryParameters = QueryParameters.EMPTY,
+        headers = HttpHeaders.EMPTY,
+        domain = "example.com",
+        protocol = "https",
+        sourceIp = "local",
+        body = TypedData.text(
+            """{"ping":{"path":"/ping","method":"GET"},"gone":{"path":"/missing","method":"GET"}}""",
+            MediaType.Application.Json,
+        ),
     )
+    val response = engine.handleRoot(request, Execution.ID.generate())
 
     // The outer bulk endpoint always returns HTTP 200; per-sub-request errors appear in the body.
     check(response.status.code == 200)
@@ -213,9 +214,9 @@ fun bulkTest() = BulkServer.testBlocking(settings = {}) {
 }
 ```
 
-`testBlocking` provides a live `ServerRuntime` (as a `context` receiver), so
-`serverRuntime` and `serverRuntime.handle()` are available directly without wrapping in
-`runBlocking`.
+`testBlocking` provides the test engine as a `context` receiver, so `engine.handleRoot()`
+runs the request as a new root execution, exactly as an engine does for an incoming request,
+without wrapping in `runBlocking`.
 
 ### Telemetry: per-sub-request spans
 

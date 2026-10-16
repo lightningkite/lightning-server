@@ -88,9 +88,10 @@ abstract class BaseTerraformEmitter<S : ServerBuilder> : TerraformEmitter {
 
     // Workflow entry points:
     fun write()     // emit .tf.json files only
-    fun deploy()    // init → plan → prompt → apply
+    fun deploy(autoApprove: Boolean = false)  // init → apply (shows the plan and prompts unless autoApprove)
+    fun destroy()   // tear the deployment down, after a typed confirmation
     fun editVars()  // interactive secret editor
-    fun terraformShell()  // drop into terraform commands interactively
+    fun terraform(vararg command: String)  // run any terraform command with the deployment's environment
 }
 ```
 
@@ -178,7 +179,7 @@ project uses.
 | `Database.Settings` | `mongodbAtlasFree(orgId, zoneName)` | `mongodbatlas_project`, `mongodbatlas_advanced_cluster`, DB user, `random_password` |
 | `Database.Settings` | `mongodbAtlas(orgId, minSize, maxSize)` | As above, with auto-scaling cluster tier |
 | `Cache.Settings` | `awsDynamoDb()` | No table (DynamoDbCache auto-creates); fulfills setting with `dynamodb://region/prefix_cache` |
-| `PublicFileSystem.Settings` | `awsS3Bucket(signedUrlDuration)` | `aws_s3_bucket`, CORS config, S3 IAM policy statements |
+| `ExternalFileSystem.Settings` | `awsS3Bucket(signedUrlDuration)` | `aws_s3_bucket`, CORS config, S3 IAM policy statements |
 | `TerraformNeed<SecretBasis>` | `secretBasis.generated()` | `random_password` (32 chars) as signing secret |
 
 ### EC2
@@ -516,7 +517,7 @@ the local OS does not matter for EC2 deployments.
 
 ## What's Next
 
-- **[Deploying to AWS Lambda](aws-deployment.md)** — end-to-end Lambda deployment
+- **[Deploying to AWS Lambda](../guide/aws-deployment.md)** — end-to-end Lambda deployment
   guide including the `AwsAdapter` entry point and the deployment object.
 - **[Deploying to EC2](deploy-ec2.md)** — EC2-specific configuration and the
   rolling redeploy mechanism.

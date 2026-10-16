@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.notifications.events.UserEventType
 import com.lightningkite.lightningserver.notifications.events.event
 import com.lightningkite.lightningserver.notifications.subscriptions.*
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.settings.setStatic
 import com.lightningkite.lightningserver.typed.sdk.module
@@ -83,13 +84,15 @@ class NotificationFlowTest {
         }) {
             runBlocking {
                 val user = TestUser(name = "E2EUser", email = "e2e@example.com", phone = "1234567890")
-                NonCustomServer.userInfo.table().insertOne(user)
+                execute {
+                    NonCustomServer.userInfo.table().insertOne(user)
 
-                val model = TestModel(name = "E2EModel", ownerId = user._id)
-                NonCustomNotifications.modelCreated(model)
+                    val model = TestModel(name = "E2EModel", ownerId = user._id)
+                    NonCustomNotifications.modelCreated(model)
+                }
 
                 // Verify notification created
-                val notifications = NonCustomNotifications.Dispatcher.info.table().all().toList()
+                val notifications = execute { NonCustomNotifications.Dispatcher.info.table().all().toList() }
                 val userNotif = notifications.find { it.user == user._id }
                 assertNotNull(userNotif)
                 assertEquals("Created: E2EModel", userNotif.content)
@@ -168,12 +171,14 @@ class NotificationFlowTest {
         }) {
             runBlocking {
                 val user = TestUser(name = "FreqDefaultUser", email = "freq@example.com")
-                FreqCustomServer.userInfo.table().insertOne(user)
+                val notifications = execute {
+                    FreqCustomServer.userInfo.table().insertOne(user)
 
-                val model = TestModel(name = "FreqModel", ownerId = user._id)
-                FreqCustomNotifications.modelCreated(model)
+                    val model = TestModel(name = "FreqModel", ownerId = user._id)
+                    FreqCustomNotifications.modelCreated(model)
 
-                val notifications = FreqCustomNotifications.Dispatcher.info.table().all().toList()
+                    FreqCustomNotifications.Dispatcher.info.table().all().toList()
+                }
                 val userNotif = notifications.find { it.user == user._id }
                 assertNotNull(userNotif)
 
@@ -192,24 +197,28 @@ class NotificationFlowTest {
         }) {
             runBlocking {
                 val user = TestUser(name = "FreqOverrideUser", email = "override@example.com")
-                FreqCustomServer.userInfo.table().insertOne(user)
+                execute {
+                    FreqCustomServer.userInfo.table().insertOne(user)
 
-                // Set user preference to disable email
-                FreqCustomNotifications.subs.info.table().insertOne(
-                    NotificationSendMethods(
-                        _id = UserEventType(user._id, FreqCustomNotifications.modelCreated.event.name),
-                        email = null, // Disable email
-                        sms = Frequency.immediately(),
-                        push = null,
-                        inApp = Frequency.immediately()
+                    // Set user preference to disable email
+                    FreqCustomNotifications.subs.info.table().insertOne(
+                        NotificationSendMethods(
+                            _id = UserEventType(user._id, FreqCustomNotifications.modelCreated.event.name),
+                            email = null, // Disable email
+                            sms = Frequency.immediately(),
+                            push = null,
+                            inApp = Frequency.immediately()
+                        )
                     )
-                )
+                }
 
                 val initialEmailCount = testEmail!!.sentEmails.size
-                val model = TestModel(name = "OverrideModel", ownerId = user._id)
-                FreqCustomNotifications.modelCreated(model)
+                val notifications = execute {
+                    val model = TestModel(name = "OverrideModel", ownerId = user._id)
+                    FreqCustomNotifications.modelCreated(model)
 
-                val notifications = FreqCustomNotifications.Dispatcher.info.table().all().toList()
+                    FreqCustomNotifications.Dispatcher.info.table().all().toList()
+                }
                 val userNotif = notifications.find { it.user == user._id }
                 assertNotNull(userNotif)
 
@@ -287,12 +296,14 @@ class NotificationFlowTest {
         }) {
             runBlocking {
                 val user = TestUser(name = "FullCustomUser", email = "fullcustom@example.com")
-                FullCustomServer.userInfo.table().insertOne(user)
+                val notifications = execute {
+                    FullCustomServer.userInfo.table().insertOne(user)
 
-                val model = TestModel(name = "FullCustomModel", ownerId = user._id)
-                FullCustomNotifications.modelCreated(model)
+                    val model = TestModel(name = "FullCustomModel", ownerId = user._id)
+                    FullCustomNotifications.modelCreated(model)
 
-                val notifications = FullCustomNotifications.Dispatcher.info.table().all().toList()
+                    FullCustomNotifications.Dispatcher.info.table().all().toList()
+                }
                 val userNotif = notifications.find { it.user == user._id }
                 assertNotNull(userNotif)
                 assertEquals("Created: FullCustomModel", userNotif.content)
@@ -317,7 +328,7 @@ class NotificationFlowTest {
                 // Don't insert any user - the owner ID won't match anyone
                 val initialEmailCount = testEmail!!.sentEmails.size
                 val model = TestModel(name = "NoSubModel", ownerId = Uuid.random())
-                NonCustomNotifications.modelCreated(model)
+                execute { NonCustomNotifications.modelCreated(model) }
 
                 // The subscriber generator returns a set with the ownerId,
                 // but since no user is found, no notification should be dispatched successfully
@@ -339,13 +350,15 @@ class NotificationFlowTest {
             runBlocking {
                 val user1 = TestUser(name = "User1", email = "user1@example.com")
                 val user2 = TestUser(name = "User2", email = "user2@example.com")
-                NonCustomServer.userInfo.table().insertOne(user1)
-                NonCustomServer.userInfo.table().insertOne(user2)
+                val notifications = execute {
+                    NonCustomServer.userInfo.table().insertOne(user1)
+                    NonCustomServer.userInfo.table().insertOne(user2)
 
-                NonCustomNotifications.modelCreated(TestModel(name = "M1", ownerId = user1._id))
-                NonCustomNotifications.modelCreated(TestModel(name = "M2", ownerId = user2._id))
+                    NonCustomNotifications.modelCreated(TestModel(name = "M1", ownerId = user1._id))
+                    NonCustomNotifications.modelCreated(TestModel(name = "M2", ownerId = user2._id))
 
-                val notifications = NonCustomNotifications.Dispatcher.info.table().all().toList()
+                    NonCustomNotifications.Dispatcher.info.table().all().toList()
+                }
                 assertTrue(notifications.any { it.user == user1._id })
                 assertTrue(notifications.any { it.user == user2._id })
 
@@ -415,9 +428,11 @@ class NotificationFlowTest {
         ) {
             runBlocking {
                 val user = TestUser(name = "MixedUser", phone = "1234567890", email = "mixed@example.com")
-                TimeTravelServer.userInfo.table().insertOne(user)
+                execute {
+                    TimeTravelServer.userInfo.table().insertOne(user)
 
-                TimeTravelNotifications.mixedChannels(TestModel(name = "MixedModel", ownerId = user._id))
+                    TimeTravelNotifications.mixedChannels(TestModel(name = "MixedModel", ownerId = user._id))
+                }
 
                 // Email should be sent immediately
                 assertTrue(testEmail!!.sentEmails.isNotEmpty(), "Email should send immediately")
@@ -426,7 +441,7 @@ class NotificationFlowTest {
                 assertTrue(testSms!!.messageHistory.isEmpty(), "SMS should not send immediately")
 
                 // Verify notification state
-                val notifications = TimeTravelNotifications.Dispatcher.info.table().all().toList()
+                val notifications = execute { TimeTravelNotifications.Dispatcher.info.table().all().toList() }
                 val userNotif = notifications.find { it.user == user._id }
                 assertNotNull(userNotif)
                 assertTrue(userNotif.email?.sent ?: false, "Email should be marked sent")
@@ -436,7 +451,7 @@ class NotificationFlowTest {
                 clock.measuredFrom = clock.measuredFrom + 2.hours
 
                 // Refresh to send delayed notifications
-                TimeTravelNotifications.Dispatcher.refreshNotifications()
+                execute { TimeTravelNotifications.Dispatcher.refreshNotifications() }
 
                 // SMS should now be sent
                 assertTrue(testSms.messageHistory.isNotEmpty(), "SMS should send after time travel")

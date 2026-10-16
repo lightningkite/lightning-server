@@ -6,14 +6,15 @@ integration.
 
 ## Overview
 
-The sessions system consists of six modules:
+The sessions system consists of these modules:
 
 - **sessions-shared** - Multiplatform data models and client interfaces
-- **sessions** - JVM server-side implementation with proof methods
-- **sessions-email** - Email-based authentication (magic links, PIN codes)
+- **sessions** - JVM server-side implementation with the password, backup code, and known device proof methods
+- **sessions-email** - Email-based authentication (PIN codes)
 - **sessions-sms** - SMS-based authentication (PIN codes)
 - **sessions-totp** - Time-based one-time passwords from authenticator apps
 - **sessions-webauthn** - WebAuthn / passkey authentication
+- **sessions-oauth** and **sessions-oauth-shared** - Logging in through OAuth providers
 
 ## Key Concepts
 
@@ -49,11 +50,11 @@ Instead of just "username and password", Lightning Server uses a flexible **proo
 Simple (strength 10 required):
 - Password proof (strength 10) → Login successful
 
-Two-factor (strength 10 required):
-- Email proof (strength 5) + TOTP proof (strength 5) → Login successful
+Two-factor (strength 20 required):
+- Password proof (strength 10) + TOTP proof (strength 10) → Login successful
 
-Stepped-down on known device (strength 10 required):
-- Password proof (strength 10) + Known device (reduces requirement to 5) → Login successful with less friction
+Lower friction on a known device (strength 13 required):
+- Password proof (strength 10) + Known device proof (strength 3) → Login successful without a second factor
 ```
 
 ### Available Proof Methods
@@ -61,20 +62,26 @@ Stepped-down on known device (strength 10 required):
 | Method           | Strength | Description                                     |
 |------------------|----------|-------------------------------------------------|
 | **Password**     | 10       | Traditional password authentication             |
-| **Email**        | 5        | PIN code or magic link via email                |
+| **Email**        | 10       | PIN code via email                              |
 | **SMS**          | 5        | PIN code via text message                       |
-| **TOTP**         | 5        | Time-based codes from authenticator apps        |
+| **TOTP**         | 10       | Time-based codes from authenticator apps        |
 | **WebAuthn**     | 10       | Hardware keys, Touch ID, Face ID, Windows Hello |
-| **Backup Code**  | 10       | Single-use recovery codes                       |
-| **Known Device** | N/A      | Reduces strength requirement on trusted devices |
+| **OAuth**        | 10       | Logging in through an external provider         |
+| **Backup Code**  | 0 / 10   | Single-use recovery codes; see below            |
+| **Known Device** | 3        | A device the user has logged in from before     |
+
+Only the strongest method for each property counts, so two email-based methods do not add up. The strength a user must
+reach is capped at the most their established methods could provide.
+
+Backup codes report a strength of 0, so having them never raises the strength a user must reach, but each backup code
+proof counts 10 at login, so it can stand in for one lost factor.
 
 ## Basic Usage
 
 ### 1. Define Your User Model
 
 ```kotlin
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class User(
     override val _id: Uuid = Uuid.random(),
     val email: String,
@@ -89,7 +96,7 @@ data class User(
 object Server : ServerBuilder() {
     val database = setting("database", Database.Settings())
     val cache = setting("cache", Cache.Settings())
-    val email = setting("email", Email.Settings())
+    val email = setting("email", EmailService.Settings())
 
     // AuthEndpoints subclasses SessionManager; one object provides both session
     // management and authentication endpoints.
@@ -107,13 +114,13 @@ object Server : ServerBuilder() {
             7.days
 
         context(server: ServerRuntime)
-        override suspend fun requiredProofStrengthFor(subject: User): Int = 100
+        override suspend fun requiredProofStrengthFor(subject: User): Int = 10
     }
 
     // Add proof methods
     val pinHandler = PinHandler(
         cache = cache,
-        pinGenerator = { BadWordList.avoidingPin(length = 6) },
+        keyPrefix = "pins",
         expiration = 10.minutes
     )
 
@@ -123,7 +130,7 @@ object Server : ServerBuilder() {
         emailTemplate = { email, pin ->
             Email(
                 subject = "Your login code",
-                to = listOf(EmailAddress(email)),
+                to = listOf(EmailAddressWithName(email)),
                 plainText = "Your verification code is: $pin"
             )
         }
@@ -210,7 +217,7 @@ browser doesn't cut it off.
 
 ### Known Device Authentication
 
-Reduce friction on trusted devices:
+Reduce friction on devices the user has logged in from before:
 
 ```kotlin
 // After successful login on new device
@@ -219,7 +226,7 @@ val deviceSecret = knownDeviceProof.establishKnownDeviceV2()
 
 // On subsequent logins
 val knownDeviceProof = knownDeviceProof.proveKnownDevice(deviceSecret.secret)
-// This reduces the required proof strength
+// Adds strength 3 to the login, alongside the user's other proofs
 ```
 
 ### TOTP Setup
@@ -235,6 +242,9 @@ val qrCodeUrl = totpProof.establishOneTimePassword(
 totpProof.confirmOneTimePassword("123456")
 ```
 
+Establishing a new authenticator does not disable the existing one. It stays active until the new one is confirmed, so
+abandoning setup never locks a user out.
+
 ### Session Management
 
 ```kotlin
@@ -249,6 +259,46 @@ authEndpoints.terminateSession()
 
 // Terminate specific session (logout from another device)
 authEndpoints.terminateSession(sessionId)
+```
+
+Sessions are marked terminated, never deleted, and nothing can delete one through the REST endpoints, not even a
+superuser. Terminating a session also terminates every sub-session derived from it. Access tokens that were already
+issued stay valid until they expire.
+
+### Observing Authentication Events
+
+`sessions` reports what happens during authentication as `AuthEvent`s: sessions created, terminated, and rejected, and
+proofs issued, accepted, and rejected. Install an `AuthEventListener` to receive them:
+
+```kotlin
+object Server : ServerBuilder() {
+    init {
+        install(object : AuthEventListener {
+            context(runtime: ServerRuntime)
+            override suspend fun onEvent(event: AuthEvent) {
+                if (event is AuthEvent.ProofCredentialRejected) runtime.logger.warn { "Rejected proof for ${event.principal}" }
+            }
+        })
+    }
+}
+```
+
+A listener's exception is logged and does not affect the request that raised the event. The audit module's
+`AuthEventLog` is a listener that records these events to the database.
+
+### Hooks on Proof Tables
+
+The password, TOTP, known device, and WebAuthn endpoints take a `signals` parameter that decorates their secrets table,
+for example to observe changes. `PasswordProofEndpoints` also takes `evaluatePassword`, called with each new password
+before it is hashed, so you can reject weak ones:
+
+```kotlin
+val passwordProof = PasswordProofEndpoints(
+    database, cache,
+    evaluatePassword = { info ->
+        if (info.password.length < 12) throw BadRequestException("Passwords must be at least 12 characters")
+    },
+)
 ```
 
 ## Security Considerations
@@ -268,8 +318,10 @@ authEndpoints.terminateSession(sessionId)
 ```kotlin
 val pinHandler = PinHandler(
     cache = cache,
-    pinGenerator = { BadWordList.avoidingPin(length = 6) }, // Avoids offensive words
-    expiration = 10.minutes // How long PINs remain valid
+    keyPrefix = "pins",     // Namespaces this handler's cache entries
+    length = 6,             // PIN length
+    expiration = 10.minutes, // How long PINs remain valid
+    maxAttempts = 5,        // Guesses allowed per PIN
 )
 ```
 
@@ -278,10 +330,11 @@ val pinHandler = PinHandler(
 By default, sessions use compact signed tokens. For JWT:
 
 ```kotlin
-val userAuth = object : SessionManager<User, Uuid>(
-    principal = userPrincipal,
+val auth = object : AuthEndpoints<User, Uuid>(
+    principal = UserPrincipal,
     database = database,
-    tokenFormat = Runtime { JwtTokenFormat(secretBasis()) }
+    cache = cache,
+    tokenFormat = Runtime { JwtTokenFormat() }
 ) { /* ... */ }
 ```
 
@@ -290,11 +343,10 @@ val userAuth = object : SessionManager<User, Uuid>(
 Customize required strength per user:
 
 ```kotlin
-context(ServerRuntime)
-override suspend fun requiredProofStrengthFor(user: User): Int {
+context(_: ServerRuntime)
+override suspend fun requiredProofStrengthFor(subject: User): Int {
     return when {
-        user.isAdmin -> 15 // Admins need stronger auth
-        user.email.endsWith("@trusted-domain.com") -> 5 // Trusted users need less
+        subject.isAdmin -> 20 // Admins need a second factor
         else -> 10 // Default
     }
 }
@@ -307,16 +359,13 @@ Use mock services for unit testing:
 ```kotlin
 class AuthTest {
     @Test
-    fun testLogin() = runBlocking {
-        val engine = LocalEngine(Server.build())
-
-        // Test login endpoint
-        val response = Server.auth.login.test(
-            engine = engine,
+    fun testLogin() = Server.testBlocking(settings = {}) {
+        val result = Server.auth.login.test(
+            auth = null,
             input = listOf(/* proofs */)
         )
 
-        assertEquals(HttpStatus.OK, response.status)
+        assertNotNull(result.refreshToken)
     }
 }
 ```

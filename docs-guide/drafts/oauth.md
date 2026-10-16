@@ -442,7 +442,7 @@ The `OauthProviderInfo.apple` object uses `SettingInfo.apple` which calls `Oauth
 ## Further reading
 
 - [Proof & Session Authentication](../guide/proof-session.md) — the full proof model, session exchange, and bearer token lifecycle
-- [Authentication & Sessions](../guide/auth.md) — `PrincipalType`, `authOptions`, reading `auth` inside handlers
+- [Authentication & Sessions](../guide/auth.md) — `PrincipalType`, `require()`, reading `auth` inside handlers
 - Demo server: `demo/src/main/kotlin/com/lightningkite/lightningserver/demo/Server.kt` — working GitHub OAuth wiring
 - `sessions-oauth/src/main/kotlin/.../sessions/proofs/OauthProofEndpoints.kt` — `OauthProofEndpoints` source
 - `sessions-oauth/src/main/kotlin/.../sessions/proofs/oauth/OauthProviderInfo.kt` — built-in provider definitions

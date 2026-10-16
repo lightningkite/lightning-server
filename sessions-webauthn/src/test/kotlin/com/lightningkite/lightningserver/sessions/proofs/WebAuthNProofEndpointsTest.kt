@@ -8,9 +8,12 @@ import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.encryption.SecretBasis
 import com.lightningkite.lightningserver.encryption.signer
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.TestRunner
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
 import com.lightningkite.lightningserver.typed.AuthAccess
 import com.lightningkite.lightningserver.typed.test
@@ -114,6 +117,7 @@ class WebAuthNProofEndpointsTest {
         val cache = setting("cache", Cache.Settings("ram"))
 
         init {
+            registerBasicMediaTypeCoders()
             register(TestUser)
             register(TestAdmin)
         }
@@ -150,7 +154,7 @@ class WebAuthNProofEndpointsTest {
         TestUser(email = email).also { TestUser.users[it._id] = it }
 
     @Suppress("UNCHECKED_CAST")
-    context(runtime: ServerRuntime)
+    context(runtime: Engine)
     private fun authFor(user: TestUser, issuedAt: kotlin.time.Instant = Clock.System.now()): Authentication<HasId<*>> =
         TestUser.testAuth(user, issuedAt = issuedAt) as Authentication<HasId<*>>
 
@@ -184,7 +188,7 @@ class WebAuthNProofEndpointsTest {
     ): WebAuthN.Authentication.StartResponse =
         this.start.test(auth, WebAuthN.Authentication.StartRequest(type, proof))
 
-    context(test: TestRunner<*>)
+    context(test: TestRunner<*>, server: ServerRuntime)
     private suspend fun WebAuthNProofEndpoints.stored(authenticator: FakeAuthenticator): WebAuthNCredential =
         modelInfo.table().get(authenticator.id)!!
 
@@ -206,7 +210,7 @@ class WebAuthNProofEndpointsTest {
             val key = FakeAuthenticator()
             server.webAuthN.register(user, key)
 
-            val stored = server.webAuthN.stored(key)
+            val stored = execute { server.webAuthN.stored(key) }
             assertEquals(user._id.toString(), stored.subjectId)
             assertEquals("TestUser", stored.subjectType)
             assertEquals(false, stored.backupEligible)
@@ -218,8 +222,8 @@ class WebAuthNProofEndpointsTest {
             assertEquals("TestUser/_id", proof.property)
             assertEquals(user._id.toString(), proof.value)
             assertEquals(10, proof.strength)
-            assertTrue(server.webAuthN.isValid(proof))
-            assertEquals(1L, server.webAuthN.stored(key).lastSignCount)
+            assertTrue(execute { server.webAuthN.isValid(proof) })
+            assertEquals(1L, execute { server.webAuthN.stored(key).lastSignCount })
         }
     }
 
@@ -254,7 +258,7 @@ class WebAuthNProofEndpointsTest {
                     key.register(started.challengeId, started.options.challenge, origin = "https://evil.example.com")
                 )
             }
-            assertNull(server.webAuthN.modelInfo.table().get(key.id))
+            assertNull(execute { server.webAuthN.modelInfo.table().get(key.id) })
         }
     }
 
@@ -457,7 +461,7 @@ class WebAuthNProofEndpointsTest {
                     key.register(started.challengeId, started.options.challenge, claimedId = squatted)
                 )
             }
-            assertNull(server.webAuthN.modelInfo.table().get(squatted))
+            assertNull(execute { server.webAuthN.modelInfo.table().get(squatted) })
         }
     }
 
@@ -468,7 +472,7 @@ class WebAuthNProofEndpointsTest {
         val server = server()
         server.test({}) {
             val user = newUser()
-            for (endpoint in listOf(server.webAuthN.registerStart.auth, server.webAuthN.registerFinish.auth)) {
+            for (endpoint in listOf(server.webAuthN.registerStart.auth, server.webAuthN.registerFinish.auth)) execute {
                 assertIs<AuthRequirement.Result.Accepted<*>>(endpoint.check(authFor(user)))
                 assertIs<AuthRequirement.Result.Rejected>(
                     endpoint.check(authFor(user, issuedAt = Clock.System.now() - 1.hours))
@@ -495,15 +499,15 @@ class WebAuthNProofEndpointsTest {
         server.test({}) {
             val reported = FakeAuthenticator()
             server.webAuthN.register(newUser(), reported, credProps = true)
-            assertTrue(server.webAuthN.stored(reported).residentKey)
+            assertTrue(execute { server.webAuthN.stored(reported).residentKey })
 
             val synced = FakeAuthenticator(backupEligible = true)
             server.webAuthN.register(newUser(), synced)
-            assertTrue(server.webAuthN.stored(synced).residentKey)
+            assertTrue(execute { server.webAuthN.stored(synced).residentKey })
 
             val unknown = FakeAuthenticator()
             server.webAuthN.register(newUser(), unknown, hint = WebAuthN.GeneralPreference.Discouraged)
-            assertFalse(server.webAuthN.stored(unknown).residentKey)
+            assertFalse(execute { server.webAuthN.stored(unknown).residentKey })
         }
     }
 
@@ -518,14 +522,17 @@ class WebAuthNProofEndpointsTest {
             server.webAuthN.register(user, key)
             val started = server.webAuthN.start()
             server.webAuthN.prove.test(null, key.assert(started.challengeId, started.options.challenge))
-            assertEquals(1L, server.webAuthN.stored(key).lastSignCount)
 
-            val ownersView = server.webAuthN.modelInfo.table(AuthAccess(authFor(user)))
-            runCatching { ownersView.updateOneById(key.id, modification { it.lastSignCount assign 0L }) }
-            assertEquals(1L, server.webAuthN.stored(key).lastSignCount)
+            execute {
+                assertEquals(1L, server.webAuthN.stored(key).lastSignCount)
 
-            ownersView.updateOneById(key.id, modification { it.disabledAt assign Clock.System.now() })
-            assertNotNull(server.webAuthN.stored(key).disabledAt)
+                val ownersView = server.webAuthN.modelInfo.table(AuthAccess(authFor(user)))
+                runCatching { ownersView.updateOneById(key.id, modification { it.lastSignCount assign 0L }) }
+                assertEquals(1L, server.webAuthN.stored(key).lastSignCount)
+
+                ownersView.updateOneById(key.id, modification { it.disabledAt assign Clock.System.now() })
+                assertNotNull(server.webAuthN.stored(key).disabledAt)
+            }
         }
     }
 
@@ -535,8 +542,10 @@ class WebAuthNProofEndpointsTest {
         server.test({}) {
             val key = FakeAuthenticator()
             server.webAuthN.register(newUser(), key)
-            server.webAuthN.modelInfo.table()
-                .updateOneById(key.id, modification { it.disabledAt assign Clock.System.now() })
+            execute {
+                server.webAuthN.modelInfo.table()
+                    .updateOneById(key.id, modification { it.disabledAt assign Clock.System.now() })
+            }
 
             val started = server.webAuthN.start()
             assertRejected("Failed to verify Authenticator") {
@@ -568,12 +577,17 @@ class WebAuthNProofEndpointsTest {
         server.test({}) {
             val key = FakeAuthenticator(backupEligible = true)
             server.webAuthN.register(newUser(), key)
-            assertEquals(true, server.webAuthN.stored(key).backupEligible)
-            assertEquals(false, server.webAuthN.stored(key).backupState)
+
+            execute {
+                assertEquals(true, server.webAuthN.stored(key).backupEligible)
+                assertEquals(false, server.webAuthN.stored(key).backupState)
+            }
 
             val synced = server.webAuthN.start()
             server.webAuthN.prove.test(null, key.assert(synced.challengeId, synced.options.challenge, backupState = true))
-            assertEquals(true, server.webAuthN.stored(key).backupState)
+            execute {
+                assertEquals(true, server.webAuthN.stored(key).backupState)
+            }
 
             val flipped = server.webAuthN.start()
             assertRejected("Failed to verify Authenticator") {
@@ -590,16 +604,21 @@ class WebAuthNProofEndpointsTest {
         val server = server()
         server.test({}) {
             val user = newUser()
-            assertFalse(server.webAuthN.established(TestUser, user))
+            execute {
+                assertFalse(server.webAuthN.established(TestUser, user))
+            }
 
             val key = FakeAuthenticator()
             server.webAuthN.register(user, key)
-            assertTrue(server.webAuthN.established(TestUser, user))
-            assertFalse(server.webAuthN.established(TestAdmin, TestAdmin(user._id)))
+            execute {
+                assertTrue(server.webAuthN.established(TestUser, user))
+                assertFalse(server.webAuthN.established(TestAdmin, TestAdmin(user._id)))
 
-            server.webAuthN.modelInfo.table()
-                .updateOneById(key.id, modification { it.disabledAt assign Clock.System.now() })
-            assertFalse(server.webAuthN.established(TestUser, user))
+                server.webAuthN.modelInfo.table()
+                    .updateOneById(key.id, modification { it.disabledAt assign Clock.System.now() })
+
+                assertFalse(server.webAuthN.established(TestUser, user))
+            }
         }
     }
 

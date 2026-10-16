@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.LSError
+import com.lightningkite.lightningserver.OverrideOnly
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.pathing.PathSpec
@@ -26,7 +27,13 @@ public interface ApiWebSocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
     override val storageSerializer: KSerializer<ApiWebSocketStorage<STORAGE>>
         get() = ApiWebSocketStorage.serializer(innerStorageSerializer)
 
-    public interface Connection<PATH : PathSpec, STORAGE, USER : HasId<*>?, INPUT, OUTPUT> : ServerRuntime {
+    /**
+     * The typed view of one socket: its request, its decoded state, and typed sending.
+     *
+     * The socket alone, like [WebSocketConnection] underneath it. The server it runs on arrives
+     * separately, as the [ServerRuntime] context of every `*Typed` method below.
+     */
+    public interface Connection<PATH : PathSpec, STORAGE, USER : HasId<*>?, INPUT, OUTPUT> {
         public val request: WebSocketConnectRequest<PATH>
         public val currentState: STORAGE
         public suspend fun auth(): Authentication<USER & Any>?
@@ -39,24 +46,33 @@ public interface ApiWebSocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
         public suspend fun close(reason: WebSocketClose)
     }
 
-    public context(serverRuntime: ServerRuntime)
-    suspend fun willConnectTyped(access: WebSocketConnectRequestAccess<PATH, USER>): STORAGE
+    /*
+     * The typed phases mirror the raw ones: the server is the context and the socket is an argument,
+     * because they have different lifetimes. On a serverless engine each phase is a separate
+     * invocation with its own runtime, while the connection persists across all of them.
+     */
+    context(serverRuntime: ServerRuntime)
+    public suspend fun willConnectTyped(access: WebSocketConnectRequestAccess<PATH, USER>): STORAGE
 
-    public context(connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>)
-    suspend fun didConnectTyped()
+    context(serverRuntime: ServerRuntime)
+    public suspend fun didConnectTyped(connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>)
 
-    public context(connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>)
-    suspend fun messageFromClientTyped(frame: INPUT)
+    context(serverRuntime: ServerRuntime)
+    public suspend fun messageFromClientTyped(connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>, frame: INPUT)
 
-    public context(connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>)
-    suspend fun messageFromSubscriptionTyped(topic: WebSocketSubscriptionMessage<*, *>)
+    context(serverRuntime: ServerRuntime)
+    public suspend fun messageFromSubscriptionTyped(
+        connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>,
+        topic: WebSocketSubscriptionMessage<*, *>,
+    )
 
-    public context(connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>)
-    suspend fun disconnectTyped(reason: WebSocketClose)
+    context(serverRuntime: ServerRuntime)
+    public suspend fun disconnectTyped(connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>, reason: WebSocketClose)
 
 
-    override context(serverRuntime: ServerRuntime)
-    suspend fun willConnect(request: WebSocketConnectRequest<PATH>): ApiWebSocketStorage<STORAGE> {
+    @OverrideOnly
+    context(serverRuntime: ServerRuntime)
+    override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): ApiWebSocketStorage<STORAGE> {
         return willConnectTyped(WebSocketConnectRequestAccess(request, request.auth(auth))).let {
             ApiWebSocketStorage(
                 request.headers.accept.firstOrNull()?.takeUnless { it.type == "*" }
@@ -67,70 +83,72 @@ public interface ApiWebSocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
         }
     }
 
-    override context(connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>)
-    suspend fun didConnect() {
-        with(ConnectionWrapper<PATH, STORAGE, USER, INPUT, OUTPUT>(connection, outputType, auth)) { didConnectTyped() }
+    @OverrideOnly
+    context(serverRuntime: ServerRuntime)
+    override suspend fun didConnect(connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>) {
+        didConnectTyped(connection.typed())
     }
 
-    override context(connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>)
-    suspend fun messageFromClient(frame: WebSocketFrame) {
+    @OverrideOnly
+    context(serverRuntime: ServerRuntime)
+    override suspend fun messageFromClient(
+        connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>,
+        frame: WebSocketFrame,
+    ) {
         val parsed = try {
-            connection.currentState.mediaType.decoder!!(frame, inputType)
+            connection.currentState.mediaType.decoder!!.decode(frame, inputType)
         } catch (e: SerializationException) {
             throw BadRequestException(e.message ?: "Could not parse", cause = e)
         }
-        with(
-            ConnectionWrapper<PATH, STORAGE, USER, INPUT, OUTPUT>(
-                connection,
-                outputType,
-                auth
-            )
-        ) { messageFromClientTyped(parsed) }
+        messageFromClientTyped(connection.typed(), parsed)
     }
 
-    override context(connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>)
-    suspend fun messageFromSubscription(topic: WebSocketSubscriptionMessage<*, *>) {
-        with(
-            ConnectionWrapper<PATH, STORAGE, USER, INPUT, OUTPUT>(
-                connection,
-                outputType,
-                auth
-            )
-        ) { messageFromSubscriptionTyped(topic) }
+    @OverrideOnly
+    context(serverRuntime: ServerRuntime)
+    override suspend fun messageFromSubscription(
+        connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>,
+        topic: WebSocketSubscriptionMessage<*, *>,
+    ) {
+        messageFromSubscriptionTyped(connection.typed(), topic)
     }
 
-    override context(connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>)
-    suspend fun disconnect(reason: WebSocketClose) {
-        with(ConnectionWrapper<PATH, STORAGE, USER, INPUT, OUTPUT>(connection, outputType, auth)) {
-            disconnectTyped(
-                reason
-            )
+    @OverrideOnly
+    context(serverRuntime: ServerRuntime)
+    override suspend fun disconnect(
+        connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>,
+        reason: WebSocketClose,
+    ) {
+        disconnectTyped(connection.typed(), reason)
+    }
+
+    /** Presents the raw connection as the typed one this handler's own methods are written against. */
+    context(serverRuntime: ServerRuntime)
+    private fun WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>.typed(): Connection<PATH, STORAGE, USER, INPUT, OUTPUT> {
+        class ConnectionWrapper(
+            val wraps: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>,
+            val outputSerializer: KSerializer<OUTPUT>,
+            val authRequirement: AuthRequirement<USER>,
+        ) : ApiWebSocketHandler.Connection<PATH, STORAGE, USER, INPUT, OUTPUT> {
+            override suspend fun auth(): Authentication<USER & Any>? = wraps.request.auth(authRequirement)
+            override val request: WebSocketConnectRequest<PATH> get() = wraps.request
+            override val currentState: STORAGE get() = wraps.currentState.storage
+            override suspend fun repullState(): STORAGE = wraps.repullState().storage
+            override suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE) =
+                wraps.queueStateUpdate { it.copy(storage = modification(it.storage)) }
+
+            override suspend fun updateStateImmediately(modification: (STORAGE) -> STORAGE): STORAGE =
+                wraps.updateStateImmediately { it.copy(storage = modification(it.storage)) }.storage
+
+            override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) = wraps.subscribe(topic)
+            override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) = wraps.unsubscribe(topic)
+            override suspend fun send(frame: OUTPUT) {
+                wraps.send(wraps.currentState.mediaType.encoder!!.ws(wraps.currentState.mediaType, outputSerializer, frame))
+            }
+
+            override suspend fun close(reason: WebSocketClose) = wraps.close(reason)
         }
+        return ConnectionWrapper(this, outputType, auth)
     }
-}
-
-
-private class ConnectionWrapper<PATH : PathSpec, STORAGE, USER : HasId<*>?, INPUT, OUTPUT>(
-    val wraps: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>,
-    val outputSerializer: KSerializer<OUTPUT>,
-    val authRequirement: AuthRequirement<USER>,
-) : ApiWebSocketHandler.Connection<PATH, STORAGE, USER, INPUT, OUTPUT>, ServerRuntime by wraps {
-    override suspend fun auth(): Authentication<USER & Any>? = wraps.request.auth(authRequirement)
-    override val request: WebSocketConnectRequest<PATH> get() = wraps.request
-    override val currentState: STORAGE get() = wraps.currentState.storage
-    override suspend fun repullState(): STORAGE = wraps.repullState().storage
-    override suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE) =
-        wraps.queueStateUpdate { it.copy(storage = modification(it.storage)) }
-
-    override suspend fun updateStateImmediately(modification: (STORAGE) -> STORAGE): STORAGE =
-        wraps.updateStateImmediately { it.copy(storage = modification(it.storage)) }.storage
-
-    override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) = wraps.subscribe(topic)
-    override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) = wraps.unsubscribe(topic)
-    override suspend fun send(frame: OUTPUT) =
-        wraps.send(wraps.currentState.mediaType.encoder!!.ws(wraps.currentState.mediaType, outputSerializer, frame))
-
-    override suspend fun close(reason: WebSocketClose) = wraps.close(reason)
 }
 
 

@@ -4,7 +4,9 @@ import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.runtime.ExecutionInterceptor
 import com.lightningkite.lightningserver.serialization.*
+import com.lightningkite.lightningserver.serialization.EncodingInterceptor
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.Setting
 import com.lightningkite.services.SettingContext
@@ -84,16 +86,18 @@ public abstract class ServerBuilder : Extendable {
     private val settings: ListRegistry<ServerSetting<*, *>> = ListRegistry()
     private val settingOverrides: MapRegistry<ServerSetting<*, *>, Runtime<*>> = MapRegistry()
 
-    private val httpConnectionInterceptors: ListRegistry<HttpConnectionInterceptor> = ListRegistry()
-    private val httpLogicalInterceptors: ListRegistry<HttpLogicalInterceptor> = ListRegistry()
+    private val executionInterceptors: ListRegistry<ExecutionInterceptor> = ListRegistry()
+
+    private val httpInterceptors: ListRegistry<HttpInterceptor> = ListRegistry()
     private val httpHandlers: PathSpecRegistry<MapRegistry<HttpMethod, HttpHandler<*>>> = PathSpecRegistry()
 
-    private val webSocketConnectionInterceptors: ListRegistry<WebSocketConnectionInterceptor> = ListRegistry()
-    private val webSocketLogicalInterceptors: ListRegistry<WebSocketLogicalInterceptor> = ListRegistry()
+    private val webSocketInterceptors: ListRegistry<WebSocketInterceptor> = ListRegistry()
     private val webSocketHandlers: PathSpecRegistry<WebSocketHandler<*, *>> = PathSpecRegistry()
     private val webSocketTopics: PathSpecRegistry<WebSocketTopic<*, *>> = PathSpecRegistry()
 
-    private var exceptionHandler: ExceptionHttpHandler = DefaultExceptionHttpHandler
+    private val encodingInterceptors: ListRegistry<EncodingInterceptor> = ListRegistry()
+
+    protected var exceptionHandler: HttpExceptionHandler = HttpExceptionHandler.Default
 
     private val preDeployTasks: MapRegistry<PathSpec0, PreDeployTask> = MapRegistry()
     private val startupTasks: MapRegistry<PathSpec0, StartupTask> = MapRegistry()
@@ -108,35 +112,28 @@ public abstract class ServerBuilder : Extendable {
     private val imports: ListRegistry<Locationed<PathSpec0, ServerDefinition>> = ListRegistry()
     private val modules: ListRegistry<Locationed<PathSpec0, ServerBuilder>> = ListRegistry()
 
-    @JvmName("installHttpConnectionInterceptor")
-    public fun <T : HttpConnectionInterceptor> install(interceptor: T): T =
-        interceptor.also { httpConnectionInterceptors.register(it) }
+    @JvmName("installExecutionInterceptor")
+    public fun <T : ExecutionInterceptor> install(interceptor: T): T =
+        interceptor.also { executionInterceptors.register(it) }
 
-    @JvmName("installHttpLogicalInterceptor")
-    public fun <T : HttpLogicalInterceptor> install(interceptor: T): T =
-        interceptor.also { httpLogicalInterceptors.register(it) }
+    @JvmName("installHttpInterceptor")
+    public fun <T : HttpInterceptor> install(interceptor: T): T =
+        interceptor.also { httpInterceptors.register(it) }
 
-    @JvmName("installWebSocketConnectionInterceptor")
-    public fun <T : WebSocketConnectionInterceptor> install(interceptor: T): T =
-        interceptor.also { webSocketConnectionInterceptors.register(it) }
+    @JvmName("installWebSocketInterceptor")
+    public fun <T : WebSocketInterceptor> install(interceptor: T): T =
+        interceptor.also { webSocketInterceptors.register(it) }
 
-    @JvmName("installWebSocketLogicalInterceptor")
-    public fun <T : WebSocketLogicalInterceptor> install(interceptor: T): T =
-        interceptor.also { webSocketLogicalInterceptors.register(it) }
-
-    @JvmName("installHttpAndWebSocketConnectionInterceptor")
-    public fun <T> install(interceptor: T): T where T : HttpConnectionInterceptor, T : WebSocketConnectionInterceptor =
+    @JvmName("installHttpAndWebSocketInterceptor")
+    public fun <T> install(interceptor: T): T where T : HttpInterceptor, T : WebSocketInterceptor =
         interceptor.also {
-            httpConnectionInterceptors.register(it)
-            webSocketConnectionInterceptors.register(it)
+            httpInterceptors.register(it)
+            webSocketInterceptors.register(it)
         }
 
-    @JvmName("installHttpAndWebSocketLogicalInterceptor")
-    public fun <T> install(interceptor: T): T where T : HttpLogicalInterceptor, T : WebSocketLogicalInterceptor =
-        interceptor.also {
-            httpLogicalInterceptors.register(it)
-            webSocketLogicalInterceptors.register(it)
-        }
+    @JvmName("installEncodingInterceptor")
+    public fun <T : EncodingInterceptor> install(interceptor: T): T =
+        interceptor.also { encodingInterceptors.register(it) }
 
     public infix fun <PATH : PathSpec, HANDLER : HttpHandler<PATH>> HttpEndpoint<PATH>.bind(handler: HANDLER): HANDLER {
         httpHandlers.getOrRegister(this.path, ::MapRegistry).register(this.method, handler)
@@ -326,10 +323,10 @@ public abstract class ServerBuilder : Extendable {
             internalSerializersModule = internalSerialization,
             externalSerializersModule = externalSerialization,
             annotationValidators = annotationValidators,
-            httpConnectionInterceptors = httpConnectionInterceptors.toSealedList(),
-            httpLogicalInterceptors = httpLogicalInterceptors.toSealedList(),
-            webSocketConnectionInterceptors = webSocketConnectionInterceptors.toSealedList(),
-            webSocketLogicalInterceptors = webSocketLogicalInterceptors.toSealedList(),
+            executionInterceptors = executionInterceptors.toSealedList(),
+            httpInterceptors = httpInterceptors.toSealedList(),
+            webSocketInterceptors = webSocketInterceptors.toSealedList(),
+            encodingInterceptors = encodingInterceptors.toSealedList(),
             endpoints = buildSealedPathSpecMap {
                 for (path in httpHandlers.keys + webSocketHandlers.keys) {
                     put(

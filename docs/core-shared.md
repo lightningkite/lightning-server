@@ -64,13 +64,14 @@ val internalError = LSError(
 **In typed endpoints:**
 
 ```kotlin
-val myEndpoint = path.path("resource").get.api(
+val myEndpoint = path.path("resource").get bind ApiHttpHandler(
     summary = "Get a resource",
+    auth = User.require(),
     errorCases = listOf(
         LSError(http = 404, detail = "not-found", message = "Resource not found"),
         LSError(http = 401, detail = "unauthorized", message = "Authentication required")
     ),
-    implementation = { input ->
+    implementation = { _: Unit ->
         // Your implementation
     }
 )
@@ -129,12 +130,12 @@ val createUser = path.path("users").post bind HttpHandler { request ->
 **Checking methods:**
 
 ```kotlin
-when (request.method) {
+when (request.path.method) {
     HttpMethod.GET -> handleGet()
     HttpMethod.POST -> handlePost()
     HttpMethod.PUT, HttpMethod.PATCH -> handleUpdate()
     HttpMethod.DELETE -> handleDelete()
-    else -> HttpResponse.plainText("Method not allowed", status = 405)
+    else -> HttpResponse.plainText("Method not allowed", status = HttpStatus(405))
 }
 ```
 

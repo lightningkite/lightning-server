@@ -23,16 +23,20 @@ Key responsibilities:
 
 - Coordinates Terraform file generation from server settings
 - Manages provider requirements and variables
-- Provides deployment workflows (init, plan, apply)
+- Provides deployment workflows (init and apply, or destroy)
 - Handles secret retrieval and environment preparation
 
 Key methods:
 
 - `write()`: Generate .tf.json files in terraformRoot
-- `deploy()`: Full deployment workflow with confirmation
+- `deploy(autoApprove)`: Runs `terraform init`, then `terraform apply`, which shows the plan and waits for you to type
+  `yes` unless `autoApprove` is set. The plan is never saved to a file, since a saved plan holds secrets in plain text
+- `destroy()`: Destroys the deployment's infrastructure after you type `destroy <project>` to confirm
 - `editVars()`: Interactive secret editor
 - `terraform(vararg command)`: Execute terraform commands
 - `prepareTerraform()`: Prepare environment variables for Terraform
+
+Override `useTofu` to run OpenTofu instead of Terraform.
 
 Implementations must provide:
 
@@ -57,10 +61,10 @@ Interfaces and implementations for managing deployment secrets.
 Base interface for retrieving secrets.
 
 - `name`: Display name for this source
-- `fetch(need)`: Retrieve a secret boxed in `Stored`, or null if this source has no entry for it.
+- `getBoxed(need)`: Retrieve a secret boxed in `Stored`, or null if this source has no entry for it.
   Implementations provide this one; the box is what lets a need of nullable type be stored *as*
   null without looking unset (and so being re-prompted) forever.
-- `getOrNull(need)`: Retrieve a secret, or null if not found - convenience over `fetch`, only
+- `getOrNull(need)`: Retrieve a secret, or null if not found - convenience over `getBoxed`, only
   meaningful for needs of non-nullable type
 - `get(need)`: Retrieve a secret, throwing if not found
 
@@ -98,6 +102,11 @@ Security Features (Version 2):
 
 Suitable for local development and testing. For production, consider dedicated secret managers.
 
+**`DynamicEncryptedFileSecretSource`**
+An `EncryptedFileSecretSource` whose file location is asked for at runtime rather than hard-coded, so several
+developers can deploy from their own secrets files. The chosen location is cached in `local.secrets.properties` in the
+working directory, which must not be committed.
+
 **`ManySecretSources`**
 Chains multiple secret sources with fallback behavior. Returns the first non-null value
 when retrieving, and prompts for storage location when setting new values.
@@ -125,8 +134,8 @@ object MyDeployment : BaseTerraformEmitter<MyServer>() {
     override val secretsSource = EncryptedFileSecretSource("production")
 
     override fun MyServer.settings() {
-        database.direct(DatabaseSettings())
-        // ... configure other services
+        secretBasis.generated()
+        // ... configure other services, e.g. database.awsDocumentDb(...)
     }
 }
 ```
@@ -152,7 +161,7 @@ fun main() {
 
 ```kotlin
 fun main() {
-    MyDeployment.deploy()  // Runs terraform init/plan/apply workflow
+    MyDeployment.deploy()  // Runs terraform init, then apply after you approve the plan
 }
 ```
 
@@ -173,20 +182,17 @@ fun main() {
 
 ## Related Documentation
 
-- User Guide: [/docs/terraform.md](../../../../docs/terraform.md)
-- AWS Deployment: [/docs/deploy-aws.md](../../../../docs/deploy-aws.md)
+- User Guide: [Terraform](../../../../../../../../docs/terraform.md)
+- AWS Deployment: [Deploying to AWS](../../../../../../../../docs/deploy-aws.md)
 - Service Abstractions: Implemented in the `services` artifact
 
 ## Known Limitations
 
-1. **Terraform Binary Required**: Must have `terraform` command available on PATH (or set via
-   `TERRAFORM_BINARY` environment variable).
+1. **Terraform Binary Required**: Must have `terraform` (or `tofu` when `useTofu` is set) available on PATH, or set
+   via the `TERRAFORM_BINARY` (or `TOFU_BINARY`) environment variable.
 
 2. **Interactive Prompts**: Some operations (password entry, confirmation prompts) require
    interactive terminal or GUI access, which may not work in all CI/CD environments.
 
-3. **Shell Argument Parsing**: `terraformShell()` splits commands on spaces and doesn't
-   handle quoted arguments correctly.
-
-4. **Password Memory**: PasswordFetcher stores passwords as String in memory, which cannot
+3. **Password Memory**: PasswordFetcher stores passwords as String in memory, which cannot
    be securely zeroed. Consider this when working with highly sensitive deployments.

@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.definition
 
-import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.services.Setting
 import com.lightningkite.services.SettingContext
 import com.lightningkite.services.terraform.TerraformNeed
@@ -8,10 +8,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.KSerializer
 import java.lang.ref.WeakReference
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 /**
- * Represents a computation that can be deferred until runtime and executed asynchronously.
+ * Represents a computation that can only be completed at runtime and executed asynchronously.
  *
  * This is similar to [Runtime] but supports suspend functions, allowing for async operations
  * like network calls or file I/O during initialization.
@@ -24,41 +23,49 @@ public fun interface RuntimeDeferred<out T> {
      *
      * @return The computed value
      */
-    context(server: ServerRuntime)
+    context(server: Engine)
     public suspend fun await(): T
 
     /**
-     * A caching wrapper that executes the deferred computation only once.
+     * A caching wrapper that executes the deferred computation once per engine.
      *
-     * Subsequent calls to [await] return the cached value without re-executing.
+     * Subsequent calls to [await] on the same engine return the cached value without re-executing.
      *
      * **Thread Safety**: The cache is thread-safe. Concurrent calls will only execute
      * the computation once, with other threads waiting for the result. If the first
      * call is cancelled before the computation is finished it will be recalculated.
      */
-    @OptIn(ExperimentalAtomicApi::class)
     public data class Cached<out T>(private val wraps: RuntimeDeferred<T>) : RuntimeDeferred<T> {
+        private class Computed<T>(
+            val runtime: WeakReference<Engine>,
+            val result: T,
+        )
+
         @kotlin.concurrent.Volatile
-        private var cache: NullWrapper<T>? = null
+        private var cache: Computed<T>? = null
         private val mutex = Mutex()
 
-        context(server: ServerRuntime)
-        override suspend fun await(): T =
-            cache?.value ?: mutex.withLock {
-                cache?.value?.let { return@withLock it }
-                val n = wraps.await()
-                cache = NullWrapper(n)
-                n
+        context(server: Engine)
+        override suspend fun await(): T {
+            // Claude: keyed on the engine like Runtime.Cached, so a server built twice in one process never sees the first engine's value.
+            val key = server.processEngine
+            cache?.let { if (it.runtime.get() == key) return it.result }
+            return mutex.withLock {
+                cache?.let { if (it.runtime.get() == key) return@withLock it.result }
+                wraps.await().also { cache = Computed(WeakReference(key), it) }
             }
+        }
     }
 }
 
 /**
- * Represents a computation that can be deferred until runtime and executed synchronously.
+ * Represents a computation that can only be completed at runtime and executed synchronously.
  *
  * Runtime is the core abstraction for lazy initialization and dependency injection in Lightning Server.
- * It allows values to be computed on-demand within a [ServerRuntime] context, providing access to
- * settings, services, and other runtime resources.
+ * It allows values to be computed on-demand within an [Engine] context, providing access to
+ * settings, services, and other runtime resources. Resolving one is process-wide work with no
+ * execution behind it, which is why it takes an engine rather than a
+ * [ServerRuntime][com.lightningkite.lightningserver.runtime.ServerRuntime].
  *
  * Example:
  * ```kotlin
@@ -77,10 +84,10 @@ public fun interface Runtime<out T> : RuntimeDeferred<T> {
      *
      * @return The computed value
      */
-    context(server: ServerRuntime)
+    context(server: Engine)
     public operator fun invoke(): T
 
-    context(server: ServerRuntime)
+    context(server: Engine)
     override suspend fun await(): T = invoke()
 
     /**
@@ -95,7 +102,7 @@ public fun interface Runtime<out T> : RuntimeDeferred<T> {
     public data class Cached<out T>(private val wraps: Runtime<T>) : Runtime<T> {
 
         private class Computed<T>(
-            val runtime: WeakReference<ServerRuntime>,
+            val runtime: WeakReference<Engine>,
             val result: T,
         )
 
@@ -103,12 +110,16 @@ public fun interface Runtime<out T> : RuntimeDeferred<T> {
         private var cache: Computed<T>? = null
         private val lock = Any()
 
-        context(server: ServerRuntime)
+        context(server: Engine)
         override operator fun invoke(): T {
+            // Keyed on the process-wide engine, never on the context handed in. A fresh
+            // ServerRuntime is minted per execution, so keying on the receiver would compare two
+            // different objects on every call and recompute what is by definition process-wide work.
+            val key = server.processEngine
             synchronized(lock) {
                 val c = cache
-                if (c != null && c.runtime.get() == server) return c.result
-                return wraps.invoke().also { cache = Computed(WeakReference(server), it) }
+                if (c != null && c.runtime.get() == key) return c.result
+                return wraps.invoke().also { cache = Computed(WeakReference(key), it) }
             }
         }
     }
@@ -116,11 +127,11 @@ public fun interface Runtime<out T> : RuntimeDeferred<T> {
     /**
      * A Runtime wrapper for a constant value.
      *
-     * Always returns the same value without requiring a ServerRuntime context.
+     * Always returns the same value without requiring an Engine context.
      * Useful for testing or when a value is known at compile time.
      */
     public data class Constant<out T>(public val value: T) : Runtime<T> {
-        context(server: ServerRuntime)
+        context(server: Engine)
         override operator fun invoke(): T = value
 
 //        public operator fun invoke(): T = value
@@ -133,7 +144,7 @@ public fun interface Runtime<out T> : RuntimeDeferred<T> {
  * @param transform Function to apply to the Runtime's value
  * @return A new Runtime that applies the transformation
  */
-public fun <T, R> Runtime<T>.map(transform: context(ServerRuntime) (T) -> R): Runtime<R> = Runtime { transform(this()) }
+public inline fun <T, R> Runtime<T>.map(crossinline transform: context(Engine) (T) -> R): Runtime<R> = Runtime { transform(this()) }
 
 /**
  * Transforms the result of this RuntimeDeferred using an async function.
@@ -141,7 +152,7 @@ public fun <T, R> Runtime<T>.map(transform: context(ServerRuntime) (T) -> R): Ru
  * @param transform Suspend function to apply to the RuntimeDeferred's value
  * @return A new RuntimeDeferred that applies the transformation
  */
-public fun <T, R> RuntimeDeferred<T>.mapSuspending(transform: suspend context(ServerRuntime) (T) -> R): RuntimeDeferred<R> =
+public inline fun <T, R> RuntimeDeferred<T>.mapSuspending(crossinline transform: suspend context(Engine) (T) -> R): RuntimeDeferred<R> =
     RuntimeDeferred { transform(this.await()) }
 
 /**
@@ -199,13 +210,9 @@ public interface ServerSetting<SETTING, RESULT> : Runtime<RESULT>, TerraformNeed
         override fun get(setting: Setting): Setting = setting
     }
 
-    context(server: ServerRuntime)
+    context(server: Engine)
     override fun invoke(): RESULT = server.settings.get(this)
 }
-
-/** Internal wrapper to allow caching of nullable values. */
-@JvmInline
-private value class NullWrapper<T>(val value: T)
 
 /**
  * Internal implementation of ServerSetting with custom getter logic.

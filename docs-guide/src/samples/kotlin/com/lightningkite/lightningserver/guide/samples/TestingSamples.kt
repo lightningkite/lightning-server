@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.runtime.test.*
+import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.*
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.services.cache.*
@@ -47,6 +48,8 @@ data class Member(
 
 // region testing-server
 object TestingServer : ServerBuilder() {
+    init { registerBasicMediaTypeCoders() }
+
     val cache = setting("cache", Cache.Settings())
 
     init {
@@ -120,7 +123,6 @@ fun authTypedTest() = TestingServer.testBlocking(settings = { cache set Cache.Se
     Member.store[alice._id] = alice  // seed the in-memory store so fetch() finds her
 
     // testAuth() creates a synthetic Authentication<Member> for the test.
-    // It must be called inside a test {} block because it needs a ServerRuntime in context.
     val aliceAuth = Member.testAuth(alice)
 
     // For authenticated endpoints (USER is non-nullable), pass a non-null Authentication.

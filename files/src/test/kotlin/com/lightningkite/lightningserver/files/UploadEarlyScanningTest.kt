@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.files
 
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.runtime.test.testBlocking
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
@@ -58,7 +59,7 @@ class UploadEarlyScanningTest {
         val uploadEarly = path.path("upload") include UploadEarlyEndpoint(
             files = files,
             database = database,
-            fileScanner = Runtime { listOf(ControlledScanner(serverRuntime)) },
+            fileScanner = Runtime { listOf(ControlledScanner(contextOf<Engine>())) },
         )
 
         init {
@@ -282,7 +283,7 @@ class UploadEarlyUnsignedFileSystemTest {
         val uploadEarly = path.path("upload") include UploadEarlyEndpoint(
             files = files,
             database = database,
-            fileScanner = Runtime { listOf(ControlledScanner(serverRuntime)) },
+            fileScanner = Runtime { listOf(ControlledScanner(contextOf<Engine>())) },
         )
 
         init {

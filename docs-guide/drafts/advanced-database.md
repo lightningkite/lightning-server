@@ -3,7 +3,7 @@
 
 # Advanced Database
 
-This chapter extends [Database & the Query DSL](database.md), which covers
+This chapter extends [Database & the Query DSL](../guide/database.md), which covers
 model definition, basic CRUD, and the `condition {}`/`modification {}` DSL.
 Read that chapter first.  Here you will learn how to sort and paginate large
 result sets, run aggregations, declare database indexes, issue bulk writes, and
@@ -36,8 +36,7 @@ and the `updatedAt` field gives a sortable timestamp:
 
 ```kotlin
 // Illustrative — not a drift-checked sample region.
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class Post(
     override val _id: Uuid = Uuid.random(),
     val title: String,
@@ -195,8 +194,7 @@ Applied to a property:
 
 ```kotlin
 // Illustrative.
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class Post(
     override val _id: Uuid = Uuid.random(),
     @Index                           // plain B-tree index on title
@@ -224,8 +222,7 @@ Applied to the class:
 
 ```kotlin
 // Illustrative.
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 @IndexSet(fields = ["author", "updatedAt"])          // compound index
 @IndexSet(fields = ["author", "slug"], unique = IndexUniqueness.Unique)  // unique compound
 data class Post(
@@ -249,8 +246,7 @@ support it (MongoDB `$text`):
 
 ```kotlin
 // Illustrative.
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 @TextIndex(fields = ["title", "body"])
 data class Post(/* ... */) : HasId<Uuid>
 ```

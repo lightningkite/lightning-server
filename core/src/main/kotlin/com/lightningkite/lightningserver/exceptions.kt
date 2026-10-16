@@ -1,7 +1,10 @@
 package com.lightningkite.lightningserver
 
+import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
+import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.serialization.parse
 
 /**
  * Converts an LSError to an HttpStatusException.
@@ -47,6 +50,26 @@ public open class HttpStatusException(
         message = message,
         data = data,
     )
+}
+
+/**
+ * Recovers the [LSError] from an error response produced by an [HttpExceptionHandler][com.lightningkite.lightningserver.http.HttpExceptionHandler].
+ *
+ * Used where a caller needs the structured error rather than the serialized body — notably a
+ * multiplexed endpoint reporting per-sub-request outcomes. Falls back to an error synthesized from
+ * the status when the body is absent or is not a serialized [LSError], which happens whenever a
+ * handler returns a failure status of its own rather than throwing.
+ */
+context(server: ServerRuntime)
+public suspend fun HttpResponse.toLSError(): LSError {
+    body?.let {
+        try {
+            return it.parse(LSError.serializer())
+        } catch (_: Exception) {
+            // Not a serialized LSError; fall through to synthesizing one from the status.
+        }
+    }
+    return LSError(http = status.code, detail = "unknown", message = status.toString())
 }
 
 /**

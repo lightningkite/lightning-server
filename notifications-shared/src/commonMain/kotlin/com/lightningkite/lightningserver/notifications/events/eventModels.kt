@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.notifications.events
 
-import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.database.*
 import kotlinx.serialization.*
 import kotlinx.serialization.json.Json
@@ -18,15 +18,13 @@ import kotlin.uuid.Uuid
  * @property name The unique identifier for this event type
  * @property tags Optional set of tags for categorizing or filtering events
  */
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 public data class EventType(
     val name: Name,
     val tags: Set<String> = emptySet(),
 ) {
-    @Serializable
+    @Queryable
     @JvmInline
-    @GenerateDataClassPaths
     public value class Name(override val raw: String) : TypedId<String, Name> {
         override fun toString(): String = raw
     }
@@ -46,8 +44,7 @@ public data class EventType(
  * @property type The type of event that occurred
  * @property subject JSON-serialized ID of the subject entity this event relates to
  */
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 public data class EventData(
     override val _id: Uuid,
     val timestamp: Instant,
@@ -80,8 +77,7 @@ public data class EventData(
  * @property user The user identifier
  * @property event The event type identifier
  */
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 public data class UserEventType<UID : Comparable<UID>>(
     val user: UID,
     val event: EventType.Name,

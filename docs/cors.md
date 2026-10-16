@@ -29,7 +29,7 @@ object Server : ServerBuilder() {
     ))
 
     init {
-        interceptors.add(CorsInterceptor(corsSettings))
+        install(CorsInterceptor(corsSettings))
     }
 
     val myEndpoint = path.path("api").get bind HttpHandler {
@@ -161,10 +161,10 @@ can be useful to avoid revealing endpoint existence.
 ### Development (Permissive)
 
 ```kotlin
-val corsSettings = setting("cors", CorsSettings.forDevelopment())
+val corsSettings = setting("cors", CorsSettings.allowAll())
 ```
 
-This uses the built-in `forDevelopment` preset that mirrors all origins, headers, and methods. **Never use this in
+This uses the built-in `allowAll` preset that mirrors all origins, headers, and methods. **Never use this in
 production.**
 
 ### Production (Single Origin)
@@ -175,7 +175,7 @@ val corsSettings = setting("cors", CorsSettings(
     limitToHeaders = listOf("Content-Type", "Authorization"),
     limitToMethods = listOf("GET", "POST", "PUT", "DELETE"),
     allowCredentials = true,
-    cacheLength = 3600u,
+    cacheLength = 1.hours,
     forbidOnMatchFail = true
 ))
 ```
@@ -188,7 +188,7 @@ val corsSettings = setting("cors", CorsSettings(
     limitToHeaders = listOf("Content-Type", "Authorization"),
     limitToMethods = listOf("GET", "POST", "PUT", "DELETE", "PATCH"),
     allowCredentials = true,
-    cacheLength = 86400u,
+    cacheLength = 1.days,
     forbidOnMatchFail = true
 ))
 ```
@@ -293,20 +293,16 @@ In your tests, use the test utilities:
 
 ```kotlin
 @Test
-fun testCors() {
-    TestServer.test(
-        settings = { generalSettings set GeneralServerSettings() }
-    ) {
-        runBlocking {
-            val response = myEndpoint.test(
-                headers = HttpHeaders {
-                    set(HttpHeader.Origin, "https://example.com")
-                }
-            )
-            assertEquals("https://example.com",
-                response.headers[HttpHeader.AccessControlAllowOrigin]?.root)
+fun testCors() = TestServer.testBlocking(
+    settings = { generalSettings set GeneralServerSettings() }
+) {
+    val response = myEndpoint.test(
+        headers = HttpHeaders {
+            add(HttpHeader.Origin, "https://example.com")
         }
-    }
+    )
+    assertEquals("https://example.com",
+        response.headers[HttpHeader.AccessControlAllowOrigin]?.root)
 }
 ```
 

@@ -1,27 +1,35 @@
 // by Claude
+@file:OptIn(com.lightningkite.lightningserver.EngineApi::class)
+
 package com.lightningkite.lightningserver.sessions
 
 import com.lightningkite.lightningserver.ForbiddenException
+import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.UnauthorizedException
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.data.get
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.handle
-import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.engine
+import com.lightningkite.lightningserver.runtime.handleRoot
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
+import com.lightningkite.lightningserver.runtime.Execution
 import org.slf4j.LoggerFactory
 import com.lightningkite.lightningserver.sessions.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.typed.ModelRestEndpoints
 import com.lightningkite.lightningserver.typed.test
+import com.lightningkite.lightningserver.typed.AuthAccess
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
@@ -64,10 +72,12 @@ class SessionManagerTest {
         database: Runtime<Database>,
         private val expirationDuration: Duration? = 30.days,
         private val staleDuration: Duration? = 7.days,
+        sessionSignals: context(ServerRuntime) (Table<Session<SessionTestUser, Uuid>>) -> Table<Session<SessionTestUser, Uuid>> = { it },
     ) : SessionManager<SessionTestUser, Uuid>(
         principal = SessionTestUser,
         database = database,
-        tokenFormat = Runtime { PrivateTinyTokenFormat() }
+        tokenFormat = Runtime { PrivateTinyTokenFormat() },
+        sessionSignals = sessionSignals,
     ) {
         context(server: ServerRuntime)
         override suspend fun sessionExpiration(subject: SessionTestUser): Instant? =
@@ -88,13 +98,15 @@ class SessionManagerTest {
         SessionTestUser.users[userId] = user
 
         object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
             val database = setting("database", Database.Settings("ram"))
 
             val sessions = path.path("auth") include TestSessionManager(database = database)
         }.let { server ->
             server.test({}) {
                 // Create a new session
-                val (session, refreshToken) = server.sessions.newSession(userId)
+                val (session, refreshToken) = execute { server.sessions.newSession(userId) }
 
                 // Verify session properties
                 assertEquals(userId, session.subjectId)
@@ -124,13 +136,16 @@ class SessionManagerTest {
         object : ServerBuilder() {
             val database = setting("database", Database.Settings("ram"))
 
-            init { install(AccessLogInterceptor()) }
+            init {
+                registerBasicMediaTypeCoders()
+                install(AccessLogInterceptor())
+            }
 
             val sessions = path.path("auth") include TestSessionManager(database = database)
             val ping = path.path("ping").get bind HttpHandler<PathSpec0> { HttpResponse.plainText("pong") }
         }.let { server ->
             server.test({}) {
-                val (_, refreshToken) = server.sessions.newSession(userId)
+                val (_, refreshToken) = execute { server.sessions.newSession(userId) }
                 val accessToken = server.sessions.tokenSimple.test(null, refreshToken.string)
 
                 // Attach the log capture after settings are applied, so the framework's logback setup can't
@@ -141,16 +156,16 @@ class SessionManagerTest {
                 logbackLogger.addAppender(appender)
                 try {
                     runBlocking {
-                        serverRuntime.handle(
-                            HttpRequest<PathSpec>(
+                        engine.handleRoot(
+                            HttpRequest(
                                 path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
                                 queryParameters = QueryParameters.EMPTY,
                                 headers = HttpHeaders { add(HttpHeader.Authorization, "Bearer $accessToken") },
                                 domain = "example.com",
                                 protocol = "https",
                                 sourceIp = "local",
-                                requestId = generateRequestId(),
-                            )
+                            ),
+                            Execution.ID.generate(),
                         )
                     }
                 } finally {
@@ -175,19 +190,181 @@ class SessionManagerTest {
         SessionTestUser.users[userId] = user
 
         object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
             val database = setting("database", Database.Settings("ram"))
 
             val sessions = path.path("auth") include TestSessionManager(database = database)
         }.let { server ->
             server.test({}) {
                 // Create a new session
-                val (session, refreshToken) = server.sessions.newSession(userId)
+                val (session, refreshToken) = execute { server.sessions.newSession(userId) }
 
                 // Exchange refresh token for access token
                 val accessToken = server.sessions.tokenSimple.test(null, refreshToken.string)
 
                 assertNotNull(accessToken)
                 assertTrue(accessToken.isNotEmpty())
+            }
+        }
+    }
+
+    /**
+     * The session's `ips` and `userAgents` sets are the closest thing this system has to an
+     * authentication audit trail, so an unobserved value must be absent from them rather than
+     * present as a placeholder — an empty-string user agent reads as a real observation to anyone
+     * querying it, exactly as the literal "test" ip did on the request-less path.
+     */
+    @Test
+    fun `an unobserved user agent is not recorded as a placeholder`() = runBlocking {
+        SessionTestUser.users.clear()
+        val userId = Uuid.random()
+        SessionTestUser.users[userId] = SessionTestUser(userId, "test@example.com")
+
+        object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
+            val database = setting("database", Database.Settings("ram"))
+
+            val sessions = path.path("auth") include TestSessionManager(database = database)
+        }.let { server ->
+            server.test({}) {
+                val (session, refreshToken) = execute { server.sessions.newSession(userId) }
+                // The harness supplies a source ip but no User-Agent header.
+                server.sessions.tokenSimple.test(null, refreshToken.string)
+
+                val stored = execute { server.sessions.sessionInfo.table().get(session._id) }
+                assertNotNull(stored)
+                assertEquals(
+                    emptySet(),
+                    stored.userAgents,
+                    "an absent user agent was recorded as a value",
+                )
+                // The ip was genuinely observed, so it is genuinely recorded.
+                assertEquals(setOf("localhost"), stored.ips)
+            }
+        }
+    }
+
+    /**
+     * The other half of the same audit-trail promise: what *is* observed must be the request's own
+     * value, not something the code supplies. The test above drives the session through the typed
+     * harness, which fixes the ip and sends no User-Agent, so it can only show that an absent value
+     * stays absent. Here a real request presents its refresh token as a bearer credential — the path
+     * a client that has not yet exchanged for an access token actually takes — carrying an ip and a
+     * user agent that appear nowhere else, so a recorded constant could not pass for either.
+     */
+    @Test
+    fun `a session use records the ip and user agent the request carried`() = runBlocking {
+        SessionTestUser.users.clear()
+        val userId = Uuid.random()
+        SessionTestUser.users[userId] = SessionTestUser(userId, "test@example.com")
+
+        object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
+            val database = setting("database", Database.Settings("ram"))
+
+            val sessions = path.path("auth") include TestSessionManager(database = database)
+        }.let { server ->
+            server.test({}) {
+                val (session, refreshToken) = execute { server.sessions.newSession(userId) }
+
+                val request = HttpRequest<PathSpec>(
+                    path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
+                    queryParameters = QueryParameters.EMPTY,
+                    headers = HttpHeaders {
+                        add(HttpHeader.Authorization, "Bearer ${refreshToken.string}")
+                        add(HttpHeader.UserAgent, "ExampleClient/9.9 (audit-trail probe)")
+                    },
+                    domain = "example.com",
+                    protocol = "https",
+                    sourceIp = "203.0.113.7",
+                )
+                // Resolving the request's authentication is what drives the session-use update. If the
+                // token were not accepted no update would happen at all, and the assertions below would
+                // be reading an untouched session rather than a recorded one.
+                val resolved = execute { request[Authentication.CacheKey] }
+                assertNotNull(resolved, "the refresh token was not accepted, so no session use was recorded")
+
+                val stored = execute { server.sessions.sessionInfo.table().get(session._id) }
+                assertNotNull(stored)
+                assertEquals(setOf("203.0.113.7"), stored.ips, "the recorded ip is not the one the request came from")
+                assertEquals(
+                    setOf("ExampleClient/9.9 (audit-trail probe)"),
+                    stored.userAgents,
+                    "the recorded user agent is not the one the request sent",
+                )
+            }
+        }
+    }
+
+    /**
+     * The auth event log needs to observe session creation and termination, and the write paths that
+     * do both are sealed — `newSession` is not open, `terminateSessionById` is private. The signals
+     * seam is what makes them observable from outside without unsealing anything.
+     */
+    @Test
+    fun `the signals seam sees session writes`() = runBlocking {
+        SessionTestUser.users.clear()
+        val userId = Uuid.random()
+        SessionTestUser.users[userId] = SessionTestUser(userId, "test@example.com")
+
+        val created = mutableListOf<Uuid>()
+
+        object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
+            val database = setting("database", Database.Settings("ram"))
+
+            val sessions = path.path("auth") include TestSessionManager(
+                database = database,
+                sessionSignals = { table -> table.postCreate { created += it._id } },
+            )
+        }.let { server ->
+            server.test({}) {
+                val (session, _) = execute { server.sessions.newSession(userId) }
+                assertEquals(listOf(session._id), created, "the seam did not observe session creation")
+            }
+        }
+    }
+
+    /**
+     * A session row is the only record that a session ever existed, and this file twice promises it
+     * is "kept for audit trail" — but delete was granted to super-users and exposed over REST, so
+     * the evidence could be erased with nothing recording that it had been. Termination is the
+     * supported operation and is unaffected: it goes through table(), which does not consult these
+     * permissions.
+     */
+    @Test
+    fun `session rows cannot be deleted, even by a super user`() = runBlocking {
+        SessionTestUser.users.clear()
+        val userId = Uuid.random()
+        SessionTestUser.users[userId] = SessionTestUser(userId, "test@example.com")
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+
+            val sessions = path.path("auth") include TestSessionManager(database = database)
+
+            init {
+                registerBasicMediaTypeCoders()
+                // Make the test subject a super user, so `isRoot` resolves to Always. Without this
+                // every branch collapses to Never for an unprivileged caller and the assertion below
+                // would hold no matter what delete was granted.
+                AuthRequirement.isSuperUser = SessionTestUser.require()
+            }
+        }.let { server ->
+            server.test({}) {
+                val permissions = execute {
+                    val (session, _) = server.sessions.newSession(userId)
+                    val auth = with(server.sessions) { session.toAuth() }
+                    server.sessions.sessionInfo.permissions(AuthAccess(auth))
+                }
+                assertTrue(
+                    permissions.delete == Condition.Never,
+                    "a super user can delete session rows, erasing the only record the session existed",
+                )
             }
         }
     }
@@ -200,6 +377,8 @@ class SessionManagerTest {
         SessionTestUser.users[userId] = user
 
         object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
             val database = setting("database", Database.Settings("ram"))
 
             val sessions = path.path("auth") include TestSessionManager(database = database)
@@ -214,22 +393,40 @@ class SessionManagerTest {
     }
 
     @Test
-    fun `tokenSimple rejects not active user`() = runBlocking {
+    /**
+     * `permitAuthentication` returning false is what refuses this, not an [AuthRequirement].
+     *
+     * `tokenSimple` is `noAuth` — it has to be, since exchanging a refresh token is how a caller
+     * becomes authenticated in the first place — so nothing about the endpoint's requirement can
+     * reject anyone. The assertion below pins that, so a future change that moved the rejection into
+     * a requirement would fail here rather than quietly keep the test green under a different
+     * mechanism than its name describes.
+     */
+    fun `tokenSimple rejects a user permitAuthentication turned away`() = runBlocking {
         SessionTestUser.users.clear()
         val userId = Uuid.random()
         val user = SessionTestUser(userId, "test@example.com")
         SessionTestUser.users[userId] = user
 
         object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
             val database = setting("database", Database.Settings("ram"))
 
             val sessions = path.path("auth") include TestSessionManager(database = database)
         }.let { server ->
             server.test({}) {
-                val (_, refreshToken) = server.sessions.newSession(userId)
+                val (_, refreshToken) = execute { server.sessions.newSession(userId) }
 
                 SessionTestUser.users[userId] = user.copy(active = false)
-                assertFailsWith<ForbiddenException>("Inactive User's refresh token should be rejected") {
+                // Nothing here can be an authorization failure: the endpoint demands no authentication.
+                assertEquals(
+                    noAuth,
+                    server.sessions.tokenSimple.auth,
+                    "tokenSimple gained an auth requirement, so the rejection below no longer proves " +
+                        "what this test claims — it could now be the requirement rather than permitAuthentication",
+                )
+                assertFailsWith<ForbiddenException>("an inactive user's refresh token must be refused") {
                     server.sessions.tokenSimple.test(null, refreshToken.string)
                 }
             }
@@ -244,16 +441,18 @@ class SessionManagerTest {
         SessionTestUser.users[userId] = user
 
         object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
             val database = setting("database", Database.Settings("ram"))
 
             val sessions = path.path("auth") include TestSessionManager(database = database)
         }.let { server ->
             server.test({}) {
                 // Create a new session
-                val (session, _) = server.sessions.newSession(userId)
+                val (session, _) = execute { server.sessions.newSession(userId) }
 
                 // Convert to authentication
-                val auth = with(server.sessions) { session.toAuth() }
+                val auth = execute { with(server.sessions) { session.toAuth() } }
 
                 assertEquals("SessionTestUser", auth.principalName)
                 assertEquals(userId, auth.id)
@@ -271,6 +470,8 @@ class SessionManagerTest {
         SessionTestUser.users[userId] = user
 
         object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
             val database = setting("database", Database.Settings("ram"))
 
             val sessions = path.path("auth") include TestSessionManager(database = database)
@@ -279,10 +480,12 @@ class SessionManagerTest {
                 val limitedScopes = setOf(GrantedScope("api:read"))
 
                 // Create a session with limited scopes
-                val (session, _) = server.sessions.newSession(
-                    subjectId = userId,
-                    scopes = limitedScopes
-                )
+                val (session, _) = execute {
+                    server.sessions.newSession(
+                        subjectId = userId,
+                        scopes = limitedScopes
+                    )
+                }
 
                 assertEquals(limitedScopes, session.scopes)
             }
@@ -297,15 +500,19 @@ class SessionManagerTest {
         SessionTestUser.users[userId] = user
 
         object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
             val database = setting("database", Database.Settings("ram"))
 
             val sessions = path.path("auth") include TestSessionManager(database = database)
         }.let { server ->
             server.test({}) {
-                val (session, _) = server.sessions.newSession(
-                    subjectId = userId,
-                    label = "Mobile App"
-                )
+                val (session, _) = execute {
+                    server.sessions.newSession(
+                        subjectId = userId,
+                        label = "Mobile App"
+                    )
+                }
 
                 assertEquals("Mobile App", session.label)
             }
@@ -320,19 +527,23 @@ class SessionManagerTest {
         SessionTestUser.users[userId] = user
 
         object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
             val database = setting("database", Database.Settings("ram"))
 
             val sessions = path.path("auth") include TestSessionManager(database = database)
         }.let { server ->
             server.test({}) {
                 // Create parent session
-                val (parentSession, _) = server.sessions.newSession(userId)
+                val (parentSession, _) = execute { server.sessions.newSession(userId) }
 
                 // Create derived session
-                val (childSession, _) = server.sessions.newSession(
-                    subjectId = userId,
-                    derivedFrom = parentSession._id
-                )
+                val (childSession, _) = execute {
+                    server.sessions.newSession(
+                        subjectId = userId,
+                        derivedFrom = parentSession._id
+                    )
+                }
 
                 assertEquals(parentSession._id, childSession.derivedFrom)
             }
@@ -347,13 +558,15 @@ class SessionManagerTest {
         SessionTestUser.users[userId] = user
 
         object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
             val database = setting("database", Database.Settings("ram"))
 
             val sessions = path.path("auth") include TestSessionManager(database = database)
         }.let { server ->
             server.test({}) {
                 // Create parent session
-                assertFailsWith<ForbiddenException> { server.sessions.newSession(userId) }
+                assertFailsWith<ForbiddenException> { execute { server.sessions.newSession(userId) } }
             }
         }
     }
@@ -366,15 +579,17 @@ class SessionManagerTest {
         SessionTestUser.users[userId] = user
 
         object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
             val database = setting("database", Database.Settings("ram"))
 
             val sessions = path.path("auth") include TestSessionManager(database = database)
         }.let { server ->
             server.test({}) {
                 // Create multiple sessions
-                val (session1, token1) = server.sessions.newSession(userId, label = "Session 1")
-                val (session2, token2) = server.sessions.newSession(userId, label = "Session 2")
-                val (session3, token3) = server.sessions.newSession(userId, label = "Session 3")
+                val (session1, token1) = execute { server.sessions.newSession(userId, label = "Session 1") }
+                val (session2, token2) = execute { server.sessions.newSession(userId, label = "Session 2") }
+                val (session3, token3) = execute { server.sessions.newSession(userId, label = "Session 3") }
 
                 // All should have different IDs
                 assertNotEquals(session1._id, session2._id)
@@ -397,12 +612,14 @@ class SessionManagerTest {
         SessionTestUser.users[userId] = user
 
         object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
             val database = setting("database", Database.Settings("ram"))
 
             val sessions = path.path("auth") include TestSessionManager(database = database)
         }.let { server ->
             server.test({}) {
-                val (session, refreshToken) = server.sessions.newSession(userId)
+                val (session, refreshToken) = execute { server.sessions.newSession(userId) }
 
                 // The secret in the refresh token should NOT equal the hash in the session
                 assertNotEquals(refreshToken.plainTextSecret, session.secretHash)
@@ -421,12 +638,14 @@ class SessionManagerTest {
         SessionTestUser.users[userId] = user
 
         object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
             val database = setting("database", Database.Settings("ram"))
 
             val sessions = path.path("auth") include TestSessionManager(database = database)
         }.let { server ->
             server.test({}) {
-                val (session, refreshToken) = server.sessions.newSession(userId)
+                val (session, refreshToken) = execute { server.sessions.newSession(userId) }
 
                 // Check refresh token can be reconstructed
                 val reconstructed = RefreshToken(refreshToken.string)
@@ -446,23 +665,25 @@ class SessionManagerTest {
         var time = Clock.System.now()
 
         object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
             val database = setting("database", Database.Settings("ram"))
 
             val sessions = path.path("auth") include TestSessionManager(database = database)
         }.let { server ->
             server.test({}, clock = { object : Clock { override fun now() = time } }) {
-                val (parent, _) = server.sessions.newSession(userId)
+                val (parent, _) = execute { server.sessions.newSession(userId) }
                 time += 1.hours
 
                 val subRefresh = server.sessions.createSubSession.test(
-                    with(server.sessions) { parent.toAuth() },
+                    execute { with(server.sessions) { parent.toAuth() } },
                     SubSessionRequest(label = "sub")
                 )
                 val accessToken = server.sessions.tokenSimple.test(null, subRefresh)
-                val subAuth = server.sessions.tokenFormat().read(SessionTestUser, accessToken)!!
+                val subAuth = execute { server.sessions.tokenFormat().read(SessionTestUser, accessToken) }!!
 
                 assertIs<AuthRequirement.Result.Rejected>(
-                    AuthRequirement.Authenticated(maxAge = 10.minutes).check(subAuth)
+                    execute { AuthRequirement.Authenticated(maxAge = 10.minutes).check(subAuth) }
                 )
             }
         }
@@ -478,12 +699,14 @@ class SessionManagerTest {
         )
 
         object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
             val database = setting("database", Database.Settings("ram"))
 
             val sessions = path.path("auth") include TestSessionManager(database = database)
         }.let { server ->
             server.test({}) {
-                assertEquals(createdAt, with(server.sessions) { session.toAuth() }.issuedAt)
+                assertEquals(createdAt, execute { with(server.sessions) { session.toAuth() } }.issuedAt)
             }
         }
     }
@@ -495,40 +718,42 @@ class SessionManagerTest {
         SessionTestUser.users[userId] = SessionTestUser(userId, "test@example.com")
 
         object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
             val database = setting("database", Database.Settings("ram"))
 
             val sessions = path.path("auth") include TestSessionManager(database = database)
         }.let { server ->
             server.test({}) {
-                val (parent, _) = server.sessions.newSession(userId)
+                val (parent, _) = execute { server.sessions.newSession(userId) }
                 val childRefresh = server.sessions.createSubSession.test(
-                    with(server.sessions) { parent.toAuth() },
+                    execute { with(server.sessions) { parent.toAuth() } },
                     SubSessionRequest(label = "child")
                 )
-                val child = server.sessions.sessionInfo.table().get(RefreshToken(childRefresh)._id)!!
+                val child = execute { server.sessions.sessionInfo.table().get(RefreshToken(childRefresh)._id) }!!
                 val grandchildRefresh = server.sessions.createSubSession.test(
-                    with(server.sessions) { child.toAuth() },
+                    execute { with(server.sessions) { child.toAuth() } },
                     SubSessionRequest(label = "grandchild")
                 )
 
-                server.sessions.sessionTerminate.test(with(server.sessions) { parent.toAuth() }, Unit)
+                server.sessions.sessionTerminate.test(execute { with(server.sessions) { parent.toAuth() } }, Unit)
 
                 assertFailsWith<UnauthorizedException> { server.sessions.tokenSimple.test(null, childRefresh) }
                 assertFailsWith<UnauthorizedException> { server.sessions.tokenSimple.test(null, grandchildRefresh) }
 
-                val (deleted, _) = server.sessions.newSession(userId)
+                val (deleted, _) = execute { server.sessions.newSession(userId) }
                 val deletedChild = server.sessions.createSubSession.test(
-                    with(server.sessions) { deleted.toAuth() },
+                    execute { with(server.sessions) { deleted.toAuth() } },
                     SubSessionRequest(label = "child")
                 )
-                server.sessions.sessionInfo.table().deleteOneById(deleted._id)
+                execute { server.sessions.sessionInfo.table().deleteOneById(deleted._id) }
                 assertFailsWith<UnauthorizedException> { server.sessions.tokenSimple.test(null, deletedChild) }
             }
         }
     }
 
     @Test
-    fun `a superuser terminating or deleting a session over REST terminates sessions derived from it`() = runBlocking {
+    fun `a superuser terminating a session over REST terminates sessions derived from it`() = runBlocking {
         SessionTestUser.users.clear()
         val userId = Uuid.random()
         val adminId = Uuid.random()
@@ -538,6 +763,7 @@ class SessionManagerTest {
 
         object : ServerBuilder() {
             init {
+                registerBasicMediaTypeCoders()
                 AuthRequirement.isSuperUser = SessionTestUser.require { it.id == adminId }
             }
 
@@ -547,11 +773,11 @@ class SessionManagerTest {
             val rest = path.path("sessions") include ModelRestEndpoints(sessions.sessionInfo)
         }.let { server ->
             server.test({}) {
-                val adminAuth = with(server.sessions) { server.sessions.newSession(adminId).first.toAuth() }
+                val adminAuth = execute { with(server.sessions) { server.sessions.newSession(adminId).first.toAuth() } }
 
-                val (terminated, _) = server.sessions.newSession(userId)
+                val (terminated, _) = execute { server.sessions.newSession(userId) }
                 val terminatedChild = server.sessions.createSubSession.test(
-                    with(server.sessions) { terminated.toAuth() },
+                    execute { with(server.sessions) { terminated.toAuth() } },
                     SubSessionRequest(label = "child")
                 )
                 server.rest.modify.test(
@@ -561,13 +787,9 @@ class SessionManagerTest {
                 )
                 assertFailsWith<UnauthorizedException> { server.sessions.tokenSimple.test(null, terminatedChild) }
 
-                val (deleted, _) = server.sessions.newSession(userId)
-                val deletedChild = server.sessions.createSubSession.test(
-                    with(server.sessions) { deleted.toAuth() },
-                    SubSessionRequest(label = "child")
-                )
-                server.rest.deleteItem.test(deleted._id, adminAuth, Unit)
-                assertFailsWith<UnauthorizedException> { server.sessions.tokenSimple.test(null, deletedChild) }
+                // Sessions are never erased over REST, not even by a superuser; they are the audit record.
+                val (kept, _) = execute { server.sessions.newSession(userId) }
+                assertFailsWith<NotFoundException> { server.rest.deleteItem.test(kept._id, adminAuth, Unit) }
             }
         }
     }
@@ -579,13 +801,15 @@ class SessionManagerTest {
         SessionTestUser.users[userId] = SessionTestUser(userId, "test@example.com")
 
         object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
             val database = setting("database", Database.Settings("ram"))
 
             val sessions = path.path("auth") include TestSessionManager(database = database)
         }.let { server ->
             server.test({}) {
-                val (parent, _) = server.sessions.newSession(userId)
-                val stillValidAccessToken = with(server.sessions) { parent.toAuth() }
+                val (parent, _) = execute { server.sessions.newSession(userId) }
+                val stillValidAccessToken = execute { with(server.sessions) { parent.toAuth() } }
                 server.sessions.sessionTerminate.test(stillValidAccessToken, Unit)
 
                 assertFailsWith<UnauthorizedException> {
@@ -602,16 +826,18 @@ class SessionManagerTest {
         SessionTestUser.users[userId] = SessionTestUser(userId, "test@example.com")
 
         object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
             val database = setting("database", Database.Settings("ram"))
 
             val sessions = path.path("auth") include TestSessionManager(database = database)
         }.let { server ->
             server.test({}) {
-                val (parent, _) = server.sessions.newSession(userId, scopes = setOf(GrantedScope("auth:sessions")))
-                val parentAuth = with(server.sessions) { parent.toAuth() }
+                val (parent, _) = execute { server.sessions.newSession(userId, scopes = setOf(GrantedScope("auth:sessions"))) }
+                val parentAuth = execute { with(server.sessions) { parent.toAuth() } }
 
                 val inherited = server.sessions.createSubSession.test(parentAuth, SubSessionRequest(label = "default"))
-                val inheritedSession = server.sessions.sessionInfo.table().get(RefreshToken(inherited)._id)!!
+                val inheritedSession = execute { server.sessions.sessionInfo.table().get(RefreshToken(inherited)._id) }!!
                 assertEquals(setOf(GrantedScope("auth:sessions")), inheritedSession.scopes)
 
                 assertFailsWith<ForbiddenException> {
@@ -624,7 +850,7 @@ class SessionManagerTest {
                     parentAuth,
                     SubSessionRequest(label = "narrower", scopes = setOf(GrantedScope("auth:sessions:create")))
                 )
-                val narrowerSession = server.sessions.sessionInfo.table().get(RefreshToken(narrower)._id)!!
+                val narrowerSession = execute { server.sessions.sessionInfo.table().get(RefreshToken(narrower)._id) }!!
                 assertEquals(setOf(GrantedScope("auth:sessions:create")), narrowerSession.scopes)
             }
         }

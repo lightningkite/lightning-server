@@ -19,6 +19,9 @@ include(":core-shared")
 include(":typed")
 include(":typed-shared")
 
+include(":audit")
+include(":audit-shared")
+
 include(":auth")
 include(":auth-shared")
 

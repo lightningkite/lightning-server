@@ -14,6 +14,8 @@ includes types for requests, responses, headers, status codes, URL parsing, and 
 - **[HttpRequest](HttpRequest.kt)** - Represents an incoming HTTP request with path, headers, body, and metadata
 - **[HttpResponse](HttpResponse.kt)** - Represents an HTTP response with body, status code, and headers
 - **[HttpStatus](HttpStatus.kt)** - Type-safe HTTP status codes (200 OK, 404 Not Found, etc.)
+- **[RequestIdentity](RequestIdentity.kt)** - How an engine identifies a request: a server-controlled id, adopted from a
+  trusted reverse proxy header only when one is configured
 
 ### Headers
 
@@ -23,15 +25,18 @@ includes types for requests, responses, headers, status codes, URL parsing, and 
 
 ### Handlers and Middleware
 
-- **[HttpHandler](HttpHandler.kt)** - Interface for handling HTTP requests and producing responses
+- **[HttpHandler](HttpHandler.kt)** - Interface for handling HTTP requests and producing responses. Its `handle`
+  method is `@OverrideOnly`: implement it, but run a handler with `handleWithMetrics` so the call is its own execution
+  and passes through the server's interceptors
 - **[HttpInterceptor](HttpInterceptor.kt)** - Middleware for intercepting and modifying requests/responses
+- **[SecurityHeadersInterceptor](SecurityHeadersInterceptor.kt)** - Adds `X-Content-Type-Options` and, over https,
+  `Strict-Transport-Security`
 - **[HttpEndpoint](HttpEndpoint.kt)** - Combines a path specification with an HTTP method
 
 ### Exception Handling
 
-- **[ExceptionHttpHandler](ExceptionHttpHandler.kt)** - Interface for converting exceptions to HTTP responses
-- **[DefaultExceptionHttpHandler](DefaultExceptionHttpHandler.kt)** - Default implementation that handles
-  HttpStatusException and generic errors
+- **[HttpExceptionHandler](HttpExceptionHandler.kt)** - Interface for converting exceptions to HTTP responses.
+  `HttpExceptionHandler.Default` maps `HttpStatusException` to its status and anything else to a 500
 
 ### URL Parsing
 
@@ -49,23 +54,25 @@ includes types for requests, responses, headers, status codes, URL parsing, and 
 // task.  Declare it once on your ServerBuilder; invoke it to get the live table.
 val userTable = database.registerTable<User>("User")
 
-val endpoint = path.path("users").arg<String>("id").get bind HttpHandler { request ->
-    val userId = request.path.arg1
-    val user = userTable().get(userId)
-    HttpResponse.json(user)
+val endpoint = path.path("users").arg<User.ID>("id").get bind HttpHandler { request ->
+    val user = userTable().get(request.path.arg1) ?: throw NotFoundException()
+    // Encodes for whatever the client accepts; the server must call registerBasicMediaTypeCoders()
+    HttpResponse(body = user.toTypedData(request.headers.accept))
 }
 ```
+
+For JSON APIs, prefer typed endpoints, which handle encoding, documentation, and SDK generation for you.
 
 ### Headers and Cookies
 
 ```kotlin
 val response = HttpResponse(
-    body = TypedData.json(data),
+    body = TypedData.text("OK", MediaType.Text.Plain),
     status = HttpStatus.OK,
     headers = HttpHeaders {
-        set("Content-Type", "application/json")
+        add(HttpHeader.CacheControl, "no-store")
         setCookie(
-            key = "session",
+            name = "session",
             value = "token123",
             httpOnly = true,
             secure = true,
@@ -78,20 +85,28 @@ val response = HttpResponse(
 ### Interceptor Middleware
 
 ```kotlin
-val loggingInterceptor = HttpInterceptor { request, cont ->
-    val start = Clock.System.now()
-    val response = cont(request)
-    val duration = Clock.System.now() - start
-    println("${request.path} completed in ${duration.inWholeMilliseconds}ms")
-    response
+object LoggingInterceptor : HttpInterceptor {
+    context(runtime: ServerRuntime)
+    override suspend fun <PATH : PathSpec> intercept(
+        request: HttpRequest<PATH>,
+        cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
+    ): HttpResponse {
+        val start = TimeSource.Monotonic.markNow()
+        val response = cont(request)
+        println("${request.path} completed in ${start.elapsedNow().inWholeMilliseconds}ms")
+        return response
+    }
 }
 
 object Server : ServerBuilder() {
     init {
-        install(loggingInterceptor)
+        install(LoggingInterceptor)
     }
 }
 ```
+
+Interceptors run for every request, including sub-requests dispatched inside `/meta/bulk`. A concern that belongs to
+the connection rather than to the work can check `runtime.execution.isRoot()`.
 
 ### Query Parameters
 
@@ -101,7 +116,7 @@ val endpoint = path.path("search").get bind HttpHandler { request ->
     val page = request.queryParameters["page"]?.toIntOrNull() ?: 1
 
     val results = searchService.search(query, page)
-    HttpResponse.json(results)
+    HttpResponse(body = results.toTypedData(request.headers.accept))
 }
 ```
 
@@ -115,11 +130,12 @@ Most types in this package are immutable for thread safety:
 - `HttpStatus` - Immutable value class
 - `PathSegments`, `QueryParameters` - Immutable value classes
 
-### Context Receivers
+### Context Parameters
 
-Handler and interceptor interfaces use Kotlin context receivers for dependency injection:
+Handler and interceptor interfaces use Kotlin context parameters to reach the current `ServerRuntime`:
 
 ```kotlin
+@OverrideOnly
 context(server: ServerRuntime)
 suspend fun handle(request: HttpRequest<PATH>): HttpResponse
 ```
@@ -156,69 +172,41 @@ All URL parsing utilities automatically handle URL encoding/decoding:
 
 ## Common Patterns
 
-### Authentication via Interceptor
+### Error Responses
+
+Throw an `HttpStatusException` subclass, such as `BadRequestException`, `UnauthorizedException`, or
+`NotFoundException`, and the server's exception handler turns it into a response with that status:
 
 ```kotlin
-val authInterceptor = HttpInterceptor { request, cont ->
-    val token = request.headers[HttpHeader.Authorization]?.root
-        ?: throw UnauthorizedException("Missing token")
-
-    val user = validateToken(token)
-    val requestWithUser = request.copy(
-        cache = request.cache.apply { put("user", user) }
-    )
-    cont(requestWithUser)
+val endpoint = path.path("items").arg<Int>("id").get bind HttpHandler { request ->
+    if (request.path.arg1 < 0) throw BadRequestException("The id must not be negative")
+    // ...
 }
 ```
 
-### Custom Error Responses
-
-```kotlin
-object MyExceptionHandler : ExceptionHttpHandler {
-    context(server: ServerRuntime)
-    override suspend fun handle(
-        request: HttpRequest<PathSpec>,
-        exception: Exception
-    ): HttpResponse = when (exception) {
-        is ValidationException -> HttpResponse(
-            status = HttpStatus.BadRequest,
-            body = TypedData.json(exception.errors)
-        )
-        else -> DefaultExceptionHttpHandler.handle(request, exception)
-    }
-}
-```
+Exceptions are mapped to responses inside the interceptor chain, so interceptors such as CORS still see and
+post-process error responses. There is currently no registration API for a custom `HttpExceptionHandler`; every server
+uses `HttpExceptionHandler.Default`.
 
 ### Content Negotiation
 
 ```kotlin
 val endpoint = path.path("data").get bind HttpHandler { request ->
     val data = getData()
-
-    val acceptsJson = request.headers.accept.any { it.subtype == "json" }
-    if (acceptsJson) {
-        HttpResponse.json(data)
-    } else {
-        HttpResponse(
-            body = TypedData.xml(data),
-            headers = HttpHeaders("Content-Type" to "application/xml")
-        )
-    }
+    // Picks a registered encoder from the request's Accept header, falling back to the default
+    HttpResponse(body = data.toTypedData(request.headers.accept))
 }
 ```
 
 ## See Also
 
-- **[HTTP Core Documentation](../../../../docs/http-core.md)** - Comprehensive guide to HTTP core types
-- **[Endpoints Documentation](../../../../docs/endpoints.md)** - Defining and routing endpoints
-- **[Typed Endpoints](../../../../docs/typed-endpoints.md)** - Type-safe API endpoint definitions
+- **[Endpoints Documentation](../../../../../../../../docs/endpoints.md)** - Defining and routing endpoints
+- **[Typed Endpoints](../../../../../../../../docs/typed-endpoints.md)** - Type-safe API endpoint definitions
 - **[CORS](../cors/)** - Cross-origin resource sharing implementation
 
 ## Testing
 
-Unit tests for this package can be found at:
-
-- `core/src/test/kotlin/com/lightningkite/lightningserver/http/HttpTest.kt`
+Unit tests for this package can be found in `core/src/test/kotlin/com/lightningkite/lightningserver/http/`.
 
 These tests cover:
 
@@ -227,10 +215,9 @@ These tests cover:
 - HttpHeaderValue parsing for standard headers and cookies
 - PathSegments and QueryParameters URL encoding/decoding
 - PathAndParams combined parsing
+- Interceptor ordering, the default exception handler, and request identity
 
 ## Notes
 
 - All header names are normalized to lowercase internally for case-insensitive comparison
-- Query parameter parsing currently requires values (keys without values will throw exception)
-- The `pathHack()` function in QueryParameters is a temporary workaround for WebSocket auth
 - HttpHeader constants include both standard and common non-standard headers

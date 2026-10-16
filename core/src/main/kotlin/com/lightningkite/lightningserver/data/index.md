@@ -19,10 +19,7 @@ Cron-style scheduling patterns for recurring tasks.
 - Calculate next occurrence from a given datetime
 - Validation of pattern components
 
-**Limitations**:
-
-- Advanced day-of-month features (Last, NearestWeekday) not yet implemented
-- Day-of-week recurrence patterns (e.g., "2nd Monday") not yet supported
+- Last day of the month (`L`), nearest weekday (`W`), and nth weekday of the month (`#`, e.g. "2nd Monday")
 
 ### Expiring.kt
 
@@ -50,11 +47,6 @@ Compact bit set stored in a single Long, supporting indices 0-63.
 - **LongBits**: Value class wrapping a Long as a bit set
 - Iterable interface for enumerating set bits
 - String representation using ranges (e.g., "0-5,10,15-20")
-
-**Known Issues**:
-
-- Bug with index 63 due to sign bit - fails in `contains()` check
-- Loop in `toString()` goes to 64 instead of 63
 
 **Usage**: Efficiently store small sets of integers, particularly for cron minute/hour patterns.
 
@@ -85,9 +77,10 @@ All schedules support timezone specification.
 
 Type-safe, serializable cache with optional expiration.
 
-- **SerializableCache**: Main cache class
-- **Key\<T\>**: Simple cache key
-- **CalculatingKey\<INPUT, T\>**: Key that automatically calculates values on miss
+- **SerializableCache\<SCOPE\>**: Main cache class. The scope names what the cache is attached to, so a key made for
+  one kind of cache cannot be used on another
+- **Key\<SCOPE, T\>**: Simple cache key
+- **CalculatingKey\<SCOPE, INPUT, T\>**: Key that automatically calculates values on miss
 - **Caching**: Interface for objects with attached caches
 
 **Key Features**:
@@ -98,7 +91,8 @@ Type-safe, serializable cache with optional expiration.
 - Automatic calculation on cache miss
 - Request-scoped caching support
 
-**Usage**: General-purpose caching with persistence support. Commonly attached to Request objects.
+**Usage**: General-purpose caching with persistence support. Attached to `Request` objects, and used as an
+`Execution`'s `context`, which is copied to the executions it starts and serialized into queued tasks.
 
 ## Common Use Cases
 
@@ -109,4 +103,4 @@ Type-safe, serializable cache with optional expiration.
 
 ## Related Documentation
 
-See `/docs/data-utilities.md` for usage examples and best practices.
+See [Data Utilities](../../../../../../../../docs/data-utilities.md) for usage examples and best practices.

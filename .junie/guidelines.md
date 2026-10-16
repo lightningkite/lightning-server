@@ -55,16 +55,18 @@ Testing
     - runtime.test helpers build typed requests to endpoints and websocket handlers without bringing up a real engine.
       Examples:
         - HTTP: endpoint.test() returns HttpResponse inline to the test.
-        - Websockets: handler.test() returns a TestRunner implementing WebSocketConnection; you can send frames and
-          observe messages via onMessageSent.
-    - ServerBuilder.test settings = { } establishes a test runtime with default settings and the UnitTest-like engine.
+        - Websockets: handler.test() returns a TestRunner.TestWebSocket; you can send frames and observe messages via
+          onMessageSent.
+    - ServerBuilder.testBlocking(settings = { }) builds the server on a TestRunner, an in-memory Engine, with default
+      settings. The TestRunner is an Engine, not a ServerRuntime: anything the test does itself that needs a runtime
+      (database access, launching tasks) goes inside execute { }.
 
 Adding New Tests
 
 - Pattern: initialize server definitions and then call .test() on endpoints/handlers. Ensure Settings are populated as
   needed for your test.
 - Example: HTTP endpoint test (refer to docs/setup.md test pattern):
-    - Settings.populateDefaults(mapOf()) to enforce explicit defaults.
+    - Pass a settings lambda to testBlocking to override defaults, e.g. database set Database.Settings("ram").
     - engine-local is not required when using the test harness.
 - Example: Websocket multiplex test pattern (see core/src/test/.../MultiplexWebSocketHandlerTest.kt):
     - Use ServerBuilder with topics and handlers bound via definition.builder DSL.
@@ -76,11 +78,12 @@ Serialization, Paths, and Caching (for debugging failures)
   com.lightningkite.lightningserver.serialization.serializerOrContextual(). It falls back to ContextualSerializer when
   no contextual serializer exists; be aware that pretty-printing/encodeDefaults may change byte-for-byte outputs but
   equals should round-trip for data classes that implement correct equals.
-- RawPath<PATH>: Serializable via PathSerializer. Equality is string-based; hash +1 to reduce collisions with other
-  strings in maps. When deserializing WebSocketConnectRequest in tests, ensure you pass the generic parameter (e.g.,
-  PathSpec0) consistently.
-- SerializableCache: Serializable via SerializableCacheSerializer, equality compares encoded byte arrays by content. In
-  tests, using cache.get(calculatingKey, input) will compute and store results; ensure you have a ServerRuntime context.
+- RawHttpEndpoint / RawWebSocketPath: the concrete path a caller asked for, with the route pattern derived on demand.
+  When deserializing WebSocketConnectRequest in tests, ensure you pass the generic parameter (e.g., PathSpec0)
+  consistently.
+- SerializableCache: Serializable via SerializableCache.Serializer. Caches are typed by scope (Request, Execution,
+  Authentication), so a key only works with its kind of cache. Using cache.get(calculatingKey, input) computes and
+  stores results; it needs a ServerRuntime context, so in tests run it inside execute { }.
 
 Minimal Verified Test Example
 
@@ -100,10 +103,10 @@ Troubleshooting Test Failures in This Repo
 - If run_test or IDE runner shows tests failing without output:
     - Prefer Gradle CLI for better error logs (./gradlew :core:test --info).
     - Ensure you’re not accidentally building the whole repo; constrain the task to the module under test.
-    - If websocket tests fail on JSON encode/decode, ensure you’re using the runtime’s externalSerialization.json from
-      the active ServerRuntime and not a default Json instance; the transport format/leniency may differ.
+    - If websocket tests fail on JSON encode/decode, ensure you’re using engine.externalSerialization.json from the
+      TestRunner and not a default Json instance; the transport format/leniency may differ.
 - If equality assertions fail after round-trip:
-    - Verify that @Serializable annotations and custom serializers are applied (RawPath has a custom serializer).
+    - Verify that @Serializable (or @Queryable) annotations and custom serializers are applied.
     - Check defaults: encodeDefaults may persist default values; adjust Json configuration if comparing strings.
 
 Code Style/Practices
@@ -111,7 +114,7 @@ Code Style/Practices
 - Official Kotlin code style is enabled (gradle.properties: kotlin.code.style=official).
 - Favor the DSLs provided by definition.builder for constructing server routes and by runtime.test for tests.
 - When adding websocket tests:
-    - Use server.externalSerialization.json tied to the TestRunner context to avoid mismatches.
+    - Use engine.externalSerialization.json from the TestRunner to avoid mismatches.
     - Observe frames via mux.onMessageSent; keep last frame and decode via MultiplexMessage.serializer().
 
 Release/Publishing

@@ -37,14 +37,14 @@ object ScheduleServer : ServerBuilder() {
 
 // region schedule-test
 // Schedules are time-driven — the engine decides when to fire them.
-// But the WORK inside a schedule is just a suspending function, and
-// ScheduledTask.execute() can be called directly in a test with a
-// ServerRuntime in context.
+// But the WORK inside a schedule can be run on demand in a test.
 //
-// This tests the work the schedule does, not the timing.
+// This tests the work the schedule does, not the timing. Running it the way the engine does is
+// engine API, so the test opts in.
+@OptIn(EngineApi::class)
 fun scheduleTest() = ScheduleServer.testBlocking(settings = {}) {
-    // Call execute() directly — same as what the engine does when the timer fires.
-    ScheduleServer.cleanup.execute()
+    // Run the schedule the same way the engine does when the timer fires.
+    ScheduleServer.cleanup.executeWithMetrics()
 
     val count = ScheduleServer.cache().get<Int>("cleanup:last-count")
     assertEquals(42, count)

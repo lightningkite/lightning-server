@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.typed.sdk
 
-import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.services.data.serialNameFQN
 import com.lightningkite.services.database.*
 import kotlinx.serialization.*
@@ -25,7 +25,7 @@ public fun KSerializer<*>.kotlinTypeString(): String {
 }
 
 @OptIn(ExperimentalSerializationApi::class)
-context(server: ServerRuntime)
+context(server: Engine)
 public fun KSerializer<*>.kotlinSerializer(): String {
     nullElement()?.let { return it.kotlinSerializer() + ".nullable" }
 
@@ -103,7 +103,7 @@ public fun KSerializer<*>.subAndChildSerializers(): Array<KSerializer<*>> = null
     ?: arrayOf()
 
 @OptIn(ExperimentalSerializationApi::class)
-context(runtime: ServerRuntime)
+context(runtime: Engine)
 public fun KSerializer<*>.decontextualize(): KSerializer<*> =
     if (descriptor.kind == SerialKind.CONTEXTUAL)
         runtime.internalSerialization.serializersModule.getContextual(

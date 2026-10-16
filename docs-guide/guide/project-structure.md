@@ -284,14 +284,14 @@ object UserAuth : PrincipalType<User, Uuid> {
 
 ## The `ksp` processor
 
-`@GenerateDataClassPaths` triggers a KSP (Kotlin Symbol Processing) annotation processor
+`@Queryable` triggers a KSP (Kotlin Symbol Processing) annotation processor
 that generates the `DataClassPaths` DSL used by `condition {}` and `modification {}`.
 The processor artifact ships with the **Service Abstractions** library (not Lightning Server
 itself):
 
 ```kotlin
 // Illustrative — not a drift-checked sample.
-// In any module where you annotate classes with @GenerateDataClassPaths:
+// In any module where you annotate classes with @Queryable:
 dependencies {
     ksp("com.lightningkite.services:database-processor:$serviceAbstractionsVersion")
 }

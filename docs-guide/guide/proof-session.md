@@ -241,7 +241,7 @@ The path prefix (`/auth` above) matches whatever path you used with `module`.
 
 ---
 
-## Relationship to `UserAuth` and `authOptions`
+## Relationship to `UserAuth` and `require()`
 
 `AuthEndpoints` needs a `PrincipalType<SUBJECT, ID>` — the same `UserAuth` object you define
 in the `Authentication` chapter and pass to `UserAuth.require()` on your endpoints.  The two
@@ -258,7 +258,7 @@ calls `register(principal)` in its own `init` block.
 
 ## Further reading
 
-- [Authentication & Sessions](auth.md) — `PrincipalType`, `authOptions`, `auth.fetch()`, caching keys
+- [Authentication & Sessions](auth.md) — `PrincipalType`, `require()`, `auth.fetch()`, caching keys
 - Demo server: `demo/src/main/kotlin/com/lightningkite/lightningserver/demo/Server.kt` — complete
   working wiring with email, SMS, TOTP, password, known-device, and OAuth proof methods
 - `sessions/src/main/kotlin/.../sessions/AuthEndpoints.kt` — proof strength calculation source

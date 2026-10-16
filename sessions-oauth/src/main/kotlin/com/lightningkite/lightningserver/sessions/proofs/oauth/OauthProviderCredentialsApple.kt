@@ -15,22 +15,14 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration.Companion.days
 
 /**
- * SETUP STEPS:
- * Get an [Apple Developer Account](https://developer.apple.com)
- * Go to [Certificates, Identities, and Profiles](https://developer.apple.com/account/resources/certificates/list)
- * Add or edit an [App Identifier](https://developer.apple.com/account/resources/identifiers/list/bundleId) to have "Sign in with Apple" capability
- * Add a [Service Identifier](https://developer.apple.com/account/resources/identifiers/list/serviceId) for the server
- * Add Sign In With Apple to said service identifier
- *     Return URLs are your auth url + /oauth/apple/callback
- * Make a [key](https://developer.apple.com/account/resources/authkeys/list) for the server
- * Download the .p8
- * Copy out the contents of the P8 (it's a regular text file)
- * Set the credentials to:
- *     appId: the App ID above
- *     serviceId: the Service ID above
- *     teamId: Your team identifier
- *     keyId: Your key's ID
- *     keyString: the contents of the P8 without the begin/end private key annotations
+ * Holds the credentials for Sign in with Apple.
+ *
+ * To obtain them, create an [App Identifier](https://developer.apple.com/account/resources/identifiers/list/bundleId) with the "Sign in with Apple" capability, and a [Service Identifier](https://developer.apple.com/account/resources/identifiers/list/serviceId) with it too, whose return URL is your auth URL + `/oauth/apple/callback`. Then create a [key](https://developer.apple.com/account/resources/authkeys/list) and download its `.p8`.
+ *
+ * @param serviceId The Service Identifier.
+ * @param teamId Your team identifier.
+ * @param keyId The key's ID.
+ * @param keyString The contents of the `.p8` without the begin/end private key lines.
  */
 @Serializable
 public data class OauthProviderCredentialsApple(

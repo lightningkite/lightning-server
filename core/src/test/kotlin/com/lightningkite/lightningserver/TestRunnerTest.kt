@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.arg1
 import com.lightningkite.lightningserver.runtime.send
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.websockets.*
@@ -102,7 +103,7 @@ class TestRunnerTest {
                 }
                 socket.send(WebSocketFrame("Ping!"))
                 assertEquals(WebSocketFrame("Ping!"), lastMessage)
-                testWebSocketTopic.send("Pong.")
+                execute { testWebSocketTopic.send("Pong.") }
                 assertEquals(WebSocketFrame("Pong."), lastMessage)
                 socket.close()
             }
@@ -138,7 +139,7 @@ class TestRunnerTest {
                 assertEquals(WebSocketFrame("Ping!"), lastRootMessage)
                 modelSocket.send(WebSocketFrame("Ping!"))
                 assertEquals(WebSocketFrame("Ping!"), lastModelMessage)
-                testWebSocketTopic.send("Pong.")
+                execute { testWebSocketTopic.send("Pong.") }
                 assertEquals(WebSocketFrame("Pong."), lastRootMessage)
                 assertEquals(WebSocketFrame("Pong."), lastModelMessage)
                 rootSocket.close()

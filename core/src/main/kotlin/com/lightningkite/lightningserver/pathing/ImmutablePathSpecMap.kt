@@ -80,7 +80,8 @@ public class ImmutablePathSpecMap<V>(start: MutablePathSpecMap<V>) : PathSpecMap
         if (pathParts.segments.isEmpty() || pathParts.singleOrNull() == "")
             return (root.path ?: root.thenConstant[""]?.path ?: root.chainedWildcard)?.let {
                 val value = root[it.after]?.let(getter) ?: return@let null
-                PathSpecMap.Match<T>(
+                PathSpecMap.Match.parse<T>(
+                    format,
                     pathSpec = PathSpec.root,
                     rawPathArguments = emptyList(),
                     wildcard = if (it.after == PathSpec.Afterwards.TrailingSegments) PathSegments.EMPTY else null,
@@ -116,15 +117,10 @@ public class ImmutablePathSpecMap<V>(start: MutablePathSpecMap<V>) : PathSpecMap
             soFar.asReversed().asSequence().mapNotNull {
                 it.chainedWildcard?.let { spec ->
                     val value = it.chainedWildcardValue?.let(getter) ?: return@let null
-                    PathSpecMap.Match<T>(
+                    PathSpecMap.Match.parse<T>(
+                        format,
                         pathSpec = spec,
-                        rawPathArguments = wildcards.zip(spec.wildcards) { v, s ->
-                            try {
-                                format.decodeFromString(s.serializer, v)
-                            } catch (e: SerializationException) {
-                                throw BadRequestException("${s.name} in '$spec' is formatted incorrectly", cause = e)
-                            }
-                        },
+                        rawPathArguments = wildcards.take(spec.wildcards.size),
                         wildcard = PathSegments(pathParts.drop(spec.segments.size)),
                         value = value,
                     )
@@ -133,15 +129,10 @@ public class ImmutablePathSpecMap<V>(start: MutablePathSpecMap<V>) : PathSpecMap
         } else {
             current.path?.let { spec ->
                 val value = current.pathValue?.let(getter) ?: return@let null
-                PathSpecMap.Match<T>(
+                PathSpecMap.Match.parse<T>(
+                    format,
                     pathSpec = spec,
-                    rawPathArguments = wildcards.zip(spec.wildcards) { v, s ->
-                        try {
-                            format.decodeFromString(s.serializer, v)
-                        } catch (e: SerializationException) {
-                            throw BadRequestException("${s.name} in '$spec' is formatted incorrectly", cause = e)
-                        }
-                    },
+                    rawPathArguments = wildcards,
                     wildcard = null,
                     value = value,
                 )
@@ -152,18 +143,10 @@ public class ImmutablePathSpecMap<V>(start: MutablePathSpecMap<V>) : PathSpecMap
                     it.chainedWildcard?.let { spec ->
                         val value = it.chainedWildcardValue?.let(getter) ?: return@let null
 //                        println("Found value $value")
-                        PathSpecMap.Match<T>(
+                        PathSpecMap.Match.parse<T>(
+                            format,
                             pathSpec = spec,
-                            rawPathArguments = wildcards.zip(spec.wildcards) { v, s ->
-                                try {
-                                    format.decodeFromString(s.serializer, v)
-                                } catch (e: SerializationException) {
-                                    throw BadRequestException(
-                                        "${s.name} in '$spec' is formatted incorrectly",
-                                        cause = e
-                                    )
-                                }
-                            },
+                            rawPathArguments = wildcards.take(spec.wildcards.size),
                             wildcard = PathSegments(pathParts.drop(spec.segments.size)),
                             value = value,
                         )

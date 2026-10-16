@@ -1,3 +1,5 @@
+@file:OptIn(com.lightningkite.lightningserver.InternalLightningServerApi::class, com.lightningkite.services.data.Unsafe::class)
+
 package com.lightningkite.lightningserver
 
 import com.lightningkite.lightningserver.data.*
@@ -6,6 +8,7 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.RawWebSocketPath
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.serializerOrContextual
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
@@ -18,11 +21,13 @@ import kotlinx.serialization.modules.EmptySerializersModule
 import org.junit.Assert.assertEquals
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
+import com.lightningkite.services.data.UuidV7
+import com.lightningkite.lightningserver.runtime.Execution
 
 class WebSocketConnectRequestTest {
     @Test
     fun serialization(): Unit = runBlocking {
-        val r = WebSocketConnectRequest<PathSpec0>(
+        val r = WebSocketConnectRequest(
             path = RawWebSocketPath(PathSegments.parse("a/b/c")),
             queryParameters = QueryParameters(listOf("a" to "b", "c" to "d")),
             headers = HttpHeaders {
@@ -32,18 +37,18 @@ class WebSocketConnectRequestTest {
             domain = "localhost",
             protocol = "https",
             sourceIp = "127.0.0.1",
-            requestId = generateRequestId(),
+            socketId = Execution.ID(UuidV7.generate()),
         )
         r.roundTripTest()
         object : ServerBuilder() {}.test(
             settings = {}
         ) {
-            r[CacheKey]
+            execute { r[CacheKey] }
             r.roundTripTest()
         }
     }
 
-    private object CacheKey : SerializableCache.CalculatingKey<Request<*>, String> {
+    private object CacheKey : SerializableCache.CalculatingKey<Request<*>, Request<*>, String> {
         override val id: String
             get() = "cache"
         override val serializer: KSerializer<String>

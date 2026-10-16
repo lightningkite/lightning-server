@@ -1,5 +1,9 @@
 # LightningServer documentation
 
+> **Outdated:** This page describes an earlier version of Lightning Server (`ServerPathGroup`, `loadSettings`,
+> `runServer`) and does not match the current API. Use the [guide](docs-guide/guide/first-endpoint.md) and the
+> reference documentation in [docs/](docs/setup.md) instead.
+
 LightningServer has a lot of nifty features. It minimizes boilerplate code making it easy to get a server up and
 running, and simplifies working with a database and building REST APIs. Here is a step-by-step example of how to program
 a server in LightningServer that will run locally on your machine.

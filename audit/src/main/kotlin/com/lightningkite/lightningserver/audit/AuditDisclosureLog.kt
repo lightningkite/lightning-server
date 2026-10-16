@@ -1,0 +1,242 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
+package com.lightningkite.lightningserver.audit
+
+import com.lightningkite.lightningserver.definition.Runtime
+import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.generateFromServerClock
+import com.lightningkite.lightningserver.serialization.EncodingInterceptor
+import com.lightningkite.services.data.UuidV7
+import com.lightningkite.services.database.PartialSerializer
+import com.lightningkite.services.database.Table
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerializationStrategy
+import kotlinx.serialization.descriptors.PolymorphicKind
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.SerialKind
+import kotlinx.serialization.descriptors.StructureKind
+import kotlinx.serialization.encoding.AbstractEncoder
+import kotlinx.serialization.encoding.CompositeEncoder
+import kotlinx.serialization.modules.SerializersModule
+import kotlin.uuid.Uuid
+
+/**
+ * Writes one [AuditDisclosureRecord] for every audited record that reaches a client.
+ *
+ * Nothing is recorded until it is installed with `install` in a [ServerBuilder][com.lightningkite.lightningserver.definition.builder.ServerBuilder].
+ * Install it at most once, or every disclosure is recorded twice.
+ *
+ * ## Fail-closed
+ *
+ * An extraction that cannot resolve a model, a record with no
+ * `_id`, or a sink that will not accept the write all propagate out of
+ * [EncodingInterceptor.beforeEncode], which aborts the send before the value is serialized. A
+ * disclosure that could not be recorded does not happen.
+ *
+ * The practical consequence is worth stating plainly: an outage of the audit database is an outage
+ * of every endpoint that returns an audited model.
+ *
+ * ## The 'Mask-Empty' Assumption
+ *
+ * This interceptor makes the assumption that sensitive information when masked will appear as an *'empty'* value (`0`, `null`, `""`).
+ * Any non-empty value will be reported as disclosed. This has the following consequences:
+ *
+ * - If you mask information to a non-empty value, it will **always** be marked as disclosed
+ * - Legitimate disclosures of empty values will not be marked as disclosed. This is considered acceptable because the disclosed value is indistinguishable from the masked state.
+ *
+ * Only the *most* empty value of a field's type counts as masked. In a nullable field that is `null`, so
+ * `0` there is disclosed; in a collection it is the empty collection, so `listOf("")` is disclosed.
+ *
+ * | Value | Disclosed? |
+ * |---|---|
+ * | `null` | no |
+ * | `false` | no |
+ * | `0` (any integer type) | no |
+ * | `0.0` and `-0.0` (`Float`, `Double`) | no (`NaN` is disclosed) |
+ * | `'\u0000'` | no |
+ * | `""` | no |
+ * | Empty `List`, `Set` or `Map` | no |
+ * | Any enum entry, including the first | yes |
+ * | Any non-null value in a nullable field, such as `0` in an `Int?` or `listOf()` in a `List<T>?` | yes |
+ * | A value class wrapping an empty value | no |
+ * | A collection whose elements are all empty, such as `listOf("")` | yes |
+ */
+public class AuditDisclosureLog(
+    private val origins: OriginRecording<*>,
+    private val registry: AuditRegistry,
+    public val table: Runtime<Table<AuditDisclosureRecord>>,
+) : EncodingInterceptor {
+    override val name: String = "DisclosureLog"
+
+    context(runtime: ServerRuntime)
+    override suspend fun <T> beforeEncode(serializer: SerializationStrategy<T>, value: T) {
+        if (!serializer.descriptor.anythingAudited()) return
+        
+        val disclosures = calculateDisclosures(serializer, value)
+        if (disclosures.isEmpty()) return
+
+        val rows = origins.withCurrentOrigin { origin ->
+            disclosures.map {
+                AuditDisclosureRecord(
+                    _id = AuditDisclosureRecord.ID(UuidV7.generateFromServerClock()),
+                    origin = origin,
+                    recordType = it.model,
+                    recordId = it.recordId,
+                    disclosed = it.disclosed,
+                )
+            }
+        }
+
+        table().insert(rows)
+    }
+
+    /** One audited record that reached a client, and which of its fields carried a value. */
+    internal data class Disclosure(
+        val model: ModelTypeId,
+        val recordId: Uuid,
+        val disclosed: FieldIdentifierSet,
+    )
+
+    /**
+     * The audited records inside [value], found by encoding it with [serializer].
+     */
+    context(runtime: ServerRuntime)
+    internal suspend fun <T> calculateDisclosures(serializer: SerializationStrategy<T>, value: T): List<Disclosure> =
+        DisclosureEncoder(registry.assignments.await(), runtime.externalSerialization.serializersModule)
+            .also { it.encodeSerializableValue(serializer, value) }
+            .found
+
+    private class DisclosureEncoder(
+        private val registry: AuditRegistry.Assignments,
+        override val serializersModule: SerializersModule,
+    ) : AbstractEncoder() {
+        val found = ArrayList<Disclosure>()
+
+        private class DisclosureBuilder(val modelId: ModelTypeId) {
+            var disclosed: FieldIdentifierSet = FieldIdentifierSet.EMPTY
+            var id: Uuid? = null
+        }
+
+        private class Structure(
+            val descriptor: SerialDescriptor,
+            val path: String,
+            val disclosed: DisclosureBuilder?,
+            val startsRecord: Boolean,
+        ) {
+            var elementPath: String = path
+        }
+
+        private val structures = ArrayList<Structure>()
+
+        /** A `Partial` carries none of its model's annotations, so its model's descriptor stands in for it. */
+        private var partialSource: SerialDescriptor? = null
+
+        /** The record whose `_id` is being written. */
+        private var awaitingId: DisclosureBuilder? = null
+
+        override fun <T> encodeSerializableValue(serializer: SerializationStrategy<T>, value: T) {
+            if (value is AuditedModel.Id<*, *>) awaitingId?.let {
+                it.id = value.asUuid
+                awaitingId = null
+            }
+            (serializer as? PartialSerializer<*>)?.let { partialSource = it.source.descriptor }
+            super.encodeSerializableValue(serializer, value)
+        }
+
+        override fun beginStructure(descriptor: SerialDescriptor): CompositeEncoder {
+            val effective = partialSource?.also { partialSource = null } ?: descriptor
+            val parent = structures.lastOrNull()
+            structures += when {
+                effective.isAudited ->
+                    Structure(effective, path = "", DisclosureBuilder(registry.modelType(effective)), startsRecord = true)
+                parent?.descriptor?.kind is PolymorphicKind ->
+                    Structure(effective, "${parent.path}(${effective.auditSerialName})", parent.disclosed, startsRecord = false)
+                else -> Structure(effective, parent?.elementPath ?: "", parent?.disclosed, startsRecord = false)
+            }
+            return this
+        }
+
+        override fun endStructure(descriptor: SerialDescriptor) {
+            awaitingId = null
+            val structure = structures.removeLast()
+            if (!structure.startsRecord) return
+            val builder = structure.disclosed!!
+            found += Disclosure(
+                builder.modelId,
+                builder.id ?: throw IllegalStateException(
+                    "An audited ${structure.descriptor.auditSerialName} reached a client without its _id, so the " +
+                        "disclosure could not name which record was disclosed. A partial query on an audited " +
+                        "model must include _id."
+                ),
+                builder.disclosed,
+            )
+        }
+
+        override fun encodeElement(descriptor: SerialDescriptor, index: Int): Boolean {
+            awaitingId = null
+            val structure = structures.last()
+            val name = descriptor.getElementName(index)
+            structure.elementPath = when (structure.descriptor.kind) {
+                StructureKind.LIST -> "${structure.path}[]"
+                StructureKind.MAP -> if (index % 2 == 0) "${structure.path}{key}" else "${structure.path}{}"
+                is PolymorphicKind -> structure.path
+                else -> if (structure.path.isEmpty()) name else "${structure.path}.$name"
+            }
+            if (structure.startsRecord && name == "_id") awaitingId = structure.disclosed
+            return true
+        }
+
+        /** Sets the bit of the element being written, if it has one. */
+        private fun disclose() {
+            val structure = structures.lastOrNull() ?: return
+            val builder = structure.disclosed ?: return
+            registry.bitIndexOrNull(builder.modelId, structure.elementPath)?.let { builder.disclosed += it }
+        }
+
+        override fun encodeValue(value: Any) {}
+        override fun encodeNull() {}
+        override fun encodeBoolean(value: Boolean) { if (value) disclose() }
+        override fun encodeByte(value: Byte) { if (value != 0.toByte()) disclose() }
+        override fun encodeShort(value: Short) { if (value != 0.toShort()) disclose() }
+        override fun encodeInt(value: Int) { if (value != 0) disclose() }
+        override fun encodeLong(value: Long) { if (value != 0L) disclose() }
+        override fun encodeFloat(value: Float) { if (value != 0f) disclose() }
+        override fun encodeDouble(value: Double) { if (value != 0.0) disclose() }
+        override fun encodeChar(value: Char) { if (value.code != 0) disclose() }
+        override fun encodeString(value: String) { if (value.isNotEmpty()) disclose() }
+        override fun encodeEnum(enumDescriptor: SerialDescriptor, index: Int) = disclose()
+
+        override fun <T> encodeSerializableElement(
+            descriptor: SerialDescriptor,
+            index: Int,
+            serializer: SerializationStrategy<T>,
+            value: T,
+        ) {
+            encodeElement(descriptor, index)
+            if (!serializer.descriptor.isLeaf() && value?.carriesAValue() == true) disclose()
+            encodeSerializableValue(serializer, value)
+        }
+
+        override fun <T : Any> encodeNullableSerializableElement(
+            descriptor: SerialDescriptor,
+            index: Int,
+            serializer: SerializationStrategy<T>,
+            value: T?,
+        ) {
+            encodeElement(descriptor, index)
+            if (value == null) return
+            disclose()
+            encodeSerializableValue(serializer, value)
+        }
+
+        /** A leaf discloses itself through its own `encodeX` call, so it is judged on the value it holds. */
+        private fun SerialDescriptor.isLeaf(): Boolean = isInline || kind is PrimitiveKind || kind == SerialKind.ENUM
+
+        private fun Any.carriesAValue(): Boolean = when (this) {
+            is Collection<*> -> isNotEmpty()
+            is Map<*, *> -> isNotEmpty()
+            else -> true
+        }
+    }
+}

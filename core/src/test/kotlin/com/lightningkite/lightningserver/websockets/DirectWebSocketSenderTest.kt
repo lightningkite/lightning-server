@@ -1,18 +1,22 @@
 // Fixed by Claude - added delay(50) after test() to allow didConnect() subscription to complete
+@file:OptIn(com.lightningkite.lightningserver.InternalLightningServerApi::class, com.lightningkite.services.data.Unsafe::class)
+
 package com.lightningkite.lightningserver.websockets
 
-import com.lightningkite.lightningserver.http.generateRequestId
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.RawWebSocketPath
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.services.data.Unsafe
 import com.lightningkite.services.pubsub.PubSub
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.runBlocking
 import kotlin.test.*
+import com.lightningkite.services.data.UuidV7
+import com.lightningkite.lightningserver.runtime.Execution
 
 /**
  * Tests for DirectWebSocketSender and the direct send optimization path.
@@ -85,10 +89,10 @@ class DirectWebSocketSenderTest {
     @Test
     fun engineSocketId_can_be_set_in_request(): Unit = runBlocking {
         // Test that engineSocketId can be explicitly set in a request
-        val request = WebSocketConnectRequest<PathSpec0>(
+        val request = WebSocketConnectRequest(
             path = RawWebSocketPath(PathSegments.EMPTY),
-            requestId = generateRequestId(),
-            engineSocketId = "test-socket-123"
+            engineSocketId = "test-socket-123",
+            socketId = Execution.ID(UuidV7.generate()),
         )
 
         assertEquals("test-socket-123", request.engineSocketId)
@@ -97,10 +101,11 @@ class DirectWebSocketSenderTest {
     @Test
     fun storage_preserves_engineSocketId(): Unit = runBlocking {
         // Verify that Storage correctly preserves the request's engineSocketId
-        val request = WebSocketConnectRequest<PathSpec0>(
-            path = RawWebSocketPath(PathSegments.EMPTY),
-            requestId = generateRequestId(),
-            engineSocketId = "aws-connection-id-xyz"
+        val request = WebSocketConnectRequest(
+            // SAFETY: Empty segments only ever resolve to PathSpec.root, which is a PathSpec0
+            path = @OptIn(Unsafe::class) RawWebSocketPath.fromPathSegments<PathSpec0>(PathSegments.EMPTY),
+            engineSocketId = "aws-connection-id-xyz",
+            socketId = Execution.ID(UuidV7.generate()),
         )
 
         // The Storage data class wraps the request

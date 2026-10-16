@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.services.database.HasId
 import kotlinx.coroutines.runBlocking
@@ -148,20 +149,21 @@ class AuthenticationCacheKeyTest {
                 })
             }
         }.test({}) {
-            val masked = Authentication.CacheKey.calculate(
-                HttpRequest<PathSpec>(
-                    path = RawHttpEndpoint(asString = "/", method = HttpMethod.GET),
-                    queryParameters = QueryParameters.EMPTY,
-                    headers = HttpHeaders { add(HttpHeader.XMasquerade, "${MasqueradeTarget.name}/$targetId") },
-                    domain = "example.com",
-                    protocol = "https",
-                    sourceIp = "local",
-                    requestId = generateRequestId(),
-                )
-            )!!
+            execute {
+                val masked = Authentication.CacheKey.calculate(
+                    HttpRequest<PathSpec>(
+                        path = RawHttpEndpoint(asString = "/", method = HttpMethod.GET),
+                        queryParameters = QueryParameters.EMPTY,
+                        headers = HttpHeaders { add(HttpHeader.XMasquerade, "${MasqueradeTarget.name}/$targetId") },
+                        domain = "example.com",
+                        protocol = "https",
+                        sourceIp = "local",
+                    )
+                )!!
 
-            assertEquals(targetId.toString(), masked.rawId)
-            assertIs<AuthRequirement.Result.Rejected>(AuthRequirement.Authenticated(maxAge = 10.minutes).check(masked))
+                assertEquals(targetId.toString(), masked.rawId)
+                assertIs<AuthRequirement.Result.Rejected>(AuthRequirement.Authenticated(maxAge = 10.minutes).check(masked))
+            }
         }
     }
 }

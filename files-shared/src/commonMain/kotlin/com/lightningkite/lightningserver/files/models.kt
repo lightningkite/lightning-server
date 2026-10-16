@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.files
 
-import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.files.ServerFile
 import kotlinx.serialization.Serializable
@@ -16,8 +16,7 @@ import kotlin.uuid.Uuid
  * signed URL that [com.lightningkite.services.files.ExternalServerFileSerializer] will accept straight
  * back as a usable `ServerFile`, bypassing scanning entirely.
  */
-@GenerateDataClassPaths
-@Serializable
+@Queryable
 public data class UploadForNextRequest(
     override val _id: Uuid = Uuid.random(),
     /** The file location (as a ServerFile URL) associated with this prepared upload. */

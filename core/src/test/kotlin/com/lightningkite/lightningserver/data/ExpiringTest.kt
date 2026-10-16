@@ -121,14 +121,12 @@ class ExpiringTest {
             settings = { generalSettings set GeneralServerSettings() }
         ) {
             runBlocking {
-                // Create expiring value that expires in 1 millisecond
-                val expiring = Expiring("test", expireAfter = 1.milliseconds)
+                val expiring = Expiring("test", expireAfter = 200.milliseconds)
 
                 // Should not be expired immediately
                 assertFalse(expiring.expired)
 
-                // Wait a bit
-                kotlinx.coroutines.delay(10)
+                kotlinx.coroutines.delay(300)
 
                 // Should be expired now
                 assertTrue(expiring.expired)

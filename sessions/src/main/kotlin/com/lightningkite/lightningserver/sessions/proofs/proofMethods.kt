@@ -32,9 +32,7 @@ public interface ProofMethod {
         public val baseScope: RequiredScope = RequiredScope("auth:proofs")
     }
 
-    /**
-     * Checks if the given [proof] is valid and was issued by this [ProofMethod]
-     * */
+    /** Returns `true` if [proof] is valid and was issued by this [ProofMethod]. */
     context(server: ServerRuntime)
     public suspend fun isValid(proof: Proof): Boolean {
         // Backwards compatibility for expiresAt.

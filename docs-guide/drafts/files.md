@@ -3,8 +3,8 @@
 
 # Files & Uploads
 
-Lightning Server provides a unified abstraction for file storage through `PublicFileSystem`.  Files are
-addressed server-side as `FileObject` values and serialized to clients as `ServerFile` URLs.  The
+Lightning Server provides a unified abstraction for file storage through `ExternalFileSystem`.  Files are
+addressed server-side as `ExternalFile` values and serialized to clients as `ServerFile` URLs.  The
 `UploadEarlyEndpoint` handles the standard upload workflow where a client uploads a file before
 referencing it in a subsequent API call.
 
@@ -34,28 +34,28 @@ import kotlin.uuid.*
 APIs serialize to and from clients.  When the framework serializes a `ServerFile` outbound, the
 contextual serializer converts it to a signed URL the client can use directly.
 
-**`FileObject`** is the server-side handle for performing I/O on a file.  It exposes `put()`,
-`get()`, `head()`, `delete()`, `list()`, `uploadUrl()`, and navigation via `then()`.  `FileObject`
+**`ExternalFile`** is the server-side handle for performing I/O on a file.  It exposes `put()`,
+`get()`, `head()`, `delete()`, `list()`, `uploadUrl()`, and navigation via `then()`.  `ExternalFile`
 values are never sent to clients.
 
 Converting between the two:
 
-- `fileObject.serverFile` — wraps the `FileObject`'s internal URL in a `ServerFile`
+- `fileObject.serverFile` — wraps the `ExternalFile`'s internal URL in a `ServerFile`
   (available everywhere; no runtime needed).
-- `serverFile.fileObject` — resolves a `ServerFile` back to a `FileObject` using the contextual
+- `serverFile.fileObject` — resolves a `ServerFile` back to a `ExternalFile` using the contextual
   serializer registered by `UploadEarlyEndpoint`.  Requires a `ServerRuntime` context; throws
   `IllegalStateException` if no serializer is configured.
 
 ## Declaring the Files Setting
 
-Add `val files = setting("files", PublicFileSystem.Settings())` to your `ServerBuilder`.  The
+Add `val files = setting("files", ExternalFileSystem.Settings())` to your `ServerBuilder`.  The
 default URL writes to a local `local/files` directory and serves files from a path relative to the
 server's public URL:
 
 ```kotlin
 object FileServer : ServerBuilder() {
     val database = setting("database", Database.Settings())
-    val files    = setting("files", PublicFileSystem.Settings())
+    val files    = setting("files", ExternalFileSystem.Settings())
 
     // Serve files at /files/**
     val served = path.path("files") include FileSystemEndpoints(files)
@@ -125,9 +125,9 @@ Client                         Server
   |<-- 201 Created                |
 ```
 
-## FileObject Operations
+## ExternalFile Operations
 
-Inside a handler, resolve a `FileObject` from the file system root:
+Inside a handler, resolve a `ExternalFile` from the file system root:
 
 ```kotlin
 // Illustrative — not a drift-checked sample region.
@@ -154,7 +154,7 @@ val exampleHandler = path.path("example").get bind HttpHandler {
 }
 ```
 
-`FileObject.then(path)` navigates to a sub-path.  `FileObject.thenRandom(prefix, extension)`
+`ExternalFile.then(path)` navigates to a sub-path.  `ExternalFile.thenRandom(prefix, extension)`
 produces `{prefix}_{uuid}.{extension}`.
 
 ## Storing a ServerFile on a Model
@@ -163,8 +163,7 @@ Store `ServerFile` directly in your model:
 
 ```kotlin
 // Illustrative — not a drift-checked sample region.
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class Post(
     override val _id: Uuid = Uuid.random(),
     val title: String,
@@ -178,7 +177,7 @@ When `Post` is returned by an endpoint within the same server that contains `Upl
 
 ## Configuring the Backend
 
-`PublicFileSystem.Settings` holds a single URL string.  Change it in `settings.json` to switch
+`ExternalFileSystem.Settings` holds a single URL string.  Change it in `settings.json` to switch
 backends — no Kotlin changes are required.
 
 ### Local Filesystem
@@ -196,7 +195,7 @@ Key points:
 - `serveUrl` is **required** for the local backend.  A relative value (`serveUrl=files`) is resolved
   against the server's public URL (`https://api.example.com/files/`).  An absolute URL
   (`serveUrl=https://cdn.example.com/files`) is used verbatim.
-- File uploads via `FileSystemEndpoints` require `KotlinxIoPublicFileSystem` (the local backend).
+- File uploads via `FileSystemEndpoints` require `KotlinxIoExternalFileSystem` (the local backend).
   Other backends reject server-generated upload URLs.
 - Signed URL expiration defaults to 1 hour.  Use `&signedUrlDuration=forever` to disable expiration
   or `&signedUrlDuration=PT30M` for 30 minutes (any ISO 8601 duration or a number of seconds).
@@ -204,15 +203,15 @@ Key points:
 ### AWS S3
 
 Register the S3 backend before settings load, otherwise the `s3://` URL scheme is unrecognised at
-startup (see [Services & Settings](services.md) for why this matters):
+startup (see [Services & Settings](../guide/services.md) for why this matters):
 
 ```kotlin
 // Illustrative — add to your ServerBuilder init block.
 object Server : ServerBuilder() {
-    val files = setting("files", PublicFileSystem.Settings())
+    val files = setting("files", ExternalFileSystem.Settings())
 
     init {
-        S3PublicFileSystem   // registers the "s3://" scheme
+        S3ExternalFileSystem   // registers the "s3://" scheme
     }
 }
 ```
@@ -237,7 +236,7 @@ Append `?signedUrlDuration=1h` (or any ISO 8601 duration or seconds) to enable s
 Without this parameter URLs are unsigned; the bucket must be configured for public read access.
 
 > **Note:** These URL examples are illustrative.  Verify exact formatting against the
-> `S3PublicFileSystem` source in `service-abstractions/files-s3`.
+> `S3ExternalFileSystem` source in `service-abstractions/files-s3`.
 
 ## File Scanning
 
@@ -259,7 +258,7 @@ Override the `files` setting with a local temp directory and a `serveUrl` that m
 // Illustrative — not a drift-checked sample region.
 fun fileUploadTest() = FileServer.testBlocking(
     settings = {
-        files    set PublicFileSystem.Settings(
+        files    set ExternalFileSystem.Settings(
             "file://build/testfiles/${Uuid.random()}?serveUrl=http://localhost:8080/files"
         )
         database set Database.Settings()

@@ -1,7 +1,5 @@
 # WebSockets
 
-Last updated July 2025 (`version-5`)
-
 Lightning Server supports WebSockets for real-time, two-way communication. The core primitives live in
 `com.lightningkite.lightningserver.websockets`; the `typed` module adds type-safe WebSockets that participate in
 SDK generation.
@@ -39,8 +37,13 @@ The callbacks receive different contexts:
 
 - `willConnect: suspend ServerRuntime.(request) -> STORAGE` — runs with a `ServerRuntime`. Return the initial
   state. Throwing here rejects the connection.
-- `didConnect`, `messageFromClient`, `disconnect` — run with the `WebSocketConnection` as receiver, which extends
-  `ServerRuntime` and adds WebSocket-specific members.
+- `didConnect`, `messageFromClient`, `disconnect` — run with the `WebSocketConnection` as receiver and a
+  `ServerRuntime` in context. A connection is not itself a runtime; the runtime is the current execution.
+
+Each lifecycle phase is its own execution, because on a serverless engine each phase is a separate invocation. The
+connection's `socketId` stays the same across all of them, and work a phase starts (a task, a topic message) is a child
+of that phase. State that must last for the whole socket belongs in `STORAGE` or the connect request's cache, not in an
+execution's context.
 
 Inside those callbacks you have access to:
 
@@ -48,7 +51,8 @@ Inside those callbacks you have access to:
 - `send(...)` — send a frame to the client. Overloads accept `String`, `ByteArray`, or a `WebSocketFrame`.
 - `subscribe(topic)` / `unsubscribe(topic)` — join or leave a pub/sub topic.
 - `updateStateImmediately { }` / `queueStateUpdate { }` — atomically update `STORAGE`.
-- `close(reason)` — close with a `WebSocketClose` code (e.g. `WebSocketClose.NORMAL`).
+- `close(reason)` — close with a `WebSocketClose`, such as `WebSocketClose.NORMAL` or
+  `WebSocketClose(WebSocketClose.Code.VIOLATED_POLICY, "Not allowed")`.
 
 Inbound frames are `WebSocketFrame` (`WebSocketFrame.Text` or `WebSocketFrame.Binary`). Use `frame.text` for the
 string form.
@@ -136,8 +140,14 @@ val liveFeed = path.path("ws").path("feed") bind ApiWebsocketHandler<_, Unit, Us
 Inside the typed callbacks, `auth()` resolves the connection's authenticated principal, and `send`, `subscribe`,
 and the state helpers behave as they do for raw handlers.
 
-`ModelRestUpdatesWebsocket` (and the combined `ModelRestEndpoints(info) + ModelRestUpdatesWebsocket(info)`) build
-on this to push live database changes to clients — see the model REST documentation.
+`ModelRestUpdatesWebSocket` (and the combined `ModelRestEndpoints(info) + ModelRestUpdatesWebSocket(info)`) build
+on this to push live database changes to clients — see the [typed endpoints documentation](typed-endpoints.md).
+
+## Interceptors
+
+Install a `WebSocketInterceptor` to wrap every WebSocket handler, for example for origin checks (`CorsInterceptor`) or
+access logging (`AccessLogInterceptor` in the `auth` module). It also wraps virtual sockets inside a multiplexed
+connection.
 
 ## Local vs. AWS execution models
 
