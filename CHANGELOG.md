@@ -16,10 +16,12 @@ Each release groups entries under:
 
 ### API
 
+- Added `ClientTelemetryEndpoints` (typed): `POST ingest` takes a `TelemetryBatch` recorded by a client app (e.g. KiteUI) and hands it to the server's telemetry backend, so client builds carry no telemetry credentials. Mount with `path.path("telemetry") module ClientTelemetryEndpoints()`. Anonymous callers are accepted; `user.id` comes from the caller's authentication and client-sent `user.*` attributes are dropped. Batches over 2000 records, owner/metric names not matching `[A-Za-z][A-Za-z0-9_.-]{0,63}`, and names past 500 distinct per process are rejected with 400.
 - Added `Session.authenticatedAt: Instant?` and an `authenticatedAt` parameter on `SessionManager.newSession` (defaults to now). `Session.toAuth()` now uses it for `Authentication.issuedAt`, falling back to `createdAt` when it is null (sessions stored before this release). It is nullable so Postgres can add the column to an existing session table.
 
 ### Behavior
 
+- **HTTP request and WebSocket connect spans continue the caller's trace.** A W3C `traceparent` request header becomes the parent of the request's root span, so client and server spans share a trace. If CORS `limitToHeaders` isn't `*`, add `traceparent`.
 - **Security: sub-sessions no longer reset the re-authentication clock.** A sub-session inherits its parent's `authenticatedAt`, so `maxAge` requirements (e.g. the 10-minute gate on proof-method credential management) measure time since the user actually proved identity rather than since the sub-session was minted.
 - **Security: sub-session scopes must be within the parent's.** `POST /sub-session` now responds 403 when the requested scopes are not all met by the parent session's scopes, and 401 when the parent session has been terminated. Omitting `scopes` (the default, root) now grants the parent's scopes rather than root, so callers of a narrower-scoped session that omit scopes keep working.
 - **Terminating a session terminates its derived sessions.** Terminating or deleting a session through the session table (`sessionInfo.table()`, `table(auth)`, the logout endpoints, a superuser's REST update or delete) now also terminates every session transitively derived from it. Writes through `sessionInfo.baseTable()` or straight to the database do not cascade. Sub-sessions no longer outlive their parent's logout; use a separate session for integrations that must.

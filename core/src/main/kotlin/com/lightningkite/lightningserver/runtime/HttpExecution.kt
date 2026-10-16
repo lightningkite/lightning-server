@@ -10,6 +10,7 @@ import com.lightningkite.services.telemetry.TelemetryKey
 import com.lightningkite.services.telemetry.TelemetryKeys
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlin.time.Duration
 
@@ -160,39 +161,41 @@ private suspend fun <PATH : PathSpec> Engine.executeHttp(
     interceptors: HttpInterceptor,
     dispatch: suspend ServerRuntime.(HttpRequest<PATH>) -> HttpResponse,
 ): HttpResponse = try {
-    execute(request.operationName(), Invocation.Http(execution, request), request.telemetryAttributes()) { trace ->
-        var handledError: String? = null
-        suspend fun handleError(e: Exception): HttpResponse {
-            handledError = e::class.simpleName
-            val response = try {
-                instrument("exceptionHandler") { serverRuntime.server.exceptionHandler.handle(request, e) }
-            } catch (_: Exception) {
-                handledError = "unhandled_exception"
-                HttpResponse(status = HttpStatus.InternalServerError)
-            }
-            if (response.status.serverError) reportException(e)
-            return response
-        }
-
-        val response = try {
-            interceptors.intercept(request) { req ->
-                // Map handler and routing exceptions to responses in-place so the surrounding
-                // interceptors (CORS, etc.) still post-process error responses.
-                try {
-                    dispatch(req)
-                } catch (e: Exception) {
-                    handleError(e)
+    withContext(request.traceParent()) {
+        execute(request.operationName(), Invocation.Http(execution, request), request.telemetryAttributes()) { trace ->
+            var handledError: String? = null
+            suspend fun handleError(e: Exception): HttpResponse {
+                handledError = e::class.simpleName
+                val response = try {
+                    instrument("exceptionHandler") { serverRuntime.server.exceptionHandler.handle(request, e) }
+                } catch (_: Exception) {
+                    handledError = "unhandled_exception"
+                    HttpResponse(status = HttpStatus.InternalServerError)
                 }
+                if (response.status.serverError) reportException(e)
+                return response
             }
-        } catch (e: Exception) {
-            handleError(e)
-        }
 
-        trace.enrich(TelemetryAttributes {
-            put(TelemetryKeys.Http.statusCode, response.status.code.toLong())
-            handledError?.let { put(errorType, it) }
-        })
-        response
+            val response = try {
+                interceptors.intercept(request) { req ->
+                    // Map handler and routing exceptions to responses in-place so the surrounding
+                    // interceptors (CORS, etc.) still post-process error responses.
+                    try {
+                        dispatch(req)
+                    } catch (e: Exception) {
+                        handleError(e)
+                    }
+                }
+            } catch (e: Exception) {
+                handleError(e)
+            }
+
+            trace.enrich(TelemetryAttributes {
+                put(TelemetryKeys.Http.statusCode, response.status.code.toLong())
+                handledError?.let { put(errorType, it) }
+            })
+            response
+        }
     }
 } catch (e: CancellationException) {
     throw e

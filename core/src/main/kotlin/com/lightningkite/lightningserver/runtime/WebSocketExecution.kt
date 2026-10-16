@@ -12,6 +12,7 @@ import com.lightningkite.services.telemetry.TelemetryAttributes
 import com.lightningkite.services.telemetry.TelemetryKey
 import com.lightningkite.services.telemetry.TelemetryKeys
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.withContext
 
 // Pre-allocated TelemetryKey instances (backend caches by equality).
 private val wsRoute = TelemetryKey.OfString("ws.route")
@@ -37,12 +38,14 @@ public suspend fun <PATH : PathSpec, STORAGE> DirectExecutableWebSocketHandler<P
     incoming: ReceiveChannel<WebSocketFrame>,
     send: suspend (WebSocketFrame) -> Unit,
     close: suspend (WebSocketClose) -> Unit,
-): Unit = engine.processEngine.execute(
-    "handleDirect",
-    request.connectPhase(null),
-    connectAttributes(request)
-) {
-    reportingServerErrors { handleDirect(request, incoming, send, close) }
+): Unit = withContext(request.traceParent()) {
+    engine.processEngine.execute(
+        "handleDirect",
+        request.connectPhase(null),
+        connectAttributes(request)
+    ) {
+        reportingServerErrors { handleDirect(request, incoming, send, close) }
+    }
 }
 
 /**
@@ -70,12 +73,14 @@ public suspend fun <PATH : PathSpec, STORAGE> DirectExecutableWebSocketHandler<P
 context(engine: Engine)
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.willConnectAsRoot(
     request: WebSocketConnectRequest<PATH>,
-): STORAGE = engine.processEngine.execute(
-    "willConnect",
-    request.connectPhase(null),
-    connectAttributes(request)
-) {
-    reportingServerErrors { willConnect(request) }
+): STORAGE = withContext(request.traceParent()) {
+    engine.processEngine.execute(
+        "willConnect",
+        request.connectPhase(null),
+        connectAttributes(request)
+    ) {
+        reportingServerErrors { willConnect(request) }
+    }
 }
 
 /** Runs [WebSocketHandler.willConnect] as the socket's Connect execution, caused by the current one. */

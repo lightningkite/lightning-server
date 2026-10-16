@@ -2,16 +2,19 @@ package com.lightningkite.lightningserver.runtime
 
 import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.InternalLightningServerApi
+import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.services.data.Unsafe
 import com.lightningkite.services.telemetry.TelemetryAttributes
 import com.lightningkite.services.telemetry.TelemetryTrace
+import com.lightningkite.services.telemetry.TraceParent
 import com.lightningkite.services.telemetry.emptyTelemetryAttributes
 import com.lightningkite.services.telemetry.telemetryTrace
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 
 /**
  * Instruments a suspend block with the metrics backend, creating a named child span.
@@ -41,6 +44,10 @@ internal class RequestTrace(val trace: TelemetryTrace) : AbstractCoroutineContex
  * through it (such as who the caller is), whichever nested span is current. Null outside a request.
  */
 public suspend fun currentRequestTrace(): TelemetryTrace? = currentCoroutineContext()[RequestTrace]?.trace
+
+/** The caller's W3C `traceparent`, which parents a root span so it continues the caller's trace. */
+internal fun Request<*>.traceParent(): CoroutineContext =
+    headers["traceparent"]?.root?.let(::TraceParent) ?: EmptyCoroutineContext
 
 context(engine: Engine)
 internal suspend fun <T> reportingServerErrors(action: suspend () -> T): T = try {

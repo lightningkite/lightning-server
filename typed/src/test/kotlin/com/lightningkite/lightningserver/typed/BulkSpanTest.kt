@@ -28,6 +28,7 @@ import com.lightningkite.services.telemetry.LogLevel
 import com.lightningkite.services.telemetry.MetricUnit
 import com.lightningkite.services.telemetry.TelemetryAttributes
 import com.lightningkite.services.telemetry.TelemetryBackend
+import com.lightningkite.services.telemetry.TelemetryBatch
 import com.lightningkite.services.telemetry.TelemetryKey
 import com.lightningkite.services.telemetry.TelemetryTrace
 import kotlinx.coroutines.CancellationException
@@ -98,6 +99,7 @@ class BulkSpanTest {
             AutoCloseable {}
         override fun reportError(throwable: Throwable, attributes: TelemetryAttributes) {}
         override suspend fun flush() {}
+        override fun ingest(batch: TelemetryBatch) {}
     }
 
     object TestServer : ServerBuilder() {
