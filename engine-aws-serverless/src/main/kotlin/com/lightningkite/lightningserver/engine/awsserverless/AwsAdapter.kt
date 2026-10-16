@@ -275,16 +275,19 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
             internalSerialization.json.encodeToStream(response, output)
             output.flush()
             output.close()
+            telemetryBackend.flush()
         } catch (e: Exception) {
             // Something basic in processing died, we must report it.
-            logger.error(e) { "Full lambda failure" }
+            reportException(e)
+            telemetryBackend.flush()
             if (preventLambdaTimeoutReuse) {
                 println("Killing self to prevent potentially broken reuse.  To disable this, set AwsAdapter.preventLambdaTimeoutReuse to false.")
                 exitProcess(1)
             }
         } catch (e: StackOverflowError) {
             // StackOverflowError is bad, but not critical.  This lambda could still serve other requests.
-            logger.error(e) { "Full lambda failure" }
+            reportException(e)
+            telemetryBackend.flush()
             if (preventLambdaTimeoutReuse) {
                 println("Killing self to prevent potentially broken reuse.  To disable this, set AwsAdapter.preventLambdaTimeoutReuse to false.")
                 exitProcess(1)

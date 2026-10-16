@@ -9,10 +9,16 @@ import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.telemetry.TelemetryAttributes
 import com.lightningkite.services.telemetry.TelemetryKey
 import com.lightningkite.services.telemetry.TelemetryKeys
+import com.lightningkite.services.telemetry.TelemetryTrace
 import com.lightningkite.services.telemetry.emptyTelemetryAttributes
 import com.lightningkite.services.telemetry.telemetryTrace
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
 
 // Pre-allocated TelemetryKey instances for custom WebSocket and task attributes (backend caches by equality).
 private val wsRoute = TelemetryKey.OfString("ws.route")
@@ -24,6 +30,16 @@ private val wsDisconnectReason = TelemetryKey.OfString("ws.disconnect.reason")
 private val taskType = TelemetryKey.OfString("task.type")
 private val taskRoute = TelemetryKey.OfString("task.route")
 private val errorType = TelemetryKey.OfString("error.type")
+
+private class RequestTrace(val trace: TelemetryTrace) : AbstractCoroutineContextElement(Key) {
+    companion object Key : CoroutineContext.Key<RequestTrace>
+}
+
+/**
+ * The span of the HTTP request or WebSocket connection being served, for attributes learned partway
+ * through it (such as who the caller is), whichever nested span is current. Null outside a request.
+ */
+public suspend fun currentRequestTrace(): TelemetryTrace? = currentCoroutineContext()[RequestTrace]?.trace
 
 /**
  * Handles an HTTP request through the server's routing and middleware system.
@@ -64,13 +80,14 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
         // catch only fires when there are no interceptors installed (the compiled chain is
         // HttpInterceptor.NoOp, which bypasses interceptInstrumented) or some other exception
         // escapes the chain machinery itself — headers from would-be interceptors are absent here.
-        this.logger.error(e) { "Exception in HTTP interceptor chain" }
         errorType = "unhandled_exception"
-        try {
+        val response = try {
             instrument("exceptionHandler") { server.exceptionHandler.handle(request, e) }
         } catch (_: Exception) {
             HttpResponse(status = HttpStatus.InternalServerError)
         }
+        if (response.status.serverError) reportException(e)
+        response
     }
     HttpInstrumentationResult(response, response.status.code, errorType)
 }
@@ -114,12 +131,14 @@ private suspend fun ServerRuntime.dispatchLogicalRequest(request: HttpRequest<Pa
 
     suspend fun handleError(e: Exception, label: String? = e::class.simpleName): HttpResponse {
         errorType = label
-        return try {
+        val response = try {
             instrument("exceptionHandler") { server.exceptionHandler.handle(request, e) }
         } catch (_: Exception) {
             errorType = "unhandled_exception"
             HttpResponse(status = HttpStatus.InternalServerError)
         }
+        if (response.status.serverError) reportException(e)
+        return response
     }
 
     val response = server.compiledHttpLogicalInterceptors.intercept(request) { req ->
@@ -195,7 +214,6 @@ private suspend fun ServerRuntime.dispatchLogicalRequest(request: HttpRequest<Pa
                 label = "timeout",
             )
         } catch (e: Exception) {
-            this.logger.error(e) { "Exception in HTTP" }
             handleError(e)
         }
     }
@@ -217,11 +235,13 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.wi
     request: WebSocketConnectRequest<PATH>,
 ): STORAGE {
     return with(serverRuntime) {
-        instrument("willConnect", TelemetryAttributes {
+        telemetryTrace("willConnect", TelemetryAttributes {
             put(wsRoute, location.toString())
             put(TelemetryKeys.Net.peerIp, request.sourceIp)
-        }) {
-            willConnect(request)
+        }) { trace ->
+            withContext(RequestTrace(trace)) {
+                reportingServerErrors { willConnect(request) }
+            }
         }
     }
 }
@@ -241,7 +261,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
             put(wsRoute, location.toString())
             put(TelemetryKeys.Net.peerIp, request.sourceIp)
         }) {
-            didConnect()
+            reportingServerErrors { didConnect() }
         }
     }
 }
@@ -277,7 +297,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
                 }
             )
         }) {
-            messageFromClient(frame)
+            reportingServerErrors { messageFromClient(frame) }
         }
     }
 }
@@ -300,7 +320,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
             put(TelemetryKeys.Net.peerIp, request.sourceIp)
             put(wsSubscriptionTopic, topic.topic.location.toString())
         }) {
-            messageFromSubscription(topic)
+            reportingServerErrors { messageFromSubscription(topic) }
         }
     }
 }
@@ -324,7 +344,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
             put(wsDisconnectCode, reason.code.toLong())
             put(wsDisconnectReason, reason.name)
         }) {
-            disconnect(reason)
+            reportingServerErrors { disconnect(reason) }
         }
     }
 }
@@ -345,7 +365,7 @@ public suspend fun <T> Task<T>.executeWithMetrics(location: PathSpec0, input: T)
         put(taskRoute, location.toString())
     }) {
         with(serverRuntime) {
-            this@executeWithMetrics.executeInline(input)
+            reportingServerErrors { this@executeWithMetrics.executeInline(input) }
         }
     }
 }
@@ -362,7 +382,7 @@ public suspend fun ScheduledTask.executeWithMetrics(location: PathSpec0) {
         put(taskRoute, location.toString())
     }) {
         with(serverRuntime) {
-            this@executeWithMetrics.execute()
+            reportingServerErrors { this@executeWithMetrics.execute() }
         }
     }
 }
@@ -378,7 +398,7 @@ public suspend fun StartupTask.executeWithMetrics(location: PathSpec0) {
         put(taskType, "STARTUP")
         put(taskRoute, location.toString())
     }) {
-        execute()
+        reportingServerErrors { execute() }
     }
 }
 
@@ -393,7 +413,7 @@ public suspend fun PreDeployTask.executeWithMetrics(location: PathSpec0) {
         put(taskType, "PREDEPLOY")
         put(taskRoute, location.toString())
     }) {
-        execute()
+        reportingServerErrors { execute() }
     }
 }
 
@@ -414,6 +434,17 @@ public suspend fun <T> instrument(
     attributes: TelemetryAttributes = emptyTelemetryAttributes(),
     action: suspend () -> T,
 ): T = runtime.telemetryTrace(name, attributes) { action() }
+
+context(runtime: ServerRuntime)
+private suspend fun <T> reportingServerErrors(action: suspend () -> T): T = try {
+    action()
+} catch (e: CancellationException) {
+    throw e
+} catch (e: Exception) {
+    val status = (e as? HttpStatusException)?.status ?: HttpStatus.InternalServerError
+    if (status.serverError) runtime.reportException(e)
+    throw e
+}
 
 /**
  * Carries the response value plus the HTTP status code and optional error class name that
@@ -459,7 +490,7 @@ public suspend fun <T> instrumentHttpRequest(
         put(TelemetryKeys.Http.host, request.domain)
         put(TelemetryKeys.Net.peerIp, request.sourceIp)
     }) { span ->
-        val result = action()
+        val result = withContext(RequestTrace(span)) { action() }
         span.enrich(TelemetryAttributes {
             put(TelemetryKeys.Http.statusCode, result.statusCode.toLong())
             result.errorType?.let { put(errorType, it) }
