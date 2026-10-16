@@ -12,7 +12,12 @@ import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.runtime.test.TestRunner
 import com.lightningkite.lightningserver.runtime.test.testBlocking
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
+import com.lightningkite.lightningserver.typed.sdk.FetcherSdk
+import com.lightningkite.lightningserver.typed.sdk.SDK.writeUsingDefaultSettings
+import com.lightningkite.lightningserver.typed.sdk.SdkModule
 import com.lightningkite.lightningserver.typed.sdk.module
+import com.lightningkite.services.kfile.KFile
+import kotlin.test.assertTrue
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.typed.sdk.User
@@ -122,6 +127,20 @@ class ClientTelemetryEndpointsTest {
         ingest.test(null, batch(*Array(500) { span("owner$it") }))
         assertFailsWith<BadRequestException> { ingest.test(null, batch(span("one-more"))) }
         ingest.test(null, batch(span("owner0"))) // already-known names keep working
+    }
+
+    @Test
+    fun generatedSdkTakesTheSharedBatchType() {
+        val folder = KFile("./build/test-sdk-client-telemetry")
+        FetcherSdk(
+            packageName = "com.example.test",
+            rootInfo = SdkModule.Info("TestApi"),
+            fileStructure = FetcherSdk.Structure.SingleFile("sdk.kt"),
+        ).writeUsingDefaultSettings(TestServer, folder)
+
+        val sdk = folder.then("sdk.kt").readString()
+        assertTrue("val clientTelemetry: ClientTelemetryApi" in sdk, sdk)
+        assertTrue("suspend fun ingest(input: com.lightningkite.services.telemetry.TelemetryBatch)" in sdk, sdk)
     }
 
     @Test
