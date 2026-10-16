@@ -12,7 +12,6 @@ import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.*
-import com.lightningkite.lightningserver.sessions.proofs.extensions.claimOnce
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.typed.sdk.*
@@ -63,6 +62,7 @@ public class WebAuthNProofEndpoints(
     private val registrationForUser: context(ServerRuntime) (HasId<*>, WebAuthN.GeneralPreference) -> WebAuthN.Registration.RegistrationOptions,
     private val proveOptions: context(ServerRuntime) (String?) -> WebAuthN.Authentication.ProveOptions = { WebAuthN.Authentication.ProveOptions() },
     private val webAuthnManager: WebAuthnManager = WebAuthnManager.createNonStrictWebAuthnManager(),
+    signals: (context(ServerRuntime) (Table<WebAuthNCredential>) -> Table<WebAuthNCredential>)? = null,
 ) : ServerBuilder(), ProofMethod {
     init {
         proofMethodsRegistry.register(this)
@@ -92,6 +92,7 @@ public class WebAuthNProofEndpoints(
     public val modelInfo: ModelInfo<HasId<*>, WebAuthNCredential, String> = database.modelInfo(
         tableName = "WebAuthNCredential",
         auth = proofMethodAuth or AuthRequirement.IsAdmin,
+        signals = { table -> signals?.invoke(serverRuntime, table) ?: table },
         permissions = {
             val admin = condition<WebAuthNCredential>(AuthRequirement.IsAdmin.accepts(authOrNull))
             val mine = authOrNull?.let { a ->
@@ -109,7 +110,6 @@ public class WebAuthNProofEndpoints(
                 update = admin or (mine and active),
                 updateRestrictions = whitelistRestrictions {
                     it.disabledAt.canBeModified()
-                    it.expiresAt requires admin
                 },
                 delete = Condition.Never,
             )
@@ -392,8 +392,9 @@ public class WebAuthNProofEndpoints(
                     val method = serverRuntime.proofMethods.find { m -> m.info.via == it.via }
                     if (method == null || !method.isValid(it))
                         throw BadRequestException("Invalid proof")
-                    val id = handler.fetchUserIdString(it.property, handler.normalizePropertyValue(it.property, it.value))
-                        ?: throw BadRequestException("Proof does not identify a $subjectType")
+                    val id =
+                        handler.fetchUserIdString(it.property, handler.normalizePropertyValue(it.property, it.value))
+                            ?: throw BadRequestException("Proof does not identify a $subjectType")
                     if (authOrNull != null && selfId != id)
                         throw BadRequestException("Proof does not match the authenticated subject")
                     id

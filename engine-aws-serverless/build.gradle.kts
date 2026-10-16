@@ -26,8 +26,6 @@ dependencies {
     api(libs.dynamodb) { excludeNetty() }
     api(libs.orgCrac)
     implementation(libs.coroutines.reactive)
-    implementation(libs.coroutines.jdk)
-    api(libs.kotlin.reflect)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)
 }

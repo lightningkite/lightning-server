@@ -13,7 +13,6 @@ dependencies {
     api(project(":auth-shared"))
     api(project(":core"))
     api(libs.services.database)
-    api(libs.kotlin.reflect)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)
 }

@@ -5,7 +5,7 @@ plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.ksp)
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.androidLibrary)
+    alias(libs.plugins.androidKmpLibrary)
     alias(libs.plugins.dokka)
     id("signing")
     alias(libs.plugins.vanniktechMavenPublish)
@@ -19,7 +19,12 @@ kotlin {
     }
 
     applyDefaultHierarchyTemplate()
-    androidTarget {
+    android {
+        namespace = "com.lightningkite.lightningserver.audit.shared"
+        compileSdk = 36
+        minSdk = 21
+        enableCoreLibraryDesugaring = true
+        withHostTest {}
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_1_8)
         }
@@ -34,16 +39,14 @@ kotlin {
             }
         }
     }
-    js(IR) {
-        browser()
-    }
+    js{ browser() }
     iosX64()
     iosArm64()
     iosSimulatorArm64()
     macosArm64()
 
     sourceSets {
-        val commonMain by getting {
+        val commonMain = getByName("commonMain") {
             dependencies {
                 api(libs.kotlinx.serialization.json)
                 api(libs.services.database.shared)
@@ -55,7 +58,7 @@ kotlin {
                 srcDir(file("build/generated/ksp/common/commonMain/kotlin"))
             }
         }
-        val commonTest by getting {
+        val commonTest = getByName("commonTest") {
             dependencies {
                 implementation(libs.kotlin.test)
             }
@@ -72,21 +75,8 @@ dependencies {
     }
 }
 
-android {
-    namespace = "com.lightningkite.lightningserver"
-    compileSdk = 36
-
-    defaultConfig {
-        minSdk = 21
-    }
-    compileOptions {
-        isCoreLibraryDesugaringEnabled = true
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
-    }
-    dependencies {
-        coreLibraryDesugaring(libs.androidDesugaring)
-    }
+dependencies {
+    coreLibraryDesugaring(libs.androidDesugaring)
 }
 
 lkLibrary(

@@ -8,24 +8,29 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.encryption.SecretBasis
 import com.lightningkite.lightningserver.encryption.signer
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.test.TestRunner
 import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
+import com.lightningkite.lightningserver.sessions.EstablishTotp
 import com.lightningkite.lightningserver.sessions.TotpSecret
 import com.lightningkite.lightningserver.sessions.proofs.extensions.code
 import com.lightningkite.lightningserver.sessions.proofs.extensions.generator
 import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.services.cache.Cache
+import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
 import dev.turingcomplete.kotlinonetimepassword.HmacAlgorithm
 import dev.turingcomplete.kotlinonetimepassword.TimeBasedOneTimePasswordConfig
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
-import org.bouncycastle.util.encoders.Base32
+import org.apache.commons.codec.binary.Base32
 import org.junit.Test
+import java.net.URLDecoder
 import java.util.concurrent.TimeUnit
 import kotlin.test.*
 import kotlin.time.Clock
@@ -71,7 +76,7 @@ class TimeBasedOTPProofEndpointsTest {
 
     // Create a known secret for testing
     private val testSecret = ByteArray(32) { (it + 1).toByte() }
-    private val testSecretBase32 = Base32.encode(testSecret).toString(Charsets.UTF_8)
+    private val testSecretBase32 = Base32().encodeToString(testSecret)
 
     private val testConfig = TimeBasedOneTimePasswordConfig(
         timeStep = 30,
@@ -300,16 +305,10 @@ class TimeBasedOTPProofEndpointsTest {
                 // Should still return false because lastUsedAt is null
                 assertFalse(execute { server.totpEndpoints.established(TestUser, user) })
 
-                // After proving (which sets lastUsedAt), should return true
-                val currentCode = totpSecret.code
-                server.totpEndpoints.prove.test(
-                    null, IdentificationAndPassword(
-                        type = "TestUser",
-                        property = "TestUser/_id",
-                        value = userId.toString(),
-                        password = currentCode
-                    )
-                )
+                // After confirming (which sets lastUsedAt), should return true
+                @Suppress("UNCHECKED_CAST")
+                val auth = TestUser.testAuth(user) as Authentication<HasId<*>>
+                server.totpEndpoints.confirm.test(auth, totpSecret.code)
 
                 // Now should return true
                 assertTrue(execute { server.totpEndpoints.established(TestUser, user) })
@@ -437,8 +436,8 @@ class TimeBasedOTPProofEndpointsTest {
         // Different secrets for different users
         val secret1 = ByteArray(32) { (it + 1).toByte() }
         val secret2 = ByteArray(32) { (it + 100).toByte() }
-        val secretBase32_1 = Base32.encode(secret1).toString(Charsets.UTF_8)
-        val secretBase32_2 = Base32.encode(secret2).toString(Charsets.UTF_8)
+        val secretBase32_1 = Base32().encodeToString(secret1)
+        val secretBase32_2 = Base32().encodeToString(secret2)
 
         object : ServerBuilder() {
             val database = setting("database", Database.Settings("ram"))
@@ -603,4 +602,218 @@ class TimeBasedOTPProofEndpointsTest {
             }
         }
     }
+
+    /** The account name and issuer from an `otpauth://totp/Issuer:AccountName?...` URI. */
+    private fun otpAuthLabel(url: String): String =
+        URLDecoder.decode(url.substringAfter("otpauth://totp/").substringBefore("?"), Charsets.UTF_8)
+
+    @Test
+    fun `establish puts the supplied account name in the URI instead of the label`() = runBlocking {
+        TestUser.users.clear()
+        val userId = Uuid.random()
+        val user = TestUser(userId, "test@example.com")
+        TestUser.users[userId] = user
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
+
+            init {
+                register(TestUser)
+                registerBasicMediaTypeCoders()
+            }
+
+            val totpEndpoints = path.path("auth").path("totp") include TimeBasedOTPProofEndpoints(
+                database = database,
+                cache = cache,
+                proofSigner = RuntimeDeferred.Cached { testBasis.signer("proof") },
+                proofExpiration = 1.hours,
+                config = testConfig,
+                accountName = { (it as TestUser).email },
+            )
+        }.let { server ->
+            server.test({}) {
+                @Suppress("UNCHECKED_CAST")
+                val auth = TestUser.testAuth(user) as Authentication<HasId<*>>
+                val url = server.totpEndpoints.establish.test(auth, EstablishTotp("Work Phone"))
+
+                val label = otpAuthLabel(url)
+                assertTrue(label.endsWith(":test@example.com"), "Unexpected otpauth label: $label")
+                assertFalse("Work Phone" in label)
+
+                // The user's own name for the secret is still what gets stored
+                val stored = execute { server.totpEndpoints.modelInfo.table().find(Condition.Always).toList() }.single()
+                assertEquals("Work Phone", stored.label)
+            }
+        }
+    }
+
+    @Test
+    fun `establish falls back to the label when no account name is supplied`() = runBlocking {
+        TestUser.users.clear()
+        val userId = Uuid.random()
+        val user = TestUser(userId, "test@example.com")
+        TestUser.users[userId] = user
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
+
+            init {
+                register(TestUser)
+                registerBasicMediaTypeCoders()
+            }
+
+            val totpEndpoints = path.path("auth").path("totp") include TimeBasedOTPProofEndpoints(
+                database = database,
+                cache = cache,
+                proofSigner = RuntimeDeferred.Cached { testBasis.signer("proof") },
+                proofExpiration = 1.hours,
+                config = testConfig,
+            )
+        }.let { server ->
+            server.test({}) {
+                @Suppress("UNCHECKED_CAST")
+                val auth = TestUser.testAuth(user) as Authentication<HasId<*>>
+                val url = server.totpEndpoints.establish.test(auth, EstablishTotp("Work Phone"))
+
+                val label = otpAuthLabel(url)
+                assertTrue(label.endsWith(":Work Phone"), "Unexpected otpauth label: $label")
+            }
+        }
+    }
+
+    private inner class ReplacementServer : ServerBuilder() {
+        val database = setting("database", Database.Settings("ram"))
+        val cache = setting("cache", Cache.Settings("ram"))
+
+        init {
+            register(TestUser)
+            registerBasicMediaTypeCoders()
+        }
+
+        val totpEndpoints = path.path("auth").path("totp") include TimeBasedOTPProofEndpoints(
+            database = database,
+            cache = cache,
+            proofSigner = RuntimeDeferred.Cached { testBasis.signer("proof") },
+            proofExpiration = 1.hours,
+            config = testConfig,
+        )
+    }
+
+    /** Runs [block] with a user who already has a confirmed TOTP secret, which is passed in. */
+    private fun withConfirmedSecret(
+        block: suspend context(TestRunner<*>) (ReplacementServer, Authentication<HasId<*>>, TotpSecret) -> Unit
+    ) = runBlocking {
+        TestUser.users.clear()
+        val userId = Uuid.random()
+        val user = TestUser(userId, "test@example.com")
+        TestUser.users[userId] = user
+
+        val server = ReplacementServer()
+        server.test({}) {
+            val existing = TotpSecret(
+                subjectId = TestUser.idString(userId),
+                subjectType = TestUser.name,
+                secretBase32 = testSecretBase32,
+                label = "Old Phone",
+                issuer = "TestApp",
+                period = 30.seconds,
+                digits = 6,
+                algorithm = TotpHashAlgorithm.SHA1,
+                establishedAt = Clock.System.now(),
+                lastUsedAt = Clock.System.now(),
+            )
+            execute { server.totpEndpoints.modelInfo.table().insert(listOf(existing)) }
+
+            @Suppress("UNCHECKED_CAST")
+            block(server, TestUser.testAuth(user) as Authentication<HasId<*>>, existing)
+        }
+    }
+
+    context(_: TestRunner<*>)
+    private suspend fun ReplacementServer.proveWith(secret: TotpSecret) = totpEndpoints.prove.test(
+        null, IdentificationAndPassword(
+            type = "TestUser",
+            property = "TestUser/_id",
+            value = secret.subjectId,
+            password = secret.code,
+        )
+    )
+
+    context(_: TestRunner<*>)
+    private suspend fun ReplacementServer.secrets() = execute { totpEndpoints.modelInfo.table().find(Condition.Always).toList() }
+
+    @Test
+    fun `an abandoned replacement leaves the confirmed secret working`() = withConfirmedSecret { server, auth, existing ->
+        server.totpEndpoints.establish.test(auth, EstablishTotp("New Phone"))
+
+        // Setup was never confirmed, so the old authenticator must still sign in
+        assertNotNull(server.proveWith(existing))
+        assertNull(server.secrets().single { it._id == existing._id }.disabledAt)
+    }
+
+    @Test
+    fun `confirming a replacement retires the old secret`() = withConfirmedSecret { server, auth, existing ->
+        server.totpEndpoints.establish.test(auth, EstablishTotp("New Phone"))
+        val replacement = server.secrets().single { it._id != existing._id }
+
+        server.totpEndpoints.confirm.test(auth, replacement.code)
+
+        val after = server.secrets()
+        assertNotNull(after.single { it._id == replacement._id }.lastUsedAt)
+        val old = after.single { it._id == existing._id }
+        assertNotNull(old.disabledAt)
+        assertEquals("", old.secretBase32)
+        assertFailsWith<BadRequestException> { server.proveWith(existing) }
+    }
+
+    @Test
+    fun `a code from the old authenticator does not confirm the replacement`() =
+        withConfirmedSecret { server, auth, existing ->
+            server.totpEndpoints.establish.test(auth, EstablishTotp("New Phone"))
+
+            assertFailsWith<BadRequestException> { server.totpEndpoints.confirm.test(auth, existing.code) }
+
+            val replacement = server.secrets().single { it._id != existing._id }
+            assertNull(replacement.lastUsedAt)
+            assertNull(server.secrets().single { it._id == existing._id }.disabledAt)
+        }
+
+    @Test
+    fun `an unconfirmed secret cannot be used to sign in`() =
+        withConfirmedSecret { server, auth, existing ->
+            server.totpEndpoints.establish.test(auth, EstablishTotp("New Phone"))
+            val replacement = server.secrets().single { it._id != existing._id }
+
+            assertFailsWith<BadRequestException> { server.proveWith(replacement) }
+
+            // Nothing changed: the replacement is still unconfirmed and the old secret still active
+            val after = server.secrets()
+            assertNull(after.single { it._id == replacement._id }.lastUsedAt)
+            assertNull(after.single { it._id == existing._id }.disabledAt)
+        }
+
+    @Test
+    @Suppress("DEPRECATION")
+    fun `the deprecated existing path still confirms`() =
+        withConfirmedSecret { server, auth, existing ->
+            server.totpEndpoints.establish.test(auth, EstablishTotp("New Phone"))
+            val replacement = server.secrets().single { it._id != existing._id }
+
+            server.totpEndpoints.confirmExisting.test(auth, replacement.code)
+
+            assertNotNull(server.secrets().single { it._id == replacement._id }.lastUsedAt)
+            assertNotNull(server.secrets().single { it._id == existing._id }.disabledAt)
+        }
+
+    @Test
+    fun `starting setup again replaces the unfinished one but not the confirmed one`() =
+        withConfirmedSecret { server, auth, existing ->
+            server.totpEndpoints.establish.test(auth, EstablishTotp("First Try"))
+            server.totpEndpoints.establish.test(auth, EstablishTotp("Second Try"))
+
+            val active = server.secrets().filter { it.disabledAt == null }
+            assertEquals(setOf("Old Phone", "Second Try"), active.map { it.label }.toSet())
+        }
 }

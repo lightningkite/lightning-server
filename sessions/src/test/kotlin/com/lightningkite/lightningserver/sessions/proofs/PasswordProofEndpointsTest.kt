@@ -432,9 +432,9 @@ class PasswordProofEndpointsTest {
                 cache = cache,
                 proofSigner = RuntimeDeferred.Cached { testBasis.signer("proof") },
                 proofExpiration = 1.hours,
-                evaluatePassword = { password ->
+                evaluatePassword = { input ->
                     evaluationCalled = true
-                    if (password.length < 8) throw BadRequestException("Password too short")
+                    if (input.password.length < 8) throw BadRequestException("Password too short")
                 }
             )
         }.let { server ->

@@ -9,27 +9,20 @@ plugins {
 }
 
 dependencies {
-    api(project(":core"))
     api(project(":engine-local"))
-    api(libs.services.database)
-    api(libs.services.cache)
-    api(libs.services.pubsub)
-    api(libs.kotlin.reflect)
 
     // Ktor dependencies
     api(libs.ktor.core)
     api(libs.ktor.netty)
-    api(libs.ktor.cio.jvm)
     api(libs.ktor.websockets)
-    api(libs.ktor.call.logging)
 //    api(libs.ktorCors)
-    api(libs.ktor.json)
 
     // Test dependencies
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)
     testImplementation(testFixtures(project(":engine-local")))
     testImplementation(libs.ktor.test.host)
+    testImplementation(libs.ktor.cio.jvm)
     testImplementation(libs.ktor.client.cio.jvm)
     testImplementation(libs.ktor.client.websockets.jvm)
     testImplementation(libs.openTelemetry.sdk.testing)

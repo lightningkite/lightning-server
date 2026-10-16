@@ -99,6 +99,8 @@ modules.  These are what you reference in your dependency blocks.
 | `sessions-shared` | KMP | Proof models, session token types, client-side auth endpoint interfaces |
 | `sessions-email` | JVM | Email magic-link / PIN proof endpoint |
 | `sessions-sms` | JVM | SMS PIN proof endpoint |
+| `sessions-totp` | JVM | Time-based one-time password (authenticator app) proof endpoint |
+| `sessions-webauthn` | JVM | WebAuthn / passkey proof endpoint |
 | `sessions-oauth` | JVM | OAuth 2.0 proof endpoint (GitHub, Google, etc.) |
 | `sessions-oauth-shared` | KMP | OAuth token types |
 

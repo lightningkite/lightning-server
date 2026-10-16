@@ -20,6 +20,8 @@ dependencies {
     ksp(libs.services.database.processor)
     kspTest(libs.services.database.processor)
 
+    testImplementation(project(":sessions-totp"))
+    testImplementation(project(":sessions-webauthn"))
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)
 

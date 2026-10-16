@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.sessions.proofs
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.encryption.Signer
@@ -11,6 +12,7 @@ import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.*
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.sessions.*
 import com.lightningkite.lightningserver.sessions.proofs.extensions.*
 import com.lightningkite.lightningserver.typed.*
@@ -21,7 +23,6 @@ import com.lightningkite.services.database.*
 import dev.turingcomplete.kotlinonetimepassword.HmacAlgorithm
 import dev.turingcomplete.kotlinonetimepassword.TimeBasedOneTimePasswordConfig
 import kotlinx.coroutines.flow.toList
-import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.builtins.serializer
 import java.security.SecureRandom
 import java.util.concurrent.TimeUnit
@@ -31,7 +32,6 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
 
 
-@OptIn(InternalSerializationApi::class)
 public class TimeBasedOTPProofEndpoints(
     database: Runtime<Database>,
     private val cache: Runtime<Cache>,
@@ -43,6 +43,13 @@ public class TimeBasedOTPProofEndpoints(
         codeDigits = 6,
         hmacAlgorithm = HmacAlgorithm.SHA1
     ),
+    signals: (context(ServerRuntime) (Table<TotpSecret>) -> Table<TotpSecret>)? = null,
+    /**
+     * Supplies the account name authenticator apps show for a new secret (the account part of the `otpauth://` URI's
+     * label), usually the subject's email or username. Returning null falls back to the secret's [TotpSecret.label],
+     * which puts the user's own name for the secret into their authenticator app instead.
+     */
+    private val accountName: context(ServerRuntime) (HasId<*>) -> String? = { null },
 ) : ServerBuilder(), DirectProofMethod {
     init {
         proofMethodsRegistry.register(this)
@@ -66,6 +73,7 @@ public class TimeBasedOTPProofEndpoints(
     public val modelInfo: ModelInfo<HasId<*>, TotpSecret, Uuid> = database.modelInfo(
         tableName = "TotpSecret",
         auth = proofMethodAuth or AuthRequirement.IsAdmin,
+        signals = { table -> signals?.invoke(serverRuntime, table) ?: table },
         permissions = {
             val admin = condition<TotpSecret>(AuthRequirement.IsAdmin.accepts(authOrNull))
             val mine = condition<TotpSecret> {
@@ -79,7 +87,6 @@ public class TimeBasedOTPProofEndpoints(
                 },
                 update = admin or (mine and active),
                 updateRestrictions = whitelistRestrictions {
-                    it.label.canBeModified()
                     it.disabledAt.canBeModified()
                 },
                 delete = Condition.Never,
@@ -95,13 +102,15 @@ public class TimeBasedOTPProofEndpoints(
             summary = "Establish Time Based One Time Password",
             inputType = EstablishTotp.serializer(),
             outputType = String.serializer(),
-            description = "Generates a new Time Based One Time Password configuration.",
+            description = "Generates a new Time Based One Time Password configuration. Any confirmed one stays " +
+                    "active until the new one is confirmed, so abandoning setup doesn't lose a working authenticator.",
             auth = proofMethodAuth,
             errorCases = listOf(),
             examples = listOf(),
             implementation = { input: EstablishTotp ->
+                // Only an unfinished setup is replaced here; a confirmed secret is retired once its replacement is used
                 modelInfo.table().updateMany(condition {
-                    it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName)
+                    it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) and it.lastUsedAt.eq(null)
                 }, modification {
                     it.disabledAt assign now()
                     it.secretBase32 assign ""
@@ -115,7 +124,7 @@ public class TimeBasedOTPProofEndpoints(
                     config = config,
                 )
                 modelInfo.table().insertOne(secret)
-                secret.url
+                secret.url(accountName(auth.fetch()) ?: secret.label)
             }
         )
 
@@ -123,7 +132,8 @@ public class TimeBasedOTPProofEndpoints(
         path.path("prove").post bind ApiHttpHandler(
             auth = noAuth,
             summary = "Prove TOTP",
-            description = "Logs in to the given account with an TOTP code.  Limits to 10 attempts per hour.",
+            description = "Logs in to the given account with an TOTP code. Only confirmed secrets are accepted, since " +
+                    "an unconfirmed one was never shown to be in the user's possession. Limits to 10 attempts per hour.",
             errorCases = listOf(),
             examples = listOf(
                 ApiHttpHandler.Example(
@@ -146,8 +156,6 @@ public class TimeBasedOTPProofEndpoints(
             ),
             successCode = HttpStatus.OK,
             implementation = { input: IdentificationAndPassword ->
-                val now = now()
-                val gracePeriod = now().minus(5.seconds)
                 val subject = input.type
                 val handler = serverRuntime.server.principalTypes[subject]
                     ?: run {
@@ -160,7 +168,7 @@ public class TimeBasedOTPProofEndpoints(
                 // by varying case or whitespace.
                 val normalizedValue = handler.normalizePropertyValue(input.property, input.value)
                 cache().constrainProofAttemptRate(
-                    cacheKey = "totp-count-${input.property}-${normalizedValue}",
+                    cacheKey = attemptKey(input.property, normalizedValue),
                     method = info,
                     request = request,
                 ) {
@@ -172,60 +180,12 @@ public class TimeBasedOTPProofEndpoints(
                             throw BadRequestException("User ID and code do not match")
                         }
 
-                    val active = modelInfo.table().find(condition {
-                        it.subjectId.eq(subjectId) and it.subjectType.eq(subject) and active
+                    val confirmed = modelInfo.table().find(condition {
+                        it.subjectId.eq(subjectId) and it.subjectType.eq(subject) and active and it.lastUsedAt.neq(null)
                     }).toList()
 
-                    // Find both the secret AND the specific time-step whose code matched, so the code can be
-                    // marked single-use against that exact step.
-                    var matching: TotpSecret? = null
-                    var matchedAt: Instant = now
-                    for (secret in active) {
-                        when {
-                            secret.generator.isValid(input.password, now.toJavaInstant()) -> matchedAt = now
-                            secret.generator.isValid(input.password, gracePeriod.toJavaInstant()) -> matchedAt = gracePeriod
-                            else -> continue
-                        }
-                        matching = secret
-                        break
-                    }
-                    val matched = matching ?: run {
-                        serverRuntime.reportAuthEvent(AuthEvent.ProofCredentialRejected(
-                            info,
-                            AuthEvent.ProofCredentialRejected.Reason.SecretMismatch,
-                            principal = subjectId,
-                            request = request,
-                        ))
-                        throw BadRequestException("User ID and code do not match")
-                    }
-
-                    // Enforce single-use (RFC 6238 §5.2): a code is valid for exactly one time-step, so the same
-                    // code must not mint two proofs. Key on the secret + the time-step that validated; reuse the
-                    // opaque "do not match" error so a replay is indistinguishable from a wrong code. claimOnce is
-                    // atomic, closing the race where two concurrent submissions of the same code both pass.
-                    val timeStepCounter = matchedAt.epochSeconds / matched.period.inWholeSeconds
-                    val claimed = cache().claimOnce(
-                        cacheKey = "totp-used-${matched._id}-$timeStepCounter",
-                        ttl = matched.period * 2 + 5.seconds,
-                    )
-                    // A reused code is reported plainly (unlike a wrong code, which stays opaque): revealing reuse
-                    // is harmless here — it only confirms a code the caller already supplied was once valid — and
-                    // a clear "wait for the next code" is far better UX than a misleading "does not match".
-                    if (!claimed) {
-                        serverRuntime.reportAuthEvent(AuthEvent.ProofCredentialRejected(
-                            info,
-                            AuthEvent.ProofCredentialRejected.Reason.SecretAlreadyUsed,
-                            principal = subjectId,
-                            request = request,
-                        ))
-                        throw BadRequestException(
-                            "That code was already used. Please wait for your authenticator to show a new code."
-                        )
-                    }
-
-                    modelInfo.table().updateOneById(matched._id, modification {
-                        it.lastUsedAt assign now
-                    })
+                    useCode(confirmed, input.password, principal = subjectId, request = request)
+                        ?: throw BadRequestException("User ID and code do not match")
 
                     serverRuntime.reportAuthEvent(AuthEvent.ProofAccepted(info, principal = subjectId, request = request))
                     proofSigner.await().makeProof(
@@ -237,33 +197,132 @@ public class TimeBasedOTPProofEndpoints(
         )
 
     public val confirm: ApiHttpHandler<PathSpec0, HasId<*>, String, Unit> =
-        path.path("existing").post bind explicitApiHttpHandler(
-            summary = "Confirm Time Based One Time Password",
+        path.path("confirm").post bind confirmHandler(deprecatedPath = false)
+
+    @Deprecated("Kept for clients built before the confirm path existed", ReplaceWith("confirm"))
+    public val confirmExisting: ApiHttpHandler<PathSpec0, HasId<*>, String, Unit> =
+        path.path("existing").post bind confirmHandler(deprecatedPath = true)
+
+    private fun confirmHandler(deprecatedPath: Boolean): ApiHttpHandler<PathSpec0, HasId<*>, String, Unit> =
+        explicitApiHttpHandler(
+            summary = "Confirm Time Based One Time Password" + if (deprecatedPath) " (Deprecated Path)" else "",
             inputType = String.serializer(),
             outputType = Unit.serializer(),
-            description = "Confirms your TOTP, making it fully active",
+            description = (if (deprecatedPath) "Deprecated: use the confirm path instead. " else "") +
+                    "Confirms your TOTP, making it fully active and retiring any it replaces",
             auth = proofMethodAuth,
             errorCases = listOf(),
             examples = listOf(),
             implementation = { code: String ->
-                val active = modelInfo.table().find(condition {
-                    it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) and it.disabledAt.eq(null)
+                // Only the unfinished setup can be confirmed; a code from the authenticator being replaced must not
+                // count, or the replacement would never become active
+                val pending = modelInfo.table().find(condition {
+                    it.subjectId.eq(auth.rawId) and
+                            it.subjectType.eq(auth.principalName) and
+                            active and
+                            it.lastUsedAt.eq(null)
                 }).toList()
 
-                if (active.isEmpty()) throw NotFoundException()
+                if (pending.isEmpty()) throw NotFoundException()
 
-                prove(
-                    IdentificationAndPassword(
-                        type = auth.principalName,
-                        property = "${auth.principalName}/_id",
-                        value = auth.rawId,
-                        password = code
-                    )
-                )
+                // Shares prove's attempt bucket so confirming can't be used to get extra guesses
+                val property = "${auth.principalName}/_id"
+                val handler = serverRuntime.server.principalTypes[auth.principalName]
+                    ?: throw IllegalArgumentException("No subject ${auth.principalName} recognized")
+                cache().constrainProofAttemptRate(
+                    cacheKey = attemptKey(property, handler.normalizePropertyValue(property, auth.rawId)),
+                    method = info,
+                    request = request,
+                ) {
+                    useCode(pending, code, principal = auth.rawId, request = request)
+                        ?: throw BadRequestException("That code does not match. Please try again.")
+                }
 
                 Unit
             }
         )
+
+    private fun attemptKey(property: String, normalizedValue: String) = "totp-count-$property-$normalizedValue"
+
+    /**
+     * Checks [code] against [candidates] and marks the matching secret used, returning it, or null if none match.
+     *
+     * A code that matches nothing or was already used is reported as an [AuthEvent.ProofCredentialRejected] for
+     * [principal].
+     *
+     * The first use of a new secret is what confirms it (only [confirm] offers unconfirmed ones), so that also retires
+     * the subject's other secrets. This keeps a single authenticator active without disabling the old one before its
+     * replacement is known to work.
+     */
+    context(_: ServerRuntime)
+    private suspend fun useCode(candidates: List<TotpSecret>, code: String, principal: String, request: Request<*>?): TotpSecret? {
+        val now = now()
+        val gracePeriod = now.minus(5.seconds)
+
+        // Find both the secret AND the specific time-step whose code matched, so the code can be
+        // marked single-use against that exact step.
+        var matching: TotpSecret? = null
+        var matchedAt: Instant = now
+        for (secret in candidates) {
+            when {
+                secret.generator.isValid(code, now.toJavaInstant()) -> matchedAt = now
+                secret.generator.isValid(code, gracePeriod.toJavaInstant()) -> matchedAt = gracePeriod
+                else -> continue
+            }
+            matching = secret
+            break
+        }
+        val matched = matching ?: run {
+            serverRuntime.reportAuthEvent(AuthEvent.ProofCredentialRejected(
+                info,
+                AuthEvent.ProofCredentialRejected.Reason.SecretMismatch,
+                principal = principal,
+                request = request,
+            ))
+            return null
+        }
+
+        // Enforce single-use (RFC 6238 §5.2): a code is valid for exactly one time-step, so the same
+        // code must not mint two proofs. Key on the secret + the time-step that validated. claimOnce is
+        // atomic, closing the race where two concurrent submissions of the same code both pass.
+        val timeStepCounter = matchedAt.epochSeconds / matched.period.inWholeSeconds
+        val claimed = cache().claimOnce(
+            cacheKey = "totp-used-${matched._id}-$timeStepCounter",
+            ttl = matched.period * 2 + 5.seconds,
+        )
+        // A reused code is reported plainly (unlike a wrong code, which stays opaque): revealing reuse
+        // is harmless here — it only confirms a code the caller already supplied was once valid — and
+        // a clear "wait for the next code" is far better UX than a misleading "does not match".
+        if (!claimed) {
+            serverRuntime.reportAuthEvent(AuthEvent.ProofCredentialRejected(
+                info,
+                AuthEvent.ProofCredentialRejected.Reason.SecretAlreadyUsed,
+                principal = principal,
+                request = request,
+            ))
+            throw BadRequestException(
+                "That code was already used. Please wait for your authenticator to show a new code."
+            )
+        }
+
+        modelInfo.table().updateOneById(matched._id, modification {
+            it.lastUsedAt assign now
+        })
+
+        if (matched.lastUsedAt == null) {
+            modelInfo.table().updateMany(condition {
+                it.subjectId.eq(matched.subjectId) and
+                        it.subjectType.eq(matched.subjectType) and
+                        it._id.neq(matched._id) and
+                        it.disabledAt.eq(null)
+            }, modification {
+                it.disabledAt assign now
+                it.secretBase32 assign ""
+            })
+        }
+
+        return matched
+    }
 
     context(server: ServerRuntime)
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> established(

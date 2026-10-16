@@ -12,7 +12,8 @@ import kotlin.uuid.Uuid
 /**
  * Asks for a sub-session with reduced privileges derived from the current session.
  *
- * @property scopes The scopes to grant, which are root access by default and should usually be restricted.
+ * @property scopes The scopes to grant. The default, root, grants the parent session's scopes; anything else must be
+ *   within them.
  * @property oauthClient The OAuth client ID, if the sub-session is for OAuth.
  * @property expires When the sub-session expires, inheriting the parent's expiration if `null`.
  */
@@ -31,7 +32,10 @@ public data class SubSessionRequest(
  * @param SUBJECT The type of the subject.
  * @param ID The type of the subject's ID.
  * @property secretHash The hash of the session secret, never the raw secret.
- * @property derivedFrom The parent session, if this is a sub-session.
+ * @property derivedFrom The parent session, if this is a sub-session. Terminating the parent terminates this session.
+ * @property authenticatedAt When the subject last proved their identity in this session's lineage, which sub-sessions
+ *   inherit, so `maxAge` measures time since real authentication. `null`, for sessions stored before this field
+ *   existed, means [createdAt].
  * @property lastUsed When the session was last used.
  * @property expires The hard expiration time, or `null` if there is none.
  * @property stale When the session goes stale and requires re-authentication, or `null` if never.
@@ -46,10 +50,11 @@ public data class SubSessionRequest(
 public data class Session<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     override val _id: Uuid = Uuid.random(),
     val secretHash: String,
-    val derivedFrom: Uuid? = null,
+    @Index val derivedFrom: Uuid? = null,
     val label: String? = null,
     val subjectId: ID,
     val createdAt: Instant,
+    val authenticatedAt: Instant? = null,
     val lastUsed: Instant,
     val expires: Instant? = null,
     val stale: Instant? = null,

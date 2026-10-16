@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
+import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.sessions.*
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
 import com.lightningkite.lightningserver.typed.*
@@ -17,7 +18,6 @@ import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.database.*
-import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.builtins.serializer
 import kotlin.time.Clock
 import kotlin.time.Duration
@@ -25,13 +25,13 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.Uuid
 
-@OptIn(InternalSerializationApi::class)
 public class KnownDeviceProofEndpoints(
     database: Runtime<Database>,
     private val cache: Runtime<Cache>,
     override val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
     override val proofExpiration: Duration = 1.hours,
     private val expires: Runtime<Duration> = Runtime.Constant(30.days),
+    signals: (context(ServerRuntime) (Table<KnownDeviceSecret>) -> Table<KnownDeviceSecret>)? = null,
 ) : ServerBuilder(), StringProofMethod {
     init {
         proofMethodsRegistry.register(this)
@@ -58,8 +58,9 @@ public class KnownDeviceProofEndpoints(
     public val modelInfo: ModelInfo<HasId<*>, KnownDeviceSecret, Uuid> = database.modelInfo(
         auth = proofMethodAuth or AuthRequirement.IsAdmin,
         tableName = "KnownDeviceSecret",
-        signals = {
-            it.interceptCreate {
+        signals = { table ->
+            val table = signals?.invoke(serverRuntime, table) ?: table
+            table.interceptCreate {
                 it.copy(hash = it.hash.fastHash(), expiresAt = now() + expires())
             }
         },

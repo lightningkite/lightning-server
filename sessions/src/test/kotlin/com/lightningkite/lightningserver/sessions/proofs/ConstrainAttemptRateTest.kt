@@ -17,6 +17,7 @@ import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 /**
@@ -47,7 +48,7 @@ class ConstrainAttemptRateTest {
     private suspend fun Cache.failN(key: String, count: Int, blocked: Duration, failures: Int) {
         repeat(failures) {
             assertFailsWith<IllegalStateException> {
-                constrainAttemptRate(key, count = count, blocked = blocked) {
+                constrainAttemptRate(key, count = count, blocked = blocked, minFailureDuration = 0.seconds) {
                     throw IllegalStateException("simulated failure")
                 }
             }
@@ -62,7 +63,7 @@ class ConstrainAttemptRateTest {
     private suspend fun Cache.hitLimit(key: String, count: Int, blocked: Duration): String {
         failN(key, count, blocked, count)
         val ex = assertFailsWith<BadRequestException> {
-            constrainAttemptRate(key, count = count, blocked = blocked) { /* not reached */ }
+            constrainAttemptRate(key, count = count, blocked = blocked, minFailureDuration = 0.seconds) { /* not reached */ }
         }
         return ex.message
     }
@@ -119,7 +120,7 @@ class ConstrainAttemptRateTest {
                 // This is intentional: we optimize the happy path by skipping cache writes
                 // when there are no recent failures to clear.
                 clock.advance(21.minutes)
-                val ok = execute { cache.constrainAttemptRate(key, count = 3, blocked = 10.minutes) { "success" } }
+                val ok = execute { cache.constrainAttemptRate(key, count = 3, blocked = 10.minutes, minFailureDuration = 0.seconds) { "success" } }
                 assertEquals("success", ok)
 
                 // The strike level persists, so a later offense still faces escalated blocking.
@@ -145,7 +146,7 @@ class ConstrainAttemptRateTest {
                 // First failure fills the single allowed attempt.
                 assertFailsWith<IllegalStateException> {
                     execute {
-                        cache.constrainAttemptRate(key, count = count, blocked = blocked, maxBlocked = maxBlocked) {
+                        cache.constrainAttemptRate(key, count = count, blocked = blocked, maxBlocked = maxBlocked, minFailureDuration = 0.seconds) {
                             throw IllegalStateException("simulated failure")
                         }
                     }
@@ -154,7 +155,7 @@ class ConstrainAttemptRateTest {
                 // Hammer past the limit; the block escalates 10 -> 20 -> capped at 25 (not 40) minutes.
                 val messages = (0 until 3).map {
                     assertFailsWith<BadRequestException> {
-                        execute { cache.constrainAttemptRate(key, count = count, blocked = blocked, maxBlocked = maxBlocked) { } }
+                        execute { cache.constrainAttemptRate(key, count = count, blocked = blocked, maxBlocked = maxBlocked, minFailureDuration = 0.seconds) { } }
                     }.message
                 }
                 assertTrue(messages[0].contains("10 minutes"), "First block should be 10 minutes, got: ${messages[0]}")

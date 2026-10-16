@@ -1,7 +1,6 @@
 // by Claude - Unit test to identify table recreation issue in AwsWebSocketDynamoDb
 package com.lightningkite.lightningserver.engine.awsserverless
 
-import com.lightningkite.services.cache.dynamodb.embeddedDynamo
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
@@ -54,7 +53,7 @@ class RequireTableTest {
      */
     @Test
     fun testTtlComparisonWhenTtlDisabled(): Unit = runBlocking {
-        val client = embeddedDynamo()
+        val client = testDynamo()
 
         // Create table with TTL enabled
         client.createTable {
@@ -144,7 +143,7 @@ class RequireTableTest {
      */
     @Test
     fun testTtlStatusTransition(): Unit = runBlocking {
-        val client = embeddedDynamo()
+        val client = testDynamo()
 
         // Create table
         client.createTable {
@@ -189,7 +188,7 @@ class RequireTableTest {
      */
     @Test
     fun testRequireTableCalledTwice(): Unit = runBlocking {
-        val client = embeddedDynamo()
+        val client = testDynamo()
         val testTableName = "require-table-test"
 
         // First call to requireTable - creates the table
@@ -275,7 +274,7 @@ class RequireTableTest {
      */
     @Test
     fun testAllTtlStatuses(): Unit = runBlocking {
-        val client = embeddedDynamo()
+        val client = testDynamo()
 
         println("\n=== TTL Status Behavior Analysis ===\n")
 
@@ -366,7 +365,7 @@ class RequireTableTest {
      */
     @Test
     fun testTtlStatusNotChecked(): Unit = runBlocking {
-        val client = embeddedDynamo()
+        val client = testDynamo()
 
         // Create a table without TTL enabled
         client.createTable {
@@ -413,7 +412,7 @@ class RequireTableTest {
      */
     @Test
     fun testDetailedComparisonOfRequestVsDescription(): Unit = runBlocking {
-        val client = embeddedDynamo()
+        val client = testDynamo()
         val testTableName = "detailed-comparison-test"
 
         // Create a table matching the pattern from AwsWebSocketDynamoDb.ensureTables()

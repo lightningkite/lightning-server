@@ -4,7 +4,6 @@ plugins {
     alias(libs.plugins.ksp)
     application
     alias(libs.plugins.graalVmNative)
-//    alias(libs.plugins.shadow)
 }
 
 group = "com.lightningkite.lightningserver"
@@ -25,6 +24,8 @@ dependencies {
     api(project(":sessions-shared"))
     api(project(":secret-source-aws"))
     api(project(":sessions-sms"))
+    api(project(":sessions-totp"))
+    api(project(":sessions-webauthn"))
     api(project(":sessions-oauth"))
     api(project(":files"))
     api(libs.services.pubsub)
@@ -75,8 +76,6 @@ dependencies {
     api(libs.services.voiceagent.openai)
 
     implementation(libs.kotlinerCli)
-    implementation(libs.ktor.call.logging)
-    implementation(project(":sessions"))
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)
 }

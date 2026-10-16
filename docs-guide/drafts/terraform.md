@@ -211,7 +211,6 @@ custom domain) produces:
 | `aws_apigatewayv2_api.ws` | WebSocket API Gateway (connect/disconnect/default → Lambda) |
 | `aws_cloudwatch_log_group.main` | Lambda log group (30-day retention) |
 | `random_password.settings` | 32-char AES key for `settings.enc` |
-| `local_sensitive_file.settings_raw` | Assembled `settings.json` before encryption |
 | `aws_sns_topic.emergency` | Alerts topic (email → `emergencyContact`) |
 | `aws_cloudwatch_metric_alarm.*` | Spend alarms (compute-seconds per month) |
 
@@ -264,7 +263,7 @@ Both EC2 builders use the same settings pipeline:
 settings map (Kotlin)
      │ fulfillSetting() calls in settings()
      ▼
-local_sensitive_file.settings_raw    ← plaintext JSON on your machine during apply
+local.settings_raw                   ← plaintext JSON only in Terraform memory; piped to openssl
      │ null_resource.encrypt_settings (openssl enc -aes-256-cbc -pbkdf2 -iter 100000)
      ▼
 build/settings.enc                   ← AES-256 encrypted
@@ -343,14 +342,14 @@ to version control: infrastructure changes are now visible in pull requests.
 
 ```bash
 cd terraform/<project-prefix>
-terraform plan -out=plan.tfplan
+terraform plan
 ```
 
 Or let `deploy()` do it:
 
 ```bash
 ./gradlew :deploy:run --main=com.example.api.ProductionDeployKt
-# Runs init → plan → waits for Enter → applies
+# Runs init → apply (shows the plan, waits for 'yes')
 ```
 
 Pass `autoApprove = true` to `deploy()` for non-interactive CI runs.
@@ -360,9 +359,10 @@ Pass `autoApprove = true` to `deploy()` for non-interactive CI runs.
 `deploy()` calls, in order:
 
 1. `terraform init -upgrade` — downloads providers (cached after first run).
-2. `terraform plan -out=plan.tfplan` — shows what will change.
-3. Optionally waits for Enter (the human review gate).
-4. `terraform apply plan.tfplan` — creates/updates resources.
+2. `terraform apply` — shows what will change, waits for you to type `yes`
+   (the human review gate; skipped with `autoApprove = true`), then
+   creates/updates resources. The plan is never saved to a file, since a saved
+   plan holds secrets in plaintext.
 
 On subsequent deploys, only the Lambda ZIP or EC2 distribution changes if no
 infrastructure was added or removed.

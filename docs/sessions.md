@@ -6,12 +6,14 @@ integration.
 
 ## Overview
 
-The sessions system consists of four modules:
+The sessions system consists of six modules:
 
 - **sessions-shared** - Multiplatform data models and client interfaces
 - **sessions** - JVM server-side implementation with proof methods
 - **sessions-email** - Email-based authentication (magic links, PIN codes)
 - **sessions-sms** - SMS-based authentication (PIN codes)
+- **sessions-totp** - Time-based one-time passwords from authenticator apps
+- **sessions-webauthn** - WebAuthn / passkey authentication
 
 ## Key Concepts
 
@@ -182,17 +184,29 @@ val accessToken = authEndpoints.getTokenSimple(result.refreshToken!!)
 
 ### Sub-Sessions
 
-Create derived sessions with reduced privileges:
+Create derived sessions with reduced privileges, e.g. a short-lived, read-only token for a report export running
+alongside the user's own session:
 
 ```kotlin
 val limitedToken = authEndpoints.subsession(
     SubSessionRequest(
-        label = "Third-Party Integration",
+        label = "Report Export",
         scopes = setOf(GrantedScope("read:profile"), GrantedScope("read:posts")),
         expires = Clock.System.now() + 1.hours
     )
 )
 ```
+
+A sub-session:
+
+- gets the parent session's scopes when `scopes` is omitted (the default, root, means "whatever the parent has"),
+- may only request scopes the parent session already has (otherwise 403),
+- keeps the parent's authentication time, so it cannot pass a `maxAge` requirement (such as the 10-minute re-authentication gate on credential management) that the parent could not,
+- is terminated when its parent is terminated or deleted through the session table (not `baseTable()` or raw database writes), and so on down the chain.
+
+Because of that last point, a sub-session is not a way to hand out access that should outlive the user's login. For a
+long-lived third-party integration, log in a separate session for it (or use OAuth), so the user logging out of their
+browser doesn't cut it off.
 
 ### Known Device Authentication
 
@@ -311,8 +325,10 @@ class AuthTest {
 
 - **sessions-email** - Add with `implementation("com.lightningkite.lightningserver:sessions-email:$version")`
 - **sessions-sms** - Add with `implementation("com.lightningkite.lightningserver:sessions-sms:$version")`
+- **sessions-totp** - Add with `implementation("com.lightningkite.lightningserver:sessions-totp:$version")`
+- **sessions-webauthn** - Add with `implementation("com.lightningkite.lightningserver:sessions-webauthn:$version")`
 
-Both modules require appropriate service configurations (Email/SMS providers) in your settings.
+The email and SMS modules require appropriate service configurations (Email/SMS providers) in your settings.
 
 ## See Also
 

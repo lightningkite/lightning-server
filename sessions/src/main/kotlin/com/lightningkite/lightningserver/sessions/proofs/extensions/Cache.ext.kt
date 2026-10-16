@@ -7,11 +7,15 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.services.cache.*
 import com.lightningkite.services.data.ExperimentalLightningServer
+import kotlinx.coroutines.delay
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.pow
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
+import kotlin.time.TimeSource
 
 /**
  * Returns `true` only for the first caller to claim [cacheKey], and `false` for every later one.
@@ -42,6 +46,8 @@ public class TooManyAttemptsException(message: String) : BadRequestException(mes
  * @param expires The time frame for allowed attempts, which starts on the first attempt.
  * @param blocked The block time applied the first time the limit is hit, at least [expires].
  * @param maxBlocked The maximum block time, at least [blocked].
+ * @param minFailureDuration The minimum time a failed attempt takes before returning, so an early failure cannot reveal
+ *   whether a subject exists, and brute force is slowed further.
  * @throws BadRequestException if the attempt is denied.
  */
 context(server: ServerRuntime)
@@ -51,8 +57,11 @@ public suspend inline fun <R> Cache.constrainAttemptRate(
     expires: Duration = 5.minutes,
     blocked: Duration = expires,
     maxBlocked: Duration = 3.hours,
+    minFailureDuration: Duration = 200.milliseconds,
     action: () -> R,
 ): R {
+    val started = TimeSource.Monotonic.markNow()
+
     val startKey = "$cacheKey-start-time"
     val levelKey = "$cacheKey-level"
 
@@ -93,7 +102,9 @@ public suspend inline fun <R> Cache.constrainAttemptRate(
         }
         result
     } catch (e: Throwable) {
+        if (e is CancellationException) throw e
         this.add(cacheKey, 1, baseBlockDuration)
+        delay(minFailureDuration - started.elapsedNow())
         throw e
     }
 }

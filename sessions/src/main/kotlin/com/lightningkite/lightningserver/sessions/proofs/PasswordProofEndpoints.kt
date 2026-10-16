@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.*
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.sessions.*
 import com.lightningkite.lightningserver.sessions.proofs.extensions.constrainAttemptRate
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
@@ -22,21 +23,27 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.Month
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
-import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.builtins.serializer
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
 
-@OptIn(InternalSerializationApi::class)
 public class PasswordProofEndpoints(
     database: Runtime<Database>,
     private val cache: Runtime<Cache>,
     override val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
     override val proofExpiration: Duration = 1.hours,
-    private val evaluatePassword: (String) -> Unit = { },
+    signals: (context(ServerRuntime) (Table<PasswordSecret>) -> Table<PasswordSecret>)? = null,
+    private val evaluatePassword: suspend context(ServerRuntime) (NewPasswordInfo) -> Unit = { _ -> },
 ) : ServerBuilder(), DirectProofMethod {
+
+    public data class NewPasswordInfo(
+        public val password: String,
+        public val subjectId: String,
+        public val subjectType: String,
+    )
 
     init {
         proofMethodsRegistry.register(this)
@@ -61,9 +68,11 @@ public class PasswordProofEndpoints(
         database.modelInfo(
             tableName = "PasswordSecret",
             auth = proofMethodAuth or AuthRequirement.IsAdmin,
-            signals = { col ->
-                col.interceptCreate {
-                    evaluatePassword(it.hash)
+            signals = { table ->
+                val table = signals?.invoke(serverRuntime, table) ?: table
+                table.interceptCreate {
+                    // The hash property is the plain text password at this point. This intercept is what hashes the value.
+                    evaluatePassword(NewPasswordInfo(it.hash, it.subjectId, it.subjectType))
                     if (it.hint?.contains(it.hash, true) == true)
                         throw BadRequestException("Hint cannot contain the password itself!")
                     it.copy(hash = it.hash.secureHash())
@@ -83,10 +92,8 @@ public class PasswordProofEndpoints(
                         it.hash.mask("")
                     },
                     update = admin or (mine and active),
-                    updateRestrictions = updateRestrictions {
-                        it.subjectType.cannotBeModified()
-                        it.subjectId.cannotBeModified()
-                        it.hash.cannotBeModified()
+                    updateRestrictions = whitelistRestrictions {
+                        it.disabledAt.canBeModified()
                     },
                     delete = Condition.Never,
                 )
@@ -110,17 +117,18 @@ public class PasswordProofEndpoints(
             hint = password.hint,
             establishedAt = now
         )
+        modelInfo.table().insertOne(secret)
         modelInfo.table().updateMany(
             condition {
                 Condition.And(
                     it.subjectId eq secret.subjectId,
                     it.subjectType eq secret.subjectType,
-                    it.establishedAt lt now
+                    it.establishedAt lt now,
+                    it._id neq secret._id,
                 )
             },
             modification { it.disabledAt assign now }
         )
-        modelInfo.table().insertOne(secret)
     }
 
     public val establish: ApiHttpHandler<PathSpec0, HasId<*>, EstablishPassword, Unit> =
@@ -185,6 +193,7 @@ public class PasswordProofEndpoints(
                     cacheKey = "password-${input.property}-${normalizedValue}",
                     method = info,
                     request = request,
+                    minFailureDuration = 1.seconds,
                 ) {
                     val subjectId = handler.fetchUserIdString(input.property, normalizedValue)
                         ?: run {

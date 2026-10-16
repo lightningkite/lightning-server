@@ -165,6 +165,8 @@ val proofPassword = path.path("proof").path("password") module
 
 ### Time-Based OTP (TOTP)
 
+Requires the `sessions-totp` module.
+
 ```kotlin
 val proofOtp = path.path("proof").path("otp") module
     TimeBasedOTPProofEndpoints(database, cache)

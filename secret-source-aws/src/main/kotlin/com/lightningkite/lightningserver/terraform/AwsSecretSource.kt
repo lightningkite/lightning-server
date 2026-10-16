@@ -25,7 +25,7 @@ public class AwsSecretException(message: String?, cause: Throwable?) : Exception
  * **Usage:**
  * ```kotlin
  * val secretSource = AwsSecretSource("myapp", Region.US_EAST_1)
- * val dbPassword = secretSource.getOrNull(TerraformNeed("db-password", String.serializer()))
+ * val dbPassword = secretSource.fetch(TerraformNeed("db-password", String.serializer()))?.value
  * ```
  *
  * **Secret naming:** Secrets are stored with the pattern `{idPrefix}/{name}`, for example:
@@ -34,7 +34,7 @@ public class AwsSecretException(message: String?, cause: Throwable?) : Exception
  * - Actual AWS secret ID: "prod-api/database-password"
  *
  * **Operations:**
- * - [getOrNull]: Retrieves a secret, returns null if not found
+ * - [getBoxed]: Retrieves a secret, returns null if the secret does not exist
  * - [set]: Creates or updates a secret (automatically detects if secret exists)
  *
  * **Error handling:**
@@ -66,14 +66,14 @@ public class AwsSecretSource(public val profile: String, private val idPrefix: S
      */
     private fun getId(name: String) = "$idPrefix/$name"
 
-    override fun <T> getOrNull(need: TerraformNeed<T>): T? {
+    override fun <T> getBoxed(need: TerraformNeed<T>): Stored<T>? {
         return try {
             val response = client.getSecretValue(
                 GetSecretValueRequest.builder()
                     .secretId(getId(need.name))
                     .build()
             )
-            json.decodeFromString(need.serializer, response.secretString())
+            Stored(json.decodeFromString(need.serializer, response.secretString()))
         } catch (e: ResourceNotFoundException) {
             null
         } catch (e: SecretsManagerException) {

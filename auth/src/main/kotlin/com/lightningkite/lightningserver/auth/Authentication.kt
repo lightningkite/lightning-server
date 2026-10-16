@@ -303,7 +303,8 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
                 id = id,
                 rawId = idString,
                 sessionId = null,
-                issuedAt = server.clock.now(),
+                // Masquerading is not re-authenticating; maxAge must still see the original time.
+                issuedAt = this.issuedAt,
                 expiration = this.expiration,
                 scopes = this.scopes,
                 fromMasquerade = this,

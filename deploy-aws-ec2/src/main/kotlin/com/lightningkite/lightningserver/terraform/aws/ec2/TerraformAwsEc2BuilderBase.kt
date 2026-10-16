@@ -634,13 +634,9 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
                 "description" - "AES-256 passphrase used to encrypt/decrypt the $deploymentTag settings bundle"
             }
 
-            // Settings file (raw)
+            // Settings (raw); these only ever exist in Terraform's memory and the encrypt step's pipe.
             "locals" {
                 "settings_raw" - JsonObject(settings)
-            }
-            "resource.local_sensitive_file.settings_raw" {
-                "content" - expression("jsonencode(local.settings_raw)")
-                "filename" - $$"${path.module}/build/raw-settings.json"
             }
 
             // Encrypt settings using PBKDF2 for stronger key derivation
@@ -648,17 +644,20 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
                 // Re-encrypt whenever anything that shapes the output changes: the settings, the cipher
                 // parameters, or the password. Changing the command alone would not re-run it.
                 "triggers" {
-                    "settings_hash" - expression("local_sensitive_file.settings_raw.content_sha256")
+                    "settings_hash" - expression("sha256(jsonencode(local.settings_raw))")
                     "cipher" - settingsCipherArgs
                     "password_hash" - expression("sha256(random_password.settings.result)")
                 }
                 "provisioner.local-exec" {
-                    "command" - $$"openssl enc $$settingsCipherArgs -in \"${local_sensitive_file.settings_raw.filename}\" -out \"${path.module}/build/settings.enc\" -pass env:SETTINGS_PASS"
+                    // The plaintext settings reach openssl only through the environment and a pipe, so they
+                    // never land on disk. printf is a bash builtin, so they never appear in any process's argv.
+                    "command" - $$"printf '%s' \"$SETTINGS_JSON\" | openssl enc $$settingsCipherArgs -out \"${path.module}/build/settings.enc\" -pass env:SETTINGS_PASS"
                     "environment" {
+                        "SETTINGS_JSON" - expression("jsonencode(local.settings_raw)")
                         "SETTINGS_PASS" - expression("random_password.settings.result")
                     }
+                    "interpreter" - listOf("bash", "-c")
                 }
-                "depends_on" - listOf("local_sensitive_file.settings_raw")
             }
 
             // Upload JAR to S3

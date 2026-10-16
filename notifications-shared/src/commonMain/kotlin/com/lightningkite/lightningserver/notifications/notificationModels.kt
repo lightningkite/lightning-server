@@ -4,7 +4,6 @@ import com.lightningkite.lightningserver.notifications.events.EventData
 import com.lightningkite.services.data.*
 import com.lightningkite.services.database.HasId
 import kotlinx.datetime.*
-import kotlinx.datetime.serializers.TimeZoneSerializer
 import kotlinx.serialization.Serializable
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -22,13 +21,14 @@ import kotlin.uuid.Uuid
 @ConsistentCopyVisibility
 public data class TimeInZone private constructor(
     val time: LocalTime,
-    val zoneId: String,
+    val zone: String,
 ) {
-    public constructor(time: LocalTime, zone: TimeZone) : this(time, zone.id)
+    public val timeZone: TimeZone get() = TimeZone.of(zone)
 
-    val zone: TimeZone by lazy { TimeZone.of(zoneId) }
-
-    public fun copy(time: LocalTime = this.time, zone: TimeZone = this.zone): TimeInZone = TimeInZone(time, zone)
+    public constructor(
+        time: LocalTime,
+        zone: TimeZone,
+    ) : this(time, zone.id)
 }
 
 /**
@@ -95,13 +95,12 @@ public data class Frequency private constructor(
 
     private fun weeklyAt(now: Instant): Instant? {
         val weekDay = onlyOn ?: return null
-        val timeInZone = onlyAt ?: return null
-        val time = timeInZone.time
-        val timeZone = timeInZone.zone
+        val onlyAt = onlyAt ?: return null
+        val timeZone = onlyAt.timeZone
 
         val dateTime = now.toLocalDateTime(timeZone)
         val numDays = (weekDay.ordinal - dateTime.date.dayOfWeek.ordinal) % 7
-        var sendAt = LocalDateTime(dateTime.date.plus(numDays, DateTimeUnit.DAY), time).toInstant(timeZone)
+        var sendAt = LocalDateTime(dateTime.date.plus(numDays, DateTimeUnit.DAY), onlyAt.time).toInstant(timeZone)
         if (sendAt < now) {
             sendAt = sendAt.plus(1, DateTimeUnit.WEEK, timeZone)
         }
@@ -110,12 +109,11 @@ public data class Frequency private constructor(
     }
 
     private fun dailyAt(now: Instant): Instant? {
-        val timeInZone = onlyAt ?: return null
-        val time = timeInZone.time
-        val timeZone = timeInZone.zone
+        val onlyAt = onlyAt ?: return null
+        val timeZone = onlyAt.timeZone
 
         val dateTime = now.toLocalDateTime(timeZone)
-        var sendAt = LocalDateTime(dateTime.date, time).toInstant(timeZone)
+        var sendAt = LocalDateTime(dateTime.date, onlyAt.time).toInstant(timeZone)
         if (sendAt < now) {
             sendAt = sendAt.plus(1, DateTimeUnit.DAY, timeZone)
         }

@@ -30,6 +30,8 @@ graph TB
     subgraph session-ext["Session Extensions"]
         sessions-email["sessions-email<br/><i>Email magic links</i>"]
         sessions-sms["sessions-sms<br/><i>SMS authentication</i>"]
+        sessions-totp["sessions-totp<br/><i>TOTP authentication</i>"]
+        sessions-webauthn["sessions-webauthn<br/><i>WebAuthn / passkeys</i>"]
     end
 
     %% Engine Modules
@@ -74,6 +76,8 @@ graph TB
     %% Session extensions
     sessions-email --> sessions
     sessions-sms --> sessions
+    sessions-totp --> sessions
+    sessions-webauthn --> sessions
 
     %% Engine dependencies
     engine-local --> core
@@ -98,6 +102,8 @@ graph TB
     demo --> sessions
     demo --> sessions-email
     demo --> sessions-sms
+    demo --> sessions-totp
+    demo --> sessions-webauthn
     demo --> files
 
     %% Styling
@@ -110,7 +116,7 @@ graph TB
     class core-shared,auth-shared,typed-shared,files-shared,media-shared,sessions-shared sharedStyle
     class core,auth,typed,files,media,sessions jvmStyle
     class engine-local,engine-ktor,engine-netty,engine-jdk,engine-aws engineStyle
-    class sessions-email,sessions-sms sessionStyle
+    class sessions-email,sessions-sms,sessions-totp,sessions-webauthn sessionStyle
     class secret-source-aws,demo otherStyle
 ```
 
@@ -145,6 +151,8 @@ Authentication method implementations built on top of the sessions module.
 
 - **sessions-email**: Email-based authentication (magic links)
 - **sessions-sms**: SMS-based authentication (PIN codes)
+- **sessions-totp**: Time-based one-time passwords from authenticator apps
+- **sessions-webauthn**: WebAuthn / passkey authentication
 
 ### Engine Implementations
 

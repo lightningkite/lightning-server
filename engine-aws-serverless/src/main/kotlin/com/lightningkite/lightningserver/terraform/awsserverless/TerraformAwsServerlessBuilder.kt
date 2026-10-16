@@ -523,7 +523,9 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                 )
                 val domainName = emitter.domain
                 val zone = emitter.domainZoneId
+                // CloudFront only accepts certificates from us-east-1; the regional API Gateway domain needs one from the deploy region.
                 "resource.aws_acm_certificate.ws" {
+                    if (useCloudFrontForWebSocket) "provider" - "aws.acm"
                     "domain_name" - "ws.${domainName}"
                     "validation_method" - "DNS"
                 }
@@ -535,6 +537,7 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                     "ttl" - "300"
                 }
                 "resource.aws_acm_certificate_validation.ws" {
+                    if (useCloudFrontForWebSocket) "provider" - "aws.acm"
                     "certificate_arn" - expression("aws_acm_certificate.ws.arn")
                     "validation_record_fqdns" - listOf(expression("aws_route53_record.ws.fqdn"))
                 }
@@ -854,10 +857,6 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
             "locals" {
                 "settings_raw" - JsonObject(settings)
             }
-            "resource.local_sensitive_file.settings_raw" {
-                "content" - expression("jsonencode(local.settings_raw)")
-                "filename" - $$"${path.module}/build/raw-settings.json"
-            }
             "locals" {
                 // Directories start with "C:..." on Windows; All other OSs use "/" for root.
                 "is_windows" - expression("substr(pathexpand(\"~\"), 0, 1) == \"/\" ? false : true")
@@ -870,10 +869,19 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                     "filename" - "\${path.module}/build/$filename"
                 }
             }
+            // Tracks whether the local build directory still exists. Writing it creates build/ for the
+            // package step to copy into, and when build/ has been deleted (or this is a fresh checkout),
+            // recreating it changes the package trigger so the package is rebuilt rather than archived
+            // from a missing directory.
+            "resource.local_file.lambda_package_marker" {
+                "content" - "Marks this build directory as holding the generated Lambda package.\n"
+                "filename" - $$"${path.module}/build/.lambda-package"
+            }
             "resource.null_resource.lambda_jar_source" {
                 "triggers" {
                     "buildHash" - expression($$"""sha256(join("", [for f in fileset("${path.module}/../../build/dist/lambda", "**") : filesha256("${path.module}/../../build/dist/lambda/${f}")]))""")
-                    "settingsHash" - expression("local_sensitive_file.settings_raw.content_sha256")
+                    "settingsHash" - expression("sha256(jsonencode(local.settings_raw))")
+                    "packageMarker" - expression("local_file.lambda_package_marker.id")
                     // This step is what copies the lambda files into the package, so editing one has
                     // to re-trigger it; the build hash above only covers the compiled output.
                     lambdaFiles.keys.forEach { filename ->
@@ -897,8 +905,16 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                         )
                         "interpreter" - this@emit.expression("local.is_windows ? [\"PowerShell\", \"-Command\"] : []")
                     }, terraformJsonObject {
-                        "command" - $$"openssl enc -aes-256-cbc -md sha256 -in \"${local_sensitive_file.settings_raw.filename}\" -out \"${path.module}/build/lambda/settings.enc\" -pass env:SETTINGS_PASS"
+                        // The plaintext settings reach openssl only through the environment and a pipe,
+                        // so they never land on disk. Windows PowerShell 5.1 would pipe them as ASCII,
+                        // mangling anything else, hence the explicit UTF-8 (without a BOM).
+                        "command" - this@emit.expression(
+                            $$"""
+                                local.is_windows ? "$OutputEncoding = New-Object System.Text.UTF8Encoding $false; $env:SETTINGS_JSON | openssl enc -aes-256-cbc -md sha256 -out \"${path.module}/build/lambda/settings.enc\" -pass env:SETTINGS_PASS" : "printf '%s' \"$SETTINGS_JSON\" | openssl enc -aes-256-cbc -md sha256 -out \"${path.module}/build/lambda/settings.enc\" -pass env:SETTINGS_PASS"
+                            """.trimIndent()
+                        )
                         "environment" {
+                            "SETTINGS_JSON" - expression("jsonencode(local.settings_raw)")
                             "SETTINGS_PASS" - expression("random_password.settings.result")
                         }
                         "interpreter" - this@emit.expression("local.is_windows ? [\"PowerShell\", \"-Command\"] : []")
@@ -911,29 +927,13 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                     }
                 })
             }
-            "resource.null_resource.settings_reread" {
-                "triggers" {
-                    "settingsRawHash" - expression("local_sensitive_file.settings_raw.content_sha256")
-                }
-                "depends_on" - listOf("null_resource.lambda_jar_source")
-                "provisioner.local-exec" {
-                    "command" - $$"openssl enc -d -aes-256-cbc -md sha256 -out \"${local_sensitive_file.settings_raw.filename}.decrypted.json\" -in \"${path.module}/build/lambda/settings.enc\" -pass env:SETTINGS_PASS"
-                    "environment" {
-                        "SETTINGS_PASS" - expression("random_password.settings.result")
-                    }
-                    "interpreter" - expression("local.is_windows ? [\"PowerShell\", \"-Command\"] : []")
-                }
-            }
             "resource.random_password.settings" {
                 "length" - 32
                 "special" - true
                 "override_special" - "-_"
             }
             "data.archive_file.lambda" {
-                "depends_on" - (listOf(
-                    "null_resource.lambda_jar_source",
-                    "null_resource.settings_reread"
-                ) + lambdaFiles.keys.map { filename ->
+                "depends_on" - (listOf("null_resource.lambda_jar_source") + lambdaFiles.keys.map { filename ->
                     "local_file.lambda_" + filename.replace(".", "_").replace("/", "_")
                 })
                 "type" - "zip"

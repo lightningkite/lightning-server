@@ -14,7 +14,6 @@ dependencies {
     api(libs.services.database)
     api(libs.services.cache)
     api(libs.services.pubsub)
-    api(libs.kotlin.reflect)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)
 
