@@ -29,6 +29,12 @@ public interface HttpHandler<PATH : PathSpec> {
     public val timeout: Duration get() = 30.seconds
 
     /**
+     * Whether requests to this handler are traced (request span, RED metrics, and every span beneath).
+     * Turn off for endpoints whose traces would only be noise, such as one that receives telemetry.
+     */
+    public val traced: Boolean get() = true
+
+    /**
      * Handles an HTTP request and returns a response.
      *
      * This function runs in the context of a [ServerRuntime], providing access to

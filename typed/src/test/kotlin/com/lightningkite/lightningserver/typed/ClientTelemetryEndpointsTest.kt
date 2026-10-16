@@ -2,11 +2,13 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.HttpMethod
+import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.telemetrySettings
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.handle
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.runtime.test.TestRunner
@@ -62,14 +64,14 @@ class ClientTelemetryEndpointsTest {
     object TestServer : ServerBuilder() {
         init { registerBasicMediaTypeCoders() }
         val telemetry = path.path("telemetry") module ClientTelemetryEndpoints()
-        val cappedTelemetry = path.path("capped") module ClientTelemetryEndpoints()
+        val ping = path.path("ping").get bind HttpHandler<PathSpec0> { HttpResponse.plainText("pong") }
     }
 
     private fun span(owner: String) = RecordedSpan(
         traceId = "0af7651916cd43dd8448eb211c80319c", spanId = "b7ad6b7169203331", owner = owner, operation = "load",
         start = Clock.System.now(), end = Clock.System.now(),
         attributes = telemetryAttributesOf(TelemetryKeys.User.id to "spoofed", TelemetryKeys.App.screenName to "Home"),
-        dimensions = setOf(), outcome = RecordedSpan.Outcome.Ok, sampled = true,
+        outcome = RecordedSpan.Outcome.Ok,
     )
 
     private fun batch(vararg spans: RecordedSpan) = TelemetryBatch(
@@ -140,12 +142,9 @@ class ClientTelemetryEndpointsTest {
     }
 
     @Test
-    fun distinctNamesAreCapped() = withServer {
-        val ingest = TestServer.cappedTelemetry.ingest
-        // 998 owners plus the batch's two attribute keys (service.name, app.screen.name) reach the 1000 cap.
-        ingest.test(null, batch(*Array(998) { span("owner$it") }))
-        assertFailsWith<BadRequestException> { ingest.test(null, batch(span("one-more"))) }
-        ingest.test(null, batch(span("owner0"))) // already-known names keep working
+    fun overlongAttributeValueIsRejected() = withServer {
+        val long = span("screen").copy(attributes = telemetryAttributesOf(TelemetryKeys.Url.path to "x".repeat(4097)))
+        assertFailsWith<BadRequestException> { TestServer.telemetry.ingest.test(null, batch(long)) }
     }
 
     @Test
@@ -166,18 +165,28 @@ class ClientTelemetryEndpointsTest {
     fun requestSpanContinuesTheClientsTrace() = withServer {
         synchronized(Recording.traceParents) { Recording.traceParents.clear() }
         val header = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"
-        serverRuntime.handle(
-            HttpRequest<PathSpec>(
-                path = RawHttpEndpoint(asString = "/telemetry/ingest", method = HttpMethod.POST),
-                queryParameters = QueryParameters.EMPTY,
-                headers = HttpHeaders { add("traceparent", header) },
-                domain = "example.com",
-                protocol = "https",
-                sourceIp = "local",
-                requestId = generateRequestId(),
-                body = TypedData.text("{}", MediaType.Application.Json),
-            )
-        )
+        serverRuntime.handle(request("/ping", HttpMethod.GET, HttpHeaders { add("traceparent", header) }))
         assertEquals(header, Recording.traceParents.first())
     }
+
+    @Test
+    fun theIngestRequestIsNotTraced() = withServer {
+        synchronized(Recording.traceParents) { Recording.traceParents.clear() }
+        val body = serverRuntime.externalSerialization.json.encodeToString(TelemetryBatch.serializer(), batch(span("screen")))
+        serverRuntime.handle(request("/telemetry/ingest", HttpMethod.POST, HttpHeaders.EMPTY, TypedData.text(body, MediaType.Application.Json)))
+
+        assertEquals(1, Recording.batches.size, "the batch was ingested")
+        assertTrue(Recording.traceParents.isEmpty(), "but no span was started for the request")
+    }
+
+    private fun request(path: String, method: HttpMethod, headers: HttpHeaders, body: TypedData? = null) = HttpRequest<PathSpec>(
+        path = RawHttpEndpoint(asString = path, method = method),
+        queryParameters = QueryParameters.EMPTY,
+        headers = headers,
+        domain = "example.com",
+        protocol = "https",
+        sourceIp = "local",
+        requestId = generateRequestId(),
+        body = body,
+    )
 }

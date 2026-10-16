@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.pathing.route
 import com.lightningkite.services.telemetry.TelemetryAttributes
 import com.lightningkite.services.telemetry.TelemetryKey
 import com.lightningkite.services.telemetry.TelemetryKeys
+import com.lightningkite.services.telemetry.Untraced
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withContext
@@ -161,7 +162,8 @@ private suspend fun <PATH : PathSpec> Engine.executeHttp(
     interceptors: HttpInterceptor,
     dispatch: suspend ServerRuntime.(HttpRequest<PATH>) -> HttpResponse,
 ): HttpResponse = try {
-    withContext(request.traceParent()) {
+    val telemetryContext = if (request.path.tryResolve()?.value?.traced == false) Untraced else request.traceParent()
+    withContext(telemetryContext) {
         execute(request.operationName(), Invocation.Http(execution, request), request.telemetryAttributes()) { trace ->
             var handledError: String? = null
             suspend fun handleError(e: Exception): HttpResponse {
