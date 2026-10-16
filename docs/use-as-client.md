@@ -1,7 +1,5 @@
 # Using Lightning Server: Client Perspective
 
-Last updated April 16, 2025 (`version-4`)
-
 Lightning Server, while being a flexible system with which any HTTP spec could be implemented, generally tends to follow
 certain patterns as it is significantly easier to build that way.
 
@@ -9,35 +7,33 @@ certain patterns as it is significantly easier to build that way.
 
 Both the standard `Accept` and `Content-Type` headers are expected with all requests. If the endpoint you are looking at
 was automatically documented, it was implemented using an abstraction that will automatically serialize and deserialize
-to the documented types. The following types are supported by default:
+to the documented types. A server using the basic coders supports:
 
-- `application/json`
-- `text/csv`
+- `application/json` - The default
 - `application/x-www-form-urlencoded`
-- `application/cbor`
-- `application/bson`
-- `multipart/form-data` - The multipart key `__json` is used as the basis for deserializing the object. Other keys are
-  interpreted as paths to `ServerFiles` and their contents automatically uploaded.
-- `text/uri-list` - Must be explicitly enabled by server developer - Communication in another format determined by the
-  `subtype` parameter, done indirectly via file URLs. Only enabled if the server is using file uploads. Can be helpful
-  if you need to get around limits that the hosting server gives you.
+- `application/x-lightningserver-kotlin-bytes` - A compact binary format for Kotlin clients
+
+Servers can register more formats, so check the server's documentation.
 
 ## Authentication
 
-Authorization in Lightning Server is done via the standard `Authorization` header using JSON Web Tokens. That header
+Authorization in Lightning Server is done via the standard `Authorization` header with an access token. That header
 looks like this:
 
 ```http request
 Authorization: Bearer <your token here>
 ```
 
-Generally, Lightning Server auth uses standardized authentication endpoints for obtaining tokens. They typically take
-the following pattern:
+Lightning Server auth works with *proofs*: each login method proves something about the user and returns a signed
+proof, and the proofs are exchanged for a session. The exact paths depend on where the server mounts its endpoints, but
+they typically look like this:
 
-- `POST /auth/login-email` - Sends the user a login email that will contain both a direct login link and a PIN to use
-  for the below endpoint.
-- `POST /auth/login-email-pin` - Returns an authentication token Given `{"email": "", "pin": ""}`.
-- `GET /auth/refresh-token` - Generates a fresh token given your current login.
+- `POST /proof/email/start` - Given an email address, sends the user a PIN and returns a `key`.
+- `POST /proof/email/prove` - Given `{"key": "", "password": "<PIN>"}`, returns a signed proof.
+- `POST /auth/login` - Given a list of proofs, returns a `refreshToken` once they are strong enough. Otherwise it lists
+  the further proof `options` the user has.
+- `POST /auth/token/simple` - Given the refresh token, returns a short-lived access token for the `Authorization`
+  header. Call it again when the access token expires.
 - `GET /auth/self` - Returns your user.
 
 ## File Uploads

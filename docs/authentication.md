@@ -1,7 +1,5 @@
 # Authentication
 
-Last updated January 2025 (`version-5`)
-
 Authentication is a fundamental concept in Lightning Server, and authentication works the same way across all endpoints.
 Multiple methods can be checked, and the system is highly customizable while providing sensible defaults.
 
@@ -19,14 +17,12 @@ import com.lightningkite.services.email.*
 import kotlinx.serialization.*
 import kotlin.uuid.Uuid
 
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class User(
     override val _id: Uuid = Uuid.random(),
-    override val email: String,
-    override val hashedPassword: String = "",
+    val email: String,
     val isSuperUser: Boolean = false
-) : HasId<Uuid>, HasEmail, HasPassword
+) : HasId<Uuid>
 
 object Server : ServerBuilder() {
     val database = setting("database", Database.Settings())
@@ -65,9 +61,9 @@ object Server : ServerBuilder() {
     val pins = PinHandler(cache, "pins")
 
     val proofEmail = path.path("proof").path("email") module EmailProofEndpoints(
-        pins = pins,
+        pin = pins,
         email = email,
-        emailBuilder = { to, pin ->
+        emailTemplate = { to, pin ->
             Email(
                 subject = "Your Login Code",
                 to = listOf(EmailAddressWithName(to)),
@@ -82,7 +78,8 @@ object Server : ServerBuilder() {
     // Set up authentication endpoints
     val auth = path.path("auth") module object : AuthEndpoints<User, Uuid>(
         principal = UserAuth,
-        database = database
+        database = database,
+        cache = cache,
     ) {
         context(server: ServerRuntime)
         override suspend fun requiredProofStrengthFor(subject: User): Int = 5
@@ -134,27 +131,30 @@ Lightning Server supports multiple authentication methods ("proofs"):
 val pins = PinHandler(cache, "pins")
 
 val proofEmail = path.path("proof").path("email") module EmailProofEndpoints(
-    pins = pins,
+    pin = pins,
     email = email,
-    emailBuilder = { to, pin ->
+    emailTemplate = { to, pin ->
         Email(
             subject = "Your Login Code",
             to = listOf(EmailAddressWithName(to)),
             plainText = "Your PIN is: $pin",
-            html = "<h1>Your PIN is: $pin</h1>"
         )
     }
 )
 ```
 
+Requires the `sessions-email` module.
+
 ### SMS PIN
 
 ```kotlin
 val proofSms = path.path("proof").path("sms") module SmsProofEndpoints(
-    pins = pins,
+    pin = pins,
     sms = sms
 )
 ```
+
+Requires the `sessions-sms` module.
 
 ### Password
 
@@ -171,6 +171,21 @@ Requires the `sessions-totp` module.
 val proofOtp = path.path("proof").path("otp") module
     TimeBasedOTPProofEndpoints(database, cache)
 ```
+
+### WebAuthn
+
+Requires the `sessions-webauthn` module. `WebAuthNProofEndpoints` supports security keys and platform authenticators
+such as Touch ID and Windows Hello.
+
+### Backup Codes
+
+```kotlin
+val proofBackupCodes = path.path("proof").path("backup-codes") module
+    BackupCodeEndpoints(database, cache)
+```
+
+Single-use recovery codes. Only their hashes are stored, and a redeemed code is kept, marked as used, as a record of the
+login.
 
 ### Known Device
 
@@ -219,14 +234,11 @@ val userInfo = database.modelInfo(
     tableName = "User",
     permissions = {
         val user = authOrNull?.fetch()
-        val self = condition<User> { it._id eq user?._id }
-        val admin = if (user?.isSuperUser == true)
-            condition { it.always }
-        else
-            condition { it.never }
+        val self = condition<User> { it._id eqNn user?._id }
+        val admin: Condition<User> = if (user?.isSuperUser == true) Condition.Always else Condition.Never
 
         ModelPermissions(
-            create = condition { it.never },
+            create = Condition.Never,
             read = self or admin,
             update = self or admin,
             delete = admin
@@ -237,19 +249,24 @@ val userInfo = database.modelInfo(
 
 ## Authentication Flow
 
-1. **Client requests proof**:
-    - `POST /proof/email/request` with `{"property": "email", "value": "user@example.com"}`
-    - Server sends email with PIN
+1. **Client requests a PIN**:
+    - `POST /proof/email/start` with the email address as a JSON string
+    - Server sends an email with the PIN and returns a `key`
 
-2. **Client submits proof**:
-    - `POST /proof/email/prove` with `{"property": "email", "value": "user@example.com", "proof": "123456"}`
-    - Server returns a proof token
+2. **Client submits the PIN**:
+    - `POST /proof/email/prove` with `{"key": "<key from step 1>", "password": "<PIN>"}`
+    - Server returns a signed `Proof`
 
-3. **Client exchanges proof for session**:
-    - `POST /auth/login-anonymous` with proof token
-    - Server returns JWT session token
+3. **Client logs in**:
+    - `POST /auth/login` with a list of proofs
+    - If the proofs are strong enough, the response's `refreshToken` is set. Otherwise it lists the further proof
+      `options` the user has and the `strengthRequired`
 
-4. **Client uses session**:
+4. **Client gets an access token**:
+    - `POST /auth/token/simple` with the refresh token
+    - Server returns a short-lived access token
+
+5. **Client uses the token**:
     - Include `Authorization: Bearer <token>` header in requests
 
 ## Customizing Authentication
@@ -259,7 +276,7 @@ val userInfo = database.modelInfo(
 Control when sessions expire:
 
 ```kotlin
-object : AuthEndpoints<User, Uuid>(principal = UserAuth, database = database) {
+object : AuthEndpoints<User, Uuid>(principal = UserAuth, database = database, cache = cache) {
     context(server: ServerRuntime)
     override suspend fun requiredProofStrengthFor(subject: User): Int = 5
 
@@ -281,11 +298,17 @@ object : AuthEndpoints<User, Uuid>(principal = UserAuth, database = database) {
 
 Different authentication methods have different "strengths". You can require a minimum strength:
 
-- Email PIN: strength 5
+- Email PIN: strength 10
 - SMS PIN: strength 5
-- Password: strength 5
+- Password: strength 10
 - TOTP: strength 10
-- Known Device: strength 15
+- WebAuthn: strength 10
+- OAuth: strength 10
+- Known Device: strength 3
+- Backup Code: strength 0 when deciding what a user must reach, but each backup code proof counts 10 at login
+
+Only the strongest method for each property counts, and the required strength is capped at what the user's established
+methods can reach.
 
 ```kotlin
 override suspend fun requiredProofStrengthFor(subject: User): Int {
@@ -303,27 +326,17 @@ full authentication flow. Use the `testAuth` extension function on your `Princip
 import com.lightningkite.lightningserver.auth.testAuth
 import com.lightningkite.lightningserver.typed.AuthAccess
 
-// Inside your test (within a ServerRuntime context):
 @Test
-fun testProtectedEndpoint() {
-    TestHelper.testServer {
-        runBlocking {
-            // Create and insert a test user
-            val user = User(
-                email = "test@example.com",
-                hashedPassword = "hashed_password",
-                isSuperUser = false
-            )
-            userInfo.table().insertOne(user)
+fun testProtectedEndpoint() = Server.testBlocking(settings = {}) {
+    // Create and insert a test user; direct database access needs a ServerRuntime
+    val user = User(email = "test@example.com", isSuperUser = false)
+    execute { userInfo.table().insertOne(user) }
 
-            // Create AuthAccess for testing
-            val auth = UserAuth.testAuth(user)
-            val access = AuthAccess(auth)
+    // Create AuthAccess for testing
+    val auth = UserAuth.testAuth(user)
+    val access = AuthAccess(auth)
 
-            // Use 'access' wherever AuthAccess is required
-            // e.g., for AI tools, model permissions, etc.
-        }
-    }
+    // Use 'access' wherever AuthAccess is required, e.g. model permissions
 }
 ```
 
@@ -332,7 +345,7 @@ fun testProtectedEndpoint() {
 The `testAuth` function accepts optional parameters:
 
 ```kotlin
-context(server: ServerRuntime)
+context(server: Engine)
 fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>.testAuth(
     subject: SUBJECT,
     issuedAt: Instant = server.clock.now(),
@@ -358,25 +371,20 @@ val access = AuthAccess(auth)
 
 ### Testing Endpoints Directly
 
-For testing typed endpoints with authentication, use `testAuth` inside a `Server.test { }` block.
-`testAuth` is a `context(server: ServerRuntime)` extension on `PrincipalType`, so it is only
-callable where a `ServerRuntime` is in context (i.e., inside `test { }`).
+For testing typed endpoints with authentication, use `testAuth` inside a `testBlocking { }` block. `testAuth` only
+needs an `Engine`, so it can be called directly in the test body.
 
 ```kotlin
 @Test
-fun testEndpoint() {
-    Server.test(settings = {}) {
-        runBlocking {
-            val user = User(email = "test@example.com", hashedPassword = "...")
-            Server.userInfo.table().insertOne(user)
+fun testEndpoint() = Server.testBlocking(settings = {}) {
+    val user = User(email = "test@example.com")
+    execute { Server.userInfo.table().insertOne(user) }
 
-            // Build a test Authentication without going through the real auth flow
-            val auth = Server.userPrincipal.testAuth(user)
+    // Build a test Authentication without going through the real auth flow
+    val auth = Server.UserAuth.testAuth(user)
 
-            val result = Server.protectedEndpoint.test(auth = auth, input = Unit)
-            assertEquals(expectedValue, result)
-        }
-    }
+    val result = Server.protectedEndpoint.test(auth = auth, input = Unit)
+    assertEquals(expectedValue, result)
 }
 ```
 

@@ -43,8 +43,7 @@ public data class SubSessionRequest(
  * @property ips The IP addresses that have used this session, for auditing.
  * @property userAgents The user agents that have used this session, for auditing.
  */
-@GenerateDataClassPaths
-@Serializable
+@Queryable
 @AdminTableColumns(["label", "subjectId", "scopes"])
 @IndexSet(["subjectId", "terminated", "expires", "stale"])
 public data class Session<SUBJECT : HasId<ID>, ID : Comparable<ID>>(

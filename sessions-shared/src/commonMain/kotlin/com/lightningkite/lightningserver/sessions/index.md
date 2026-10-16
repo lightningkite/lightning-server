@@ -18,7 +18,8 @@ Core session data models:
 
 Authentication credential storage models:
 
-- **TotpSecret** - Time-based One-Time Password (TOTP) credentials for authenticator apps
+- **TotpSecret** - Time-based One-Time Password (TOTP) credentials for authenticator apps, used by the `sessions-totp`
+  module
 - **PasswordSecret** - Hashed password storage with optional hints
 - **KnownDeviceSecret** - "Remember this device" credentials
 - **EstablishPassword** - Input model for setting/changing passwords

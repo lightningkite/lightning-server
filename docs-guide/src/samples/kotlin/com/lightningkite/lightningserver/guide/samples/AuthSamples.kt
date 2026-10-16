@@ -19,8 +19,7 @@ import kotlin.uuid.*
 // endregion auth-imports
 
 // region user-model
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class UserProfile(
     override val _id: Uuid = Uuid.random(),
     val name: String,

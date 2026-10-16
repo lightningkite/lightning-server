@@ -313,52 +313,22 @@ When you see it, either add the missing `LSError` to `errorCases` or change the
 
 ## Custom Exception Handler
 
-If the built-in exception handler does not cover your needs — for example, you
-want to map `IllegalArgumentException` to 400 or include a correlation ID in
-all 500 responses — implement `HttpExceptionHandler`:
+`HttpExceptionHandler` is the interface that turns an exception into a response, and `HttpExceptionHandler.Default` is
+the implementation every server uses. There is currently no API for installing a different one, so to control error
+responses:
+
+- Throw an `HttpStatusException` subclass with the `detail` and `message` you want, as shown above.
+- Catch library exceptions in your handler and rethrow them as one, for example mapping `IllegalArgumentException` to
+  `BadRequestException`:
 
 ```kotlin
 // Illustrative — not drift-checked.
-// ExceptionHttpHandler is in com.lightningkite.lightningserver.http.
-// Note: ExceptionHttpHandler.Default is internal to the framework; you cannot
-// call it directly from your code. Reconstruct an HttpStatusException and
-// let the framework handle it, or build the HttpResponse manually.
-object CorrelatingExceptionHandler : ExceptionHttpHandler {
-    context(server: ServerRuntime)
-    override suspend fun handle(
-        request: HttpRequest<PathSpec>,
-        exception: Exception,
-    ): HttpResponse {
-        val correlationId = java.util.UUID.randomUUID().toString()
-        val statusException = when (exception) {
-            is HttpStatusException -> exception
-            is IllegalArgumentException -> BadRequestException(
-                detail  = "invalid-argument",
-                message = exception.message ?: "Invalid argument"
-            )
-            else -> HttpStatusException(
-                status  = HttpStatus.InternalServerError,
-                detail  = "unknown",
-                message = "An error occurred (id: $correlationId)"
-            )
-        }
-        return HttpResponse(
-            status = statusException.status,
-            body   = statusException.toLSError().toTypedData(request.headers.accept)
-        )
-    }
+val parsed = try {
+    parseInput(input)
+} catch (e: IllegalArgumentException) {
+    throw BadRequestException(detail = "invalid-argument", message = e.message ?: "Invalid argument")
 }
 ```
-
-> `ExceptionHttpHandler.Default` is `internal` to the framework — you cannot
-> reference it from your own code.  If you need fall-through to the default
-> behaviour, replicate the logic above: convert `HttpStatusException` via
-> `.toLSError()`, return a generic 500 for everything else.
->
-> Wart: there is currently no registration API for a custom `HttpExceptionHandler`
-> documented in the public guide.  Check the engine documentation for your
-> deployment target (Ktor, Netty, JDK server) for the wiring point.  The
-> interface itself is public and stable.
 
 ## What's Next
 

@@ -51,4 +51,4 @@ val fileToDisplay = preview?.file ?: metadata.original
 These models are used in conjunction with the JVM-only `media` module which provides the actual processing
 implementation via the Scrimage library.
 
-See [media.md](../../../../../../docs/media.md) for full documentation.
+See [media.md](../../../../../../../../docs/media.md) for full documentation.

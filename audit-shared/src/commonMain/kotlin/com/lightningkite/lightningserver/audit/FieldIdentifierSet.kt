@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.audit
 
-import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.DataClassPath
 import com.lightningkite.services.database.InlineProperty
@@ -8,10 +8,8 @@ import com.lightningkite.services.database.SerializableProperty
 import com.lightningkite.services.database.andNotNull
 import com.lightningkite.services.database.orNotNull
 import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 public data class FieldIdentifierSet(
     @SerialName("f0") public val fields0: Segment,
     @SerialName("f1") public val fields1: Segment,

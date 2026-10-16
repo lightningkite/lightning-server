@@ -7,7 +7,7 @@ SDK generation — without writing a single handler by hand.
 
 ## Before You Begin
 
-> **KSP plugin required.**  `@GenerateDataClassPaths` is processed at build time.
+> **KSP plugin required.**  `@Queryable` is processed at build time.
 > Add these two lines to your module's `build.gradle.kts`:
 >
 > ```kotlin
@@ -45,8 +45,7 @@ A model must implement `HasId<ID>` and carry two annotations:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/ModelRestSamples.kt#mr-model -->
 ```kotlin
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class Post(
     override val _id: Uuid = Uuid.random(),
     val title: String,
@@ -57,9 +56,8 @@ data class Post(
 
 - **`HasId<Uuid>`** — declares the primary-key type.  Any `Comparable` type works:
   `Uuid`, `String`, `Int`, `Long`.
-- **`@Serializable`** — required for kotlinx.serialization; every field must be
-  serializable.
-- **`@GenerateDataClassPaths`** — KSP generates `Post.path.title`, `Post.path.author`,
+- **`@Queryable`** — makes the class `@Serializable` (every field must be
+  serializable) and KSP generates `Post.path.title`, `Post.path.author`,
   etc. — the typed handles used by `condition {}` and `modification {}` queries.
   See [Database & the Query DSL](database.md) for how these work.
 - **Default `_id`** — defaulting to `Uuid.random()` means callers can omit the ID;

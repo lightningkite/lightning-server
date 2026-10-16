@@ -59,9 +59,9 @@ object Server : ServerBuilder() {
     val email = setting("email", EmailService.Settings())
 
     // Access services directly - no injection needed
-    val createUser = path.path("users").post.api(
+    val createUser = path.path("users").post bind ApiHttpHandler(
         summary = "Create user",
-        authOptions = noAuth,
+        auth = noAuth,
         implementation = { input: CreateUserRequest ->
             val db = database()
             val emailSvc = email()
@@ -103,9 +103,9 @@ public class UserController {
 ```kotlin
 object UserEndpoints : ServerBuilder() {
 
-    val getUser = path.path("users").arg<String>("id").get.api(
+    val getUser = path.path("users").arg<String>("id").get bind ApiHttpHandler(
         summary = "Get user by ID",
-        authOptions = noAuth,
+        auth = noAuth,
         errorCases = listOf(LSError(http = 404, detail = "not-found", message = "User not found")),
         implementation = { _: Unit ->
             val id = path.arg1
@@ -114,9 +114,9 @@ object UserEndpoints : ServerBuilder() {
         }
     )
 
-    val createUser = path.path("users").post.api(
+    val createUser = path.path("users").post bind ApiHttpHandler(
         summary = "Create user",
-        authOptions = noAuth,
+        auth = noAuth,
         successCode = HttpStatus.Created,
         implementation = { request: CreateUserRequest ->
             userTable().insertOne(request.toUser())
@@ -151,8 +151,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 ### Lightning Server
 
 ```kotlin
-@Serializable
-@GenerateDataClassPaths  // Enables the type-safe query DSL
+@Queryable  // Enables the type-safe query DSL
 data class User(
     override val _id: Uuid = Uuid.random(),
     val email: String,
@@ -269,8 +268,7 @@ public class SecurityConfig {
 ### Lightning Server
 
 ```kotlin
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class User(
     override val _id: Uuid = Uuid.random(),
     override val email: String,
@@ -289,16 +287,16 @@ object UserAuth : PrincipalType<User, Uuid> {
 
 object Server : ServerBuilder() {
     // Public endpoint - no auth required
-    val publicEndpoint = path.path("api").path("public").get.api(
+    val publicEndpoint = path.path("api").path("public").get bind ApiHttpHandler(
         summary = "Public endpoint",
-        authOptions = noAuth,
+        auth = noAuth,
         implementation = { _: Unit -> "Hello!" }
     )
 
     // Authenticated endpoint
-    val protectedEndpoint = path.path("api").path("protected").get.api(
+    val protectedEndpoint = path.path("api").path("protected").get bind ApiHttpHandler(
         summary = "Protected endpoint",
-        authOptions = authOptions<User>(),
+        auth = User.require(),
         implementation = { _: Unit ->
             val user = auth.fetch()
             "Hello, ${user.email}!"
@@ -306,9 +304,9 @@ object Server : ServerBuilder() {
     )
 
     // Admin-only endpoint
-    val adminEndpoint = path.path("api").path("admin").get.api(
+    val adminEndpoint = path.path("api").path("admin").get bind ApiHttpHandler(
         summary = "Admin endpoint",
-        authOptions = authOptions<User>(),
+        auth = User.require(),
         implementation = { _: Unit ->
             val user = auth.fetch()
             if (!user.isAdmin) throw ForbiddenException("Admin access required")
@@ -401,9 +399,9 @@ public class UserService {
 object Server : ServerBuilder() {
     val cache = setting("cache", Cache.Settings())
 
-    val getUser = path.path("users").arg<String>("id").get.api(
+    val getUser = path.path("users").arg<String>("id").get bind ApiHttpHandler(
         summary = "Get user",
-        authOptions = noAuth,
+        auth = noAuth,
         implementation = { _: Unit ->
             val id = path.arg1
             val cacheKey = "user:$id"
@@ -454,12 +452,12 @@ public class ScheduledTasks {
 ```kotlin
 object Server : ServerBuilder() {
     // Every 15 minutes
-    val periodicTask = schedule("cleanup-task", Schedule.Frequency(15.minutes)) {
+    val periodicTask = path.path("schedules").path("cleanup-task") bind ScheduledTask(schedule = Schedule.Frequency(15.minutes)) {
         println("Running every 15 minutes")
     }
 
     // Daily at noon
-    val dailyTask = schedule("daily-report", Schedule.Daily(LocalTime(12, 0))) {
+    val dailyTask = path.path("schedules").path("daily-report") bind ScheduledTask(schedule = Schedule.Daily(LocalTime(12, 0))) {
         println("Daily report at noon")
     }
 
@@ -495,15 +493,15 @@ public class NotificationService {
 ```kotlin
 object Server : ServerBuilder() {
     // Define the task
-    val sendNotification = task("send-notification") { input: NotificationRequest ->
+    val sendNotification = path.path("tasks").path("send-notification") bind Task { input: NotificationRequest ->
         // This runs asynchronously
         emailService().send(input.toEmail())
     }
 
     // Call it from an endpoint
-    val createOrder = path.path("orders").post.api(
+    val createOrder = path.path("orders").post bind ApiHttpHandler(
         summary = "Create order",
-        authOptions = authOptions<User>(),
+        auth = User.require(),
         implementation = { order: CreateOrderRequest ->
             val saved = orderTable().insertOne(order.toOrder())
 
@@ -618,37 +616,22 @@ public class UserControllerTest {
 
 ```kotlin
 class UserEndpointsTest {
-    companion object {
-        val testRunner by lazy { TestRunner(Server.build()) }
-
-        @BeforeAll
-        @JvmStatic
-        fun setup() {
-            JsonFileDatabase  // Use in-memory database for tests
-        }
-    }
-
     @Test
-    fun testGetUser() = runBlocking {
-        with(testRunner) {
-            // Insert test data
-            Server.userTable().insertOne(
-                User(_id = Uuid.parse("..."), email = "test@example.com")
-            )
+    fun testGetUser() = Server.testBlocking(settings = { database set Database.Settings("ram") }) {
+        // Insert test data; direct database access needs a ServerRuntime
+        val inserted = User(email = "test@example.com")
+        execute { Server.userTable().insertOne(inserted) }
 
-            // Test the endpoint directly
-            val response = Server.getUser.test(pathArgs = listOf("..."))
+        // Test the endpoint directly
+        val user = Server.getUser.test(inserted._id.toString(), auth = null, input = Unit)
 
-            assertEquals(HttpStatus.OK, response.status)
-            val user = response.body!!.parse<User>()
-            assertEquals("test@example.com", user.email)
-        }
+        assertEquals("test@example.com", user.email)
     }
 }
 ```
 
-**Key difference**: Endpoint references are stored in variables, making them directly testable. Use mock service
-implementations (`JsonFileDatabase`, RAM cache) instead of mocking.
+**Key difference**: Endpoint references are stored in variables, making them directly testable. Use in-memory service
+implementations (the `ram` database and cache) instead of mocking.
 
 ## OpenAPI / Swagger
 
@@ -667,13 +650,13 @@ public User getUser(@PathVariable String id) { ... }
 ### Lightning Server
 
 ```kotlin
-val getUser = path.path("users").arg<String>("id").get.api(
+val getUser = path.path("users").arg<String>("id").get bind ApiHttpHandler(
     summary = "Get user by ID",
     description = "Retrieves a user by their unique identifier",
     errorCases = listOf(
         LSError(http = 404, detail = "not-found", message = "User not found")
     ),
-    authOptions = noAuth,
+    auth = noAuth,
     implementation = { _: Unit -> /* ... */ }
 )
 ```

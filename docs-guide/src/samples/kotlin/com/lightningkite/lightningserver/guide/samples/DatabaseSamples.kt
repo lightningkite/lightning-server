@@ -18,8 +18,7 @@ import kotlin.uuid.*
 // endregion db-imports
 
 // region note-model
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class Note(
     override val _id: Uuid = Uuid.random(),
     val title: String,

@@ -163,7 +163,7 @@ session object.  For authenticated endpoints you pass an
 
 ## What's Next
 
-- **Authenticated endpoints** — swap `noAuth` for `authOptions<YourUser>()`
+- **Authenticated endpoints** — swap `noAuth` for `YourUser.require()`
   to require a valid session token.
 - **Database access** — define a `setting("database", Database.Settings())`
   and query it with the type-safe condition/modification DSL inside any handler.

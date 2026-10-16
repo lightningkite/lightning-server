@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.sessions.proofs.oauth
 
-import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.Serializable
 import kotlin.time.Instant
@@ -16,8 +16,7 @@ import kotlin.uuid.Uuid
  * @property secrets The client's secrets, of which there can be several for rotation.
  * @property redirectUris The redirect URIs the client may use, which must match exactly.
  */
-@GenerateDataClassPaths
-@Serializable
+@Queryable
 public data class OauthClient(
     override val _id: String,
     val niceName: String,
@@ -38,8 +37,7 @@ public data class OauthClient(
  * @property secretHash The hash of the secret, which is never stored in plaintext.
  * @property disabledAt When the secret stopped being valid, or `null` if it is still valid.
  */
-@GenerateDataClassPaths
-@Serializable
+@Queryable
 public data class OauthClientSecret(
     val createdAt: Instant,
     val masked: String,

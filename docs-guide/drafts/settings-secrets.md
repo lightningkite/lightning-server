@@ -42,7 +42,7 @@ object Server : ServerBuilder() {
     // works without any external infrastructure.
     val database = setting("database", Database.Settings())
     val cache    = setting("cache",    Cache.Settings())
-    val files    = setting("files",    PublicFileSystem.Settings())
+    val files    = setting("files",    ExternalFileSystem.Settings())
 }
 ```
 
@@ -131,7 +131,7 @@ so you can run the demo immediately.
 > **Note:** service settings (`Database.Settings`, `Cache.Settings`, etc.) serialize as
 > a URL string when the value matches a simple built-in backend (`"ram"`, `"local"`) or
 > as a URL string with a scheme for external backends (`"mongodb://…"`,
-> `"redis://…"`).  See [Services & Settings](services.md) for how to reference
+> `"redis://…"`).  See [Services & Settings](../guide/services.md) for how to reference
 > non-default backends.
 
 ## File Formats

@@ -62,8 +62,7 @@ end
 
 ```kotlin
 // Lightning Server — illustrative
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class Post(
     override val _id: Uuid = Uuid.random(),
     @MaxLength(100) val title: String,
@@ -75,7 +74,7 @@ data class Post(
 fun FieldCollection<Post>.published() = find(condition { it.published eq true })
 ```
 
-`@GenerateDataClassPaths` is processed by KSP at build time.  It produces typed field references
+`@Queryable` is processed by KSP at build time.  It produces typed field references
 used by `condition {}` and `modification {}`.  A typo like `it.titel` is a compile error, not a runtime bug.
 
 ### Migrations

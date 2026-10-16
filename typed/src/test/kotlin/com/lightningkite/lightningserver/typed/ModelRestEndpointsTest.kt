@@ -10,10 +10,9 @@ import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
-import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.Serializable
 import kotlin.test.*
 import kotlin.uuid.Uuid
 
@@ -640,8 +639,7 @@ class ModelRestEndpointsTest {
 }
 
 // Data class for CRUD tests - defined outside test class to avoid KSP conflicts
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class CrudItem(
     override val _id: Uuid = Uuid.random(),
     val name: String = "",

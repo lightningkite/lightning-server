@@ -7,7 +7,7 @@ updates all queries.
 
 ## Before You Begin
 
-> **Before you begin — KSP plugin required.**  `@GenerateDataClassPaths` is
+> **Before you begin — KSP plugin required.**  `@Queryable` is
 > processed at build time by the KSP plugin.  Add these two lines to your
 > module's `build.gradle.kts` before using this chapter's examples:
 >
@@ -46,12 +46,11 @@ import kotlin.uuid.*
 ## Defining a Model
 
 Database models must implement `HasId<ID>` and be annotated with
-`@Serializable` and `@GenerateDataClassPaths`:
+`@Queryable`:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/DatabaseSamples.kt#note-model -->
 ```kotlin
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class Note(
     override val _id: Uuid = Uuid.random(),
     val title: String,
@@ -59,7 +58,7 @@ data class Note(
 ) : HasId<Uuid>
 ```
 
-`@GenerateDataClassPaths` is processed by the KSP plugin at build time.
+`@Queryable` is processed by the KSP plugin at build time.
 It generates a `Note.path` companion-object extension with a typed field for
 every property — `Note.path.title`, `Note.path._id`, `Note.path.body`.
 These path objects are what `condition {}` and `modification {}` use to build
@@ -219,7 +218,7 @@ Change `"ram"` to `"mongodb://host/dbname"` (or `"postgres://..."`) and restart
 
 ## What's Next
 
-- **Authentication** — add `auth = authOptions<User>()` to your endpoints and
+- **Authentication** — add `auth = User.require()` to your endpoints and
   enforce access control in handler lambdas.  Chapter 6 covers the proofs-based
   session system.
 - **Query parameters and pagination** — `find(condition, orderBy, skip, limit)`

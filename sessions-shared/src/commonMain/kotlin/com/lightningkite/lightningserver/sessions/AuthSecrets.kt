@@ -1,8 +1,8 @@
 package com.lightningkite.lightningserver.sessions
 
 import com.lightningkite.lightningserver.sessions.proofs.TotpHashAlgorithm
-import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.data.IndexSet
+import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.Serializable
 import kotlin.time.Duration
@@ -22,8 +22,7 @@ import kotlin.uuid.Uuid
  * @property expiresAt When this secret stops being valid, or `null` if it does not expire.
  * @property disabledAt When this secret was disabled, which makes it unusable even if not expired.
  */
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 @IndexSet(["subjectId", "subjectType", "expiresAt", "disabledAt"])
 public data class TotpSecret(
     override val _id: Uuid = Uuid.random(),
@@ -51,8 +50,7 @@ public data class TotpSecret(
  * @property expiresAt When the password must be changed, or `null` if it does not expire.
  * @property disabledAt When this password was disabled, which prevents its use.
  */
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 @IndexSet(["subjectId", "subjectType", "expiresAt", "disabledAt"])
 public data class PasswordSecret(
     override val _id: Uuid = Uuid.random(),
@@ -76,8 +74,7 @@ public data class PasswordSecret(
  * @property expiresAt When the device must be re-verified, or `null` if it does not expire.
  * @property disabledAt When trust for this device was revoked.
  */
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 @IndexSet(["subjectId", "subjectType", "expiresAt", "disabledAt"])
 public data class KnownDeviceSecret(
     override val _id: Uuid = Uuid.random(),

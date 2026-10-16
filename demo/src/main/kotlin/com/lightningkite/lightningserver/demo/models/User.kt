@@ -1,8 +1,7 @@
 package com.lightningkite.lightningserver.demo.models
 
-import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.database.*
-import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
 
 /**
@@ -12,10 +11,9 @@ import kotlin.uuid.Uuid
  * - HasId interface for database primary key
  * - HasEmail interface for email-based authentication
  * - HasPassword interface for password hashing
- * - GenerateDataClassPaths for type-safe query DSL
+ * - Queryable for type-safe query DSL
  */
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class User(
     override val _id: Uuid = Uuid.random(),
     override val email: String,

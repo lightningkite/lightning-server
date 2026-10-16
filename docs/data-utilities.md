@@ -5,26 +5,32 @@ server-side data handling needs.
 
 ## SerializableCache
 
-A type-safe, serializable cache that can persist across requests or server restarts.
+A type-safe cache whose contents can be serialized, so it can travel with a request or an execution, including into a
+queued task.
 
 ### Basic Usage
 
-```kotlin
-val cache = SerializableCache()
-val userKey = SerializableCache.Key("user", User.serializer(), expireAfter = 5.minutes)
+A cache is typed by its *scope*, what it is attached to, so a key made for one kind of cache cannot be used with
+another. Requests (`SerializableCache<Request<*>>`) and executions (`execution.context`, a
+`SerializableCache<Execution>`) each have one.
 
-with(serverRuntime) {
-    cache[userKey] = currentUser
-    val user = cache[userKey]  // Retrieve from cache
-}
+```kotlin
+val userKey = SerializableCache.Key<Execution, User>("my-app/user", User.serializer(), expireAfter = 5.minutes)
+
+val context = serverRuntime.execution.context
+context[userKey] = currentUser
+val user = context[userKey]  // Retrieve from cache
 ```
+
+An execution's context is copied to every execution it starts, including queued tasks, so keep values small. A key with
+`localOnly = true` is copied within the process but dropped when the context is serialized.
 
 ### Calculating Keys
 
 For values that should be calculated on cache miss:
 
 ```kotlin
-val expensiveKey = object : SerializableCache.CalculatingKey<String, Result> {
+val expensiveKey = object : SerializableCache.CalculatingKey<Execution, String, Result> {
     override val id = "expensive-calculation"
     override val serializer = Result.serializer()
 
@@ -35,9 +41,7 @@ val expensiveKey = object : SerializableCache.CalculatingKey<String, Result> {
     }
 }
 
-with(serverRuntime) {
-    val result = cache.get(expensiveKey, "input")  // Calculates if not cached
-}
+val result = serverRuntime.execution.context.get(expensiveKey, "input")  // Calculates if not cached
 ```
 
 ### Features
@@ -51,11 +55,10 @@ with(serverRuntime) {
 Wraps a value with an optional expiration time.
 
 ```kotlin
-with(serverRuntime) {
-    val cached = Expiring("cached data", expireAfter = 5.minutes)
-    if (!cached.expired) {
-        // Use cached.value
-    }
+// Needs an Engine in context, for its clock
+val cached = Expiring("cached data", expireAfter = 5.minutes)
+if (!cached.expired) {
+    // Use cached.value
 }
 ```
 
@@ -90,7 +93,7 @@ val bimonthly = CronPattern(
 ### Calculating Next Occurrence
 
 ```kotlin
-val nextRun = LocalDateTime.now() + cronPattern
+val nextRun = Clock.System.now().toLocalDateTime(TimeZone.UTC) + cronPattern
 ```
 
 ## Schedule
@@ -145,11 +148,15 @@ val javaFile = kFile.toJavaFile()
 Base class for HTTP requests with built-in caching support.
 
 ```kotlin
-val myKey = SerializableCache.CalculatingKey<Request<*>, User> { ... }
+object CurrentUserKey : Request.CacheKey<PathSpec, User?> {
+    override val id = "my-app/current-user"
+    override val serializer = User.serializer().nullable
 
-with(serverRuntime) {
-    val user = request[myKey]  // Uses request's cache
+    context(server: ServerRuntime)
+    override suspend fun calculate(input: Request<*>): User? = /* look the user up */
 }
+
+val user = request[CurrentUserKey]  // Calculated once per request, then cached
 ```
 
 ## Best Practices

@@ -12,10 +12,9 @@ import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCod
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.lightningserver.websockets.text
-import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import kotlin.test.*
 
@@ -237,6 +236,5 @@ class ModelRestUpdatesWebSocketTest {
     }
 }
 
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class Sample(override val _id: String, val name: String, val note: String = "") : HasId<String>

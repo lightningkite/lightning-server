@@ -516,6 +516,6 @@ terraform force-unlock <lock-id>
 
 - **[Terraform Deep-Dive](terraform.md)** — understanding how Lightning Server
   generates Terraform, the `settings()` → resource mapping, and secret management.
-- **[Deploying to AWS Lambda](aws-deployment.md)** — the serverless alternative.
-- **[Running Your Server](running.md)** — engine selection, settings loading,
+- **[Deploying to AWS Lambda](../guide/aws-deployment.md)** — the serverless alternative.
+- **[Running Your Server](../guide/running.md)** — engine selection, settings loading,
   and graceful shutdown.

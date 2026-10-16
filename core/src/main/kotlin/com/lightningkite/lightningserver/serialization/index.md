@@ -38,11 +38,22 @@ data in various formats for HTTP requests and responses.
   Handles URL encoding/decoding and provides utility methods for working with maps and lists. Automatically wraps
   primitive types and enums for compatibility with the Properties format.
 
+### Encoding Hooks
+
+- **[EncodingInterceptor.kt](EncodingInterceptor.kt)** - Sees every value the server encodes, with its serializer, just
+  before it is encoded: HTTP responses, WebSocket frames, and error bodies. It may throw to stop the send but must not
+  alter the value. Installed on a `ServerBuilder`; the audit module's disclosure log is built on it.
+
 ### Utilities
 
 - **[serializerOrContextual.kt](serializerOrContextual.kt)** - Utility functions for obtaining serializers at runtime,
   falling back to contextual serializers when built-in serializers aren't available. Useful for generic code that works
   with both `@Serializable` types and custom serialized types.
+
+- **[validation.kt](validation.kt)** - Runs the validation annotations on decoded input.
+
+- **[JsonSizeEstimate.kt](JsonSizeEstimate.kt)** / **[JsonSizeCountingEncoder.kt](JsonSizeCountingEncoder.kt)** -
+  Estimate a value's encoded JSON size without producing the JSON.
 
 ## Key Features
 
@@ -63,19 +74,17 @@ object Server : ServerBuilder() {
     }
 
     val api = path.path("api").path("users").post bind HttpHandler { request ->
-        with(serverRuntime) {
-            // Automatically decode based on Content-Type
-            val user = request.body!!.parse(User.serializer())
+        // Automatically decode based on Content-Type
+        val user = request.body!!.parse(User.serializer())
 
-            // Process user...
+        // Process user...
 
-            // Automatically encode based on Accept header
-            user.toTypedData(request.headers.accept)
-        }
+        // Automatically encode based on Accept header
+        HttpResponse(body = user.toTypedData(request.headers.accept))
     }
 }
 ```
 
 ## Related Documentation
 
-See [/docs/serialization.md](../../../../docs/serialization.md) for comprehensive usage guide and examples.
+See [Serialization](../../../../../../../../docs/serialization.md) for comprehensive usage guide and examples.

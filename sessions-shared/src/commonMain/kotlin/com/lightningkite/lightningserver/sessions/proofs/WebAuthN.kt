@@ -33,8 +33,7 @@ import kotlin.time.Instant
  * @property backupEligible The authenticator's signed BE flag, which says whether the credential can be synced to other devices. It never changes, and webauthn4j rejects a login whose flag differs. `false` implies nothing about residency, and `null` means the credential predates this field and is filled in on next use.
  * @property backupState The authenticator's signed BS flag as of the last registration or login, which says whether the credential is currently backed up and may change over time.
  */
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 @IndexSet(["subjectId", "subjectType", "expiresAt", "disabledAt"])
 public data class WebAuthNCredential(
     override val _id: String,

@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.audit
 
-import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.data.Index
+import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.data.UuidV7
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.TypedId
@@ -28,8 +28,7 @@ import kotlin.uuid.Uuid
  * @property methodProperty The property [method] was applied to, such as the `email` of an emailed PIN,
  *   or `null` if the method identifies the subject directly.
  */
-@GenerateDataClassPaths
-@Serializable
+@Queryable
 public data class AuthEventRecord(
     override val _id: ID,
     @Index val origin: OriginRecord.ID,

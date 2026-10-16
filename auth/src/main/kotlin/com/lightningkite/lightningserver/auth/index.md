@@ -22,6 +22,8 @@ The core authentication token type:
 
 - **Authentication<SUBJECT>** - Represents an authenticated entity with associated scopes, expiration, and caching
 - **Authentication.Reader** - Interface for reading authentication from HTTP requests
+- **Authentication.CacheKey** - The request cache key holding a request's resolved authentication. Readers run once per
+  request; an anonymous result is not cached, so a sub-request that brings its own credential is still read
 - **AuthCacheKey** - Type alias for cache keys specific to authentication
 
 #### Key Features
@@ -95,6 +97,11 @@ Extension functions for working with authentication:
 - `PrincipalType.testAuth(...)` - Create test authentication instances
 - `authReaders` - Registry for authentication readers
 
+### AccessLogInterceptor.kt
+
+- **AccessLogInterceptor** - Opt-in HTTP and WebSocket access log that names the authenticated principal. Install it
+  with `install(AccessLogInterceptor())`
+
 ### PrincipalType.ext.kt
 
 Extension functions for principal types:
@@ -107,7 +114,7 @@ Extension functions for principal types:
 ### Defining a Principal Type
 
 ```kotlin
-@Serializable
+@Queryable
 data class User(
     override val _id: Uuid,
     val email: String,
@@ -179,11 +186,11 @@ val optionalUser = User.require() or noAuth
 ### Using Authentication in Endpoints
 
 ```kotlin
-val getProfile = path.path("profile").get.api(
+val getProfile = path.path("profile").get bind ApiHttpHandler(
     summary = "Get user profile",
-    authOptions = User.require(),
-    implementation = { auth: Authentication<User> ->
-        val user = auth.fetch()
+    auth = User.require(),
+    implementation = { _: Unit ->
+        val user = auth.fetch()  // `auth` is the caller's Authentication<User>
         UserProfileResponse(
             name = user.name,
             email = user.email
@@ -210,8 +217,8 @@ object BearerTokenReader : Authentication.Reader<User> {
         return Authentication(
             principalType = User,
             id = session.userId,
-            sessionId = session.id,
-            scopes = session.scopes
+            sessionId = session.id.toString(),
+            scopes = session.scopes,
         )
     }
 }
@@ -219,7 +226,7 @@ object BearerTokenReader : Authentication.Reader<User> {
 // Register in ServerBuilder
 object Server : ServerBuilder() {
     init {
-        authReaders.add(BearerTokenReader)
+        authReaders.register(BearerTokenReader)
     }
 }
 ```

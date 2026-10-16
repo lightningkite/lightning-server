@@ -1,13 +1,11 @@
 # Meta Tools
 
-Last updated January 2025 (`version-5`)
-
 Lightning Server comes with a bunch of easy tools for working with your server.
 
 You can enable them just like this:
 
 ```kotlin
-import com.lightningkite.lightningserver.definition.MetaEndpoints
+import com.lightningkite.lightningserver.typed.MetaEndpoints
 
 object Server : ServerBuilder() {
     val meta = path.path("meta") module MetaEndpoints(
@@ -37,8 +35,8 @@ Simply returns the plain-text 200 response "Server is running."  Can be useful f
 
 ## /meta/admin
 
-A React-driven administrative panel that allows for management of any models you've exposed RESTful endpoints for, as
-well as testers for your endpoints.
+An administrative panel that allows for management of any models you've exposed RESTful endpoints for, as well as
+testers for your endpoints.
 
 ## /meta/openapi
 
@@ -48,9 +46,9 @@ Automatically-generated Swagger docs.
 
 Automatically-generated OpenAPI JSON spec.
 
-## /meta/schema
+## /meta/kschema
 
-Returns a Lightning Server specific schema in JSON.
+Returns a Lightning Server specific schema in JSON, used for SDK generation.
 
 ## /meta/paths
 
@@ -59,3 +57,9 @@ Returns a list of all paths that the server responds to, as well as all tasks, s
 ## /meta/ws-tester
 
 A convenient web socket tester.
+
+## /meta/bulk
+
+Runs several typed endpoint calls in one request and returns their results keyed the same way. Each call is a
+sub-request: it runs through the server's interceptors as a child execution of the bulk request, and may carry its own
+`Authorization`.

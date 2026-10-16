@@ -196,7 +196,7 @@ fun queryParamsTest() = SearchServer.testBlocking(settings = {}) {
 - **Typed endpoints with error cases** — use `ApiHttpHandler` (introduced in
   Chapter 1) to add automatic JSON serialisation, documentation, and typed
   error responses to any of the routes above.
-- **Authentication** — swap `noAuth` for `authOptions<YourUser>()` and use
+- **Authentication** — swap `noAuth` for `YourUser.require()` and use
   `request.auth` inside the handler to access the validated session.
 - **Services** — the handler lambda has access to a `ServerRuntime` context;
   call `database()`, `cache()`, or any other configured service from there.

@@ -16,8 +16,10 @@ The main settings manager class that handles the configuration lifecycle. Mainta
 
 Key methods:
 
-- `set()` / `setStatic()`: Configure settings during the configuration phase
-- `ready()`: Validate and transform all settings for runtime use
+- `set` / `setStatic`: Configure settings during the configuration phase
+- `ready()`: Validate and transform all settings for runtime use. Requires an `Engine` context, and engines call it
+  themselves before serving
+- `readyUsingDefaults()`: Ready the settings using defaults for anything unset, for tests
 - `get()`: Retrieve transformed setting values during runtime
 - `allSerializable()` / `allGoals()`: Bulk access to settings state
 
@@ -64,20 +66,19 @@ Internal utility for decrypting OpenSSL-encrypted settings files:
 
 ## Typical Usage
 
+Each engine owns a `ServerSettings`. Load it during the configuration phase; the engine readies it when it starts:
+
 ```kotlin
-// 1. Create settings manager
-val settings = ServerSettings(Server.build().settings)
+KtorEngine(Server.build()).apply {
+    // Configuration phase
+    settings.loadFromFile(KFile("settings.json"), internalSerializersModule)
 
-// 2. Load from file (configuration phase)
-settings.loadFromFile(KFile("settings.json"), internalSerializersModule)
-
-// 3. Mark as ready (validates and transforms)
-with(serverRuntime) {
-    settings.ready()
-
-    // 4. Access settings at runtime
-    val value = settings.get(Server.someSetting)
+    // Readies the settings (validating and transforming them), then serves
+    start(Netty)
 }
+
+// At runtime, inside any handler:
+val value = Server.someSetting()
 ```
 
 ## Key Concepts
@@ -97,7 +98,7 @@ with(serverRuntime) {
 Settings can specify a `getter` function that transforms the serializable value into a runtime value:
 
 ```kotlin
-val hashedPassword = setting("password", "default", getter = { hash(it) })
+val maxUpload = setting("maxUploadMegabytes", 10) { it * 1024L * 1024L }
 ```
 
 The transformation occurs once during `ready()` and results are cached.
@@ -141,6 +142,6 @@ The settings system provides helpful error messages and auto-remediation:
 
 ## See Also
 
-- [Settings Documentation](../../../../../docs/settings.md) - User guide for working with settings
+- [Settings Documentation](../../../../../../../../docs/settings.md) - User guide for working with settings
 - `ServerSetting` class - Individual setting definition
 - `ServerBuilder` class - Server definition with settings registration

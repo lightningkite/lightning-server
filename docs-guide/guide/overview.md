@@ -144,7 +144,7 @@ See: [Services & Settings](services.md)
 ### Authentication
 
 `PrincipalType<SUBJECT, ID>` is the bridge between a model and the auth system.  Endpoints
-declare `authOptions = UserAuth.require()` to require a bearer token; handlers access the
+declare `auth = UserAuth.require()` to require a bearer token; handlers access the
 authenticated subject via `auth.fetch()`.
 
 See: [Authentication & Sessions](auth.md)
@@ -160,7 +160,7 @@ See: [Proof & Session Authentication](proof-session.md)
 ### Database & Query DSL
 
 `Database` is a service abstraction over MongoDB, Postgres, and in-memory / JSON-file backends.
-Models annotated with `@GenerateDataClassPaths` get a compile-time query DSL — `condition {}`,
+Models annotated with `@Queryable` get a compile-time query DSL — `condition {}`,
 `modification {}` — that prevents typos and field-rename drift.
 
 See: [Database](database.md)

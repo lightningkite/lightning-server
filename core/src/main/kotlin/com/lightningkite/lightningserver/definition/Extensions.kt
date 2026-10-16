@@ -109,7 +109,7 @@ public class MutableExtensions() : Extensions {
      * interface Foo : Extended
      * class FooBuilder : Foo, Extendable { //... }
      *
-     * object ArgumentsKey : MutableExtensions.DegradingKey<MutableList<String>, List<String>>
+     * object ArgumentsKey : MutableExtensions.WritableKey<MutableList<String>, List<String>>
      *
      * // extension made publicly accessible through extension property.
      * val FooBuilder.arguments: MutableList<String> by ArgumentsKey // WRITE type

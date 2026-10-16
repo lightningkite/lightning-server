@@ -1,7 +1,5 @@
 # Database
 
-Last updated January 2025 (`version-5`)
-
 Lightning Server contains a database abstraction that enables you to build applications without worrying about exactly
 which database will be used. It is abstracted over both NoSQL and SQL databases.
 
@@ -19,21 +17,20 @@ object Server : ServerBuilder() {
 
 ## Declaring a model
 
-Next we need to declare a model. All models are serializable via `kotlinx.serialization`, and need the additional
-annotation `@GenerateDataClassPaths` for the query DSL to work properly.
+Next we need to declare a model. All models are serializable via `kotlinx.serialization`, and need the
+annotation `@Queryable` (which also makes them `@Serializable`) for the query DSL to work properly.
 
 It is strongly recommended you define the primary key yourself by making the class implement `HasId<T>`.
 
 ```kotlin
 import kotlinx.serialization.*
 import com.lightningkite.services.database.HasId
-import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.services.data.Queryable
 import kotlin.uuid.Uuid
 import kotlin.time.Instant
 import kotlin.time.Clock
 
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class Post(
     override val _id: Uuid = Uuid.random(),
     val title: String,
@@ -98,7 +95,7 @@ val postInfo = database.modelInfo(
         val user = auth.fetch()
         ModelPermissions(
             create = condition { it.author eq user.email },
-            read = condition { it.always },
+            read = Condition.Always,
             update = condition { it.author eq user.email },
             delete = condition { it.author eq user.email }
         )
@@ -124,7 +121,7 @@ condition { (it.title eq "Test") and (it.author eq "joe@example.com") }
 // Modifications
 modification { it.title assign "New Title" }
 modification { it.updatedAt assign Clock.System.now() }
-modification { it.body.append(" - Updated") }
+modification { it.body += " - Updated" }
 ```
 
 ### Common Condition Operations
@@ -137,29 +134,24 @@ modification { it.body.append(" - Updated") }
 - `lte` - Less than or equal
 - `inside` - Value is in a collection
 - `notInside` - Value is not in a collection
-- `contains` - String contains (case-sensitive)
-- `containsIgnoreCase` - String contains (case-insensitive)
+- `contains` - String contains; pass `ignoreCase = true` for a case-insensitive match
 - `and` - Logical AND
 - `or` - Logical OR
-- `always` - Always true
-- `never` - Never true
+- `Condition.Always` / `Condition.Never` - Always or never true
 
 ### Common Modification Operations
 
 - `assign` - Set a value
-- `plus` - Add to a number
-- `times` - Multiply a number
-- `append` - Append to a string
-- `listAppend` - Add items to a list
-- `listRemove` - Remove items from a list based on condition
-- `setAppend` - Add items to a set
-- `setRemove` - Remove items from a set based on condition
+- `+=` - Add to a number, append to a string, or add items to a list or set
+- `*=` - Multiply a number
+- `addAll` - Add items to a list or set
+- `removeAll` - Remove items from a list or set, by value or by condition
 
 ## Adding Signals
 
 Signals occur when a change is made to the database.
 
-You can wrap a collection with actions that will occur on those changes:
+You can wrap a table with actions that will occur on those changes:
 
 ```kotlin
 val collection = postTable()
@@ -170,12 +162,24 @@ val collection = postTable()
     .postCreate { value ->
         println("$value was inserted in the database.")
     }
-    .postChange { value ->
-        println("$value was updated in the database.")
+    .postChange { old, new ->
+        println("$old was updated to $new.")
     }
     .postDelete { value ->
         println("$value was removed from the database.")
     }
+```
+
+With `ModelInfo`, put the wrapping in the `signals` parameter, so it applies to every access to the table, privileged or
+not:
+
+```kotlin
+val postInfo = database.modelInfo(
+    auth = UserAuth.require(),
+    tableName = "Post",
+    signals = { table -> table.postCreate { notifyFollowers(it) } },
+    permissions = { /* ... */ },
+)
 ```
 
 Available interceptors and signals:
@@ -186,6 +190,7 @@ Available interceptors and signals:
 - `postChange` - Called after successful update
 - `postDelete` - Called after successful deletion
 - `postNewValue` - Called after creation or update
+- `postRawChanges` - Called with every change's old and new values, for any kind of write
 
 ## Available Backends
 
@@ -205,7 +210,7 @@ Available interceptors and signals:
 ```json5
 // settings.json
 {
-  "database": { "url": "json://path-to-folder" }
+  "database": { "url": "json-files://path-to-folder" }
 }
 ```
 
@@ -289,13 +294,18 @@ object Server: ServerBuilder() {
 }
 ```
 
+### Other Backends
+
+The service-abstractions database modules also register `cassandra`, `keyspaces` (AWS Keyspaces), and SQL backends
+(`sql-h2`, `sql-mariadb`, `sql-mysql`, `sql-sqlite`). Reference the backend's class in your server, as with
+`MongoDatabase` above, so its URL schemes are registered.
+
 ## Model Annotations
 
 Lightning Server provides several annotations to enhance your models for use with the admin panel and documentation:
 
 ```kotlin
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 @AdminTableColumns(["title", "author", "updatedAt"])
 @Description("A blog post in the system")
 data class Post(
@@ -310,7 +320,7 @@ data class Post(
 
 Available annotations:
 
-- `@GenerateDataClassPaths` - Required for query DSL
+- `@Queryable` - Required for query DSL
 - `@AdminTableColumns([...])` - Columns to show in admin table view
 - `@Description("...")` - Description for documentation
 - `@AdminHidden` - Hide field from admin panel

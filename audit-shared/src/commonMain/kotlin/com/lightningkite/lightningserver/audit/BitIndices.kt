@@ -1,14 +1,12 @@
 package com.lightningkite.lightningserver.audit
 
-import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.DataClassPath
 import com.lightningkite.services.database.InlineProperty
-import kotlinx.serialization.Serializable
 import kotlin.jvm.JvmInline
 
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 @JvmInline
 /**
  * An [Int] bitmask holding a 'set' of indices in range `0-31` (32 bits).

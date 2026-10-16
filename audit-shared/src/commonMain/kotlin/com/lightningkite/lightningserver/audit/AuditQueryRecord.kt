@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.audit
 
-import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.data.Index
+import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.data.UuidV7
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.TypedId
@@ -32,8 +32,7 @@ import kotlin.time.Instant
  * @property fields The fields a partial find asked for.
  * @property aggregate The aggregate applied, or the parameters of a similarity search.
  */
-@GenerateDataClassPaths
-@Serializable
+@Queryable
 public data class AuditQueryRecord(
     override val _id: ID,
     @SerialName("ogn") @Index val origin: OriginRecord.ID,

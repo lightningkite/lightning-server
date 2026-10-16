@@ -1,7 +1,5 @@
 # Set Up Lightning Server
 
-Last updated January 2025 (`version-5`)
-
 ## Create a new Kotlin/Gradle KTS project.
 
 IntelliJ has a quick option for this under "New Project". Make sure you select Kotlin, Gradle, and Kotlin as your DSL
@@ -12,44 +10,34 @@ language.
 Use the version catalog pattern in `gradle/libs.versions.toml` or configure plugins directly in your build files.
 
 ```kotlin
-// settings.gradle.kts
-pluginManagement {
-    repositories {
-        mavenLocal()
-        google()
-        gradlePluginPortal()
-        mavenCentral()
-        maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
-        maven(url = "https://s01.oss.sonatype.org/content/repositories/releases/")
-    }
-}
-```
-
-```kotlin
 // build.gradle.kts
 plugins {
-    kotlin("jvm") version "2.1.0" // or your preferred Kotlin version
-    kotlin("plugin.serialization") version "2.1.0"
-    id("com.google.devtools.ksp") version "2.1.0-1.0.29"
+    kotlin("jvm") version "2.4.20"
+    kotlin("plugin.serialization") version "2.4.20"
+    id("com.google.devtools.ksp") version "2.3.12"
 }
 
 repositories {
-    mavenLocal()
-    maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
-    maven(url = "https://s01.oss.sonatype.org/content/repositories/releases/")
+    maven("https://lightningkite-maven.s3.us-west-2.amazonaws.com")
     mavenCentral()
 }
 ```
+
+Use the Kotlin and KSP versions in this repository's `gradle/libs.versions.toml`, since Lightning Server is built
+against them.
 
 ## Add the Lightning Server dependencies you need
 
 ```kotlin
 // build.gradle.kts
-val lightningServerVersion = "version-5-SNAPSHOT"
+val lightningServerVersion = "<version>"            // See the badge at the top of the README
+val serviceAbstractionsVersion = "<version>"        // The serviceAbstractions version in libs.versions.toml
 
 dependencies {
+    // Generates the query DSL for @Queryable models
+    ksp("com.lightningkite.services:database-processor:$serviceAbstractionsVersion")
+
     // Core modules - always needed
-    ksp("com.lightningkite.lightningserver:processor:$lightningServerVersion")
     implementation("com.lightningkite.lightningserver:core:$lightningServerVersion")
     implementation("com.lightningkite.lightningserver:core-shared:$lightningServerVersion")
 
@@ -83,6 +71,9 @@ dependencies {
     implementation("com.lightningkite.lightningserver:files:$lightningServerVersion")
     implementation("com.lightningkite.lightningserver:files-shared:$lightningServerVersion")
 
+    // Optional: Audit logging
+    implementation("com.lightningkite.lightningserver:audit:$lightningServerVersion")
+
     // Add service implementations as needed (see individual documentation)
 }
 ```
@@ -108,7 +99,7 @@ object Server : ServerBuilder() {
 // src/main/kotlin/Main.kt
 import com.lightningkite.lightningserver.engine.ktor.KtorEngine
 import com.lightningkite.lightningserver.settings.loadFromFile
-import com.lightningkite.KFile
+import com.lightningkite.services.kfile.KFile
 import io.ktor.server.netty.Netty
 
 fun main(args: Array<String>) {
@@ -137,19 +128,15 @@ Unit tests in Lightning Server use mock services to avoid external dependencies:
 ```kotlin
 // src/test/kotlin/ServerTest.kt
 import com.lightningkite.lightningserver.runtime.test.test
-import kotlinx.coroutines.runBlocking
+import com.lightningkite.lightningserver.runtime.test.testBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class ServerTest {
     @Test
-    fun testRoot() {
-        Server.test(settings = {}) {
-            runBlocking {
-                val response = Server.root.test()
-                assertEquals("Hello world!", response.body!!.text())
-            }
-        }
+    fun testRoot() = Server.testBlocking(settings = {}) {
+        val response = Server.root.test()
+        assertEquals("Hello world!", response.body!!.text())
     }
 }
 ```

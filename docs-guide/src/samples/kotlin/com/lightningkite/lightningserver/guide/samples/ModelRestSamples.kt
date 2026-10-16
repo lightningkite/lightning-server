@@ -15,8 +15,7 @@ import kotlin.uuid.*
 // endregion mr-imports
 
 // region mr-model
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class Post(
     override val _id: Uuid = Uuid.random(),
     val title: String,

@@ -9,7 +9,7 @@ import com.lightningkite.lightningserver.runtime.test.executePreDeployTasks
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.typed.registerTable
-import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.data.UuidV7
 import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.Database
@@ -285,8 +285,7 @@ class MutationLogTest {
     }
 }
 
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class Appointment(
     override val _id: ID,
     val note: String = "",

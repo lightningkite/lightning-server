@@ -1,8 +1,8 @@
 package com.lightningkite.lightningserver.audit
 
-import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.data.Index
 import com.lightningkite.services.data.IndexSet
+import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.data.UuidV7
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.TypedId
@@ -13,8 +13,7 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 @IndexSet(fields = ["rt", "rid"], name = "DisclosureRecord_byRecord")
-@GenerateDataClassPaths
-@Serializable
+@Queryable
 public data class AuditDisclosureRecord(
     override val _id: ID,
     @SerialName("o") @Index val origin: OriginRecord.ID,

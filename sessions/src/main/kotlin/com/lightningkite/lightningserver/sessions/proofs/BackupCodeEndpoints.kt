@@ -18,10 +18,9 @@ import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
 import com.lightningkite.services.cache.Cache
-import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.data.IndexSet
+import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.database.*
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import java.security.MessageDigest
@@ -41,8 +40,7 @@ import kotlin.uuid.Uuid
  * @property subjectId The owning subject's id, as produced by [PrincipalType.idString].
  * @property subjectType The owning subject's [PrincipalType.name].
  */
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 @IndexSet(["subjectId", "subjectType"])
 public data class BackupCodeSecret(
     override val _id: Uuid = Uuid.random(),

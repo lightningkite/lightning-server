@@ -47,6 +47,11 @@ Live HTTP/WebSocket implementations of client interfaces:
 - **LiveClientModelRestUpdatesWebsocket** - Actual WebSocket client for model updates
 - **LiveClientModelRestEndpointsAndUpdatesWebsocket** - Combined implementation
 
+### contract/
+
+API contract checking: `canonicalize` reduces a `LightningServerKSchema` to only what affects wire compatibility, and
+`diffApiContract` compares two of them to report breaking changes as an `ApiDiffReport`.
+
 ## Usage
 
 These types are used by generated client SDKs to provide type-safe API access. Server developers typically don't
@@ -55,8 +60,8 @@ interact with these directly, but they define the contract between server and cl
 Example client usage:
 
 ```kotlin
-// Create a fetcher (platform-specific implementation)
-val fetcher = KtorFetcher("https://api.example.com")
+// A Fetcher implementation for your platform; this module defines only the interface
+val fetcher: Fetcher = createFetcher("https://api.example.com")
 
 // Create model client
 val postsClient = LiveClientModelRestEndpoints(

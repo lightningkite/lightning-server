@@ -9,11 +9,10 @@ import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.engine
 import com.lightningkite.lightningserver.typed.DatabaseTableRegistration
 import com.lightningkite.lightningserver.typed.sdk.usedTypes
-import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.all
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
 
 public typealias SerialName = String
@@ -28,8 +27,7 @@ public typealias SerialName = String
  *   disclosure is observed with a serializer in hand and nothing else — the table a value came from
  *   is not knowable at that point, and an audited model need not be a table at all.
  */
-@GenerateDataClassPaths
-@Serializable
+@Queryable
 public data class AuditModelRegistration(
     override val _id: SerialName,
     val modelId: ModelTypeId,
@@ -46,8 +44,7 @@ public data class AuditModelRegistration(
  * @property fieldPath Dotted path from the audited model's root — `ssn`, `address.street`,
  *   `phones[].number`. See [auditFieldPaths].
  */
-@GenerateDataClassPaths
-@Serializable
+@Queryable
 public data class AuditFieldRegistration(
     override val _id: String,
     val modelId: ModelTypeId,

@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.audit
 
-import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.data.Index
+import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.data.References
 import com.lightningkite.services.data.Unsafe
 import com.lightningkite.services.database.HasId
@@ -23,8 +23,7 @@ import kotlin.uuid.Uuid
  * - A `ScheduledTask`, `StartupTask`, or `PreDeployTask`. These three are server managed events and no user is
  *   responsible for them, but they can still expose information.
  */
-@GenerateDataClassPaths
-@Serializable
+@Queryable
 public data class OriginRecord<REQUEST_INFO>(
     override val _id: ID,
     @Index val parent: ExecutionId? = null, // the origin of the execution that started this one, or that execution itself if it had none
@@ -43,8 +42,7 @@ public data class OriginRecord<REQUEST_INFO>(
     public val at: Instant
         get() = _id.raw.timestamp()
 
-    @Serializable
-    @GenerateDataClassPaths
+    @Queryable
     public data class StandardRequestInfo(
         val subjectId: Uuid?,
         val sessionId: Uuid?,

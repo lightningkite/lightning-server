@@ -43,6 +43,12 @@ extensibility system.
 - **`ScheduledTask.kt`** - Tasks that run on a schedule (frequency, daily, or cron-based). Used for cleanup jobs, report
   generation, data synchronization, etc.
 
+- **`PreDeployTask.kt`** - Tasks that run once per deploy, before any instance serves, with dependency-based ordering.
+  Used for work that must not race between instances, such as preparing database tables.
+
+The bodies of all four kinds are `@OverrideOnly`: the framework runs each one as its own execution through the server's
+interceptors.
+
 ### Settings and Configuration
 
 - **`ServerSetting.kt`** - Type-safe settings that can be configured via `settings.json`. Includes `Runtime` and
@@ -90,10 +96,11 @@ and OpenAPI documentation.
 
 ### Task Types
 
-Lightning Server provides three types of tasks:
+Lightning Server provides four types of tasks:
 
-- **Tasks** - Asynchronous background work with serializable input
-- **StartupTasks** - One-time initialization with dependency ordering
+- **Tasks** - Asynchronous background work with serializable input, launched from a running execution
+- **StartupTasks** - Per-instance initialization with dependency ordering
+- **PreDeployTasks** - Once-per-deploy work with dependency ordering
 - **ScheduledTasks** - Recurring work on a schedule
 
 ### Settings
@@ -108,22 +115,23 @@ cloud deployments.
 object Server : ServerBuilder() {
     // Define settings
     val database = setting("database", Database.Settings())
+    val userTable = database.registerTable<User>("User")
     
     // Define endpoints
     val root = path.get bind HttpHandler {
         HttpResponse.plainText("Hello World!")
     }
     
-    val api = path.path("api").path("users").get bind HttpHandler {
-        // Access settings
-        val db = database()
-        HttpResponse.json(db.users.findAll())
+    val api = path.path("api").path("users").get bind HttpHandler { request ->
+        // Access a registered table
+        val users = userTable().find(Condition.Always).toList()
+        HttpResponse(body = users.toTypedData(request.headers.accept))
     }
     
     // Define a task
-    val sendEmail = path.path("tasks").path("send-email") bind Task<EmailInput> { input ->
-        // Send email asynchronously
-        emailService().send(input.to, input.subject, input.body)
+    val sendEmail = path.path("tasks").path("send-email") bind Task { input: EmailInput ->
+        // Runs in the background, as a child of the execution that launched it
+        deliverEmail(input)
     }
     
     // Define a scheduled task
@@ -131,19 +139,21 @@ object Server : ServerBuilder() {
         frequency = 1.hours
     ) {
         // Cleanup old data every hour
-        database().cleanupOldRecords()
+        userTable().deleteMany(condition { it.deactivatedAt lt now() - 30.days })
     }
 }
 
 fun main() {
-    val definition = Server.build()
-    KtorEngine(definition).start()
+    KtorEngine(Server.build()).apply {
+        settings.loadFromFile(KFile("settings.json"), internalSerializersModule)
+        start(Netty)
+    }
 }
 ```
 
 ## See Also
 
-- `/docs/setup.md` - Getting started with Lightning Server
-- `/docs/endpoints.md` - Defining HTTP and WebSocket endpoints
-- `/docs/tasks.md` - Working with tasks and schedules
-- `/docs/settings.md` - Configuring server settings
+- [Setup](../../../../../../../../docs/setup.md) - Getting started with Lightning Server
+- [Endpoints](../../../../../../../../docs/endpoints.md) - Defining HTTP and WebSocket endpoints
+- [Tasks](../../../../../../../../docs/tasks.md) - Working with tasks and schedules
+- [Settings](../../../../../../../../docs/settings.md) - Configuring server settings

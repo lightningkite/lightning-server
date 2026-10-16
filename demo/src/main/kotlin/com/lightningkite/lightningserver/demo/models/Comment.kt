@@ -2,7 +2,6 @@ package com.lightningkite.lightningserver.demo.models
 
 import com.lightningkite.services.data.*
 import com.lightningkite.services.database.HasId
-import kotlinx.serialization.Serializable
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -15,8 +14,7 @@ import kotlin.uuid.Uuid
  * - Self-referencing for threaded comments
  * - Simple moderation features
  */
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 @Description("A comment on a blog post, with support for threaded replies.")
 data class Comment(
     override val _id: Uuid = Uuid.random(),

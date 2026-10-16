@@ -64,8 +64,7 @@ client code:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/AuthSamples.kt#user-model -->
 ```kotlin
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class UserProfile(
     override val _id: Uuid = Uuid.random(),
     val name: String,
@@ -230,21 +229,23 @@ But sometimes you want to cache *derived* values (e.g., role flags, computed
 permissions, or expensive lookups) across requests.
 
 `AuthCacheKey<SUBJECT, T>` is a typealias for
-`SerializableCache.CalculatingKey<Authentication<SUBJECT>, T>`.  Create one
-as a property on your `PrincipalType` object:
+`SerializableCache.CalculatingKey<Authentication<SUBJECT>, Authentication<SUBJECT>, T>`: a key whose value is
+calculated from the `Authentication` on a cache miss.  Create one as an object, typically next to your
+`PrincipalType`:
 
 ```kotlin
 // Illustrative — not a drift-checked sample.
-// AuthCacheKey caches a derived value keyed by Authentication<UserProfile>.
-// The value is recomputed on cache miss and stored for the TTL.
-val isAdmin: AuthCacheKey<UserProfile, Boolean> = authCacheKey(
-    serializer = Boolean.serializer(),
-    ttl = 5.minutes,
-) { auth ->
-    // `auth` is the Authentication<UserProfile> the value is derived from.
+object IsAdmin : AuthCacheKey<UserProfile, Boolean> {
+    override val id = "my-app/is-admin"
+    override val serializer = Boolean.serializer()
+    override val expireAfter = 5.minutes
+
+    // `input` is the Authentication<UserProfile> the value is derived from.
     // Run any suspension here — database queries, etc.
-    UserProfileServer.userProfiles()
-        .count(condition { it._id eq auth.id } and condition { it.role eq "admin" }) > 0
+    context(server: ServerRuntime)
+    override suspend fun calculate(input: Authentication<UserProfile>): Boolean =
+        UserProfileServer.userProfiles()
+            .count(condition { (it._id eq input.id) and (it.role eq "admin") }) > 0
 }
 ```
 
@@ -252,7 +253,7 @@ Use the key inside a handler:
 
 ```kotlin
 // Illustrative.
-val isAdminValue: Boolean = UserAuth.isAdmin[auth]   // suspends; cache miss → recomputes
+val isAdminValue: Boolean = auth.get(IsAdmin)   // suspends; cache miss → recomputes
 ```
 
 `PrincipalType` also exposes two caching helpers out of the box:
@@ -265,8 +266,8 @@ val isAdminValue: Boolean = UserAuth.isAdmin[auth]   // suspends; cache miss →
   object.  Any key you add here is eagerly populated on login, so the first
   handler invocation after login never pays a cache-miss cost.
 
-> The code above is illustrative; authCacheKey helpers and exact generics are
-> verified against the source in `/auth/src/main/kotlin/.../Authentication.ext.kt`.
+> The code above is illustrative; the typealias and `get` accessor are in
+> `/auth/src/main/kotlin/.../Authentication.ext.kt`.
 > Unit-assertable sample regions cannot be added here because verifying the
 > caching behavior requires an external cache service.
 

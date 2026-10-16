@@ -39,8 +39,7 @@ data class ServerFileWithMetadata(
 Use this in your models instead of plain `ServerFile` when you want automatic preview generation:
 
 ```kotlin
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class Post(
     override val _id: Uuid = Uuid.random(),
     val title: String,
@@ -187,8 +186,7 @@ The method returns previews sorted by best fit:
 Here's a complete example integrating media processing into an API:
 
 ```kotlin
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class Product(
     override val _id: Uuid = Uuid.random(),
     val name: String,

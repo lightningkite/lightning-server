@@ -16,8 +16,7 @@ import kotlin.uuid.Uuid
  * @property time The local time (hour and minute)
  * @property zone The time zone in which this time should be interpreted
  */
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 @ConsistentCopyVisibility
 public data class TimeInZone private constructor(
     val time: LocalTime,
@@ -41,8 +40,7 @@ public data class TimeInZone private constructor(
  *
  * The class prioritizes longer time periods (weekly > daily > batch > now) when determining the next notification time.
  */
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 @ConsistentCopyVisibility
 public data class Frequency private constructor(
     val onlyAt: TimeInZone?,
@@ -150,8 +148,7 @@ public data class Frequency private constructor(
  * @property sendAt The scheduled time to send this notification
  * @property sent Whether the notification has been successfully sent
  */
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 @IndexSet(["sent", "sendAt"])
 public data class SendInfo(
     val sendAt: Instant,
@@ -180,8 +177,7 @@ public data class SendInfo(
  * @property sms SMS delivery info, or null if SMS is disabled
  * @property inApp In-app notification delivery info, or null if in-app is disabled
  */
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 public data class Notification<UID, CONTENT>(
     override val _id: Uuid = Uuid.random(),
     val event: EventData,

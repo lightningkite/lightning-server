@@ -25,6 +25,10 @@ conversion, and optimization.
 - **interceptImagesForProcessing()** - Wraps a database table to process images synchronously on create/update
 - **interceptImagesForProcessingNotNull()** - Non-nullable variant of the interceptor
 
+### validation.kt
+
+- **AnnotationValidators.Media** - Validators for media annotations (currently none)
+
 ## Key Concepts
 
 ### Processing Approaches
@@ -62,4 +66,4 @@ object Server : ServerBuilder() {
 }
 ```
 
-See [media.md](../../../../../docs/media.md) for comprehensive documentation.
+See [media.md](../../../../../../../../docs/media.md) for comprehensive documentation.

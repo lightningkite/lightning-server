@@ -1,7 +1,5 @@
 # Deploy to VM
 
-Last updated December 2024 (`version-5`)
-
 Lightning Server applications can be deployed to traditional virtual machines or bare metal servers. This guide covers
 general VM deployment concepts, with AWS EC2 as a fully automated option.
 
@@ -11,7 +9,7 @@ For AWS deployments, use the `deploy-aws-ec2` module which provides:
 
 - Fully automated Terraform generation
 - Auto Scaling with Application Load Balancer
-- Distributed scheduled task handling via SQS
+- Scheduled tasks coordinated across instances through the shared cache
 - CloudWatch integration for logs and metrics
 
 See **[Deploy to AWS EC2](deploy-aws-ec2.md)** for the complete guide.
@@ -46,27 +44,29 @@ tasks.shadowJar {
 ```kotlin
 // src/main/kotlin/Main.kt
 import com.lightningkite.lightningserver.engine.ktor.KtorEngine
+import com.lightningkite.lightningserver.settings.loadFromFile
+import com.lightningkite.services.kfile.KFile
 import io.ktor.server.netty.Netty
-import java.io.File
 
 object Main {
     @JvmStatic
     fun main(args: Array<String>) {
-        val server = Server.build()
-        val engine = KtorEngine(server)
+        KtorEngine(Server.build()).apply {
+            // Load settings from the file named by SETTINGS_FILE, or settings.json
+            val settingsFile = System.getenv("SETTINGS_FILE") ?: "settings.json"
+            settings.loadFromFile(KFile(settingsFile), internalSerializersModule)
 
-        // Load settings from environment or file
-        val settingsFile = System.getenv("SETTINGS_FILE") ?: "settings.json"
-        if (File(settingsFile).exists()) {
-            engine.settings.loadFromFile(File(settingsFile))
+            // Host and port come from the ktorRunConfig setting
+            start(Netty)
         }
-
-        // Start HTTP server
-        val port = System.getenv("PORT")?.toIntOrNull() ?: 8080
-        engine.start(Netty, port = port)
     }
 }
 ```
+
+The `ktorRunConfig` setting holds the host and port (default `0.0.0.0:8080`). Behind a reverse proxy, also set its
+`realIpHeader` (such as `X-Real-IP`) so requests carry the client's address rather than the proxy's, and
+`requestIdHeader` if the proxy stamps a request id the server should adopt. Only name headers your proxy sets, since a
+client could otherwise send them.
 
 ### 3. Install Java Runtime
 
@@ -103,7 +103,6 @@ StandardOutput=journal
 StandardError=journal
 
 Environment=SETTINGS_FILE=/opt/app/settings.json
-Environment=PORT=8080
 
 [Install]
 WantedBy=multi-user.target
@@ -148,12 +147,11 @@ java -jar server.jar
 # Edit as needed, then restart
 ```
 
-## Scheduled Tasks on Single Server
+## Scheduled Tasks
 
-For single-server deployments, scheduled tasks run automatically. No additional configuration is needed.
-
-For multi-server deployments without SQS, you'll need to implement your own coordination (database locks, Redis, etc.)
-or designate one server as the scheduler.
+Scheduled tasks run automatically. The engine coordinates them through the `engine-cache` setting: each schedule takes a
+lock in that cache, so each tick runs on one server. For a single server the default in-memory cache is enough; for
+several servers, point `engine-cache` at a shared cache such as Redis, Memcached, or DynamoDB.
 
 ## Health Checks
 
@@ -161,13 +159,20 @@ Expose a health endpoint for load balancers:
 
 ```kotlin
 object Server : ServerBuilder() {
-    val meta = path("meta") include MetaEndpoints
+    val meta = path.path("meta") module MetaEndpoints(
+        packageName = "com.yourcompany.yourproject",
+        database = database,
+        cache = cache,
+    )
 
     // MetaEndpoints provides:
-    // GET /meta/online - returns 200 if healthy
-    // GET /meta/health - detailed health info
+    // GET /meta/online - returns 200 if the server is running
+    // GET /meta/health - detailed health info, including each service
 }
 ```
+
+Point load balancer health checks at `/meta/online`, which checks only that the server is up, so a slow downstream
+service does not take every server out of rotation.
 
 ## See Also
 

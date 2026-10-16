@@ -91,7 +91,7 @@ A few things to note:
   by their implementation modules: `"redis://…"`, `"memcached://…"`.  Switching
   backends is a configuration change, not a code change.
 - **All service types follow the same shape**: `Database.Settings()`,
-  `PublicFileSystem.Settings()`, `EmailService.Settings()` — one `setting()`
+  `ExternalFileSystem.Settings()`, `EmailService.Settings()` — one `setting()`
   declaration per service, one URL string in settings.json.
 
 ## Using Non-Default Backends: Reference Them Early
@@ -119,13 +119,13 @@ inside your `ServerBuilder`, *before* settings are loaded:
 object Server : ServerBuilder() {
     val database = setting("database", Database.Settings())
     val cache = setting("cache", Cache.Settings())
-    val files = setting("files", PublicFileSystem.Settings())
+    val files = setting("files", ExternalFileSystem.Settings())
 
     init {
         MongoDatabase       // registers "mongodb://"
         MemcachedCache      // registers "memcached://"
         DynamoDbCache       // registers "dynamodb://"
-        S3PublicFileSystem  // registers "s3://"
+        S3ExternalFileSystem  // registers "s3://"
         JsonFileDatabase    // registers "jsonfile://"
         // ... and so on for any backend your settings.json might name
     }
@@ -212,7 +212,7 @@ correct for `noAuth` endpoints (see Chapter 1 for a fuller explanation).
 - **Database** — declare `val database = setting("database", Database.Settings())`
   and use `"ram"` in tests.  Chapter 5 covers the type-safe query DSL for
   inserting, finding, and updating documents.
-- **Files** — `PublicFileSystem.Settings()` provides presigned URLs and
+- **Files** — `ExternalFileSystem.Settings()` provides presigned URLs and
   multipart upload support; the `"local"` backend writes to a temp directory.
 - **Multiple services** — any number of settings can be declared in a single
   `ServerBuilder`; override as many as needed in the `settings = { }` lambda.

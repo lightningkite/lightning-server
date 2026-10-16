@@ -124,8 +124,7 @@ class SyntaxTest {
         )
     }
 
-    @Serializable
-    @GenerateDataClassPaths
+    @Queryable
     data class Model(
         override val _id: Uuid = Uuid.random(),
         val name: String = "Hello World",

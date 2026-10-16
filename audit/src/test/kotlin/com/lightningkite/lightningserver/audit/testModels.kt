@@ -1,14 +1,13 @@
 package com.lightningkite.lightningserver.audit
 
-import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.jvm.JvmInline
 import kotlin.uuid.Uuid
 
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class Patient(
     override val _id: ID,
     @Audited val name: String,
@@ -368,8 +367,7 @@ data class Roomy(
 }
 
 /** Not audited, so the data access log must pass it through untouched. */
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class PlainThing(override val _id: Uuid, val value: String) : HasId<Uuid>
 
 /**
@@ -379,8 +377,7 @@ data class PlainThing(override val _id: Uuid, val value: String) : HasId<Uuid>
  * `@Audited` here and returned the table undecorated, so every read of the Patient inside went
  * unrecorded.
  */
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class PatientWrapper(override val _id: Uuid, val patient: Patient) : HasId<Uuid>
 
 /** The [OriginRecord] id that audit records made under this execution's origin join to. */

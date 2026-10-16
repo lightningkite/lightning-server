@@ -16,7 +16,7 @@ security mechanism that controls which web applications can make cross-origin re
 **Key Components:**
 
 - `CorsSettings` - Serializable data class containing all CORS configuration options
-- `CorsSettings.allowAll` - Companion object preset for permissive development settings
+- `CorsSettings.allowAll()` - Preset for permissive development settings
 
 **Usage:**
 
@@ -35,7 +35,7 @@ val corsSettings = setting("cors", CorsSettings(
 
 **Key Components:**
 
-- `CorsInterceptor` - Main interceptor class that implements `HttpInterceptor` and `WebSocketHandlerInterceptor`
+- `CorsInterceptor` - Main interceptor class that implements `HttpInterceptor` and `WebSocketInterceptor`
 - `originMatches()` - Internal function for pattern matching origins against allowed patterns
 
 **Features:**
@@ -52,7 +52,7 @@ object Server : ServerBuilder() {
     val corsSettings = setting("cors", CorsSettings(...))
 
     init {
-        interceptors.add(CorsInterceptor(corsSettings))
+        install(CorsInterceptor(corsSettings))
     }
 }
 ```
@@ -97,6 +97,7 @@ Tests are located in `core/src/test/kotlin/com/lightningkite/lightningserver/cor
 
 - `OriginMatchesTest.kt` - Unit tests for origin pattern matching logic
 - `CorsInterceptorTest.kt` - Integration tests for CORS behavior
+- `CorsSettingsTest.kt` - Tests for the settings presets and defaults
 
 Run tests with:
 
@@ -106,9 +107,9 @@ Run tests with:
 
 ## Related Documentation
 
-- [CORS Documentation](../../../../../../../../../docs/cors.md) - Complete guide to using CORS
-- [Endpoints Documentation](../../../../../../../../../docs/endpoints.md) - HTTP endpoint definition
-- [WebSockets Documentation](../../../../../../../../../docs/websockets.md) - WebSocket configuration
+- [CORS Documentation](../../../../../../../../docs/cors.md) - Complete guide to using CORS
+- [Endpoints Documentation](../../../../../../../../docs/endpoints.md) - HTTP endpoint definition
+- [WebSockets Documentation](../../../../../../../../docs/websockets.md) - WebSocket configuration
 
 ## Common Issues
 
@@ -116,7 +117,7 @@ Run tests with:
 
 - Check that request includes `Origin` header
 - Verify origin matches a pattern in `limitToDomains`
-- Confirm `CorsInterceptor` is added to `interceptors`
+- Confirm `CorsInterceptor` is installed with `install(...)`
 
 **"Preflight request returns 404"**
 

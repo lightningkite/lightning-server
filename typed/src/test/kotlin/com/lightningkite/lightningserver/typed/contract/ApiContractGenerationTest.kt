@@ -8,10 +8,9 @@ import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.LightningServerKSchema
 import com.lightningkite.lightningserver.typed.kschema.lightningServerKSchemaFromDefaultRuntime
 import com.lightningkite.services.cache.Cache
-import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
-import kotlinx.serialization.Serializable
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -21,16 +20,14 @@ import kotlin.uuid.Uuid
  * End-to-end tests that capture real raw [LightningServerKSchema]s from [ServerBuilder]s (offline) and diff mutated
  * servers against a baseline, asserting the expected taxonomy codes are produced.
  */
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class Widget(
     override val _id: Uuid = Uuid.random(),
     val name: String,
     val color: String,
 ) : HasId<Uuid>
 
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class WidgetV2(
     override val _id: Uuid = Uuid.random(),
     val name: String,

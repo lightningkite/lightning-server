@@ -9,8 +9,7 @@ Server-side subscription providers for the notification system.
 Fully programmatic subscription management:
 
 - No database storage for subscriptions
-- All logic defined via `addEventListener` calls
-- Multiple listeners can register for the same event type
+- Subscribers for each event are defined in code, with `subscribedDirect` inside the event's setup block
 - Results are merged, taking earliest schedule time per channel
 - Best for mandatory notifications or complete programmatic control
 
@@ -36,5 +35,5 @@ Maximum user customization:
     - `ReplaceExistingWithDefault`: Overwrite with new defaults (discards user changes)
     - `UpdateRetainingUserChanges`: Smart merge that preserves user modifications
 
-All providers implement `NotificationEventHandler.SubscriptionProvider` and determine which users should be notified for
-each event occurrence.
+All providers implement `NotificationEndpoints.Subscriptions` and determine which users should be notified for each event
+occurrence.

@@ -1,5 +1,9 @@
 # AI Module
 
+> **Note:** The AI module is not part of this repository; it is developed in the separate `lightning-bot` project. This
+> page has not been checked against that project's current code, so treat names and signatures here as approximate and
+> confirm them there.
+
 The AI module provides intelligent chatbot capabilities for Lightning Server, including LLM integration, database access
 through tools, and multi-channel communication (WebSocket, voice, phone, SMS, email).
 

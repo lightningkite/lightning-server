@@ -97,8 +97,7 @@ public abstract class ServerBuilder : Extendable {
 
     private val encodingInterceptors: ListRegistry<EncodingInterceptor> = ListRegistry()
 
-
-    private var exceptionHandler: HttpExceptionHandler = HttpExceptionHandler.Default
+    protected var exceptionHandler: HttpExceptionHandler = HttpExceptionHandler.Default
 
     private val preDeployTasks: MapRegistry<PathSpec0, PreDeployTask> = MapRegistry()
     private val startupTasks: MapRegistry<PathSpec0, StartupTask> = MapRegistry()

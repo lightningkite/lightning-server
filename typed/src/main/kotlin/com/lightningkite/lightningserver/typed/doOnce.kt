@@ -4,16 +4,14 @@ import com.lightningkite.lightningserver.definition.PreDeployTask
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.StartupTask
 import com.lightningkite.lightningserver.runtime.*
-import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.database.*
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.serialization.Serializable
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
-@GenerateDataClassPaths
-@Serializable
+@Queryable
 public data class ActionHasOccurred(
     override val _id: String,
     val started: Instant? = null,

@@ -27,7 +27,7 @@ Before diving in, it's helpful to understand the key philosophical differences:
 |--------------------------|---------------------------------------------------------------------|
 | Django Admin             | Admin UI in lightning-server-kiteui                                 |
 | Django ORM               | Type-safe query DSL with `condition {}` and `modification {}`       |
-| Models                   | `@Serializable` data classes with `@GenerateDataClassPaths`         |
+| Models                   | `@Queryable` data classes                                           |
 | Signals                  | Database lifecycle hooks (`postCreate`, `postChange`, `postDelete`) |
 | Named URLs / `reverse()` | Endpoint constants with type-safe path construction                 |
 | Forms                    | KiteUI form renderers (40+ built-in types)                          |
@@ -63,8 +63,7 @@ The admin UI is automatically generated from your server schema at runtime. You 
 models:
 
 ```kotlin
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 @AdminTableColumns(["title", "author", "updatedAt"])
 @Description("A blog post in the system")
 data class Post(
@@ -131,13 +130,12 @@ class Post(models.Model):
 ```kotlin
 import kotlinx.serialization.*
 import com.lightningkite.services.database.HasId
-import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.services.data.Queryable
 import kotlin.uuid.Uuid
 import kotlinx.datetime.Instant
 import kotlinx.datetime.Clock
 
-@Serializable
-@GenerateDataClassPaths  // Required for query DSL
+@Queryable  // Required for query DSL
 data class Post(
     override val _id: Uuid = Uuid.random(),
     val title: String,
@@ -150,8 +148,8 @@ data class Post(
 
 **Key differences:**
 
-- Models are Kotlin data classes with `@Serializable`
-- `@GenerateDataClassPaths` enables the type-safe query DSL
+- Models are Kotlin data classes with `@Queryable`, which makes them serializable
+- `@Queryable` enables the type-safe query DSL
 - Primary key is explicitly defined via `HasId<T>`
 - No migrations needed for MongoDB (schemaless)
 
@@ -254,8 +252,8 @@ val collection = postTable()
     .postCreate { value ->
         println("Post created: ${value.title}")
     }
-    .postChange { value ->
-        println("Post updated: ${value.title}")
+    .postChange { old, new ->
+        println("Post updated: ${old.title} -> ${new.title}")
     }
     .postDelete { value ->
         println("Post deleted: ${value.title}")
@@ -301,31 +299,28 @@ url = reverse('post-detail', args=[123])  # '/posts/123/'
 ```kotlin
 object Server : ServerBuilder() {
     // Endpoints are stored as constants
-    val postList = path.path("posts").get bind HttpHandler {
-        HttpResponse.json(postTable().find(condition { it.always }).toList())
+    val postList = path.path("posts").get bind HttpHandler { request ->
+        val posts = postTable().find(condition { it.always }).toList()
+        HttpResponse(body = posts.toTypedData(request.headers.accept))
     }
 
     val postDetail = path.path("posts").arg<Int>("pk").get bind HttpHandler { request ->
         val pk = request.path.arg1
         val post = postTable().get(pk) ?: throw NotFoundException()
-        HttpResponse.json(post)
+        HttpResponse(body = post.toTypedData(request.headers.accept))
     }
 
     val userPosts = path.path("users").arg<String>("userId").path("posts").get bind HttpHandler { request ->
         val userId = request.path.arg1
-        HttpResponse.json(
-            postTable().find(condition { it.author eq userId }).toList()
-        )
+        val posts = postTable().find(condition { it.author eq userId }).toList()
+        HttpResponse(body = posts.toTypedData(request.headers.accept))
     }
 }
-
-// Type-safe URL construction
-val url = Server.postDetail.path.toString(123)  // "/posts/123"
 ```
 
 **Key differences:**
 
-- Endpoints are stored as constants, enabling type-safe references
+- Endpoints are stored as constants, so tests and other code reference them directly
 - Path arguments are type-safe (`arg<Int>("pk")` ensures `arg1` is an `Int`)
 - No string-based lookup; you reference the endpoint directly
 
@@ -355,15 +350,16 @@ class PostListView(View):
 
 ```kotlin
 object PostEndpoints : ServerBuilder() {
-    val list = path.get bind HttpHandler {
-        HttpResponse.json(postTable().find(condition { it.always }).toList())
+    val list = path.get bind HttpHandler { request ->
+        val posts = postTable().find(condition { it.always }).toList()
+        HttpResponse(body = posts.toTypedData(request.headers.accept))
     }
 
     val create = path.post bind HttpHandler { request ->
-        val data = request.body?.parse<Post>() ?: throw BadRequestException("Missing body")
+        val data = request.body?.parse(Post.serializer()) ?: throw BadRequestException("Missing body")
         val created = postTable().insertOne(data)
         HttpResponse(
-            body = TypedData.json(mapOf("id" to created._id)),
+            body = created.toTypedData(request.headers.accept),
             status = HttpStatus.Created
         )
     }
@@ -402,10 +398,9 @@ class PostViewSet(viewsets.ModelViewSet):
 ```kotlin
 @Serializable
 data class CreatePostRequest(
-    @StringLength(1, 200)
+    @MaxLength(200)
     val title: String,
-    @EmailPattern
-    val author: String,
+    val author: EmailAddress,
     val body: String
 )
 
@@ -414,7 +409,7 @@ object PostApi : ServerBuilder() {
 
     // Define model info with permissions
     val postInfo = database.modelInfo<User?, Post, Uuid>(
-        auth = authOptions<User>(),
+        auth = User.require(),
         tableName = "Post",
         permissions = {
             val user = authOrNull?.fetch()
@@ -456,7 +451,7 @@ This automatically creates:
 val createPost = path.path("posts").post bind ApiHttpHandler<_, User?, CreatePostRequest, Post>(
     summary = "Create a new post",
     description = "Creates a new blog post. Requires authentication.",
-    auth = authOptions<User>(),
+    auth = User.require(),
     errorCases = listOf(
         LSError(http = 400, detail = "validation-failed", message = "Invalid post data"),
         LSError(http = 401, detail = "unauthorized", message = "Authentication required")
@@ -496,18 +491,23 @@ class LoggingMiddleware:
 ### Lightning Server Interceptors
 
 ```kotlin
-val loggingInterceptor = HttpInterceptor { request, cont ->
-    val start = Clock.System.now()
-    println("Request: ${request.path}")
-    val response = cont(request)
-    val duration = Clock.System.now() - start
-    println("Response: ${response.status} (${duration.inWholeMilliseconds}ms)")
-    response
+object LoggingInterceptor : HttpInterceptor {
+    context(runtime: ServerRuntime)
+    override suspend fun <PATH : PathSpec> intercept(
+        request: HttpRequest<PATH>,
+        cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
+    ): HttpResponse {
+        val start = TimeSource.Monotonic.markNow()
+        println("Request: ${request.path}")
+        val response = cont(request)
+        println("Response: ${response.status} (${start.elapsedNow().inWholeMilliseconds}ms)")
+        return response
+    }
 }
 
 object Server : ServerBuilder() {
     init {
-        install(loggingInterceptor)
+        install(LoggingInterceptor)
         install(CorsInterceptor(corsSettings))
     }
 }
@@ -546,8 +546,7 @@ Lightning Server supports multiple authentication methods:
 - Known device authentication
 
 ```kotlin
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class User(
     override val _id: Uuid = Uuid.random(),
     override val email: String,
@@ -668,11 +667,10 @@ Form rendering is handled by KiteUI with a priority-based renderer selection sys
 ```kotlin
 @Serializable
 data class PostForm(
-    @StringLength(1, 200)
+    @MaxLength(200)
     val title: String,
 
-    @EmailPattern
-    val author: String,
+    val author: EmailAddress,
 
     @Multiline
     @MimeType("text/html")
@@ -753,27 +751,18 @@ class PostTests(TestCase):
 
 ```kotlin
 class PostTests {
-    companion object {
-        @BeforeAll
-        @JvmStatic
-        fun setup() {
-            JsonFileDatabase  // Load mock service implementations
-        }
-    }
-
     @Test
-    fun testCreatePost() = runBlocking {
-        val engine = LocalEngine(Server.build())
-        val response = Server.createPost.test(
-            engine,
-            CreatePostRequest(title = "Test", author = "test@example.com", body = "Content")
+    fun testCreatePost() = Server.testBlocking(settings = { database set Database.Settings("ram") }) {
+        val post = Server.createPost.test(
+            auth = null,
+            input = CreatePostRequest(title = "Test", author = "test@example.com", body = "Content")
         )
-        assertEquals(HttpStatus.Created, response.status)
+        assertEquals("Test", post.title)
     }
 }
 ```
 
-Unit tests use mock services (`JsonFileDatabase`, RAM cache) to avoid external dependencies.
+Unit tests use in-memory services (the `ram` database and cache) to avoid external dependencies.
 
 ---
 

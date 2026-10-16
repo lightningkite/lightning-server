@@ -83,19 +83,24 @@ object Server : ServerBuilder() {
 }
 ```
 
-## Degrading Keys
+## Set-Once Keys
 
-`DegradingKey` provides different types for read vs. write access. This is useful when you want mutable access during
+A `MutableExtensions.SetOnceKey` may only be set once. Setting it again throws; `trySet` returns `false` instead.
+
+## Writable Keys
+
+`WritableKey` provides different types for read vs. write access. This is useful when you want mutable access during
 building, but read-only access at runtime.
 
 ### Example: Mutable List to Read-Only List
 
 ```kotlin
-object ArgumentsKey : MutableExtensions.DegradingKey<MutableList<String>, List<String>> {
+object ArgumentsKey : MutableExtensions.WritableKey<MutableList<String>, List<String>> {
     override fun default(): MutableList<String> = mutableListOf()
-    override fun MutableList<String>.include(other: List<String>, pathSpec: PathSpec0) {
+    override fun MutableList<String>.include(other: List<String>) {
         addAll(other)
     }
+    override fun seal(data: List<String>): List<String> = data.toList()
 }
 
 // On Extendable types (like ServerBuilder), you get MutableList
@@ -145,42 +150,24 @@ val ServerDefinition.interceptors: List<HttpInterceptor> by InterceptorsKey
 
 This gives you a mutable `ListRegistry` during building and an immutable `List` at runtime.
 
-## Cached Properties
-
-Use `.cache()` to create properties with lazy initialization:
-
-```kotlin
-object ConfigKey : MutableExtensions.Key<Config>
-
-var ServerBuilder.config: Config by ConfigKey.cache {
-    Config(defaultName = "server-${hashCode()}")
-}
-
-// First access creates the default
-val builder = ServerBuilder()
-val config1 = builder.config // Creates default Config
-val config2 = builder.config // Returns same instance
-assert(config1 === config2)
-
-// Can still be overridden
-builder.config = Config("custom")
-```
-
 ## Extension Merging
 
 When modules are included in `ServerBuilder`, their extensions are merged:
 
-- **Regular keys**: Last value wins (putIfAbsent behavior)
-- **Degrading keys**: Values are combined using the `include` function
+- **Regular keys**: The existing value is kept; an included module's value is used only if none is set
+- **Writable keys**: Values are combined using the `include` function
 
 ```kotlin
-object TagsKey : MutableExtensions.DegradingKey<MutableList<String>, List<String>> {
+object TagsKey : MutableExtensions.WritableKey<MutableList<String>, List<String>> {
     override fun default(): MutableList<String> = mutableListOf()
-    override fun MutableList<String>.include(other: List<String>, pathSpec: PathSpec0) {
+    override fun MutableList<String>.include(other: List<String>) {
         addAll(other) // Combine tags from included modules
     }
+    override fun seal(data: List<String>): List<String> = data.toList()
 }
 ```
+
+When the server is built, each writable key's value is passed through `seal` to produce the read-only runtime value.
 
 ## Utility Functions
 
@@ -193,7 +180,7 @@ val value = extensions.getOrPut(MyKey) {
 }
 ```
 
-### toSealedExtensions
+### sealed
 
 Convert mutable extensions to immutable:
 
@@ -201,7 +188,7 @@ Convert mutable extensions to immutable:
 val mutable = MutableExtensions()
 mutable[MyKey] = "value"
 
-val sealed = mutable.toSealedExtensions()
+val sealed = mutable.sealed()
 // sealed is now immutable Extensions
 ```
 
@@ -231,9 +218,9 @@ copy[MyKey] = "modified" // Doesn't affect original
    val value = extensions[MyKey] ?: "default"
    ```
 
-4. **Use degrading keys for builder patterns** - Mutable during building, immutable at runtime
+4. **Use writable keys for builder patterns** - Mutable during building, immutable at runtime
    ```kotlin
-   object ListKey : MutableExtensions.DegradingKey<MutableList<T>, List<T>>
+   object ListKey : MutableExtensions.WritableKey<MutableList<T>, List<T>>
    ```
 
 5. **Document your extensions** - Add KDoc to extension properties
