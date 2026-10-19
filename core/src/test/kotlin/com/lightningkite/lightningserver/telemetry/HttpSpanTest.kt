@@ -18,8 +18,6 @@ import io.opentelemetry.sdk.trace.data.SpanData
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 import kotlin.test.fail
 
 /**
@@ -119,7 +117,7 @@ class HttpSpanTest {
             runBlocking {
                 serverRuntime.handle(
                     HttpRequest<PathSpec>(
-                        path = RawHttpEndpoint(asString = "/does/not/exist", method = HttpMethod.GET),
+                        path = RawHttpEndpoint(asString = "/does/not/exist", method = HttpMethod("SCAN")),
                         queryParameters = QueryParameters.EMPTY,
                         headers = HttpHeaders.EMPTY,
                         domain = "example.com",
@@ -134,16 +132,13 @@ class HttpSpanTest {
             val root = spans.firstOrNull { it.parentSpanContext.spanId == SpanId.getInvalid() }
                 ?: fail("Expected a root span even for unmatched routes. Got: ${spans.map { it.name }}")
 
-            // For unmatched paths the literal target is used as the route — what matters is a
-            // single top-level HTTP span with the correct verb.
-            assertTrue(
-                root.name.startsWith("lightningserver.GET "),
-                "Root span should start with \"lightningserver.GET \", was \"${root.name}\"",
-            )
-            assertNotNull(
-                root.attributes.asMap().entries.firstOrNull { it.key.key == "http.method" }?.value,
-                "Root span should carry http.method attribute",
-            )
+            // The span name is also the RED metrics' `operation` label, so it must not contain the
+            // client-supplied path or method.
+            assertEquals("lightningserver.unmatched", root.name)
+            val attributes = root.attributes.asMap().mapKeys { it.key.key }
+            assertEquals(null, attributes["http.route"])
+            assertEquals("/does/not/exist", attributes["http.target"])
+            assertEquals("SCAN", attributes["http.method"])
         }
     }
 }
