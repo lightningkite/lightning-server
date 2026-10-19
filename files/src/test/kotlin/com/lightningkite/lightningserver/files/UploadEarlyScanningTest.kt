@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.files
 
+import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.serverRuntime
@@ -185,7 +186,7 @@ class UploadEarlyScanningTest {
         val key = uploadEarly.tokens().parseOrNull(prepare.futureCallToken)!!.key
         files().jailed(key).put(TypedData.text("malicious", MediaType.Text.Plain))
 
-        assertFailsWith<FileScanException> { uploadEarly.verify.test(null, prepare.futureCallToken) }
+        assertFailsWith<BadRequestException> { uploadEarly.verify.test(null, prepare.futureCallToken) }
 
         assertEquals(
             emptyList(),
@@ -234,7 +235,7 @@ class UploadEarlyScanningTest {
 
         ScanControl.behavior = { throw FileScanException("infected") }
         files().jailed(key).put(TypedData.text("malicious", MediaType.Text.Plain))
-        assertFailsWith<FileScanException> { uploadEarly.verify.test(null, prepare.futureCallToken) }
+        assertFailsWith<BadRequestException> { uploadEarly.verify.test(null, prepare.futureCallToken) }
 
         assertEquals("benign", files().promoted(certified).get()!!.text(), "The certified file must survive")
     }

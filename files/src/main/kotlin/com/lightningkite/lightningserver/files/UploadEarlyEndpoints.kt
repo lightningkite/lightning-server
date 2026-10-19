@@ -1,11 +1,14 @@
 package com.lightningkite.lightningserver.files
 
+import com.lightningkite.lightningserver.BadRequestException
+import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.encryption.Signer
 import com.lightningkite.lightningserver.encryption.signerBlocking
+import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
@@ -169,6 +172,12 @@ public class UploadEarlyEndpoint(
             }
         )
 
+    private val fileScanFailedError = LSError(
+        http = HttpStatus.BadRequest.code,
+        detail = "file-scan-failed",
+        message = "The uploaded file was rejected by a file scanner.",
+    )
+
     /**
      * POST handler to verify a previously uploaded file, scanning it and promoting it to the ready
      * location. Returns a token that can be decoded as a ServerFile in a later request.
@@ -178,7 +187,7 @@ public class UploadEarlyEndpoint(
             auth = authOptions,
             summary = "Verify uploaded file",
             description = "Scans an uploaded file and moves it out of jail so later requests can use it.",
-            errorCases = listOf(),
+            errorCases = listOf(fileScanFailedError),
             implementation = { token: String ->
                 val parsed = tokens().parseOrNull(token)
                     ?: throw IllegalArgumentException("Not an upload token.")
@@ -224,6 +233,12 @@ public class UploadEarlyEndpoint(
                             } catch (cleanupFailure: Exception) {
                                 e.addSuppressed(cleanupFailure)
                             }
+                            // A scanner rejecting the file is the client's fault, not ours.
+                            if (e is FileScanException) throw BadRequestException(
+                                detail = fileScanFailedError.detail,
+                                message = e.message ?: fileScanFailedError.message,
+                                cause = e,
+                            )
                             throw e
                         }
 
