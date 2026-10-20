@@ -1,3 +1,5 @@
+@file:OptIn(com.lightningkite.lightningserver.EngineApi::class)
+
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.BadRequestException
@@ -7,10 +9,11 @@ import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.telemetrySettings
 import com.lightningkite.lightningserver.http.*
-import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.runtime.handle
-import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.Engine
+import com.lightningkite.lightningserver.runtime.Execution
+import com.lightningkite.lightningserver.runtime.engine
+import com.lightningkite.lightningserver.runtime.handleRoot
 import com.lightningkite.lightningserver.runtime.test.TestRunner
 import com.lightningkite.lightningserver.runtime.test.testBlocking
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
@@ -24,6 +27,7 @@ import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCod
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.typed.sdk.User
 import com.lightningkite.services.Namespaced
+import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.database.HasId
@@ -63,7 +67,8 @@ class ClientTelemetryEndpointsTest {
 
     object TestServer : ServerBuilder() {
         init { registerBasicMediaTypeCoders() }
-        val telemetry = path.path("telemetry") module ClientTelemetryEndpoints()
+        val cache = setting("cache", Cache.Settings("ram"))
+        val telemetry = path.path("telemetry") module ClientTelemetryEndpoints(cache)
         val ping = path.path("ping").get bind HttpHandler<PathSpec0> { HttpResponse.plainText("pong") }
     }
 
@@ -94,9 +99,47 @@ class ClientTelemetryEndpointsTest {
 
         val received = Recording.batches.single()
         assertNull(received.resource[TelemetryKeys.User.id])
-        assertEquals("app", received.resource[TelemetryKeys.Service.name])
         assertNull(received.spans.single().attributes[TelemetryKeys.User.id])
         assertEquals("Home", received.spans.single().attributes[TelemetryKeys.App.screenName])
+    }
+
+    @Test
+    fun theServerDecidesWhoTheRecordsAreFrom() = withServer {
+        val sent = batch(span("screen")).copy(resource = telemetryAttributesOf(
+            TelemetryKeys.Service.name to "the-server-itself",
+            TelemetryKeys.Service.version to "2.1",
+            TelemetryKeys.Os.type to "web",
+            TelemetryKey.OfString("deployment.environment") to "production",
+        ))
+        TestServer.telemetry.ingest.test(null, sent)
+
+        val resource = Recording.batches.single().resource
+        assertEquals("${engine.projectName}-client", resource[TelemetryKeys.Service.name])
+        assertEquals("2.1", resource[TelemetryKeys.Service.version])
+        assertEquals("web", resource[TelemetryKeys.Os.type])
+        assertNull(resource[TelemetryKey.OfString("deployment.environment")], "keys outside the allowlist are dropped")
+    }
+
+    @Test
+    fun clientIdsPassThroughSoTracesStillJoin() = withServer {
+        val sent = span("screen").copy(parentSpanId = "00f067aa0ba902b7")
+        TestServer.telemetry.ingest.test(null, batch(sent))
+
+        val received = Recording.batches.single().spans.single()
+        assertEquals(sent.traceId, received.traceId)
+        assertEquals(sent.spanId, received.spanId)
+        assertEquals(sent.parentSpanId, received.parentSpanId)
+    }
+
+    @Test
+    fun uploadsAreRateLimitedPerCaller() = withServer {
+        val body = engine.externalSerialization.json.encodeToString(TelemetryBatch.serializer(), batch(span("screen")))
+        val statuses = List(30) {
+            engine.handleRoot(request("/telemetry/ingest", HttpMethod.POST, HttpHeaders.EMPTY, TypedData.text(body, MediaType.Application.Json)), Execution.ID.generate()).status
+        }
+        assertEquals(HttpStatus.OK, statuses.first())
+        assertTrue(HttpStatus.TooManyRequests in statuses, "a burst past the budget gets 429: $statuses")
+        assertEquals(HttpStatus.OK, engine.handleRoot(request("/ping", HttpMethod.GET, HttpHeaders.EMPTY), Execution.ID.generate()).status, "other routes aren't limited")
     }
 
     @Test
@@ -165,28 +208,28 @@ class ClientTelemetryEndpointsTest {
     fun requestSpanContinuesTheClientsTrace() = withServer {
         synchronized(Recording.traceParents) { Recording.traceParents.clear() }
         val header = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"
-        serverRuntime.handle(request("/ping", HttpMethod.GET, HttpHeaders { add("traceparent", header) }))
+        engine.handleRoot(request("/ping", HttpMethod.GET, HttpHeaders { add("traceparent", header) }), Execution.ID.generate())
         assertEquals(header, Recording.traceParents.first())
     }
 
     @Test
     fun theIngestRequestIsNotTraced() = withServer {
         synchronized(Recording.traceParents) { Recording.traceParents.clear() }
-        val body = serverRuntime.externalSerialization.json.encodeToString(TelemetryBatch.serializer(), batch(span("screen")))
-        serverRuntime.handle(request("/telemetry/ingest", HttpMethod.POST, HttpHeaders.EMPTY, TypedData.text(body, MediaType.Application.Json)))
+        val body = engine.externalSerialization.json.encodeToString(TelemetryBatch.serializer(), batch(span("screen")))
+        engine.handleRoot(request("/telemetry/ingest", HttpMethod.POST, HttpHeaders.EMPTY, TypedData.text(body, MediaType.Application.Json)), Execution.ID.generate())
 
         assertEquals(1, Recording.batches.size, "the batch was ingested")
         assertTrue(Recording.traceParents.isEmpty(), "but no span was started for the request")
     }
 
-    private fun request(path: String, method: HttpMethod, headers: HttpHeaders, body: TypedData? = null) = HttpRequest<PathSpec>(
+    context(_: Engine)
+    private fun request(path: String, method: HttpMethod, headers: HttpHeaders, body: TypedData? = null) = HttpRequest(
         path = RawHttpEndpoint(asString = path, method = method),
         queryParameters = QueryParameters.EMPTY,
         headers = headers,
         domain = "example.com",
         protocol = "https",
         sourceIp = "local",
-        requestId = generateRequestId(),
         body = body,
     )
 }
