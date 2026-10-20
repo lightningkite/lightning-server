@@ -27,6 +27,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
     context(runtime: ServerRuntime)
     private suspend fun <T> WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>.withWrapped(
         handler: WebSocketHandler<PathSpec, T>,
+        physicalSocketClosing: Boolean,
         action: suspend (WebSocketConnection<PathSpec, T>) -> Unit,
     ): WebSocketConnection<PathSpec, T> {
         class ConnectionWrapped(
@@ -43,7 +44,11 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
                 private set
 
             context(server: ServerRuntime)
-            override suspend fun close(reason: WebSocketClose) = wrapped.close(reason)
+            override suspend fun close(reason: WebSocketClose) {
+                // Whatever is disconnecting the physical socket closes it once that finishes.
+                if (physicalSocketClosing) return
+                wrapped.close(reason)
+            }
 
             context(server: ServerRuntime)
             override suspend fun send(frame: WebSocketFrame) = wrapped.send(frame)
@@ -142,16 +147,17 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
                 ?: listOf()))
             @Suppress("UNCHECKED_CAST")
             val routed = match as PathSpecMap.Match<WebSocketHandler<PathSpec, *>>
-            // Same physical socket, only the path is rewritten, so the socket id carries over.
-            request.withPath(
+            // A child socket, as with multiplexing, so its phases are traced and intercepted under its real
+            // route instead of under this shim's.
+            request.subConnection(
                 // SAFETY: match came from routing, which only pairs a handler with the spec it was registered under
                 path = @OptIn(Unsafe::class) RawWebSocketPath.fromMatch(routed),
+                socketId = Execution.ID.generate(),
                 queryParameters = fixedQueryParameters,
             )
         }
-        val otherHandler = match.value
         @Suppress("UNCHECKED_CAST")
-        otherHandler as WebSocketHandler<PathSpec, *>
+        val otherHandler = serverRuntime.server.interceptIncomingSocket(match.value as WebSocketHandler<PathSpec, Any?>)
         val startData = otherHandler.willConnectWithMetrics(request)
 
         @Suppress("UNCHECKED_CAST")
@@ -175,14 +181,14 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
         val otherHandler = innerRequest.path.tryResolve()?.value
             ?: throw NotFoundException("No web socket handler found for '${innerRequest.path}'")
         @Suppress("UNCHECKED_CAST")
-        return otherHandler as WebSocketHandler<PathSpec, Any?>
+        return serverRuntime.server.interceptIncomingSocket(otherHandler as WebSocketHandler<PathSpec, Any?>)
     }
 
     @OverrideOnly
     context(serverRuntime: ServerRuntime)
     override suspend fun didConnect(connection: WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>) {
         val otherHandler = connection.inner()
-        connection.withWrapped(otherHandler) {
+        connection.withWrapped(otherHandler, physicalSocketClosing = false) {
             otherHandler.didConnectWithMetrics(it)
         }
     }
@@ -194,7 +200,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
         frame: WebSocketFrame,
     ) {
         val otherHandler = connection.inner()
-        connection.withWrapped(otherHandler) {
+        connection.withWrapped(otherHandler, physicalSocketClosing = false) {
             otherHandler.messageFromClientWithMetrics(it, frame)
         }
     }
@@ -206,7 +212,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
         topic: WebSocketSubscriptionMessage<*, *>,
     ) {
         val otherHandler = connection.inner()
-        connection.withWrapped(otherHandler) {
+        connection.withWrapped(otherHandler, physicalSocketClosing = false) {
             otherHandler.messageFromSubscriptionWithMetrics(it, topic)
         }
     }
@@ -218,7 +224,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
         reason: WebSocketClose,
     ) {
         val otherHandler = connection.inner()
-        connection.withWrapped(otherHandler) {
+        connection.withWrapped(otherHandler, physicalSocketClosing = true) {
             otherHandler.disconnectAndClose(it, reason)
         }
     }

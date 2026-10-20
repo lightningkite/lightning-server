@@ -51,7 +51,38 @@ class MultiplexWebSocketHandlerTest {
             },
             disconnect = {}
         )
+        val disconnected = ArrayList<String>()
+        val failsToDisconnect = path.path("fails-to-disconnect") bind WebSocketHandler(
+            storageSerializer = Unit.serializer(),
+            willConnect = { Unit },
+            disconnect = { throw IllegalStateException("disconnect failed") }
+        )
+        val recordsDisconnect = path.path("records-disconnect") bind WebSocketHandler(
+            storageSerializer = Unit.serializer(),
+            willConnect = { Unit },
+            disconnect = { disconnected.add("/records-disconnect") }
+        )
         val multiplex = path.path("multiplex") bind MultiplexWebSocketHandler()
+    }
+
+    // On AWS, sending over a socket that is going away throws; each channel's close used to send an
+    // "end" message, so the first channel's failure skipped every channel after it.
+    @Test
+    fun physical_disconnect_disconnects_every_channel_without_sending() = runBlocking {
+        TestServer.disconnected.clear()
+        TestServer.test(settings = {}) {
+            val mux = TestServer.multiplex.test()
+            val json = engine.externalSerialization.json
+            for ((channel, path) in listOf("f" to "/fails-to-disconnect", "r" to "/records-disconnect")) {
+                val start = MultiplexMessage(channel = channel, path = path, start = true)
+                mux.send(WebSocketFrame.Text(json.encodeToString(MultiplexMessage.serializer(), start)))
+            }
+
+            mux.onMessageSent = { throw IllegalStateException("socket is gone: $it") }
+            mux.close()
+
+            assertEquals(listOf("/records-disconnect"), TestServer.disconnected)
+        }
     }
 
     @Test

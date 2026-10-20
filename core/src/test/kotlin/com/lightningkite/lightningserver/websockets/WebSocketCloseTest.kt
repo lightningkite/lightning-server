@@ -137,4 +137,24 @@ class WebSocketCloseTest {
         assertEquals(WebSocketClose.Code.INTERNAL_ERROR, close.code)
         assertEquals(true, close.isExceptional)
     }
+
+    @Test
+    fun `an ordinary failure does not leak its message to the client`() {
+        val close = WebSocketClose.exceptional(RuntimeException("db password is hunter2"))
+        assertEquals(null, close.message)
+        assertEquals(WebSocketClose.Code.INTERNAL_ERROR, close.code)
+    }
+
+    @Test
+    fun `an HttpStatusException keeps its message`() {
+        val close = WebSocketClose.exceptional(HttpStatusException(HttpStatus.Forbidden, message = "Not yours"))
+        assertEquals("Not yours", close.message)
+    }
+
+    @Test
+    fun `a long message is cut to 123 UTF-8 bytes on a character boundary`() {
+        // Two bytes per character, so the 123-byte cut lands mid-character.
+        val close = WebSocketClose.exceptional(HttpStatusException(HttpStatus.BadRequest, message = "é".repeat(100)))
+        assertEquals("é".repeat(61), close.message)
+    }
 }

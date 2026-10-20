@@ -221,7 +221,7 @@ class RequestIdentityTest {
 
     @Test
     fun `adopts the id from the configured trusted header`() {
-        val proxyId = Uuid.parse("00000000-0000-4000-8000-0000000000b2")
+        val proxyId = Uuid.parse("00000000-0000-7000-8000-0000000000b2")
         val identity = with(bareEngine) {
             headers("X-Proxy-Request-Id" to proxyId.toString())
                 .requestIdentity(trustedRequestIdHeader = "X-Proxy-Request-Id")
@@ -232,7 +232,7 @@ class RequestIdentityTest {
 
     @Test
     fun `records a separate untrusted claim alongside the trusted id`() {
-        val proxyId = Uuid.parse("00000000-0000-4000-8000-0000000000b2")
+        val proxyId = Uuid.parse("00000000-0000-7000-8000-0000000000b2")
         val identity = with(bareEngine) {
             headers(
                 "X-Proxy-Request-Id" to proxyId.toString(),
@@ -244,10 +244,10 @@ class RequestIdentityTest {
         assertEquals("attacker-chosen", identity.upstreamRequestId)
     }
 
-    /** The Envoy arrangement: the proxy stamps X-Request-ID, so there is no separate untrusted claim. */
+    /** The proxy stamps X-Request-ID itself, so there is no separate untrusted claim. */
     @Test
     fun `no upstream id is recorded when the trusted header is X-Request-ID itself`() {
-        val proxyId = Uuid.parse("00000000-0000-4000-8000-0000000000c3")
+        val proxyId = Uuid.parse("00000000-0000-7000-8000-0000000000c3")
         val identity = with(bareEngine) {
             headers(HttpHeader.XRequestId to proxyId.toString())
                 .requestIdentity(trustedRequestIdHeader = HttpHeader.XRequestId)
@@ -259,7 +259,7 @@ class RequestIdentityTest {
 
     @Test
     fun `header matching is case insensitive`() {
-        val proxyId = Uuid.parse("00000000-0000-4000-8000-0000000000c3")
+        val proxyId = Uuid.parse("00000000-0000-7000-8000-0000000000c3")
         val identity = with(bareEngine) {
             headers("x-request-id" to proxyId.toString())
                 .requestIdentity(trustedRequestIdHeader = "X-Request-ID")
@@ -296,6 +296,20 @@ class RequestIdentityTest {
 
         assertTrue(warned)
         assertNotEquals(Uuid.NIL, identity.requestId.uuid)
+    }
+
+    /** An execution id's timestamp is read from the id, so a version 4 id from the proxy would give a garbage start time. */
+    @Test
+    fun `generates an id and reports when the trusted header holds a non-v7 UUID`() {
+        val proxyId = Uuid.parse("00000000-0000-4000-8000-0000000000d5")
+        var warned = false
+        val identity = with(bareEngine) {
+            headers("X-Proxy-Request-Id" to proxyId.toString())
+                .requestIdentity(trustedRequestIdHeader = "X-Proxy-Request-Id") { warned = true }
+        }
+
+        assertTrue(warned)
+        assertNotEquals(proxyId, identity.requestId.uuid)
     }
 
     @Test

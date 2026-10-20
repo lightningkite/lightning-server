@@ -36,10 +36,24 @@ public data class WebSocketClose(
          *
          * A cancellation, other than a handler's own timeout, is the socket being torn down rather than
          * failing, so it gives a plain [GOING_AWAY] with no cause.
+         *
+         * The message is sent to the client, so like an HTTP error response it only carries an
+         * [HttpStatusException]'s message; anything else could leak internals.
          */
         public fun exceptional(exception: Throwable): WebSocketClose =
             if (exception is CancellationException && exception !is TimeoutCancellationException) GOING_AWAY
-            else WebSocketClose(exception.bestWebSocketCloseCode, exception.message, exception)
+            else WebSocketClose(
+                code = exception.bestWebSocketCloseCode,
+                message = (exception as? HttpStatusException)?.message?.takeIf { it.isNotEmpty() }?.let(::fitCloseReason),
+                cause = exception,
+            )
+
+        // RFC 6455 caps a close frame's reason at 123 bytes of UTF-8.
+        private fun fitCloseReason(message: String): String {
+            val bytes = message.encodeToByteArray()
+            if (bytes.size <= 123) return message
+            return bytes.decodeToString(0, 123).trimEnd('\uFFFD')
+        }
     }
 }
 

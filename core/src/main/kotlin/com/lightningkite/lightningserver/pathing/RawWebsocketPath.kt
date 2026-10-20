@@ -41,18 +41,15 @@ public class RawWebSocketPath<PATH : PathSpec> private constructor(
     context(server: Engine)
     public fun tryResolve(): PathSpecMap.Match<WebSocketHandler<PATH, *>>? {
         if (searched) return matchIfPresent
-        searched = true
 
+        @Suppress("UNCHECKED_CAST")
         val match = server.server.endpoints.match(
             server.externalSerialization.stringArrayFormat,
             pathSegments
-        ) { it.webSocket }
-
-        @Suppress("UNCHECKED_CAST")
-        if (match != null) match as PathSpecMap.Match<WebSocketHandler<PATH, *>>
+        ) { it.webSocket } as PathSpecMap.Match<WebSocketHandler<PATH, *>>?
 
         matchIfPresent = match
-
+        searched = true
         return match
     }
 

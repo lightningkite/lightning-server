@@ -47,7 +47,7 @@ public data class BackupCodeSecret(
     val code: String,
     val subjectId: String,
     val subjectType: String,
-    val createdAt: Instant,
+    val createdAt: Instant = Instant.fromEpochMilliseconds(0),
     /**
      * Returns when this code was redeemed, or `null` while it is still usable.
      *

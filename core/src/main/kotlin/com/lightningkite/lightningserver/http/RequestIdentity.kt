@@ -31,14 +31,14 @@ public data class RequestIdentity(
  * [trustedRequestIdHeader], which names a header stamped by a reverse proxy the deployment has
  * declared trustworthy. Leave it null and every request gets a freshly generated ID.
  *
- * Point [trustedRequestIdHeader] at `X-Request-ID` when running behind Envoy, which both stamps that
- * header and forwards the same value it records — so the proxy's capture and the server's own logs
- * share an identifier with no correlation step.
+ * The proxy must stamp version 7 UUIDs, because an execution's id also carries its start time. Behind
+ * such a proxy, the proxy's capture and the server's own logs share an identifier with no correlation
+ * step. Envoy's built-in `X-Request-ID` is a version 4 UUID, so it does not qualify.
  *
  * @param onTrustedHeaderMissing Invoked when [trustedRequestIdHeader] is configured but the header is
- *   absent or does not hold a UUID, which means the request did not arrive through the expected
- *   proxy, or that proxy does not stamp UUIDs. A fresh ID is generated in that case, so correlation
- *   degrades rather than failing.
+ *   absent or does not hold a version 7 UUID, which means the request did not arrive through the
+ *   expected proxy, or that proxy does not stamp v7 UUIDs. A fresh ID is generated in that case, so
+ *   correlation degrades rather than failing.
  */
 @OptIn(InternalLightningServerApi::class)
 context(engine: Engine)
@@ -50,10 +50,11 @@ public inline fun HttpHeaders.requestIdentity(
     if (trustedRequestIdHeader == null) return RequestIdentity(Execution.ID.generate(), claimed)
 
     @OptIn(Unsafe::class)
-    // SAFETY: The proxy has been set as a trusted source for ids, and should be configured to provide V7 UUIDs.
+    // SAFETY: Only a version 7 UUID is wrapped.
     val trusted = get(trustedRequestIdHeader)
         ?.root
         ?.let(Uuid::parseOrNull)
+        ?.takeIf { uuid -> uuid.toLongs { mostSignificantBits, _ -> (mostSignificantBits ushr 12) and 0xF } == 7L }
         ?.let(UuidV7::fromRaw)
         ?.let(Execution::ID)
 

@@ -286,5 +286,5 @@ private fun disconnectAttributes(connection: WebSocketConnection<*, *>, reason: 
     put(wsRoute, connection.request.path.route())
     put(TelemetryKeys.Net.peerIp, connection.request.sourceIp)
     put(wsDisconnectCode, reason.code.code.toLong())
-    put(wsDisconnectReason, reason.message ?: reason.code.name)
+    put(wsDisconnectReason, reason.cause?.message ?: reason.message ?: reason.code.name)
 }

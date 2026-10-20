@@ -51,8 +51,8 @@ import kotlin.time.Clock
  *                        Common values: "X-Forwarded-For", "X-Real-IP"
  * @property requestIdHeader Optional header name carrying a request ID stamped by a **trusted**
  *   reverse proxy, adopted as the authoritative request ID. Leave null (the default) to always
- *   generate one; a client-supplied ID is never trusted. Set to "X-Request-ID" behind Envoy so the
- *   proxy's capture and the server's logs share an identifier.
+ *   generate one; a client-supplied ID is never trusted. The proxy must stamp version 7 UUIDs
+ *   (Envoy's built-in X-Request-ID is version 4); see [requestIdentity].
  * @property reliability Shared engine reliability settings (request timeout, max body size, graceful
  *   shutdown drain, WebSocket backpressure). See [EngineReliabilitySettings]. Note that
  *   [EngineReliabilitySettings.idleTimeout] and [EngineReliabilitySettings.workerThreads] are

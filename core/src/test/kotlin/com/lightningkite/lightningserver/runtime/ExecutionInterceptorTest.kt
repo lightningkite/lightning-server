@@ -14,6 +14,7 @@ import com.lightningkite.lightningserver.http.HttpInterceptor
 import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
+import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
@@ -161,5 +162,29 @@ class ExecutionInterceptorTest {
             listOf("execution in", "http in", "handler", "http out", "execution out"),
             log,
         )
+    }
+
+    // Execution interceptors sit outside the HTTP error handling, so their failures used to escape handleRoot.
+    @Test
+    fun `a throwing execution interceptor yields a 500`() {
+        val server = object : ServerBuilder() {
+            init {
+                registerBasicMediaTypeCoders()
+                install(object : ExecutionInterceptor {
+                    context(runtime: ServerRuntime)
+                    override suspend fun <T> intercept(cont: suspend context(ServerRuntime) () -> T): T {
+                        if (runtime.execution is Execution.Http) throw IllegalStateException("interceptor failed")
+                        return cont()
+                    }
+                })
+            }
+
+            val endpoint = path.path("test").get bind HttpHandler { HttpResponse.plainText("hi") }
+        }
+        server.test(settings = { generalSettings set GeneralServerSettings() }) {
+            runBlocking {
+                assertEquals(HttpStatus.InternalServerError, server.endpoint.test().status)
+            }
+        }
     }
 }

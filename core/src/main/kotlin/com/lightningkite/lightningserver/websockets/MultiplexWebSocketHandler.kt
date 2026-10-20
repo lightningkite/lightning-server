@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.services.data.Unsafe
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.serialization.*
@@ -32,7 +33,8 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
         val wrapped: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>,
         val channel: String,
         val handler: WebSocketHandler<PathSpec, T>,
-        internalSerialization: Serialization
+        internalSerialization: Serialization,
+        val physicalSocketClosing: Boolean,
     ) : WebSocketConnection<PathSpec, T> {
         private inline fun MultiplexWebSocketHandlerState.updateChannel(
             channel: String,
@@ -52,12 +54,14 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
 
         context(server: ServerRuntime)
         override suspend fun close(reason: WebSocketClose) {
+            // Sending over a socket that is going away fails, and its state is going with it.
+            if (physicalSocketClosing) return
             wrapped.send(
                 serverRuntime.externalSerialization.json.encodeToString(
                     MultiplexMessage(
                         channel,
                         end = true,
-                        error = reason.cause?.let { it.message ?: "Unknown Error" }
+                        error = reason.cause?.let { reason.message ?: "Unknown Error" }
                     )
                 )
             )
@@ -168,7 +172,8 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
             this,
             channel,
             handler,
-            internalSerialization = runtime.internalSerialization
+            internalSerialization = runtime.internalSerialization,
+            physicalSocketClosing = false,
         )
         action(wrapped)
         wrapped.finalize()
@@ -298,7 +303,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                             MultiplexMessage(
                                 channel = message.channel,
                                 end = true,
-                                error = e.message ?: "Unknown Error"
+                                error = WebSocketClose.exceptional(e).message ?: "Unknown Error"
                             )
                         )
                     )
@@ -325,13 +330,9 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
     ) {
         for ((channel, info) in connection.currentState.map) {
             if (info.topics.contains(topic.topicPath())) {
-                val match = info.request.path.resolve()
-
-                @Suppress("UNCHECKED_CAST")
-                val otherHandler = serverRuntime.server.compiledWebSocketInterceptors
-                    .intercept(match.value as WebSocketHandler<PathSpec, Any?>)
-                connection.withVirtualConnection(otherHandler, channel) {
-                    otherHandler.messageFromSubscriptionWithMetrics(it, topic)
+                val channelHandler = info.getChannelHandler()
+                connection.withVirtualConnection(channelHandler, channel) {
+                    channelHandler.messageFromSubscriptionWithMetrics(it, topic)
                 }
             }
         }
@@ -343,14 +344,22 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
         connection: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>,
         reason: WebSocketClose,
     ) {
-        connection.currentState.map.entries.forEach { (channel, info) ->
-            val match = info.request.path.resolve()
-
-            @Suppress("UNCHECKED_CAST")
-            val otherHandler = serverRuntime.server.compiledWebSocketInterceptors
-                .intercept(match.value as WebSocketHandler<PathSpec, Any?>)
-            connection.withVirtualConnection(otherHandler, channel) {
-                otherHandler.disconnectAndClose(it, reason)
+        for ((channel, info) in connection.currentState.map) {
+            // One channel failing to disconnect must not stop the rest from disconnecting.
+            try {
+                val channelHandler = info.getChannelHandler()
+                val virtual = VirtualConnection(
+                    connection,
+                    channel,
+                    channelHandler,
+                    internalSerialization = serverRuntime.internalSerialization,
+                    physicalSocketClosing = true,
+                )
+                channelHandler.disconnectAndClose(virtual, reason)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                serverRuntime.logger.error(e) { "Multiplex channel $channel failed to disconnect" }
             }
         }
     }

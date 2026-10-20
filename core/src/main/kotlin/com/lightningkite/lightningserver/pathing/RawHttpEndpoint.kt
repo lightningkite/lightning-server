@@ -24,18 +24,15 @@ public data class RawHttpEndpoint<PATH : PathSpec> private constructor(
     context(server: Engine)
     public fun tryResolve(): PathSpecMap.Match<HttpHandler<PATH>>? {
         if (searched) return matchIfPresent
-        searched = true
 
+        @Suppress("UNCHECKED_CAST")
         val match = server.server.endpoints.match(
             server.externalSerialization.stringArrayFormat,
             pathSegments
-        ) { it.http[method] }
-
-        @Suppress("UNCHECKED_CAST")
-        if (match != null) match as PathSpecMap.Match<HttpHandler<PATH>>
+        ) { it.http[method] } as PathSpecMap.Match<HttpHandler<PATH>>?
 
         matchIfPresent = match
-
+        searched = true
         return match
     }
 

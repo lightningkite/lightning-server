@@ -53,7 +53,7 @@ internal suspend fun ApplicationCall.adaptHttpRequest(maxBody: Long): Pair<HttpR
         protocol = request.origin.scheme,
         sourceIp = ktorRunConfig().realIpHeader?.let { realIp ->
             request.header(realIp).also {
-                if (it == null) server.logger.warn { "Real IP address header for proxy '$it' was missing from the request." }
+                if (it == null) server.logger.warn { "Real IP address header for proxy '$realIp' was missing from the request." }
             }
         } ?: request.origin.remoteAddress,
         body = run {

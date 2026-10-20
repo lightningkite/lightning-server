@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.pathing.route
 import com.lightningkite.services.telemetry.TelemetryAttributes
 import com.lightningkite.services.telemetry.TelemetryKey
 import com.lightningkite.services.telemetry.TelemetryKeys
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 
@@ -120,63 +121,71 @@ private suspend fun <PATH : PathSpec> Engine.executeHttpIntercepted(
     val method = request.path.method.toString()
     val route = request.path.route()
 
-    return execute("$method $route", execution, TelemetryAttributes {
-        put(TelemetryKeys.Http.method, method)
-        put(TelemetryKeys.Http.route, route)
-        put(TelemetryKeys.Http.target, "/" + request.path.pathSegments.toString())
-        put(TelemetryKeys.Http.scheme, request.protocol)
-        put(TelemetryKeys.Http.host, request.domain)
-        put(TelemetryKeys.Net.peerIp, request.sourceIp)
-    }) { trace ->
-        var handledError: String? = null
-        suspend fun handleError(e: Exception, label: String? = e::class.simpleName): HttpResponse {
-            handledError = label
-            return try {
-                instrument("exceptionHandler") { serverRuntime.server.exceptionHandler.handle(request, e) }
-            } catch (_: Exception) {
-                handledError = "unhandled_exception"
-                HttpResponse(status = HttpStatus.InternalServerError)
-            }
-        }
-
-        val response = try {
-            serverRuntime.server.compiledHttpInterceptors.intercept(request) { req ->
-                // Access logging (with the resolved principal) is provided by the opt-in AccessLogInterceptor in
-                // the auth module, not hardcoded here — so it can name the principal without core depending on auth.
-                // Map handler/route/compression exceptions to responses in-place so the surrounding
-                // interceptors (CORS, etc.) still post-process error responses.
-                try {
-                    dispatch(req)
-                } catch (_: TimeoutCancellationException) {
-                    // A handler exceeded its HttpHandler.timeout. This is a server-side condition (the server
-                    // couldn't finish in time), so it maps to 503 Service Unavailable — NOT 408, which per
-                    // RFC 7231 means the client was too slow sending its request. Routed through the normal
-                    // exception handler so the error body is formatted consistently. (Other
-                    // CancellationExceptions — e.g. client disconnect — are handled by the generic catch below.)
-                    serverRuntime.logger.warn { "Request to ${req.path} exceeded its handler timeout." }
-                    handleError(
-                        HttpStatusException(
-                            status = HttpStatus.ServiceUnavailable,
-                            detail = "timeout",
-                            message = "The request handler exceeded its timeout.",
-                        ),
-                        label = "timeout",
-                    )
-                } catch (e: Exception) {
-                    serverRuntime.logger.error(e) { "Exception in HTTP" }
-                    handleError(e)
+    // The ExecutionInterceptors wrap the HTTP error handling below, so their own failures land here.
+    return try {
+        execute("$method $route", execution, TelemetryAttributes {
+            put(TelemetryKeys.Http.method, method)
+            put(TelemetryKeys.Http.route, route)
+            put(TelemetryKeys.Http.target, "/" + request.path.pathSegments.toString())
+            put(TelemetryKeys.Http.scheme, request.protocol)
+            put(TelemetryKeys.Http.host, request.domain)
+            put(TelemetryKeys.Net.peerIp, request.sourceIp)
+        }) { trace ->
+            var handledError: String? = null
+            suspend fun handleError(e: Exception, label: String? = e::class.simpleName): HttpResponse {
+                handledError = label
+                return try {
+                    instrument("exceptionHandler") { serverRuntime.server.exceptionHandler.handle(request, e) }
+                } catch (_: Exception) {
+                    handledError = "unhandled_exception"
+                    HttpResponse(status = HttpStatus.InternalServerError)
                 }
             }
-        } catch (e: Exception) {
-            logger.error(e) { "Exception in HTTP interceptor chain" }
-            handleError(e)
-        }
 
-        trace.enrich(TelemetryAttributes {
-            put(TelemetryKeys.Http.statusCode, response.status.code.toLong())
-            handledError?.let { put(errorType, it) }
-        })
-        response
+            val response = try {
+                serverRuntime.server.compiledHttpInterceptors.intercept(request) { req ->
+                    // Access logging (with the resolved principal) is provided by the opt-in AccessLogInterceptor in
+                    // the auth module, not hardcoded here — so it can name the principal without core depending on auth.
+                    // Map handler/route/compression exceptions to responses in-place so the surrounding
+                    // interceptors (CORS, etc.) still post-process error responses.
+                    try {
+                        dispatch(req)
+                    } catch (_: TimeoutCancellationException) {
+                        // A handler exceeded its HttpHandler.timeout. This is a server-side condition (the server
+                        // couldn't finish in time), so it maps to 503 Service Unavailable — NOT 408, which per
+                        // RFC 7231 means the client was too slow sending its request. Routed through the normal
+                        // exception handler so the error body is formatted consistently. (Other
+                        // CancellationExceptions — e.g. client disconnect — are handled by the generic catch below.)
+                        serverRuntime.logger.warn { "Request to ${req.path} exceeded its handler timeout." }
+                        handleError(
+                            HttpStatusException(
+                                status = HttpStatus.ServiceUnavailable,
+                                detail = "timeout",
+                                message = "The request handler exceeded its timeout.",
+                            ),
+                            label = "timeout",
+                        )
+                    } catch (e: Exception) {
+                        serverRuntime.logger.error(e) { "Exception in HTTP" }
+                        handleError(e)
+                    }
+                }
+            } catch (e: Exception) {
+                logger.error(e) { "Exception in HTTP interceptor chain" }
+                handleError(e)
+            }
+
+            trace.enrich(TelemetryAttributes {
+                put(TelemetryKeys.Http.statusCode, response.status.code.toLong())
+                handledError?.let { put(errorType, it) }
+            })
+            response
+        }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        logger.error(e) { "Exception in execution interceptor chain" }
+        HttpResponse(status = HttpStatus.InternalServerError)
     }
 }
 

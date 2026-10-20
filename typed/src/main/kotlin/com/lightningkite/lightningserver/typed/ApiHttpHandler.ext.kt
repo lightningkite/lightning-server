@@ -36,7 +36,7 @@ private val logger = KotlinLogging.logger("com.lightningkite.lightningserver.typ
  * Authentication is resolved from the request the interceptors pass on, as it is for a routed request.
  */
 context(server: ServerRuntime)
-public suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PATH, USER, INPUT, OUTPUT>.handleWithMetrics(
+public suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PATH, USER, INPUT, OUTPUT>.handleWithMetrics(  // TODO: J: Rename handleKeepingTyping or something?  It's honestly a weird use case where you want to use it...
     request: HttpRequest<PATH>,
     input: INPUT,
 ): OUTPUT {
@@ -57,7 +57,7 @@ public suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHan
     if (!httpResponse.status.success) throw HttpStatusException(httpResponse.toLSError())
     outcome?.let { return it.getOrThrow() }
 
-    // An interceptor answered before the endpoint ran, so its response is the only output there is.
+    // Odd case: An interceptor answered before the endpoint ran, so its response is the only output there is.
     @Suppress("UNCHECKED_CAST")
     if (outputType == Unit.serializer()) return Unit as OUTPUT
     return httpResponse.body?.parse(outputType)
