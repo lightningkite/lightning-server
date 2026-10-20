@@ -52,6 +52,8 @@ kotlin {
                 api(libs.kotlinx.datetime)
                 api(libs.kotlinx.serialization.json)
                 api(libs.services.database.shared)
+                // The generated client SDK sends ClientTelemetryEndpoints' TelemetryBatch.
+                api(libs.services.telemetry.shared)
                 api(project(":core-shared"))
                 api(project(":auth-shared"))
             }

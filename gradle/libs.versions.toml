@@ -92,6 +92,7 @@ services-database-mongodb = { module = "com.lightningkite.services:database-mong
 services-database-postgres = { module = "com.lightningkite.services:database-postgres", version = { ref = "serviceAbstractions" } }
 services-database-processor = { module = "com.lightningkite.services:database-processor", version = { ref = "serviceAbstractions" } }
 services-database-shared = { module = "com.lightningkite.services:database-shared", version = { ref = "serviceAbstractions" } }
+services-telemetry-shared = { module = "com.lightningkite.services:telemetry-shared", version = { ref = "serviceAbstractions" } }
 services-database-test = { module = "com.lightningkite.services:database-test", version = { ref = "serviceAbstractions" } }
 services-email = { module = "com.lightningkite.services:email", version = { ref = "serviceAbstractions" } }
 services-email-inbound = { module = "com.lightningkite.services:email-inbound", version = { ref = "serviceAbstractions" } }
