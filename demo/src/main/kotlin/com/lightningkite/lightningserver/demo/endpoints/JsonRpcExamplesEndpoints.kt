@@ -4,6 +4,8 @@ import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
+import com.lightningkite.lightningserver.typed.jsonrpc.JsonRpcError
+import com.lightningkite.lightningserver.typed.jsonrpc.JsonRpcException
 import com.lightningkite.lightningserver.typed.jsonrpc.JsonRpcHandler
 import com.lightningkite.lightningserver.typed.jsonrpc.JsonRpcMethod
 import kotlinx.serialization.Serializable
@@ -105,7 +107,7 @@ object JsonRpcExamplesEndpoints : ServerBuilder() {
         description = "Divides a by b",
         auth = noAuth,
         implementation = { params ->
-            require(params.b != 0.0) { "Cannot divide by zero" }
+            if (params.b == 0.0) throw JsonRpcException(JsonRpcError.invalidParams("Cannot divide by zero"))
             params.a / params.b
         }
     )
