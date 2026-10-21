@@ -19,7 +19,6 @@ private val wsFrameType = TelemetryKey.OfString("ws.frame.type")
 private val wsFrameSize = TelemetryKey.OfLong("ws.frame.size")
 private val wsSubscriptionTopic = TelemetryKey.OfString("ws.subscription.topic")
 private val wsDisconnectCode = TelemetryKey.OfLong("ws.disconnect.code")
-private val wsDisconnectReason = TelemetryKey.OfString("ws.disconnect.reason")
 
 // Each phase runs either as a root, started by whatever drives the socket (an engine, the test runner, a
 // pub/sub collector), or as a child of the current execution (a handler driving a nested socket, such as a
@@ -291,5 +290,4 @@ private fun disconnectAttributes(connection: WebSocketConnection<*, *>, reason: 
     put(wsRoute, connection.request.path.route())
     put(TelemetryKeys.Net.peerIp, connection.request.sourceIp)
     put(wsDisconnectCode, reason.code.code.toLong())
-    put(wsDisconnectReason, reason.cause?.message ?: reason.message ?: reason.code.name)
 }

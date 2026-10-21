@@ -27,6 +27,19 @@ public data class WebSocketClose(
     /** Whether this close was caused by a thrown exception, as built by [exceptional]. */
     public val isExceptional: Boolean get() = cause != null
 
+    /**
+     * Returns the reason to send in the close frame: [message], or the [code]'s name when there is none,
+     * cut to the 123 bytes of UTF-8 that RFC 6455 allows.
+     */
+    public val truncatedMessage: String
+        get() {
+            val reason = message ?: code.name
+            val bytes = reason.encodeToByteArray()
+            if (bytes.size <= 123) return reason
+            // Claude: a cut through a multi-byte character decodes to a trailing replacement character.
+            return bytes.decodeToString(0, 123).trimEnd('\uFFFD')
+        }
+
     public companion object {
         public val NORMAL: WebSocketClose = WebSocketClose(Code.NORMAL, null, null)
         public val GOING_AWAY: WebSocketClose = WebSocketClose(Code.GOING_AWAY, null, null)
@@ -44,16 +57,9 @@ public data class WebSocketClose(
             if (exception is CancellationException && exception !is TimeoutCancellationException) GOING_AWAY
             else WebSocketClose(
                 code = exception.bestWebSocketCloseCode,
-                message = (exception as? HttpStatusException)?.message?.takeIf { it.isNotEmpty() }?.let(::fitCloseReason),
+                message = (exception as? HttpStatusException)?.message?.takeIf { it.isNotEmpty() },
                 cause = exception,
             )
-
-        // RFC 6455 caps a close frame's reason at 123 bytes of UTF-8.
-        private fun fitCloseReason(message: String): String {
-            val bytes = message.encodeToByteArray()
-            if (bytes.size <= 123) return message
-            return bytes.decodeToString(0, 123).trimEnd('\uFFFD')
-        }
     }
 }
 

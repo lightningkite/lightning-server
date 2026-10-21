@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.websockets
 
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.MultiplexMessage
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.send
@@ -11,6 +12,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.builtins.serializer
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 class MultiplexWebSocketHandlerTest {
@@ -82,6 +84,19 @@ class MultiplexWebSocketHandlerTest {
             mux.close()
 
             assertEquals(listOf("/records-disconnect"), TestServer.disconnected)
+        }
+    }
+
+    // The decoder's own message can echo the client's input, and a decode failure used to close the
+    // physical socket as a server fault.
+    @Test
+    fun malformed_frame_closes_as_a_policy_violation_with_a_fixed_message() = runBlocking {
+        TestServer.test(settings = {}) {
+            val mux = TestServer.multiplex.test()
+            val thrown = assertFailsWith<BadRequestException> { mux.send(WebSocketFrame.Text("{not json <script>")) }
+            val close = WebSocketClose.exceptional(thrown)
+            assertEquals(WebSocketClose.Code.VIOLATED_POLICY, close.code)
+            assertEquals("Invalid multiplex message", close.message)
         }
     }
 

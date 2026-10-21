@@ -155,6 +155,17 @@ class WebSocketCloseTest {
     fun `a long message is cut to 123 UTF-8 bytes on a character boundary`() {
         // Two bytes per character, so the 123-byte cut lands mid-character.
         val close = WebSocketClose.exceptional(HttpStatusException(HttpStatus.BadRequest, message = "é".repeat(100)))
-        assertEquals("é".repeat(61), close.message)
+        assertEquals("é".repeat(61), close.truncatedMessage)
+    }
+
+    @Test
+    fun `a close built directly is cut too`() {
+        val close = WebSocketClose(WebSocketClose.Code.VIOLATED_POLICY, "x".repeat(200))
+        assertEquals("x".repeat(123), close.truncatedMessage)
+    }
+
+    @Test
+    fun `a close without a message sends the code's name`() {
+        assertEquals("GOING_AWAY", WebSocketClose.GOING_AWAY.truncatedMessage)
     }
 }

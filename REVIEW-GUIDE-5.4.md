@@ -1,6 +1,8 @@
 # Review guide: `hn/auditing-and-engines` vs `version-5.4`
 
-Range: `origin/version-5.4...HEAD` at `9f39ebba1`. That is 65 commits and 402 files (+22.6k / −9k).
+Range: `origin/version-5.4...HEAD`, first written at `9f39ebba1` (65 commits, 402 files, +22.6k / −9k).
+Updated after the suggested fixes (`4529cddac`) and the interceptor rework that split interceptors into physical
+(HTTP, WebSocket) and logical (execution) chains. Line links in untouched sections may have drifted.
 - About a third of the diff is tests and docs.
 - `version-5.4` is a direct ancestor of this branch, so nothing in 5.4 is missing here.
 - Line numbers are at HEAD.
@@ -21,22 +23,22 @@ Before reading the code, read these two plans for the intent:
 
 The subagents that read each area found these. I checked the first one myself.
 
-| # | Issue | Where |
-|---|---|---|
-| 1 | **`BackupCodeSecret.createdAt` is required with no default.** Existing rows won't deserialize. Needs a default or a migration. | [BackupCodeEndpoints.kt:50](sessions/src/main/kotlin/com/lightningkite/lightningserver/sessions/proofs/BackupCodeEndpoints.kt#L50) |
-| 2 | **Multiplex physical disconnect.** Each virtual `close` *sends* over the dead socket. On AWS that is a `GoneException`, then `clean()`, then `WebSocketStateGoneException`. The exception escapes `forEach`, so the remaining channels never run `disconnect`. | [MultiplexWebSocketHandler.kt:341-356](core/src/main/kotlin/com/lightningkite/lightningserver/websockets/MultiplexWebSocketHandler.kt#L341) |
-| 3 | **`QueryParamWebSocketHandler` execution ids.** The inner Connect execution reuses `socketId`, so it duplicates its parent's execution id. That is a risk for `OriginRecord`. The physical socket is also closed twice, and the inner handler is not intercepted. | [QueryParamWebSocketHandler.kt:146](core/src/main/kotlin/com/lightningkite/lightningserver/websockets/QueryParamWebSocketHandler.kt#L146), [WebSocketExecution.kt:226-233](core/src/main/kotlin/com/lightningkite/lightningserver/runtime/WebSocketExecution.kt#L226) |
-| 4 | **`RawHttpEndpoint` / `RawWebSocketPath.tryResolve` race.** It memoizes in plain vars and sets `searched = true` before matching. A concurrent reader can get `null`, which surfaces as a spurious RouteNotFound. | [RawHttpEndpoint.kt](core/src/main/kotlin/com/lightningkite/lightningserver/pathing/RawHttpEndpoint.kt), [RawWebsocketPath.kt](core/src/main/kotlin/com/lightningkite/lightningserver/pathing/RawWebsocketPath.kt) |
-| 5 | **Close reason leaks onto the wire.** Engines now send `exception.message` as the WebSocket close reason. That can leak internal details, and nothing truncates it to the 123-byte RFC limit (Netty may reject a longer one). | [ktor/extensions.kt:113](engine-ktor/src/main/kotlin/com/lightningkite/lightningserver/engine/ktor/extensions.kt#L113), [NettyEngine.kt:314](engine-netty/src/main/kotlin/com/lightningkite/lightningserver/engine/netty/NettyEngine.kt#L314) |
-| 6 | **Ktor header log bug.** It logs `'$it'`, which is the null value, not the header name. | [ktor/extensions.kt:54-58](engine-ktor/src/main/kotlin/com/lightningkite/lightningserver/engine/ktor/extensions.kt#L54) |
-| 7 | **No version check on proxy request ids.** A trusted proxy request-id is wrapped with `UuidV7.fromRaw` without checking the version. A v4 id gives a garbage `timestamp()`. | [RequestIdentity.kt:52-58](core/src/main/kotlin/com/lightningkite/lightningserver/http/RequestIdentity.kt#L52) |
-| 8 | **`ExecutionInterceptor` errors escape.** An exception thrown there escapes `handleRoot` with no HTTP response, because the try/catch sits inside the chain. | [HttpExecution.kt:123-180](core/src/main/kotlin/com/lightningkite/lightningserver/runtime/HttpExecution.kt#L123) |
-| 9 | **Audit fails closed.** If the audit DB is down, every audited read or response fails. The mutation log writes *after* the change, so a retry can apply it twice. Decide whether that's acceptable. | §1.5 |
-| 10 | **Origin recording resolves auth on every request.** This includes public endpoints, which could also fire `SessionRejected` events there. | [OriginRecording.kt:238-244](audit/src/main/kotlin/com/lightningkite/lightningserver/audit/OriginRecording.kt#L238) |
-| 11 | **Stray text.** These comments have a stray `// Claude:` prefix: [AuthEvent.kt:208](sessions/src/main/kotlin/com/lightningkite/lightningserver/sessions/AuthEvent.kt#L208), [Authentication.kt:247](auth/src/main/kotlin/com/lightningkite/lightningserver/auth/Authentication.kt#L247), [JsonRpcHandler.kt:100](typed/src/main/kotlin/com/lightningkite/lightningserver/typed/jsonrpc/JsonRpcHandler.kt#L100). | |
-| 12 | **Stale docs.** <ul><li>The `ExecutionInterceptor` KDoc example uses an old signature ([:21-30](core/src/main/kotlin/com/lightningkite/lightningserver/runtime/ExecutionInterceptor.kt#L21)).</li><li>The `HttpExceptionHandler` KDoc still names `ExceptionHttpHandler`, and its `timeout` is never read ([:23-31](core/src/main/kotlin/com/lightningkite/lightningserver/http/HttpExceptionHandler.kt#L23)).</li><li>`Engine.dispatchTask` docs say `from` is nullable, but it isn't ([Engine.kt:122](core/src/main/kotlin/com/lightningkite/lightningserver/runtime/Engine.kt#L122)).</li><li>The plan's "Known gaps" entry about WebSocket tests is out of date.</li><li>`audit-implementation-risks.md` references a seal/hash chain that doesn't exist.</li></ul> | |
-| 13 | **`TimeInZone` primary constructor made private.** Unexplained, and it arrived inside the `@Queryable` commit. Confirm it is intended. | [notificationModels.kt:21](notifications-shared/src/commonMain/kotlin/com/lightningkite/lightningserver/notifications/notificationModels.kt#L21) |
-| 14 | **TOTP status code.** An unknown principal type still throws `IllegalArgumentException` (500). Password was fixed to 400. | [TimeBasedOTPProofEndpoints.kt:163](sessions-totp/src/main/kotlin/com/lightningkite/lightningserver/sessions/proofs/TimeBasedOTPProofEndpoints.kt#L163) |
+| # | Issue | Where | Status |
+|---|---|---|---|
+| 1 | **`BackupCodeSecret.createdAt` is required with no default.** Existing rows won't deserialize. Needs a default or a migration. | [BackupCodeEndpoints.kt:50](sessions/src/main/kotlin/com/lightningkite/lightningserver/sessions/proofs/BackupCodeEndpoints.kt#L50) | **Fixed.** Defaults to the epoch, so old rows decode. Nothing reads `createdAt` yet. |
+| 2 | **Multiplex physical disconnect.** Each virtual `close` *sends* over the dead socket. On AWS that is a `GoneException`, then `clean()`, then `WebSocketStateGoneException`. The exception escapes `forEach`, so the remaining channels never run `disconnect`. | [MultiplexWebSocketHandler.kt:341-356](core/src/main/kotlin/com/lightningkite/lightningserver/websockets/MultiplexWebSocketHandler.kt#L341) | **Fixed.** Virtual `close` is a no-op during physical teardown, and each channel disconnects in its own `try`. |
+| 3 | **`QueryParamWebSocketHandler` execution ids.** The inner Connect execution reuses `socketId`, so it duplicates its parent's execution id. That is a risk for `OriginRecord`. The physical socket is also closed twice, and the inner handler is not intercepted. | [QueryParamWebSocketHandler.kt:146](core/src/main/kotlin/com/lightningkite/lightningserver/websockets/QueryParamWebSocketHandler.kt#L146), [WebSocketExecution.kt:226-233](core/src/main/kotlin/com/lightningkite/lightningserver/runtime/WebSocketExecution.kt#L226) | **Fixed.** The inner socket is a `subConnection` with a fresh `socketId`, and closes once. It goes through the execution chain only, since the WebSocket chain already wrapped the shim. |
+| 4 | **`RawHttpEndpoint` / `RawWebSocketPath.tryResolve` race.** It memoizes in plain vars and sets `searched = true` before matching. A concurrent reader can get `null`, which surfaces as a spurious RouteNotFound. | [RawHttpEndpoint.kt](core/src/main/kotlin/com/lightningkite/lightningserver/pathing/RawHttpEndpoint.kt), [RawWebsocketPath.kt](core/src/main/kotlin/com/lightningkite/lightningserver/pathing/RawWebsocketPath.kt) | **Fixed.** `searched` is written last and is `@Volatile`. |
+| 5 | **Close reason leaks onto the wire.** Engines now send `exception.message` as the WebSocket close reason. That can leak internal details, and nothing truncates it to the 123-byte RFC limit (Netty may reject a longer one). | [ktor/extensions.kt:113](engine-ktor/src/main/kotlin/com/lightningkite/lightningserver/engine/ktor/extensions.kt#L113), [NettyEngine.kt:314](engine-netty/src/main/kotlin/com/lightningkite/lightningserver/engine/netty/NettyEngine.kt#L314) | **Fixed.** Only an `HttpStatusException` message reaches the client, and engines send `WebSocketClose.truncatedMessage` (123 bytes). |
+| 6 | **Ktor header log bug.** It logs `'$it'`, which is the null value, not the header name. | [ktor/extensions.kt:54-58](engine-ktor/src/main/kotlin/com/lightningkite/lightningserver/engine/ktor/extensions.kt#L54) | **Fixed.** |
+| 7 | **No version check on proxy request ids.** A trusted proxy request-id is wrapped with `UuidV7.fromRaw` without checking the version. A v4 id gives a garbage `timestamp()`. | [RequestIdentity.kt:52-58](core/src/main/kotlin/com/lightningkite/lightningserver/http/RequestIdentity.kt#L52) | **Fixed**, by `UuidV7.fromRaw` now checking the version. Behaviour change: a proxy stamping v4 ids (Envoy's default `X-Request-ID`) is no longer adopted, and every request logs a warning. |
+| 8 | **`ExecutionInterceptor` errors escape.** An exception thrown there escapes `handleRoot` with no HTTP response, because the try/catch sits inside the chain. | [HttpExecution.kt:123-180](core/src/main/kotlin/com/lightningkite/lightningserver/runtime/HttpExecution.kt#L123) | **Fixed.** A failing execution interceptor gives a logged 500. |
+| 9 | **Audit fails closed.** If the audit DB is down, every audited read or response fails. The mutation log writes *after* the change, so a retry can apply it twice. Decide whether that's acceptable. | §1.5 | Open: decide. |
+| 10 | **Origin recording resolves auth on every request.** This includes public endpoints, which could also fire `SessionRejected` events there. | [OriginRecording.kt:238-244](audit/src/main/kotlin/com/lightningkite/lightningserver/audit/OriginRecording.kt#L238) | Open. |
+| 11 | **Stray text.** These comments have a stray `// Claude:` prefix: [AuthEvent.kt:208](sessions/src/main/kotlin/com/lightningkite/lightningserver/sessions/AuthEvent.kt#L208), [Authentication.kt:247](auth/src/main/kotlin/com/lightningkite/lightningserver/auth/Authentication.kt#L247), [JsonRpcHandler.kt:100](typed/src/main/kotlin/com/lightningkite/lightningserver/typed/jsonrpc/JsonRpcHandler.kt#L100). | | **Intentional.** The project convention (`CLAUDE.md`) prefixes agent-written comments with `Claude: `. |
+| 12 | **Stale docs.** <ul><li>The `ExecutionInterceptor` KDoc example uses an old signature ([:21-30](core/src/main/kotlin/com/lightningkite/lightningserver/runtime/ExecutionInterceptor.kt#L21)).</li><li>The `HttpExceptionHandler` KDoc still names `ExceptionHttpHandler`, and its `timeout` is never read ([:23-31](core/src/main/kotlin/com/lightningkite/lightningserver/http/HttpExceptionHandler.kt#L23)).</li><li>`Engine.dispatchTask` docs say `from` is nullable, but it isn't ([Engine.kt:122](core/src/main/kotlin/com/lightningkite/lightningserver/runtime/Engine.kt#L122)).</li><li>The plan's "Known gaps" entry about WebSocket tests is out of date.</li><li>`audit-implementation-risks.md` references a seal/hash chain that doesn't exist.</li></ul> | | Partly fixed: the `ExecutionInterceptor` KDoc example is current. The rest is open. |
+| 13 | **`TimeInZone` primary constructor made private.** Unexplained, and it arrived inside the `@Queryable` commit. Confirm it is intended. | [notificationModels.kt:21](notifications-shared/src/commonMain/kotlin/com/lightningkite/lightningserver/notifications/notificationModels.kt#L21) | Open: confirm. |
+| 14 | **TOTP status code.** An unknown principal type still throws `IllegalArgumentException` (500). Password was fixed to 400. | [TimeBasedOTPProofEndpoints.kt:163](sessions-totp/src/main/kotlin/com/lightningkite/lightningserver/sessions/proofs/TimeBasedOTPProofEndpoints.kt#L163) | Open. |
 
 ---
 
@@ -73,15 +75,16 @@ This is the root of most of the diff.
   - Every root helper runs on `processEngine`, so it never nests inside the runtime in scope. Check this is true everywhere.
   - Connect uses `request.socketId` as its execution id, so that id must be fresh for every virtual sub-socket (see §0 #3).
 
-### 1.3 Interceptor model collapsed; `ExecutionInterceptor` added
+### 1.3 Interceptors: physical HTTP/WebSocket chains, logical execution chain
 - **Deleted:** `Http/WebSocket` × `Connection/Logical` interceptors.
 - **New:**
-  - One `HttpInterceptor` and one `WebSocketInterceptor` see every logical request, including `/meta/bulk` sub-requests and virtual sockets ([ServerDefinition.kt:41-45](core/src/main/kotlin/com/lightningkite/lightningserver/definition/ServerDefinition.kt#L41), [ServerBuilder.kt:116-136](core/src/main/kotlin/com/lightningkite/lightningserver/definition/builder/ServerBuilder.kt#L116)).
-  - Connection-level concerns check `execution.isRoot()`. CORS, Gzip and SecurityHeaders already do ([HttpInterceptor.kt:41-51](core/src/main/kotlin/com/lightningkite/lightningserver/http/HttpInterceptor.kt#L41)).
-  - New [`ExecutionInterceptor`](core/src/main/kotlin/com/lightningkite/lightningserver/runtime/ExecutionInterceptor.kt#L35) wraps every execution of every kind. It sits inside the telemetry span and outside the HTTP chain ([ServerRuntime.kt:83-86](core/src/main/kotlin/com/lightningkite/lightningserver/runtime/ServerRuntime.kt#L83)).
+  - **Physical:** `HttpInterceptor` and `WebSocketInterceptor` run only for requests and sockets the engine received ([HttpExecution.kt `handleRoot`](core/src/main/kotlin/com/lightningkite/lightningserver/runtime/HttpExecution.kt)). They see the raw request and response, but never `/meta/bulk` sub-requests, internal endpoint calls, multiplexed virtual sockets or the `QueryParamWebSocketHandler` inner socket. CORS, Gzip, SecurityHeaders and RateLimit live here, with no `isRoot()` guards.
+  - **Logical:** [`ExecutionInterceptor`](core/src/main/kotlin/com/lightningkite/lightningserver/runtime/ExecutionInterceptor.kt) wraps every execution of every kind, sub-requests and virtual sockets included. It receives an [`Invocation`](core/src/main/kotlin/com/lightningkite/lightningserver/runtime/Invocation.kt): the execution paired with its `HttpRequest` or `WebSocketConnectRequest` when it has one, held in memory only so serialized executions stay small. `AccessLogInterceptor` and `OriginRecording` live here.
+  - `Engine.execute` is still the single place the execution chain runs ([ServerRuntime.kt](core/src/main/kotlin/com/lightningkite/lightningserver/runtime/ServerRuntime.kt)). It sits inside the telemetry span and outside the physical chains.
 - **Review focus:**
-  - Downstream connection-level interceptors silently start running per sub-request unless they add `isRoot()`.
-  - Anything parented to `Execution.Direct` is not root. Typed test helpers run under `execute {}`, so CORS, gzip and security headers are skipped there.
+  - An exception thrown by an execution interceptor skips the physical chains: the client gets a logged 500 with no CORS or security headers. A rejection a browser must read belongs in an `HttpInterceptor`.
+  - Rate limiting is per physical request: a bulk call is charged once for its wall-clock duration.
+  - Execution interceptors can't see the response or close reason. `AccessLogInterceptor` logs `ok` (or a thrown `HttpStatusException`'s status) for internal calls, and its WebSocket close line no longer carries the reason.
   - `HttpInterceptor.intercept` is generic over `PATH` and is no longer a SAM interface, so lambda interceptors break.
 
 ### 1.4 WebSockets: connection is no longer a runtime, and sockets have a `socketId`
@@ -101,7 +104,7 @@ Opt-in. Nothing outside the modules depends on them, the demo doesn't use them, 
 | Piece | What it does |
 |---|---|
 | [AuditingBuilder](audit/src/main/kotlin/com/lightningkite/lightningserver/audit/AuditingBuilder.kt) | A `ServerBuilder` you `include`. It wires everything below, with lazy `Audit_*` tables. |
-| [OriginRecording](audit/src/main/kotlin/com/lightningkite/lightningserver/audit/OriginRecording.kt) | HTTP, WebSocket and Execution interceptor. It builds an `OriginRecord` per originating execution, keeps it in the execution context, and only writes it the first time an audit record references it. |
+| [OriginRecording](audit/src/main/kotlin/com/lightningkite/lightningserver/audit/OriginRecording.kt) | An `ExecutionInterceptor`, installed with `install(origins)`. It reads the request from the `Invocation`, builds an `OriginRecord` per originating execution, keeps it in the execution context, and only writes it the first time an audit record references it. |
 | [AuditRegistry](audit/src/main/kotlin/com/lightningkite/lightningserver/audit/AuditRegistry.kt) | Assigns a permanent `ModelTypeId` per model and a permanent bit per `@Audited` field (max 64, never reused). The assignment runs as a pre-deploy task. |
 | [AuditDisclosureLog](audit/src/main/kotlin/com/lightningkite/lightningserver/audit/AuditDisclosureLog.kt) | An `EncodingInterceptor` (§2.9). Every audited record that is encoded produces a disclosure row holding a field bitmask. |
 | [AuditMutationLog](audit/src/main/kotlin/com/lightningkite/lightningserver/audit/AuditMutationLog.kt) | Table wrapper. Writes the changed audited fields as `Partial` JSON. |
@@ -144,18 +147,17 @@ Opt-in. Nothing outside the modules depends on them, the demo doesn't use them, 
   - `install` is a very generic name to put on `ServerBuilder`.
   - The `CancellationException` handling at [:211](sessions/src/main/kotlin/com/lightningkite/lightningserver/sessions/AuthEvent.kt#L211).
 
-### 1.7 Internal typed calls and `.test()` now run the full pipeline
+### 1.7 Internal typed calls and `.test()` run as child executions
 - **Old:** `endpoint(input)` called `handle()` directly, with no interceptors, validation or metrics.
 - **New:**
-  - It runs as a child execution through `handleWithMetrics` and the full `HttpInterceptor` chain, with input validation ([ApiHttpHandler.ext.kt:38-67, 196](typed/src/main/kotlin/com/lightningkite/lightningserver/typed/ApiHttpHandler.ext.kt#L38)).
-  - The response body is lazy, so encoding observers (and disclosure auditing) don't fire on internal calls.
-  - If an interceptor short-circuits, its body is parsed back into the output.
-  - A non-2xx response becomes an `HttpStatusException`.
-- **Tests:** typed `.test()` ([testing.kt:107](typed/src/main/kotlin/com/lightningkite/lightningserver/typed/testing.kt#L107)) now checks the `AuthRequirement` by seeding `Authentication.CacheKey`. Downstream tests that passed a non-qualifying auth will now fail, which is correct.
+  - It runs as a child `Execution.Http` through the execution interceptors, with input validation and the endpoint's own auth requirement ([ApiHttpHandler.ext.kt `handleWithMetrics`](typed/src/main/kotlin/com/lightningkite/lightningserver/typed/ApiHttpHandler.ext.kt), [HttpExecution.kt `executeWithMetrics`](core/src/main/kotlin/com/lightningkite/lightningserver/runtime/HttpExecution.kt)).
+  - It does not run the HTTP interceptors, which are physical (§1.3).
+  - The output is returned as-is and the endpoint's exceptions are thrown as-is. Nothing is encoded, so encoding observers (and disclosure auditing) don't fire on internal calls.
+  - A handler timeout is thrown as a 503 `HttpStatusException`.
+- **Tests:** typed `.test()` ([testing.kt](typed/src/main/kotlin/com/lightningkite/lightningserver/typed/testing.kt)) runs the same way, and checks the `AuthRequirement` by seeding `Authentication.CacheKey`. Downstream tests that passed a non-qualifying auth will now fail, which is correct. Tests that relied on HTTP interceptors running under `.test()` must use `handleRoot`.
 - **Review focus:**
   - Validation now applies to internal callers.
-  - The cancellation vs timeout branch.
-  - The `Result` side channel.
+  - Execution interceptors see internal calls, so access logs and origin records gain a row per internal call.
 
 ---
 
@@ -215,10 +217,15 @@ Opt-in. Nothing outside the modules depends on them, the demo doesn't use them, 
     - Cancellation is no longer swallowed.
     - Binary frames are decoded instead of crashing on a cast.
     - A missing path is a 400.
-    - See §0 #2.
+    - A physical disconnect reaches every channel without sending over the dead socket (§0 #2).
+    - A frame that doesn't decode closes the socket with `VIOLATED_POLICY` and a fixed "Invalid multiplex message", instead of `INTERNAL_ERROR`.
+    - Virtual sockets go through the execution chain only (§1.3).
 19. **`WebSocketClose` is a data class** (`code`, `message`, `cause`) with `exceptional(e)` ([WebSocketClose.kt:8-72](core/src/main/kotlin/com/lightningkite/lightningserver/websockets/WebSocketClose.kt#L8)).
     - Cancellation maps to `GOING_AWAY`.
     - A timeout maps to `INTERNAL_ERROR`.
+    - Only an `HttpStatusException`'s message becomes the reason; the exception stays on `cause`.
+    - Engines send `truncatedMessage`: the message, or the code's name, cut to RFC 6455's 123 bytes. Netty used to send an empty reason when there was no message.
+    - Telemetry no longer records `ws.disconnect.reason`; `ws.disconnect.code` is the only close attribute, to keep cardinality bounded.
 20. **Raw paths have private constructors and `@Unsafe` factories.** An endpoint built from a `ResolvedPath` is pinned to its handler.
     - This fixes a mismatch: the old code built paths in the internal string format but matched against the external one ([RawHttpEndpoint.kt:14-114](core/src/main/kotlin/com/lightningkite/lightningserver/pathing/RawHttpEndpoint.kt#L14), [RawWebsocketPath.kt:34-143](core/src/main/kotlin/com/lightningkite/lightningserver/pathing/RawWebsocketPath.kt#L34)).
     - See §0 #4.
@@ -238,9 +245,10 @@ Opt-in. Nothing outside the modules depends on them, the demo doesn't use them, 
 23. **JSON-RPC** validates params and calls `notifyEncoding` ([JsonRpcHandler.kt:86-101](typed/src/main/kotlin/com/lightningkite/lightningserver/typed/jsonrpc/JsonRpcHandler.kt#L86)).
 
 ### Build
-24. **Dependency bump.** `serviceAbstractions` goes from `1.3.0-4-fa781902` to **`1.4.0-prerelease-13-10e4cfd6`** ([libs.versions.toml](gradle/libs.versions.toml)).
+24. **Dependency bump.** `serviceAbstractions` goes from `1.3.0-4-fa781902` to **`1.4.0-prerelease-43-787b8ae8`** ([libs.versions.toml](gradle/libs.versions.toml)).
     - It's a prerelease on a release branch.
     - It provides `@Queryable`.
+    - Since `prerelease-13`: `UuidV7.fromRaw` returns `null` for a non-v7 UUID (`fromRawUnchecked` doesn't check), `condition(Boolean)` takes no type argument, and `TelemetryBackend` gained `flush()`.
 
 ---
 
@@ -248,7 +256,7 @@ Opt-in. Nothing outside the modules depends on them, the demo doesn't use them, 
 
 - **`@Queryable`** replaces `@Serializable @GenerateDataClassPaths` on all models (last commit, `9f39ebba1`). Mechanical; it relies on `@Queryable` implying `@Serializable`.
 - **`context(ServerRuntime)` → `context(Engine)`** for setup-only APIs: settings, `Runtime`, `ResolvedPath`, `Authentication(...)`, `testAuth`, SDK generation, `DatabaseTableRegistration`, `UploadEarlyEndpoint`. `SDK.Runtime` now extends `EngineBase`.
-- **Interceptor ports** to the merged `HttpInterceptor`/`WebSocketInterceptor`: `AccessLogInterceptor` (id suffix now from `execution.logicalId`) and `RateLimitInterceptor`.
+- **Interceptor ports:** `AccessLogInterceptor` and `OriginRecording` are `ExecutionInterceptor`s (id suffix now from `execution.logicalId`). `RateLimitInterceptor`, CORS, Gzip and SecurityHeaders are physical `HttpInterceptor`/`WebSocketInterceptor`s.
 - **`ApiWebSocketHandler` builder lambdas** became `suspend context(ServerRuntime) Connection.() -> …`. `ConnectionWrapper` is now local. `ModelRestUpdatesWebsocket` closes with reason text.
 - **Small moves:** `ApiHttpHandler` factories moved verbatim to [ApiHttpHandler.builder.kt](typed/src/main/kotlin/com/lightningkite/lightningserver/typed/ApiHttpHandler.builder.kt). `CacheMutex` lost its stored server. `MetaEndpoints` bulk uses `serverRuntime.handle`.
 - **New utilities:** `concurrent/Flow.ext.kt`, `Iterable.ext.kt`, `MutableExtensions.SetOnceKey`/`copy()`, `HttpRequest.subRequest(headers)`.
@@ -267,7 +275,9 @@ Opt-in. Nothing outside the modules depends on them, the demo doesn't use them, 
 
 - `ServerRuntimeBase` → `EngineBase`. Engines implement `dispatchTask`; `Task.invoke` is now a context shortcut.
 - Code that held a `ServerRuntime` for setup should now take `Engine`. `TestRunner` is not a runtime, so wrap runtime work in `execute {}`.
-- `Http/WebSocket{Connection,Logical}Interceptor` → `HttpInterceptor`/`WebSocketInterceptor` plus `isRoot()`. Lambda `HttpInterceptor`s no longer compile.
+- `Http/WebSocket{Connection,Logical}Interceptor` → `HttpInterceptor`/`WebSocketInterceptor` for connection concerns, and `ExecutionInterceptor` (`intercept(invocation, cont)`) for anything that must also see sub-requests, internal calls or virtual sockets. Lambda `HttpInterceptor`s no longer compile.
+- `requestIdHeader` only adopts version 7 UUIDs.
+- Dashboards on `ws.disconnect.reason` must use `ws.disconnect.code`.
 - `ExceptionHttpHandler` → `HttpExceptionHandler`. `http.toLSError` → root package.
 - `Request.requestId`, `parentRequestId` and `generateRequestId()` are removed. `WebSocketConnectRequest` needs a `socketId`.
 - WebSocket handlers: phases take `context(ServerRuntime)` plus the connection, and the `*NoOp` helpers are gone.
@@ -277,4 +287,4 @@ Opt-in. Nothing outside the modules depends on them, the demo doesn't use them, 
 - `@Serializable @GenerateDataClassPaths` → `@Queryable`, which requires service-abstractions `1.4.0-prerelease`.
 - `BackupCodeSecret` schema changed (see §0 #1).
 - `TimeInZone` primary constructor is private.
-- Typed `.test()` now enforces auth, and internal typed calls are validated and intercepted.
+- Typed `.test()` now enforces auth, and internal typed calls are validated and run through the execution interceptors, but not the HTTP ones.

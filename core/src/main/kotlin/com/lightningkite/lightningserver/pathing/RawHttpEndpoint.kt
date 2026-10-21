@@ -19,6 +19,8 @@ public data class RawHttpEndpoint<PATH : PathSpec> private constructor(
     private var matchIfPresent: PathSpecMap.Match<HttpHandler<PATH>>? = null
 
     @Transient
+    // Claude: volatile, and written after matchIfPresent, so a thread that sees it set also sees the match.
+    @Volatile
     private var searched: Boolean = false
 
     context(server: Engine)

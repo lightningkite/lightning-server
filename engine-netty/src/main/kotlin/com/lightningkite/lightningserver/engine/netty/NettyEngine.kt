@@ -311,7 +311,7 @@ public class NettyEngine(
         }
     }
 
-    private fun WebSocketClose.adapt(): CloseWebSocketFrame = CloseWebSocketFrame(code.code.toInt(), message)
+    private fun WebSocketClose.adapt(): CloseWebSocketFrame = CloseWebSocketFrame(code.code.toInt(), truncatedMessage)
 
     /**
      * Raises a pub/sub socket's disconnect phase, at most once per channel.

@@ -206,12 +206,17 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
             connection.send(" ")
             return
         }
-        val message = when (frame) {
-            is WebSocketFrame.Binary ->
-                serverRuntime.externalSerialization.kotlinBytesFormat.decodeFromByteArray<MultiplexMessage>(frame.content)
+        val message = try {
+            when (frame) {
+                is WebSocketFrame.Binary ->
+                    serverRuntime.externalSerialization.kotlinBytesFormat.decodeFromByteArray<MultiplexMessage>(frame.content)
 
-            is WebSocketFrame.Text ->
-                serverRuntime.externalSerialization.json.decodeFromString<MultiplexMessage>(frame.content)
+                is WebSocketFrame.Text ->
+                    serverRuntime.externalSerialization.json.decodeFromString<MultiplexMessage>(frame.content)
+            }
+        } catch (e: SerializationException) {
+            // Claude: the decoder's own message can echo the client's input back; a fixed one cannot.
+            throw BadRequestException(message = "Invalid multiplex message", cause = e)
         }
         try {
             when {

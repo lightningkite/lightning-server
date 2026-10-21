@@ -110,7 +110,7 @@ internal fun ApplicationCall.adaptWebSocketConnectRequest(): WebSocketConnectReq
     )
 }
 
-internal fun WebSocketClose.adapt(): CloseReason = CloseReason(code = code.code, message = message ?: code.name)
+internal fun WebSocketClose.adapt(): CloseReason = CloseReason(code = code.code, message = truncatedMessage)
 
 // TODO: Implement MultiPart support - the code below is a partial implementation that needs completion
 

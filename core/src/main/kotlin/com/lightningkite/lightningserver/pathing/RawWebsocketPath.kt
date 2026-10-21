@@ -36,6 +36,8 @@ public class RawWebSocketPath<PATH : PathSpec> private constructor(
 ) : HasContextualPath<PATH> {
     private var matchIfPresent: PathSpecMap.Match<WebSocketHandler<PATH, *>>? = null
 
+    // Claude: volatile, and written after matchIfPresent, so a thread that sees it set also sees the match.
+    @Volatile
     private var searched: Boolean = false
 
     context(server: Engine)
