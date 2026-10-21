@@ -94,7 +94,7 @@ public class WebAuthNProofEndpoints(
         auth = proofMethodAuth or AuthRequirement.IsAdmin,
         signals = { table -> signals?.invoke(serverRuntime, table) ?: table },
         permissions = {
-            val admin = condition<WebAuthNCredential>(AuthRequirement.IsAdmin.accepts(authOrNull))
+            val admin = condition(AuthRequirement.IsAdmin.accepts(authOrNull))
             val mine = authOrNull?.let { a ->
                 condition<WebAuthNCredential> {
                     it.subjectId.eq(a.rawId) and it.subjectType.eq(a.principalName)

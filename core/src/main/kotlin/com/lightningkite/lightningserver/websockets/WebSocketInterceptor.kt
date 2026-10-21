@@ -6,17 +6,10 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.instrument
 
 /**
- * Wraps every logical socket: the one the client opened, and each virtual socket multiplexed inside
- * it. An implementation must therefore tolerate wrapping several handlers within one physical
- * connection.
+ * Wraps the handler of every socket a client opens, across all of its phases.
  *
- * A concern tied to the connection itself — the origin check, transport-level policy — narrows itself
- * with [com.lightningkite.lightningserver.runtime.isRoot], which answers the same for all five phases
- * of one socket:
- *
- * ```kotlin
- * if (!serverRuntime.execution.isRoot()) return wrapped.willConnect(request)
- * ```
+ * It does not wrap the virtual sockets multiplexed inside one. A concern that must cover those belongs
+ * in a [com.lightningkite.lightningserver.runtime.ExecutionInterceptor].
  */
 public interface WebSocketInterceptor {
     public val name: String get() = this::class.simpleName ?: "anonymous"

@@ -79,7 +79,7 @@ public class PasswordProofEndpoints(
                 }
             },
             permissions = {
-                val admin = condition<PasswordSecret>(AuthRequirement.IsAdmin.accepts(authOrNull))
+                val admin = condition(AuthRequirement.IsAdmin.accepts(authOrNull))
                 val mine = authOrNull?.let { a ->
                     condition<PasswordSecret> {
                         it.subjectId.eq(a.rawId) and it.subjectType.eq(a.principalName)

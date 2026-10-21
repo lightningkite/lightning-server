@@ -97,6 +97,7 @@ class BulkSpanTest {
         override fun gauge(owner: Namespaced, name: String, unit: MetricUnit, attributes: TelemetryAttributes, sample: () -> Long): AutoCloseable =
             AutoCloseable {}
         override fun reportError(throwable: Throwable, attributes: TelemetryAttributes) {}
+        override suspend fun flush() {}
     }
 
     object TestServer : ServerBuilder() {

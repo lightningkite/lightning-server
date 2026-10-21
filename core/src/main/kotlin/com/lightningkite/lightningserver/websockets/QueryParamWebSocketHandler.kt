@@ -147,8 +147,9 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
                 ?: listOf()))
             @Suppress("UNCHECKED_CAST")
             val routed = match as PathSpecMap.Match<WebSocketHandler<PathSpec, *>>
-            // A child socket, as with multiplexing, so its phases are traced and intercepted under its real
-            // route instead of under this shim's.
+            // A child socket, as with multiplexing, so its phases are traced and run through the execution
+            // interceptors under its real route instead of under this shim's. The WebSocket chain already
+            // wrapped this shim, so it does not wrap the child again.
             request.subConnection(
                 // SAFETY: match came from routing, which only pairs a handler with the spec it was registered under
                 path = @OptIn(Unsafe::class) RawWebSocketPath.fromMatch(routed),
@@ -157,7 +158,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
             )
         }
         @Suppress("UNCHECKED_CAST")
-        val otherHandler = serverRuntime.server.interceptIncomingSocket(match.value as WebSocketHandler<PathSpec, Any?>)
+        val otherHandler = match.value as WebSocketHandler<PathSpec, Any?>
         val startData = otherHandler.willConnectWithMetrics(request)
 
         @Suppress("UNCHECKED_CAST")
@@ -181,7 +182,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
         val otherHandler = innerRequest.path.tryResolve()?.value
             ?: throw NotFoundException("No web socket handler found for '${innerRequest.path}'")
         @Suppress("UNCHECKED_CAST")
-        return serverRuntime.server.interceptIncomingSocket(otherHandler as WebSocketHandler<PathSpec, Any?>)
+        return otherHandler as WebSocketHandler<PathSpec, Any?>
     }
 
     @OverrideOnly

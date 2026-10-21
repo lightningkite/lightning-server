@@ -74,19 +74,15 @@ public data class ServerDefinition(
     /** Everything that wants to hear about authentication events. Empty unless a module installs one. */
     public val compiledExecutionInterceptors: ExecutionInterceptor by lazy { executionInterceptors.compileAndInstrument() }
 
-    /** Interceptors wrapping every logical request, sub-requests included. See [HttpInterceptor]. */
+    /** Interceptors wrapping every request the engine receives, but not sub-requests. See [HttpInterceptor]. */
     public val httpInterceptors: List<HttpInterceptor> get() = flattened.httpInterceptors
     public val compiledHttpInterceptors: HttpInterceptor by lazy { httpInterceptors.compileAndInstrument() }
 
-    /** Interceptors wrapping every logical socket, virtual ones included. See [WebSocketInterceptor]. */
+    /** Interceptors wrapping every socket a client opens, but not virtual ones. See [WebSocketInterceptor]. */
     public val webSocketInterceptors: List<WebSocketInterceptor> get() = flattened.webSocketInterceptors
     public val compiledWebSocketInterceptors: WebSocketInterceptor by lazy { webSocketInterceptors.compileAndInstrument() }
 
-    /**
-     * Wraps a handler for a socket a client just opened. The same chain wraps a virtual socket
-     * multiplexed inside it; see [WebSocketInterceptor] for how an interceptor narrows itself to the
-     * physical connection.
-     */
+    /** Wraps a handler for a socket a client just opened. Engines call this; virtual sockets skip it. */
     public fun <PATH : PathSpec, T> interceptIncomingSocket(
         handler: WebSocketHandler<PATH, T>,
     ): WebSocketHandler<PATH, T> = compiledWebSocketInterceptors.intercept(handler)

@@ -24,6 +24,7 @@ import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.EngineApi
 import com.lightningkite.lightningserver.runtime.EngineBase
 import com.lightningkite.lightningserver.runtime.Execution
+import com.lightningkite.lightningserver.runtime.Invocation
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.execute
 import com.lightningkite.lightningserver.runtime.executeInlineWithMetrics
@@ -356,7 +357,7 @@ private class BulkProbeEngine : EngineBase(BulkTestServer.build()) {
 
     /** Runs [action] as this probe's own work, the way `TestRunner.execute` does. */
     suspend fun <T> direct(action: suspend context(ServerRuntime) () -> T): T =
-        execute("probe", Execution.Direct(newId())) { action(this) }
+        execute("probe", Invocation.Unrequested(Execution.Direct(newId()))) { action(this) }
 
     @Serializable
     private data class Queued(val location: String, val from: Execution, val input: String)

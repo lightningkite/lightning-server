@@ -17,7 +17,7 @@ import kotlin.uuid.Uuid
  */
 @OptIn(InternalLightningServerApi::class, com.lightningkite.services.data.Unsafe::class)
 class InitiatorTest {
-    private fun id(raw: String): Execution.ID = Execution.ID(UuidV7.fromRaw(Uuid.parse(raw)))
+    private fun id(raw: String): Execution.ID = Execution.ID(UuidV7.fromRawUnchecked(Uuid.parse(raw)))
 
     private val execution = id("00000000-0000-4000-8000-000000000001")
     private val root = id("00000000-0000-4000-8000-000000000002")

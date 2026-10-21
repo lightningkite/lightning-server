@@ -132,7 +132,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                     else -> spath.subjectId eq auth.id
                 }
 
-                val isRoot = condition<Session<SUBJECT, ID>>(AuthRequirement.IsSuperUser.accepts(auth))
+                val isRoot = condition(AuthRequirement.IsSuperUser.accepts(auth))
 
                 ModelPermissions(
                     create = isRoot,

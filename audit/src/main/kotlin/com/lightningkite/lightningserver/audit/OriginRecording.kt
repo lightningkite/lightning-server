@@ -1,25 +1,20 @@
 package com.lightningkite.lightningserver.audit
 
-import com.lightningkite.lightningserver.OverrideOnly
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.concurrent.forEachConcurrent
 import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.data.get
 import com.lightningkite.lightningserver.definition.Runtime
-import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.http.HttpInterceptor
-import com.lightningkite.lightningserver.http.HttpRequest
-import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.logger
-import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.route
 import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ExecutionInterceptor
+import com.lightningkite.lightningserver.runtime.Invocation
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.typed.registerTable
-import com.lightningkite.lightningserver.websockets.*
+import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.services.data.Unsafe
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.Table
@@ -48,7 +43,7 @@ import kotlin.uuid.Uuid
 public class OriginRecording<REQUEST_INFO>(
     public val table: Runtime<Table<OriginRecord<REQUEST_INFO>>>,
     public val info: RequestInfo<REQUEST_INFO>
-) : ExecutionInterceptor, WebSocketInterceptor, HttpInterceptor {
+) : ExecutionInterceptor {
     public data class RequestInfo<T>(
         val serializer: KSerializer<T>,
         val getInfo: suspend context(ServerRuntime) (Request<*>) -> T
@@ -228,72 +223,25 @@ public class OriginRecording<REQUEST_INFO>(
     }
 
     context(runtime: ServerRuntime)
-    override suspend fun <T> intercept(cont: suspend context(ServerRuntime) () -> T): T {
-        val execution = runtime.execution
-        // Claude: requested executions are captured by the HTTP and WebSocket hooks, which can see the request.
-        if (execution !is Execution.Requested && execution.id == execution.origin) runtime.queueOrigin(originOf(request = null))
-        return cont()
-    }
-
-    context(runtime: ServerRuntime)
-    override suspend fun <PATH : PathSpec> intercept(
-        request: HttpRequest<PATH>, cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse
-    ): HttpResponse {
-        runtime.queueOrigin(originOf(request))
-        return cont(request)
-    }
-
-    override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> =
-        object : DelegatingWebSocketHandler<PATH, T>(handler) {
-            @OverrideOnly
-            context(serverRuntime: ServerRuntime)
-            override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
-                request.cache[socketKey(request.socketId)] = SocketOrigin(originOf(request))
-                return serverRuntime.withSocketOrigin(request) {
-                    wrapped.willConnect(request)
-                }
+    override suspend fun <T> intercept(invocation: Invocation, cont: suspend context(ServerRuntime) () -> T): T =
+        when (invocation) {
+            is Invocation.Http -> {
+                runtime.queueOrigin(originOf(invocation.request))
+                cont()
             }
 
-            @OverrideOnly
-            context(serverRuntime: ServerRuntime)
-            override suspend fun didConnect(connection: WebSocketConnection<PATH, T>) {
-                return serverRuntime.withSocketOrigin(connection.request) {
-                    wrapped.didConnect(connection)
+            is Invocation.WebSocket -> {
+                val request = invocation.request
+                if (invocation.execution.phase == Execution.WebSocket.Phase.Connect) {
+                    request.cache[socketKey(request.socketId)] = SocketOrigin(originOf(request))
                 }
+                runtime.withSocketOrigin(request) { cont() }
             }
 
-            @OverrideOnly
-            context(serverRuntime: ServerRuntime)
-            override suspend fun messageFromClient(connection: WebSocketConnection<PATH, T>, frame: WebSocketFrame) {
-                return serverRuntime.withSocketOrigin(connection.request) {
-                    wrapped.messageFromClient(connection, frame)
-                }
-            }
-
-            @OverrideOnly
-            context(serverRuntime: ServerRuntime)
-            override suspend fun messageFromSubscription(
-                connection: WebSocketConnection<PATH, T>,
-                topic: WebSocketSubscriptionMessage<*, *>,
-            ) {
-                return serverRuntime.withSocketOrigin(connection.request) {
-                    wrapped.messageFromSubscription(connection, topic)
-                }
-            }
-
-            @OverrideOnly
-            context(serverRuntime: ServerRuntime)
-            override suspend fun disconnect(connection: WebSocketConnection<PATH, T>, reason: WebSocketClose) {
-                return serverRuntime.withSocketOrigin(connection.request) {
-                    wrapped.disconnect(connection, reason)
-                }
+            is Invocation.Unrequested -> {
+                val execution = invocation.execution
+                if (execution.id == execution.origin) runtime.queueOrigin(originOf(request = null))
+                cont()
             }
         }
-
-    context(builder: ServerBuilder)
-    public fun install() {
-        builder.install(this as HttpInterceptor)
-        builder.install(this as WebSocketInterceptor)
-        builder.install(this as ExecutionInterceptor)
-    }
 }

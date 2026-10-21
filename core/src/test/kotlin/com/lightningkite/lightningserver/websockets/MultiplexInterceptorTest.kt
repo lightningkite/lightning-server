@@ -4,10 +4,11 @@ import com.lightningkite.lightningserver.MultiplexMessage
 import com.lightningkite.lightningserver.OverrideOnly
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.cors.CorsInterceptor
+import com.lightningkite.lightningserver.runtime.Execution
+import com.lightningkite.lightningserver.runtime.ExecutionInterceptor
+import com.lightningkite.lightningserver.runtime.Invocation
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.engine
-import com.lightningkite.lightningserver.runtime.isRoot
 import com.lightningkite.lightningserver.runtime.test.test
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.builtins.serializer
@@ -17,10 +18,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * `MultiplexWebSocketHandler` used to dispatch each virtual socket to the raw handler resolved from
- * the route table, so every multiplexed socket bypassed the WebSocket interceptor chain — access
- * logging and rate limiting among them. It is the same defect `/meta/bulk` had on the HTTP side: many
- * logical connections executing while the pipeline saw one.
+ * A multiplexed connection is one physical socket carrying many virtual ones. The WebSocket chain
+ * decides about the physical socket only, while the execution chain sees every virtual socket too,
+ * with the request that opened it, so access logging and auditing still cover them.
  */
 class MultiplexInterceptorTest {
 
@@ -37,42 +37,34 @@ class MultiplexInterceptorTest {
         }
     }
 
-    /** Records every logical socket it is given a chance to see, virtual ones included. */
-    private object LogicalRecorder : WebSocketInterceptor {
+    /** Records the open and close of every socket, virtual ones included. */
+    private object LogicalRecorder : ExecutionInterceptor {
         override val name: String = "LogicalRecorder"
 
-        override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> =
-            object : DelegatingWebSocketHandler<PATH, T>(handler) {
-                @OverrideOnly
-                context(serverRuntime: ServerRuntime)
-                override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
-                    Observed.connects.add("/" + request.path.pathSegments.toString())
-                    return wrapped.willConnect(request)
-                }
-
-                @OverrideOnly
-                context(serverRuntime: ServerRuntime)
-                override suspend fun disconnect(connection: WebSocketConnection<PATH, T>, reason: WebSocketClose) {
-                    Observed.disconnects.add("/" + connection.request.path.pathSegments.toString())
-                    wrapped.disconnect(connection, reason)
+        context(runtime: ServerRuntime)
+        override suspend fun <T> intercept(invocation: Invocation, cont: suspend context(ServerRuntime) () -> T): T {
+            if (invocation is Invocation.WebSocket) {
+                val path = "/" + invocation.request.path.pathSegments.toString()
+                when (invocation.execution.phase) {
+                    Execution.WebSocket.Phase.Connect -> Observed.connects.add(path)
+                    Execution.WebSocket.Phase.Disconnect -> Observed.disconnects.add(path)
+                    else -> {}
                 }
             }
+            return cont()
+        }
     }
 
-    /**
-     * Narrows itself to the one real socket with [isRoot], the way [CorsInterceptor] does, and so must
-     * see nothing multiplexed inside it.
-     */
-    private object ConnectionRecorder : WebSocketInterceptor {
-        override val name: String = "ConnectionRecorder"
+    /** Records whatever the WebSocket chain hands it, which should only ever be the physical socket. */
+    private object PhysicalRecorder : WebSocketInterceptor {
+        override val name: String = "PhysicalRecorder"
 
         override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> =
             object : DelegatingWebSocketHandler<PATH, T>(handler) {
                 @OverrideOnly
                 context(serverRuntime: ServerRuntime)
                 override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
-                    if (serverRuntime.execution.isRoot())
-                        Observed.physicalConnects.add("/" + request.path.pathSegments.toString())
+                    Observed.physicalConnects.add("/" + request.path.pathSegments.toString())
                     return wrapped.willConnect(request)
                 }
 
@@ -82,8 +74,7 @@ class MultiplexInterceptorTest {
                     connection: WebSocketConnection<PATH, T>,
                     frame: WebSocketFrame,
                 ) {
-                    if (serverRuntime.execution.isRoot())
-                        Observed.physicalMessages.add("/" + connection.request.path.pathSegments.toString())
+                    Observed.physicalMessages.add("/" + connection.request.path.pathSegments.toString())
                     wrapped.messageFromClient(connection, frame)
                 }
             }
@@ -92,7 +83,7 @@ class MultiplexInterceptorTest {
     object TestServer : ServerBuilder() {
         init {
             install(LogicalRecorder)
-            install(ConnectionRecorder)
+            install(PhysicalRecorder)
         }
 
         val mirror = path.path("mirror") bind WebSocketHandler(
@@ -107,7 +98,7 @@ class MultiplexInterceptorTest {
     }
 
     @Test
-    fun `a virtual socket passes through the webSocket interceptor chain`() = runBlocking {
+    fun `a virtual socket passes through the execution interceptor chain`() = runBlocking {
         Observed.reset()
         TestServer.test(settings = {}) {
             runBlocking {
@@ -125,7 +116,7 @@ class MultiplexInterceptorTest {
 
                 assertTrue(
                     "/mirror" in Observed.connects,
-                    "the virtual socket bypassed the interceptor chain; saw ${Observed.connects}",
+                    "the virtual socket bypassed the execution interceptors; saw ${Observed.connects}",
                 )
             }
         }
@@ -159,19 +150,19 @@ class MultiplexInterceptorTest {
                 assertEquals(
                     listOf("/mirror"),
                     Observed.disconnects,
-                    "closing a virtual socket was not observed by the interceptor chain",
+                    "closing a virtual socket was not observed by the execution interceptors",
                 )
             }
         }
     }
 
     /**
-     * The counterpart invariant: an interceptor that guards on [isRoot] decides about the one real
-     * socket, so re-running it per virtual socket would repeat a decision already made — and for
-     * something like the origin check, repeat it against a request that never crossed the network.
+     * The counterpart invariant: the WebSocket chain decides about the one real socket, so re-running
+     * it per virtual socket would repeat a decision already made — and for something like the origin
+     * check, repeat it against a request that never crossed the network.
      */
     @Test
-    fun `an isRoot-guarded interceptor does not see virtual sockets`() = runBlocking {
+    fun `the webSocket interceptor chain does not see virtual sockets`() = runBlocking {
         Observed.reset()
         TestServer.test(settings = {}) {
             runBlocking {
@@ -190,23 +181,15 @@ class MultiplexInterceptorTest {
                 assertEquals(
                     listOf("/multiplex"),
                     Observed.physicalConnects,
-                    "an interceptor guarding on isRoot must see only the physical socket",
-                )
-                assertTrue(
-                    "/mirror" in Observed.connects,
-                    "an unguarded interceptor should still have seen the virtual socket; saw ${Observed.connects}",
+                    "the webSocket interceptor chain must see only the physical socket",
                 )
             }
         }
     }
 
-    /**
-     * A socket's five phases are five executions, each with its own id, linked by their `socketId`
-     * rather than by parentage. A phase nothing dispatched is a root like any other execution, so an
-     * interceptor guarding a later phase still runs on the real connection.
-     */
+    /** The WebSocket chain wraps every phase of the physical socket, not only its connect. */
     @Test
-    fun `a physical socket is still root after the connect phase`() = runBlocking {
+    fun `the webSocket interceptor chain sees later phases of the physical socket`() = runBlocking {
         Observed.reset()
         TestServer.test(settings = {}) {
             runBlocking {
@@ -219,15 +202,15 @@ class MultiplexInterceptorTest {
                 assertEquals(
                     listOf("/multiplex"),
                     Observed.physicalMessages,
-                    "a later phase of the physical socket was not seen as root",
+                    "a later phase of the physical socket skipped the webSocket interceptor chain",
                 )
             }
         }
     }
 
-    /** The other half of the same rule: a virtual socket's later phases are still not root. */
+    /** The other half of the same rule: a virtual socket's later phases skip the chain too. */
     @Test
-    fun `a virtual socket is not root in a later phase either`() = runBlocking {
+    fun `the webSocket interceptor chain does not see later phases of a virtual socket`() = runBlocking {
         Observed.reset()
         TestServer.test(settings = {}) {
             runBlocking {
@@ -253,7 +236,7 @@ class MultiplexInterceptorTest {
 
                 assertTrue(
                     "/mirror" !in Observed.physicalMessages,
-                    "a virtual socket's message phase was treated as root; saw ${Observed.physicalMessages}",
+                    "a virtual socket's message phase went through the webSocket interceptor chain; saw ${Observed.physicalMessages}",
                 )
             }
         }

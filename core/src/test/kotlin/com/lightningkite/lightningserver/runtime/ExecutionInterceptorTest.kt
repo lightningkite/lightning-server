@@ -45,6 +45,7 @@ class ExecutionInterceptorTest {
         val seen = ArrayList<Execution>()
         context(runtime: ServerRuntime)
         override suspend fun <T> intercept(
+            invocation: Invocation,
             cont: suspend context(ServerRuntime) () -> T,
         ): T {
             seen.add(runtime.execution)
@@ -56,6 +57,7 @@ class ExecutionInterceptorTest {
     private class Marker(override val name: String, val log: MutableList<String>) : ExecutionInterceptor {
         context(runtime: ServerRuntime)
         override suspend fun <T> intercept(
+            invocation: Invocation,
             cont: suspend context(ServerRuntime) () -> T,
         ): T {
             log.add("$name in")
@@ -172,7 +174,7 @@ class ExecutionInterceptorTest {
                 registerBasicMediaTypeCoders()
                 install(object : ExecutionInterceptor {
                     context(runtime: ServerRuntime)
-                    override suspend fun <T> intercept(cont: suspend context(ServerRuntime) () -> T): T {
+                    override suspend fun <T> intercept(invocation: Invocation, cont: suspend context(ServerRuntime) () -> T): T {
                         if (runtime.execution is Execution.Http) throw IllegalStateException("interceptor failed")
                         return cont()
                     }

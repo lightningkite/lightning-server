@@ -3,6 +3,7 @@
 package com.lightningkite.lightningserver.http
 
 import com.lightningkite.lightningserver.runtime.Execution
+import com.lightningkite.lightningserver.runtime.Invocation
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.definition.Task
@@ -12,6 +13,7 @@ import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.EngineBase
+import com.lightningkite.lightningserver.runtime.ExecutionInterceptor
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.engine
 import com.lightningkite.lightningserver.runtime.executeWithoutTelemetry
@@ -29,11 +31,11 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
-private val outerId = Execution.ID(UuidV7.fromRaw(Uuid.parse("00000000-0000-4000-8000-0000000000d4")))
+private val outerId = Execution.ID(UuidV7.fromRawUnchecked(Uuid.parse("00000000-0000-4000-8000-0000000000d4")))
 
-private fun outer() = Execution.Http(
-    id = outerId,
-    endpoint = RawHttpEndpoint(asString = "/outer", method = HttpMethod.POST),
+private fun outer() = Invocation.Http(
+    Execution.Http(id = outerId, endpoint = RawHttpEndpoint(asString = "/outer", method = HttpMethod.POST)),
+    subTestRequest("/outer"),
 )
 
 private fun subTestRequest(path: String): HttpRequest<PathSpec> = HttpRequest(
@@ -64,14 +66,14 @@ private val unrouted = HttpHandler<PathSpec> {
  */
 private object SubServer : ServerBuilder() {
     init {
-        install(object : HttpInterceptor {
+        install(object : ExecutionInterceptor {
             context(runtime: ServerRuntime)
-            override suspend fun <PATH : PathSpec> intercept(
-                request: HttpRequest<PATH>,
-                cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
-            ): HttpResponse {
+            override suspend fun <T> intercept(
+                invocation: Invocation,
+                cont: suspend context(ServerRuntime) () -> T,
+            ): T {
                 subIntercepted += runtime.execution.id
-                return cont(request)
+                return cont()
             }
         })
     }
@@ -362,7 +364,7 @@ class RequestIdentityTest {
     }
 
     @Test
-    fun `dispatching a handler directly gets its own execution and passes the interceptors`() {
+    fun `dispatching a handler directly gets its own execution and passes the execution interceptors`() {
         subRecorded.clear()
         subIntercepted.clear()
         SubServer.test(settings = {}) {
@@ -376,6 +378,6 @@ class RequestIdentityTest {
         val sub = subRecorded.single()
         assertNotEquals(outerId, sub.id)
         assertEquals(outerId, sub.parent)
-        assertEquals(listOf(sub.id), subIntercepted, "the interceptors must run inside the new execution")
+        assertEquals(listOf(outerId, sub.id), subIntercepted, "the interceptors must run inside the new execution")
     }
 }

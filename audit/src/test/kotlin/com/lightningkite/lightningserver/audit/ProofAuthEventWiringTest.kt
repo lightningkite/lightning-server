@@ -169,7 +169,7 @@ class ProofAuthEventWiringTest {
     // SAFETY: Fixed, valid v7 ids, so the records they key can be asserted on by value.
     @OptIn(InternalLightningServerApi::class, Unsafe::class)
     private fun testId(n: Int) =
-        Execution.ID(UuidV7.fromRaw(Uuid.parse("00000000-0000-7000-8000-" + n.toString().padStart(12, '0'))))
+        Execution.ID(UuidV7.fromRawUnchecked(Uuid.parse("00000000-0000-7000-8000-" + n.toString().padStart(12, '0'))))
 
     private fun post(
         path: String,

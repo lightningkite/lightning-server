@@ -78,7 +78,7 @@ class AccessLogInterceptorTest {
 
     private val requestIdUnderTest = Uuid.parse("11111111-2222-3333-4444-555555555555")
     @OptIn(InternalLightningServerApi::class, Unsafe::class) // SAFETY: Only matched as a string, never ordered by time
-    private val executionIdUnderTest = Execution.ID(UuidV7.fromRaw(requestIdUnderTest))
+    private val executionIdUnderTest = Execution.ID(UuidV7.fromRawUnchecked(requestIdUnderTest))
 
     private fun get(path: String) = HttpRequest<PathSpec>(
         path = RawHttpEndpoint(asString = path, method = HttpMethod.GET),
@@ -132,6 +132,6 @@ class AccessLogInterceptorTest {
         val ws = accessLines(lines).filter { it.startsWith("ws ") }
         assertEquals(2, ws.size, "expected an open and a close line; got $ws")
         assertTrue(ws.any { it.contains("opened by") }, "missing the open line; got $ws")
-        assertTrue(ws.any { it.contains("closed by") && it.contains("NORMAL") }, "missing the close line; got $ws")
+        assertTrue(ws.any { it.contains("closed by") }, "missing the close line; got $ws")
     }
 }

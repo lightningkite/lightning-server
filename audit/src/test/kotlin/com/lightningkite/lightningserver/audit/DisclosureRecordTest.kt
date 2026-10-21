@@ -12,7 +12,7 @@ class DisclosureRecordTest {
 
     @OptIn(Unsafe::class)
     private fun record(id: Uuid) = AuditDisclosureRecord(
-        _id = AuditDisclosureRecord.ID(UuidV7.fromRaw(id)),
+        _id = AuditDisclosureRecord.ID(UuidV7.fromRawUnchecked(id)),
         origin = OriginRecord.ID(ExecutionId(UuidV7.generate())),
         recordType = ModelTypeId(1),
         recordId = Uuid.random(),

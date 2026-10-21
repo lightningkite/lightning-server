@@ -29,6 +29,7 @@ import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.pathing.RawWebSocketPath
 import com.lightningkite.lightningserver.runtime.EngineBase
 import com.lightningkite.lightningserver.runtime.Execution
+import com.lightningkite.lightningserver.runtime.Invocation
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.didConnectAsRoot
 import com.lightningkite.lightningserver.runtime.disconnectAndCloseAsRoot
@@ -692,7 +693,7 @@ private class OriginProbeEngine : EngineBase(OriginTestServer.build()) {
     fun newId(): Execution.ID = Execution.ID.generate()
 
     suspend fun <T> direct(id: Execution.ID = newId(), action: suspend context(ServerRuntime) () -> T): T =
-        execute("probe", Execution.Direct(id)) { action(this) }
+        execute("probe", Invocation.Unrequested(Execution.Direct(id))) { action(this) }
 
     override suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(
         event: WebSocketSubscriptionMessage<PATH, T>,

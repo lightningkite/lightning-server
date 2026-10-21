@@ -554,11 +554,14 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                                 with(root) {
                                     root.execute(
                                         "debug",
-                                        Execution.WebSocket(
-                                            id = Execution.ID.generate(),
-                                            socketId = mid.socketId,
-                                            path = mid.request.path,
-                                            phase = Execution.WebSocket.Phase.ClientMessage,
+                                        Invocation.WebSocket(
+                                            Execution.WebSocket(
+                                                id = Execution.ID.generate(),
+                                                socketId = mid.socketId,
+                                                path = mid.request.path,
+                                                phase = Execution.WebSocket.Phase.ClientMessage,
+                                            ),
+                                            mid.request,
                                         ),
                                     ) {
                                         mid.send(WebSocketFrame("!!! DEBUG AWS INFO !!! - ${mid.currentState}"))

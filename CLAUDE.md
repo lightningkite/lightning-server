@@ -202,8 +202,11 @@ fun main() {
   `context(Engine)` for setup or reading shared state.
 - Raw entry points such as `HttpHandler.handle` and `WebSocketHandler.willConnect` are `@OverrideOnly`. Run them through
   the `WithMetrics` helpers (child executions) or, in engines, the `@EngineApi` root helpers, never directly.
-- Interceptor chains: `HttpInterceptor` (every request, including `/meta/bulk` sub-requests), `WebSocketInterceptor`, and
-  `ExecutionInterceptor` (every execution of every kind). Use `execution.isRoot()` for connection-level concerns.
+- Interceptor chains: `HttpInterceptor` and `WebSocketInterceptor` are physical: they run only for requests and
+  sockets the engine received, never for `/meta/bulk` sub-requests, internal endpoint calls, or virtual sockets.
+  `ExecutionInterceptor` is logical: it wraps every execution of every kind, and its `Invocation` carries the HTTP or
+  WebSocket request when there is one. It runs outside the physical chains, so a rejection that needs CORS headers
+  belongs in an `HttpInterceptor`.
 
 ### Endpoint Definition
 

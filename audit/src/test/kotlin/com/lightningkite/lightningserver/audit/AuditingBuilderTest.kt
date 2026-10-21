@@ -131,7 +131,7 @@ class AuditingBuilderTest {
 
     // SAFETY: A fixed, valid v7 id, so the records it keys can be asserted on by value.
     @OptIn(InternalLightningServerApi::class, Unsafe::class)
-    private val requestId = Execution.ID(UuidV7.fromRaw(Uuid.parse("00000000-0000-7000-8000-000000000101")))
+    private val requestId = Execution.ID(UuidV7.fromRawUnchecked(Uuid.parse("00000000-0000-7000-8000-000000000101")))
 
     @OptIn(EngineApi::class)
     @Test

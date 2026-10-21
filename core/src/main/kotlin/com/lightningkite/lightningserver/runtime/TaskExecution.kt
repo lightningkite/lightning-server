@@ -52,10 +52,10 @@ private enum class TaskKind(
 private suspend fun Engine.executeTaskLike(
     kind: TaskKind,
     location: PathSpec0,
-    execution: Execution,
+    execution: Execution.Unrequested,
     body: suspend context(ServerRuntime) () -> Unit,
 ) {
-    execute("${kind.label} $location", execution, TelemetryAttributes {
+    execute("${kind.label} $location", Invocation.Unrequested(execution), TelemetryAttributes {
         put(taskType, kind.telemetryType)
         put(taskRoute, location.toString())
     }) {

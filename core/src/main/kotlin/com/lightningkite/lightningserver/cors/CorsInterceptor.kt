@@ -6,7 +6,6 @@ import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.isRoot
 import com.lightningkite.lightningserver.websockets.*
 
 /**
@@ -58,10 +57,6 @@ internal fun originMatches(allowed: List<String>, origin: String): Boolean {
  * An empty list in [CorsSettings.limitToDomains] means NO origins are allowed.
  * Use `null` to allow all origins (mirroring behavior).
  *
- * ## Scope
- * CORS is a decision about the connection the browser opened, so this acts only on the root
- * execution: a `/meta/bulk` sub-request or a multiplexed virtual socket passes through untouched.
- *
  * @param config Runtime configuration for CORS behavior
  **/
 public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpInterceptor, WebSocketInterceptor {
@@ -76,9 +71,6 @@ public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpIn
         request: HttpRequest<PATH>,
         cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
     ): HttpResponse {
-        // Only the request the browser actually sent has an origin to police; see "Scope" above.
-        if (!runtime.execution.isRoot()) return cont(request)
-
         val config = config()
         // If no Origin header, request is not cross-origin - pass through without CORS headers
         val origin = request.headers[HttpHeader.Origin]?.root ?: return cont(request)
@@ -195,7 +187,6 @@ public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpIn
             @OverrideOnly
             context(serverRuntime: ServerRuntime)
             override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
-                if (!serverRuntime.execution.isRoot()) return handler.willConnect(request)
                 val origin = request.headers[HttpHeader.Origin]?.root ?: return handler.willConnect(request)
                 // WebSocket connections always enforce origin checking (ignore forbidOnMatchFail)
                 if (config().limitToDomains.takeUnless { it == allowAll }

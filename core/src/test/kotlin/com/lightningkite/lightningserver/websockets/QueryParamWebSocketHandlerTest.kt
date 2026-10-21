@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ExecutionInterceptor
+import com.lightningkite.lightningserver.runtime.Invocation
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.disconnectAndCloseAsRoot
 import com.lightningkite.lightningserver.data.set
@@ -147,7 +148,7 @@ class QueryParamWebSocketHandlerTest {
             init {
                 install(object : ExecutionInterceptor {
                     context(runtime: ServerRuntime)
-                    override suspend fun <T> intercept(cont: suspend context(ServerRuntime) () -> T): T {
+                    override suspend fun <T> intercept(invocation: Invocation, cont: suspend context(ServerRuntime) () -> T): T {
                         executions.add(runtime.execution)
                         return cont()
                     }

@@ -132,7 +132,7 @@ class EncodingInterceptorTest {
     }
 
     @OptIn(InternalLightningServerApi::class, Unsafe::class) // SAFETY: Only compared for identity, never ordered by time
-    private val outerRequestId = Execution.ID(UuidV7.fromRaw(Uuid.parse("00000000-0000-4000-8000-000000000001")))
+    private val outerRequestId = Execution.ID(UuidV7.fromRawUnchecked(Uuid.parse("00000000-0000-4000-8000-000000000001")))
 
     private fun request(path: String, method: HttpMethod = HttpMethod.GET, body: String? = null) =
         HttpRequest<PathSpec>(

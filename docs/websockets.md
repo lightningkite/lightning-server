@@ -145,9 +145,10 @@ on this to push live database changes to clients — see the [typed endpoints do
 
 ## Interceptors
 
-Install a `WebSocketInterceptor` to wrap every WebSocket handler, for example for origin checks (`CorsInterceptor`) or
-access logging (`AccessLogInterceptor` in the `auth` module). It also wraps virtual sockets inside a multiplexed
-connection.
+Install a `WebSocketInterceptor` to wrap the handler of every socket a client opens, for example for origin checks
+(`CorsInterceptor`) or rate limiting. It does not wrap virtual sockets inside a multiplexed connection. Each phase of
+those runs through the `ExecutionInterceptor` chain instead, which is where access logging (`AccessLogInterceptor` in
+the `auth` module) and auditing live.
 
 ## Local vs. AWS execution models
 

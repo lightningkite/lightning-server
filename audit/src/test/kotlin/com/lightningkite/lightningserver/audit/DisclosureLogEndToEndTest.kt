@@ -96,7 +96,7 @@ class DisclosureLogEndToEndTest {
     // SAFETY: Fixed, valid v7 ids.
     @OptIn(InternalLightningServerApi::class, Unsafe::class)
     private fun testId(n: Int) =
-        Execution.ID(UuidV7.fromRaw(Uuid.parse("00000000-0000-7000-8000-" + n.toString().padStart(12, '0'))))
+        Execution.ID(UuidV7.fromRawUnchecked(Uuid.parse("00000000-0000-7000-8000-" + n.toString().padStart(12, '0'))))
 
     private fun request(path: String, method: HttpMethod = HttpMethod.GET, body: String? = null, sourceIp: String = "10.0.0.1") =
         HttpRequest<PathSpec>(

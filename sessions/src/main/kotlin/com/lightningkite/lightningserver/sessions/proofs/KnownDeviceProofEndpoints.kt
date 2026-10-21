@@ -65,7 +65,7 @@ public class KnownDeviceProofEndpoints(
             }
         },
         permissions = {
-            val admin = condition<KnownDeviceSecret>(AuthRequirement.IsAdmin.accepts(authOrNull))
+            val admin = condition(AuthRequirement.IsAdmin.accepts(authOrNull))
             val mine = authOrNull?.let { a ->
                 condition<KnownDeviceSecret> {
                     it.subjectId.eq(a.rawId) and it.subjectType.eq(a.principalName)
