@@ -1,7 +1,5 @@
 package com.lightningkite.lightningserver.runtime
 
-import com.lightningkite.lightningserver.http.HttpRequest
-
 /**
  * Wraps one whole execution, whatever kind of execution it is.
  *
