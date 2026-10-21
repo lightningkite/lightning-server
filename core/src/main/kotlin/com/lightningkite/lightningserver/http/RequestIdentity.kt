@@ -49,12 +49,9 @@ public inline fun HttpHeaders.requestIdentity(
     val claimed = get(HttpHeader.XRequestId)?.root
     if (trustedRequestIdHeader == null) return RequestIdentity(Execution.ID.generate(), claimed)
 
-    @OptIn(Unsafe::class)
-    // SAFETY: Only a version 7 UUID is wrapped.
     val trusted = get(trustedRequestIdHeader)
         ?.root
         ?.let(Uuid::parseOrNull)
-        ?.takeIf { uuid -> uuid.toLongs { mostSignificantBits, _ -> (mostSignificantBits ushr 12) and 0xF } == 7L }
         ?.let(UuidV7::fromRaw)
         ?.let(Execution::ID)
 
