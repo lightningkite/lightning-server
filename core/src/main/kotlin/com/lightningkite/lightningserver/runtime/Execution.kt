@@ -85,9 +85,13 @@ public sealed interface Execution {
      */
     public val context: SerializableCache<Execution>
 
+    /** An execution started by a client's request: an [Http] request or a [WebSocket] phase. */
     public sealed interface Requested : Execution
 
-    public sealed interface ServerManaged : Execution {
+    /** An execution with no request of its own: a task, a server-managed run, or a [Direct] one. */
+    public sealed interface Unrequested : Execution
+
+    public sealed interface ServerManaged : Unrequested {
         override val rootExecution: ID get() = id
         override val parent: ID? get() = null
         override val origin: ID get() = id
@@ -183,7 +187,7 @@ public sealed interface Execution {
         override val origin: ID,
         val location: PathSegments,
         override val context: SerializableCache<Execution> = SerializableCache()
-    ) : Execution {
+    ) : Execution, Unrequested {
         @InternalLightningServerApi public constructor(
             id: ID,
             parent: Execution,
@@ -240,7 +244,7 @@ public sealed interface Execution {
         override val parent: ID? = null,
         override val rootExecution: ID = id,
         override val context: SerializableCache<Execution> = SerializableCache()
-    ) : Execution {
+    ) : Execution, Unrequested {
         override val origin: ID get() = id
     }
 }
@@ -265,8 +269,5 @@ public val Execution.logicalId: Execution.ID get() = when (this) {
  *
  * Equivalent to `rootExecution == id`, since a [parent] of `null` is exactly the case where nothing
  * caused this execution to inherit another's root. [parent] is the more direct read.
- *
- * Interceptors use this when their concern belongs to the connection rather than to the work, since
- * the interceptor chains run for every logical request and socket.
  */
 public fun Execution.isRoot(): Boolean = parent == null

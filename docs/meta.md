@@ -61,5 +61,6 @@ A convenient web socket tester.
 ## /meta/bulk
 
 Runs several typed endpoint calls in one request and returns their results keyed the same way. Each call is a
-sub-request: it runs through the server's interceptors as a child execution of the bulk request, and may carry its own
+sub-request: it runs through the server's execution interceptors, but not its HTTP interceptors, as a child execution
+of the bulk request, and may carry its own
 `Authorization`.

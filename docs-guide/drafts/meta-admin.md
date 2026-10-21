@@ -135,7 +135,8 @@ Send multiple API calls in a single HTTP request.  The body is a
 `Map<String, BulkRequest>` where each key is a caller-defined label and each
 value specifies a `path`, `method`, and optional JSON `body`.  The response is
 a `Map<String, BulkResponse>` with each call's result (or error) and duration.
-Auth, headers, and middleware run normally for each sub-request.
+Auth and headers apply normally to each sub-request, and execution interceptors run for each one. HTTP interceptors
+run once, for the outer request.
 
 This is useful for mobile clients that want to reduce round-trips at app
 startup, or for batch administrative operations.

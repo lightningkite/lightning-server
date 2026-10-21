@@ -529,9 +529,9 @@ object Server : ServerBuilder() {
 }
 ```
 
-Interceptors run for every request, including the sub-requests inside `/meta/bulk`. An interceptor whose concern
-belongs to the connection rather than to each request can check `runtime.execution.isRoot()`. To wrap every kind of
-work, including tasks and schedules, install an `ExecutionInterceptor` instead (see [Runtime](runtime.md)).
+Interceptors run once for each request the engine receives, not for the sub-requests inside `/meta/bulk` or internal
+endpoint calls. To wrap every execution, including those, tasks and schedules, install an `ExecutionInterceptor`
+instead (see [Runtime](runtime.md)).
 
 ### Interceptor Capabilities
 

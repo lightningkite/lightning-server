@@ -11,58 +11,29 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.executeWithMetrics
 import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.lightningserver.serialization.assertValidOrBadRequest
-import com.lightningkite.lightningserver.serialization.defaultEncoder
-import com.lightningkite.lightningserver.serialization.encoder
-import com.lightningkite.lightningserver.serialization.parse
-import com.lightningkite.lightningserver.serialization.toTypedData
 import com.lightningkite.lightningserver.serialization.validators
-import com.lightningkite.lightningserver.toLSError
-import com.lightningkite.services.data.Data
 import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.data.Unsafe
 import com.lightningkite.services.database.HasId
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
-import kotlinx.serialization.builtins.serializer
 
 private val logger = KotlinLogging.logger("com.lightningkite.lightningserver.typed.ApiHttpHandler")
 
 /**
- * Runs this endpoint for [request] as a new execution caused by the current one, through the server's
- * HTTP interceptors, using [input] as-is rather than parsing it from the request.
+ * Runs this endpoint for [request] as a new execution caused by the current one, using [input] as-is
+ * rather than parsing it from the request.
  *
- * Authentication is resolved from the request the interceptors pass on, as it is for a routed request.
+ * Like any sub-request, it runs through the server's execution interceptors but not its HTTP
+ * interceptors. Authentication is resolved from [request] against the endpoint's own requirements, and
+ * exceptions the endpoint throws are thrown here.
  */
 context(server: ServerRuntime)
 public suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PATH, USER, INPUT, OUTPUT>.handleWithMetrics(
     request: HttpRequest<PATH>,
     input: INPUT,
-): OUTPUT {
-    // The interceptor chain only speaks HttpResponse, so the typed result is carried out beside it.
-    var outcome: Result<OUTPUT>? = null
-
+): OUTPUT =
     @OptIn(InternalLightningServerApi::class)
-    val httpResponse = executeWithMetrics(request) { req ->
-        val result = runCatching { handleTypedInput(req.access(auth), input) }
-        outcome = result
-        internalCallResponse(req, result.getOrThrow())
-    }
-
-    outcome?.exceptionOrNull()?.let {
-        if (it is CancellationException) currentCoroutineContext().ensureActive()
-        else throw it
-    }
-    if (!httpResponse.status.success) throw HttpStatusException(httpResponse.toLSError())
-    outcome?.let { return it.getOrThrow() }
-
-    // An interceptor answered before the endpoint ran, so its response is the only output there is.
-    @Suppress("UNCHECKED_CAST")
-    if (outputType == Unit.serializer()) return Unit as OUTPUT
-    return httpResponse.body?.parse(outputType)
-        ?: throw IllegalStateException("An interceptor answered '${request.path}' without a body to read the output from.")
-}
+    executeWithMetrics(request) { req -> handleTypedInput(req.access(auth), input) }
 
 /**
  * Invokes a PathSpec0 endpoint (no path parameters) from server-side code.
@@ -76,7 +47,7 @@ public suspend operator fun <USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<Pat
     request: HttpRequest<*>,
     input: INPUT,
 ): OUTPUT = handleWithMetrics(
-    request.internalCallTo(RawHttpEndpoint(location.path, location.method)),
+    request.subRequest(RawHttpEndpoint(location.path, location.method)),
     input
 )
 
@@ -94,7 +65,7 @@ public suspend operator fun <A, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<
     first: A,
     input: INPUT,
 ): OUTPUT = handleWithMetrics(
-    request.internalCallTo(RawHttpEndpoint(location.path, first, location.method)),
+    request.subRequest(RawHttpEndpoint(location.path, first, location.method)),
     input
 )
 
@@ -114,7 +85,7 @@ public suspend operator fun <A, B, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandl
     second: B,
     input: INPUT,
 ): OUTPUT = handleWithMetrics(
-    request.internalCallTo(RawHttpEndpoint(location.path, first, second, location.method)),
+    request.subRequest(RawHttpEndpoint(location.path, first, second, location.method)),
     input
 )
 
@@ -136,14 +107,14 @@ public suspend operator fun <A, B, C, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHa
     third: C,
     input: INPUT,
 ): OUTPUT = handleWithMetrics(
-    request.internalCallTo(RawHttpEndpoint(location.path, first, second, third, location.method)),
+    request.subRequest(RawHttpEndpoint(location.path, first, second, third, location.method)),
     input
 )
 
 /**
  * Invokes an API endpoint internally from within another endpoint handler.
  *
- * Runs as its own execution through the server's HTTP interceptors, and is re-authenticated with the
+ * Runs as its own execution through the server's execution interceptors, and is re-authenticated with the
  * endpoint's own auth requirements.
  *
  * @param input The request input
@@ -165,7 +136,7 @@ public suspend operator fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> A
         "calling a PathSpecMany endpoint from another PathSpecMany endpoint requires that both paths have the same type of arguments. This cannot be checked by the type system."
     }
     return handleWithMetrics(
-        access.request.internalCallTo(
+        access.request.subRequest(
             RawHttpEndpoint(
                 @OptIn(Unsafe::class)
                 // SAFETY: The types enforce the same type of PathSpec, and the PathSpecMany edge case is checked above.
@@ -185,11 +156,6 @@ public suspend operator fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> A
 
 
 // INTERNAL IMPLEMENTATION STUFF
-
-// Drops the caller's Accept header so the called endpoint encodes its output in its own default format:
-// the caller may accept something this output can't be encoded as.
-private fun <PATH : PathSpec> HttpRequest<*>.internalCallTo(path: RawHttpEndpoint<PATH>): HttpRequest<PATH> =
-    subRequest(path, headers = headers.copy { remove(HttpHeader.Accept) })
 
 /** Everything a call to this endpoint does once [input] is parsed: validation and the handler itself. */
 context(server: ServerRuntime)
@@ -214,25 +180,6 @@ internal suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpH
     }
 
     return result
-}
-
-/**
- * Makes an HttpResponse with a lazily-encoded body. Most, if not all, interceptors don't read the body
- * of the response, so this is more efficient and also prevents [com.lightningkite.lightningserver.serialization.EncodingInterceptor]s
- * from being called for most internal calls.
- */
-context(server: ServerRuntime)
-private fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PATH, USER, INPUT, OUTPUT>.internalCallResponse(
-    request: HttpRequest<*>,
-    output: OUTPUT,
-): HttpResponse {
-    if (output == Unit) return response(null)
-    val (mediaType, encoder) = request.headers.accept.encoder ?: defaultEncoder
-    return response(
-        TypedData.suspendingSink(mediaType) { sink ->
-            encoder.encode(mediaType, outputType, output).data.writeSuspending(sink)
-        }
-    )
 }
 
 internal fun ApiHttpHandler<*, *, *, *>.response(body: TypedData?): HttpResponse = HttpResponse(

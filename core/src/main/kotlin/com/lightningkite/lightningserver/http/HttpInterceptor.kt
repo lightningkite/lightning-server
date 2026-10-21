@@ -39,16 +39,10 @@ import kotlinx.coroutines.CancellationException
  * ```
  *
  * ## Scope
- * An interceptor runs for every *logical* request, including each sub-request of a multiplexed
- * request such as `/meta/bulk`. That is the scope access logging, auditing and rate limiting need.
- *
- * A concern tied to the connection or the wire format — CORS, compression, security headers — should
- * run only once per physical request, and narrows itself with
- * [com.lightningkite.lightningserver.runtime.isRoot]:
- *
- * ```kotlin
- * if (!runtime.execution.isRoot()) return cont(request)
- * ```
+ * An interceptor runs once per request the engine received, so it sees the raw request and the response
+ * that goes back over the wire. It does not run for requests dispatched inside another execution, such
+ * as each part of a `/meta/bulk` call or an internal endpoint call. A concern that must cover those —
+ * access logging, auditing — belongs in a [ExecutionInterceptor][com.lightningkite.lightningserver.runtime.ExecutionInterceptor].
  */
 public interface HttpInterceptor {
     /**

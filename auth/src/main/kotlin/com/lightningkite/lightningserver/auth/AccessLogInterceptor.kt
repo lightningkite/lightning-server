@@ -1,25 +1,19 @@
 package com.lightningkite.lightningserver.auth
 
+import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.data.get
-import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.http.HttpInterceptor
 import com.lightningkite.lightningserver.logger
-import com.lightningkite.lightningserver.OverrideOnly
-import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.lightningserver.runtime.Execution
+import com.lightningkite.lightningserver.runtime.ExecutionInterceptor
+import com.lightningkite.lightningserver.runtime.Invocation
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.logicalId
-import com.lightningkite.lightningserver.websockets.DelegatingWebSocketHandler
-import com.lightningkite.lightningserver.websockets.WebSocketClose
-import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
-import com.lightningkite.lightningserver.websockets.WebSocketConnection
-import com.lightningkite.lightningserver.websockets.WebSocketHandler
-import com.lightningkite.lightningserver.websockets.WebSocketInterceptor
 import kotlinx.coroutines.CancellationException
 import kotlin.time.TimeSource
 
 /**
- * Writes one access-log line per logical request and per WebSocket connection, naming the resolved
+ * Writes one access-log line per HTTP request and per WebSocket open and close, naming the resolved
  * principal.
  *
  * Install it in your `ServerBuilder`:
@@ -31,78 +25,73 @@ import kotlin.time.TimeSource
  * ```
  * /widgets accessed by user@example.com (10.0.0.1) -> 200 in 12ms [req a1b2…]
  * ws /widgets/updates opened by user@example.com (10.0.0.1) [conn c3d4…]
- * ws /widgets/updates closed by user@example.com (10.0.0.1) -> VIOLATED_POLICY after 34s [conn c3d4…]
+ * ws /widgets/updates closed by user@example.com (10.0.0.1) [conn c3d4…]
  * ```
  * `<principal>` is the resolved [Authentication] — rendered including masquerade as "actor
  * masquerading as target" — or `anonymous` when the request carries no credentials.
  *
  * ## What gets a line
- * A multiplexed request such as `/meta/bulk` produces a line per sub-request rather than one line for
- * the batch, each carrying its own request ID and the ID of the request that carried it. WebSocket
- * connections are logged at open and close, including the virtual sockets inside a multiplexed
- * connection.
+ * Every HTTP execution gets a line: each part of a `/meta/bulk` call and each internal endpoint call
+ * gets its own, carrying its own request ID and the ID of the execution that dispatched it. The outcome
+ * is the response status, `ok` for an internal call that returned, or the status of the
+ * [HttpStatusException] it threw. WebSocket connections are logged at open and close, including the
+ * virtual sockets inside a multiplexed connection.
  *
  * ## Failures
- * HTTP lines are emitted after the handler returns, so they carry the outcome — including when the
- * handler threw, which is logged as `failed` rather than being silently dropped. Auth resolution is
- * cached per request, so naming the principal costs nothing when a handler resolves auth anyway, and
- * a resolution failure (e.g. a malformed token) is swallowed here so logging never breaks a request.
+ * HTTP lines are emitted after the request finishes, so a request that threw is logged as `failed`
+ * rather than silently dropped. Auth resolution is cached per request, so naming the principal costs
+ * nothing when a handler resolves auth anyway, and a resolution failure (e.g. a malformed token) is
+ * swallowed here so logging never breaks a request.
  */
-public class AccessLogInterceptor : HttpInterceptor, WebSocketInterceptor {
+public class AccessLogInterceptor : ExecutionInterceptor {
     override val name: String = "AccessLog"
 
     context(runtime: ServerRuntime)
-    override suspend fun <PATH : PathSpec> intercept(
-        request: HttpRequest<PATH>,
-        cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
-    ): HttpResponse {
-        if (!runtime.logger.isInfoEnabled()) return cont(request)
-        val started = TimeSource.Monotonic.markNow()
-        var outcome: String = "failed"
-        try {
-            return cont(request).also { outcome = it.status.code.toString() }
-        } finally {
-            // In a finally so a handler that threw still produces a line: an access log with silent
-            // gaps is worse than one that records the failure. Resolved outside the logging lambda,
-            // which is not suspending; by now auth is cached, so this costs nothing.
-            val principal = request.authString()
-            val elapsedMs = started.elapsedNow().inWholeMilliseconds
-            runtime.logger.info {
-                "${request.path} accessed by $principal (${request.sourceIp}) " +
-                    "-> $outcome in ${elapsedMs}ms ${idSuffix()}"
+    override suspend fun <T> intercept(invocation: Invocation, cont: suspend context(ServerRuntime) () -> T): T {
+        if (!runtime.logger.isInfoEnabled()) return cont()
+
+        return when (invocation) {
+            is Invocation.Http -> {
+                val request = invocation.request
+                val started = TimeSource.Monotonic.markNow()
+                var outcome = "failed"
+                try {
+                    // Claude: a routed request returns its response; an internal typed call returns its output.
+                    cont().also { outcome = (it as? HttpResponse)?.status?.code?.toString() ?: "ok" }
+                } catch (e: HttpStatusException) {
+                    outcome = e.status.code.toString()
+                    throw e
+                } finally {
+                    // In a finally so a request that threw still produces a line. Resolved outside the logging
+                    // lambda, which is not suspending; by now auth is cached, so this costs nothing.
+                    val principal = request.authString()
+                    val elapsedMs = started.elapsedNow().inWholeMilliseconds
+                    runtime.logger.info {
+                        "${request.path} accessed by $principal (${request.sourceIp}) " +
+                            "-> $outcome in ${elapsedMs}ms ${idSuffix()}"
+                    }
+                }
             }
+
+            is Invocation.WebSocket -> {
+                val request = invocation.request
+                val event = when (invocation.execution.phase) {
+                    Execution.WebSocket.Phase.Connect -> "opened"
+                    Execution.WebSocket.Phase.Disconnect -> "closed"
+                    else -> null
+                }
+                if (event != null) {
+                    val principal = request.authString()
+                    runtime.logger.info {
+                        "ws ${request.path} $event by $principal (${request.sourceIp}) ${idSuffix(idLabel = "conn")}"
+                    }
+                }
+                cont()
+            }
+
+            is Invocation.Unrequested -> cont()
         }
     }
-
-    override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> =
-        object : DelegatingWebSocketHandler<PATH, T>(handler) {
-            @OverrideOnly
-            context(serverRuntime: ServerRuntime)
-            override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
-                if (serverRuntime.logger.isInfoEnabled()) {
-                    val principal = request.authString()
-                    serverRuntime.logger.info {
-                        "ws ${request.path} opened by $principal (${request.sourceIp}) " +
-                            idSuffix(idLabel = "conn")
-                    }
-                }
-                return wrapped.willConnect(request)
-            }
-
-            @OverrideOnly
-            context(serverRuntime: ServerRuntime)
-            override suspend fun disconnect(connection: WebSocketConnection<PATH, T>, reason: WebSocketClose) {
-                if (serverRuntime.logger.isInfoEnabled()) {
-                    val request = connection.request
-                    val principal = request.authString()
-                    serverRuntime.logger.info {
-                        "ws ${request.path} closed by $principal (${request.sourceIp}) " +
-                            "-> $reason ${idSuffix(idLabel = "conn")}"
-                    }
-                }
-                wrapped.disconnect(connection, reason)
-            }
-        }
 }
 
 /**

@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.Execution
+import com.lightningkite.lightningserver.runtime.Invocation
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.EngineBase
 import com.lightningkite.lightningserver.runtime.execute
@@ -74,7 +75,7 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
     public suspend inline fun <T> execute(crossinline action: suspend context(ServerRuntime) () -> T): T =
         // A test has no server-side execution behind it, so it mints Execution.Direct; see its
         // documentation for why that hole exists.
-        execute("test", Execution.Direct(Execution.ID.generate())) { action(this) }
+        execute("test", Invocation.Unrequested(Execution.Direct(Execution.ID.generate()))) { action(this) }
 
     public companion object {
         internal val logger = KotlinLogging.logger("com.lightningkite.lightningserver.TestRunner")

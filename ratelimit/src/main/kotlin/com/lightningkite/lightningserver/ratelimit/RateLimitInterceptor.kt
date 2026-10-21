@@ -75,6 +75,9 @@ public data class RequestLimits(
  * is invoked). When [settings] resolves to `null`, or [requestLimits] returns `null` for a given
  * request, the interceptor passes the request through unmodified.
  *
+ * It sees only requests and sockets the engine received, so a `/meta/bulk` call or a multiplexed
+ * connection is charged once for its whole duration, not again for each part.
+ *
  * @property settings Runtime-resolved [RateLimitSettings]; if `null`, rate limiting is disabled.
  * @property cache Runtime-resolved [Cache] used to persist per-key reservation state.
  * @property requestLimits Function that computes the [RequestLimits] for a request, or returns

@@ -48,7 +48,7 @@ public abstract class AuditingBuilder<ORIGIN_REQUEST_INFO>(
     )
 
     init {
-        origins.install()
+        install(origins)
     }
 
     public val registry: AuditRegistry = path.path("registry") include AuditRegistry(

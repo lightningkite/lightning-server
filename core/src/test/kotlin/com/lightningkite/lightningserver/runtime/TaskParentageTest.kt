@@ -9,6 +9,9 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
+import com.lightningkite.lightningserver.http.HttpHeaders
+import com.lightningkite.lightningserver.http.HttpRequest
+import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
@@ -85,10 +88,11 @@ class TaskParentageTest {
 
         val requestId = with(engine) { Execution.ID.generate() }
         runBlocking {
+            val endpoint = RawHttpEndpoint(asString = "/thing", method = HttpMethod.GET)
             engine.executeWithoutTelemetry(
-                Execution.Http(
-                    id = requestId,
-                    endpoint = RawHttpEndpoint(asString = "/thing", method = HttpMethod.GET),
+                Invocation.Http(
+                    Execution.Http(id = requestId, endpoint = endpoint),
+                    HttpRequest(endpoint, QueryParameters.EMPTY, HttpHeaders.EMPTY, domain = "example.com", protocol = "https", sourceIp = "local"),
                 )
             ) {
                 TestServer.first(Unit)

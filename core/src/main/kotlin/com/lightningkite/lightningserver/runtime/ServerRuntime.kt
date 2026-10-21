@@ -74,27 +74,27 @@ public val serverRuntime: ServerRuntime get() = runner
 @InternalLightningServerApi
 public suspend inline fun <T> Engine.execute(
     opName: String,
-    scope: Execution,
+    invocation: Invocation,
     attributes: TelemetryAttributes = emptyTelemetryAttributes(),
     crossinline action: suspend ServerRuntime.(trace: TelemetryTrace) -> T
 ): T {
     @OptIn(Unsafe::class)
     // SAFETY: The created runtime is immediately used and wrapped in the execution interceptors
-    return with(ServerRuntime.create(this, scope)) {
+    return with(ServerRuntime.create(this, invocation.execution)) {
         telemetryTrace(opName, attributes) { trace ->
-            server.compiledExecutionInterceptors.intercept { serverRuntime.action(trace) }
+            server.compiledExecutionInterceptors.intercept(invocation) { serverRuntime.action(trace) }
         }
     }
 }
 
 @InternalLightningServerApi
 public suspend inline fun <T> Engine.executeWithoutTelemetry(
-    scope: Execution,
+    invocation: Invocation,
     crossinline action: suspend ServerRuntime.() -> T
 ): T {
     @OptIn(Unsafe::class)
     // SAFETY: The created runtime is immediately used and wrapped in the execution interceptors
-    return with(ServerRuntime.create(this, scope)) {
-        server.compiledExecutionInterceptors.intercept { serverRuntime.action() }
+    return with(ServerRuntime.create(this, invocation.execution)) {
+        server.compiledExecutionInterceptors.intercept(invocation) { serverRuntime.action() }
     }
 }

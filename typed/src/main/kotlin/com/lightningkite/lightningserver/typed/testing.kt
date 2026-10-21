@@ -99,10 +99,10 @@ import com.lightningkite.services.database.HasId
 //        with(it.server) { didConnect() }
 //    }
 //}
-// Runs the endpoint as a direct call from the test, through validation, its own auth requirement, the
-// HTTP interceptors and encoding interceptors. [presented] stands in for whatever the request's
-// credentials would have resolved to, so the requirement is checked against it as it would be for a
-// real request.
+// Runs the endpoint as a direct call from the test, through validation, its own auth requirement and
+// the execution interceptors. Like any internal call it skips the HTTP interceptors. [presented] stands
+// in for whatever the request's credentials would have resolved to, so the requirement is checked
+// against it as it would be for a real request.
 context(test: TestRunner<*>)
 private suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PATH, USER, INPUT, OUTPUT>.testWith(
     path: RawHttpEndpoint<PATH>,

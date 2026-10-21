@@ -23,9 +23,13 @@ per-execution `ServerRuntime`, and the `Execution` records that tie every piece 
   tick, a startup or pre-deploy task) and what caused it: its `parent`, its `rootExecution`, and its `origin`.
   Serializable, so parentage survives a task queue.
 
-- **[ExecutionInterceptor.kt](ExecutionInterceptor.kt)** - Wraps every execution the server runs, of every kind — HTTP,
-  each WebSocket phase, tasks, schedules, startup and pre-deploy — rather than one kind each, as the HTTP and WebSocket
-  interceptors do. Installed on a `ServerBuilder`; first installed is outermost.
+- **[ExecutionInterceptor.kt](ExecutionInterceptor.kt)** - Wraps every execution the server runs, of every kind — HTTP
+  (sub-requests and internal calls included), each WebSocket phase (virtual sockets included), tasks, schedules,
+  startup and pre-deploy. The chain for logical concerns, where the HTTP and WebSocket chains only see what the engine
+  received. Installed on a `ServerBuilder`; first installed is outermost.
+
+- **[Invocation.kt](Invocation.kt)** - What an `ExecutionInterceptor` is handed: the execution about to run, paired
+  with its HTTP or WebSocket request when it has one. Kept in memory only, so executions stay small when serialized.
 
 - **[Engine.ext.kt](Engine.ext.kt)** - Extension functions for convenient engine operations including
   setting access via `invoke()`, the clock, and location lookups for handlers and tasks.

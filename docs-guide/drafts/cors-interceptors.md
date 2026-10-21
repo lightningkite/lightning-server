@@ -207,9 +207,8 @@ object MaintenanceMode : HttpInterceptor {
 > The `name` property on `HttpInterceptor` defaults to `this::class.simpleName ?: "anonymous"`,
 > and appears in telemetry traces. Override it to tell instances of one class apart.
 
-Interceptors run for every request, including the sub-requests inside `/meta/bulk`. An interceptor whose concern
-belongs to the connection rather than to each request, such as rate limiting by client, can check
-`runtime.execution.isRoot()`.
+Interceptors run once for each request the engine receives, not for the sub-requests inside `/meta/bulk` or internal
+endpoint calls. A concern that must cover those, such as access logging, belongs in an `ExecutionInterceptor`.
 
 ## Interceptor Ordering
 

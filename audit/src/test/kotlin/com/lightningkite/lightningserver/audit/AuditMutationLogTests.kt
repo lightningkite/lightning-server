@@ -37,7 +37,7 @@ class MutationLogTest {
         val origins = OriginRecording(
             database.registerTable("OriginRecord", OriginRecord.serializer(OriginRecord.StandardRequestInfo.serializer())),
             OriginRecording.RequestInfo.Standard
-        ).also { it.install() }
+        ).also { install(it) }
         val registry = path.path("registry") include AuditRegistry(
             database.registerTable("AuditModelRegistration", AuditModelRegistration.serializer()),
             database.registerTable("AuditFieldRegistration", AuditFieldRegistration.serializer()),

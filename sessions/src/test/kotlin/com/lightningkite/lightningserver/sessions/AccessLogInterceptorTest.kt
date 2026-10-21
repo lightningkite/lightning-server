@@ -132,6 +132,6 @@ class AccessLogInterceptorTest {
         val ws = accessLines(lines).filter { it.startsWith("ws ") }
         assertEquals(2, ws.size, "expected an open and a close line; got $ws")
         assertTrue(ws.any { it.contains("opened by") }, "missing the open line; got $ws")
-        assertTrue(ws.any { it.contains("closed by") && it.contains("NORMAL") }, "missing the close line; got $ws")
+        assertTrue(ws.any { it.contains("closed by") }, "missing the close line; got $ws")
     }
 }

@@ -164,12 +164,17 @@ userTopic.send(
 
 Three interceptor chains can be installed on a `ServerBuilder`:
 
-- `HttpInterceptor` wraps each HTTP request, including sub-requests.
-- `WebSocketInterceptor` wraps WebSocket handlers.
-- `ExecutionInterceptor` wraps every execution of every kind, including tasks, schedules, startup and pre-deploy tasks.
+- `HttpInterceptor` wraps each HTTP request the engine receives, with the raw request and response.
+- `WebSocketInterceptor` wraps the handler of each socket a client opens.
+- `ExecutionInterceptor` wraps every execution of every kind: HTTP requests including `/meta/bulk` sub-requests and
+  internal endpoint calls, every WebSocket phase including virtual sockets, tasks, schedules, startup and pre-deploy
+  tasks. It receives an `Invocation`, which carries the execution's HTTP or WebSocket request when it has one.
 
-Each runs for nested executions as well as root ones. An interceptor whose concern belongs to the connection rather
-than to the work can check `runtime.execution.isRoot()`.
+The HTTP and WebSocket chains are for the physical connection: CORS, compression, security headers, rate limiting.
+Anything about the work itself — access logging, auditing — belongs in an `ExecutionInterceptor`.
+
+The execution chain wraps outside the other two. An exception it throws skips them, so the response gets no CORS or
+security headers; a rejection a browser must be able to read belongs in an `HttpInterceptor`.
 
 ## Compression
 

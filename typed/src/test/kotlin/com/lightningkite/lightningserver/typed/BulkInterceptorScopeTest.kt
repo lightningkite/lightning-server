@@ -3,6 +3,7 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.HttpMethod
+import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
@@ -10,10 +11,12 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.runtime.Execution
+import com.lightningkite.lightningserver.runtime.ExecutionInterceptor
+import com.lightningkite.lightningserver.runtime.Invocation
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.engine
 import com.lightningkite.lightningserver.runtime.handleRoot
-import com.lightningkite.lightningserver.runtime.isRoot
+import com.lightningkite.lightningserver.runtime.test.TestRunner
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.services.cache.Cache
@@ -30,11 +33,9 @@ import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
 /**
- * `/meta/bulk` used to invoke each sub-request's handler directly, so sub-requests bypassed the
- * entire interceptor chain — access logging, auditing and rate limiting among them. N logical
- * requests executed while the pipeline saw one. These tests pin the fixed behaviour: every
- * [HttpInterceptor] observes every sub-request, one that guards on [isRoot] still observes only the
- * physical request, and each sub-request is independently attributable via its own request ID.
+ * `/meta/bulk` runs each part as its own execution. The HTTP chain sees only the physical request,
+ * while the execution chain sees every part with its own request and its own id, parented to the
+ * bulk request, so access logging and auditing can attribute each part independently.
  */
 class BulkInterceptorScopeTest {
 
@@ -45,46 +46,39 @@ class BulkInterceptorScopeTest {
 
     private object Observed {
         val logical: MutableList<Seen> = Collections.synchronizedList(mutableListOf())
-        val connection: MutableList<Seen> = Collections.synchronizedList(mutableListOf())
+        val physical: MutableList<Seen> = Collections.synchronizedList(mutableListOf())
 
         fun reset() {
             logical.clear()
-            connection.clear()
+            physical.clear()
         }
     }
 
-    /** Records what it saw, then delegates. Shared by both interceptor kinds below. */
     context(runtime: ServerRuntime)
     private fun record(into: MutableList<Seen>, request: HttpRequest<*>) {
-        val initiator = runtime.execution
-        into.add(Seen("/" + request.path.pathSegments.toString(), initiator.id, initiator.parent))
+        val execution = runtime.execution
+        into.add(Seen("/" + request.path.pathSegments.toString(), execution.id, execution.parent))
     }
 
-    /** Takes the default scope: every logical request, sub-requests included. */
-    private inner class LogicalRecorder : HttpInterceptor {
+    private inner class LogicalRecorder : ExecutionInterceptor {
         override val name: String = "LogicalRecorder"
 
         context(runtime: ServerRuntime)
-        override suspend fun <PATH : PathSpec> intercept(
-            request: HttpRequest<PATH>,
-            cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
-        ): HttpResponse {
-            record(Observed.logical, request)
-            return cont(request)
+        override suspend fun <T> intercept(invocation: Invocation, cont: suspend context(ServerRuntime) () -> T): T {
+            if (invocation is Invocation.Http) record(Observed.logical, invocation.request)
+            return cont()
         }
     }
 
-    /** Narrows itself to the physical request the way CORS, gzip and security headers do. */
-    private inner class ConnectionRecorder : HttpInterceptor {
-        override val name: String = "ConnectionRecorder"
+    private inner class PhysicalRecorder : HttpInterceptor {
+        override val name: String = "PhysicalRecorder"
 
         context(runtime: ServerRuntime)
         override suspend fun <PATH : PathSpec> intercept(
             request: HttpRequest<PATH>,
             cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
         ): HttpResponse {
-            if (!runtime.execution.isRoot()) return cont(request)
-            record(Observed.connection, request)
+            record(Observed.physical, request)
             return cont(request)
         }
     }
@@ -93,7 +87,7 @@ class BulkInterceptorScopeTest {
         init {
             registerBasicMediaTypeCoders()
             install(BulkInterceptorScopeTest().LogicalRecorder())
-            install(BulkInterceptorScopeTest().ConnectionRecorder())
+            install(BulkInterceptorScopeTest().PhysicalRecorder())
         }
 
         val database = setting("database", Database.Settings())
@@ -117,6 +111,24 @@ class BulkInterceptorScopeTest {
             implementation = { _: Unit -> throw NotFoundException("nope") }
         )
 
+        val callsAlpha = path.path("calls-alpha").get bind ApiHttpHandler(
+            summary = "Calls alpha internally",
+            auth = noAuth,
+            implementation = { _: Unit -> alpha(request, Unit) }
+        )
+
+        val callsBoom = path.path("calls-boom").get bind ApiHttpHandler(
+            summary = "Calls boom internally",
+            auth = noAuth,
+            implementation = { _: Unit ->
+                try {
+                    boom(request, Unit)
+                } catch (e: HttpStatusException) {
+                    "caught ${e.status.code} ${e.detail}"
+                }
+            }
+        )
+
         val meta = path.path("meta") include MetaEndpoints(
             packageName = "com.lightningkite.lightningserver.typed",
             database = database,
@@ -126,25 +138,27 @@ class BulkInterceptorScopeTest {
 
     private fun bulk(body: String, block: () -> Unit = {}) = TestServer.test(settings = {}) {
         Observed.reset()
-        runBlocking {
-            engine.handleRoot(
-                HttpRequest<PathSpec>(
-                    path = RawHttpEndpoint(asString = "/meta/bulk", method = HttpMethod.POST),
-                    queryParameters = QueryParameters.EMPTY,
-                    headers = HttpHeaders.EMPTY,
-                    domain = "example.com",
-                    protocol = "https",
-                    sourceIp = "local",
-                    body = TypedData.text(body, MediaType.Application.Json),
-                ),
-                outerRequestId,
-            )
-        }
+        runBlocking { root("/meta/bulk", HttpMethod.POST, TypedData.text(body, MediaType.Application.Json)) }
         block()
     }
 
+    context(test: TestRunner<*>)
+    private suspend fun root(path: String, method: HttpMethod, body: TypedData? = null): HttpResponse =
+        engine.handleRoot(
+            HttpRequest<PathSpec>(
+                path = RawHttpEndpoint(asString = path, method = method),
+                queryParameters = QueryParameters.EMPTY,
+                headers = HttpHeaders.EMPTY,
+                domain = "example.com",
+                protocol = "https",
+                sourceIp = "local",
+                body = body,
+            ),
+            outerRequestId,
+        )
+
     @Test
-    fun `logical scope interceptor observes every sub-request`() = bulk(
+    fun `the execution interceptor chain observes every sub-request`() = bulk(
         """{"a":{"path":"/alpha","method":"GET"},"b":{"path":"/beta","method":"GET"}}"""
     ) {
         val paths = Observed.logical.map { it.path }
@@ -153,13 +167,13 @@ class BulkInterceptorScopeTest {
     }
 
     @Test
-    fun `an isRoot-guarded interceptor observes only the physical request`() = bulk(
+    fun `the http interceptor chain observes only the physical request`() = bulk(
         """{"a":{"path":"/alpha","method":"GET"},"b":{"path":"/beta","method":"GET"}}"""
     ) {
         assertEquals(
             listOf("/meta/bulk"),
-            Observed.connection.map { it.path },
-            "an interceptor that guards on isRoot must not re-run per sub-request",
+            Observed.physical.map { it.path },
+            "the http interceptor chain must not re-run per sub-request",
         )
     }
 
@@ -180,5 +194,22 @@ class BulkInterceptorScopeTest {
     ) {
         val paths = Observed.logical.map { it.path }
         assertTrue("/boom" in paths, "a sub-request that threw was not intercepted; saw $paths")
+    }
+
+    @Test
+    fun `an internal call returns the endpoint's output as its own execution`() = TestServer.test(settings = {}) {
+        Observed.reset()
+        val response = runBlocking { root("/calls-alpha", HttpMethod.GET) }
+        assertEquals("\"alpha\"", runBlocking { response.body!!.text() })
+
+        val inner = Observed.logical.single { it.path == "/alpha" }
+        assertEquals(outerRequestId, inner.parentRequestId)
+        assertEquals(listOf("/calls-alpha"), Observed.physical.map { it.path }, "an internal call ran the http chain")
+    }
+
+    @Test
+    fun `an internal call throws the endpoint's exception`() = TestServer.test(settings = {}) {
+        val response = runBlocking { root("/calls-boom", HttpMethod.GET) }
+        assertEquals("\"caught 404 \"", runBlocking { response.body!!.text() })
     }
 }

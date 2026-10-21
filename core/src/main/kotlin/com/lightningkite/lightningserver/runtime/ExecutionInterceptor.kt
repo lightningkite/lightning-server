@@ -1,17 +1,20 @@
 package com.lightningkite.lightningserver.runtime
 
+import com.lightningkite.lightningserver.http.HttpRequest
+
 /**
  * Wraps one whole execution, whatever kind of execution it is.
  *
- * The HTTP and WebSocket interceptors each see one kind of work; this one sees every kind — an HTTP
- * request, each WebSocket lifecycle phase, a task, a schedule tick, a startup task, a pre-deploy
- * task. That uniformity is the reason it exists: a concern that must hold for *everything the server
- * runs* — a tenant context, a unit of work, a top-level audit record — cannot be expressed by
- * installing the same logic into three chains that between them still miss tasks and schedules.
+ * This is the chain for logical concerns: it sees every execution the server runs — an HTTP request,
+ * each WebSocket lifecycle phase, a task, a schedule tick, a startup task, a pre-deploy task — including
+ * the `/meta/bulk` sub-requests, internal endpoint calls and multiplexed virtual sockets that the
+ * [com.lightningkite.lightningserver.http.HttpInterceptor] and
+ * [com.lightningkite.lightningserver.websockets.WebSocketInterceptor] chains never see. The [Invocation]
+ * names the kind of execution and carries its request, if it has one.
  *
  * It wraps outside the HTTP and WebSocket chains, which run inside the execution this one wraps, and
- * inside the execution's own telemetry span, so that whatever an interceptor does is recorded as part
- * of the execution it belongs to rather than as a detached trace of its own.
+ * inside the execution's own telemetry span. An exception thrown here therefore skips those chains,
+ * so a rejection that must still get CORS or security headers belongs in an `HttpInterceptor`.
  *
  * Install on a `ServerBuilder`; the first installed is the outermost, as with the other two chains.
  *
@@ -19,13 +22,14 @@ package com.lightningkite.lightningserver.runtime
  * object Server : ServerBuilder() {
  *     init {
  *         install(object : ExecutionInterceptor {
+ *             context(runtime: ServerRuntime)
  *             override suspend fun <T> intercept(
- *                 runtime: ServerRuntime,
+ *                 invocation: Invocation,
  *                 cont: suspend context(ServerRuntime) () -> T,
  *             ): T {
  *                 val start = TimeSource.Monotonic.markNow()
- *                 try { return with(runtime) { cont() } }
- *                 finally { println("${runtime.Execution} took ${start.elapsedNow()}") }
+ *                 try { return cont() }
+ *                 finally { println("${invocation.execution} took ${start.elapsedNow()}") }
  *             }
  *         })
  *     }
@@ -42,12 +46,12 @@ public interface ExecutionInterceptor {
     /**
      * Wraps [cont], which is the rest of the chain and then the execution itself.
      *
-     * @param runtime The runtime for the execution being wrapped, naming what initiated it.
-     * @param cont The continuation, invoked as `with(runtime) { cont() }`. Skipping it skips the
-     *   execution entirely, so an interceptor that means to let the work happen must call it.
+     * [invocation] holds the same execution as the runtime in context. Skipping [cont] skips the
+     * execution entirely, so an interceptor that means to let the work happen must call it.
      */
     context(runtime: ServerRuntime)
     public suspend fun <T> intercept(
+        invocation: Invocation,
         cont: suspend context(ServerRuntime) () -> T,
     ): T
 
@@ -60,6 +64,7 @@ public interface ExecutionInterceptor {
     public object NoOp : ExecutionInterceptor {
         context(runtime: ServerRuntime)
         override suspend fun <T> intercept(
+            invocation: Invocation,
             cont: suspend context(ServerRuntime) () -> T,
         ): T = cont()
     }
@@ -75,8 +80,9 @@ public interface ExecutionInterceptor {
  */
 context(runtime: ServerRuntime)
 private suspend fun <T> ExecutionInterceptor.interceptInstrumented(
+    invocation: Invocation,
     cont: suspend context(ServerRuntime) () -> T,
-): T = instrument(name) { intercept(cont) }
+): T = instrument(name) { intercept(invocation, cont) }
 
 /** One link of a compiled chain, wrapping [interceptor] in its own instrumentation span. */
 private fun instrumentedLink(interceptor: ExecutionInterceptor): ExecutionInterceptor =
@@ -85,8 +91,9 @@ private fun instrumentedLink(interceptor: ExecutionInterceptor): ExecutionInterc
 
         context(runtime: ServerRuntime)
         override suspend fun <T> intercept(
+            invocation: Invocation,
             cont: suspend context(ServerRuntime) () -> T,
-        ): T = interceptor.interceptInstrumented(cont)
+        ): T = interceptor.interceptInstrumented(invocation, cont)
     }
 
 /** Nests [inner] inside [outer], so [outer] runs first and can post-process what [inner] returns. */
@@ -96,8 +103,9 @@ private fun composeLinks(outer: ExecutionInterceptor, inner: ExecutionIntercepto
 
         context(runtime: ServerRuntime)
         override suspend fun <T> intercept(
+            invocation: Invocation,
             cont: suspend context(ServerRuntime) () -> T,
-        ): T = outer.intercept { inner.interceptInstrumented(cont) }
+        ): T = outer.intercept(invocation) { inner.interceptInstrumented(invocation, cont) }
     }
 
 /**

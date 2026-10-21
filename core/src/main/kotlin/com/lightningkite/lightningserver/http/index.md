@@ -105,8 +105,9 @@ object Server : ServerBuilder() {
 }
 ```
 
-Interceptors run for every request, including sub-requests dispatched inside `/meta/bulk`. A concern that belongs to
-the connection rather than to the work can check `runtime.execution.isRoot()`.
+Interceptors run once for each request the engine receives, and see the raw request and response. They do not run for
+requests dispatched inside another execution, such as each part of a `/meta/bulk` call or an internal endpoint call. A
+concern that must cover those belongs in an `ExecutionInterceptor`.
 
 ### Query Parameters
 

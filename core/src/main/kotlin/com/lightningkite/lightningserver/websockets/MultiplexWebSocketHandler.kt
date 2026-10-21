@@ -177,9 +177,8 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
 
     context(runtime: ServerRuntime)
     private fun MultiplexWebSocketHandlerConnectionInfo.getChannelHandler(): WebSocketHandler<PathSpec, Any?> {
-        val handler = request.path.resolve().value
         @Suppress("UNCHECKED_CAST")
-        return runtime.server.interceptIncomingSocket(handler as WebSocketHandler<PathSpec, Any?>)
+        return request.path.resolve().value as WebSocketHandler<PathSpec, Any?>
     }
 
     @OverrideOnly
@@ -220,7 +219,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                     @Suppress("UNCHECKED_CAST")
                     match as PathSpecMap.Match<WebSocketHandler<PathSpec, Any?>>
 
-                    val channelHandler = serverRuntime.server.interceptIncomingSocket(match.value)
+                    val channelHandler = match.value
 
                     val request = connection.request.subConnection(
                         // SAFETY: match came from routing, which only pairs a handler with the spec it was registered under
@@ -328,8 +327,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                 val match = info.request.path.resolve()
 
                 @Suppress("UNCHECKED_CAST")
-                val otherHandler = serverRuntime.server.compiledWebSocketInterceptors
-                    .intercept(match.value as WebSocketHandler<PathSpec, Any?>)
+                val otherHandler = match.value as WebSocketHandler<PathSpec, Any?>
                 connection.withVirtualConnection(otherHandler, channel) {
                     otherHandler.messageFromSubscriptionWithMetrics(it, topic)
                 }
@@ -347,8 +345,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
             val match = info.request.path.resolve()
 
             @Suppress("UNCHECKED_CAST")
-            val otherHandler = serverRuntime.server.compiledWebSocketInterceptors
-                .intercept(match.value as WebSocketHandler<PathSpec, Any?>)
+            val otherHandler = match.value as WebSocketHandler<PathSpec, Any?>
             connection.withVirtualConnection(otherHandler, channel) {
                 otherHandler.disconnectAndClose(it, reason)
             }

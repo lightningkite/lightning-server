@@ -223,25 +223,30 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
 
 // INTERNAL IMPLEMENTATION STUFF
 
-private fun WebSocketConnectRequest<*>.connectPhase(parent: Execution?): Execution.WebSocket =
+private fun WebSocketConnectRequest<*>.connectPhase(parent: Execution?): Invocation.WebSocket = Invocation.WebSocket(
     Execution.WebSocket(
         id = socketId,
         parent = parent,
         socketId = socketId,
         path = path,
         phase = Execution.WebSocket.Phase.Connect,
-    )
+    ),
+    this,
+)
 
 context(engine: Engine)
 private fun WebSocketConnection<*, *>.phase(
     phase: Execution.WebSocket.Phase,
     parent: Execution?,
-): Execution.WebSocket = Execution.WebSocket(
-    id = Execution.ID.generate(),
-    parent = parent,
-    socketId = socketId,
-    path = request.path,
-    phase = phase,
+): Invocation.WebSocket = Invocation.WebSocket(
+    Execution.WebSocket(
+        id = Execution.ID.generate(),
+        parent = parent,
+        socketId = socketId,
+        path = request.path,
+        phase = phase,
+    ),
+    request,
 )
 
 context(engine: Engine)

@@ -20,6 +20,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.RawWebSocketPath
 import com.lightningkite.lightningserver.runtime.EngineBase
 import com.lightningkite.lightningserver.runtime.Execution
+import com.lightningkite.lightningserver.runtime.Invocation
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.didConnectAsRoot
 import com.lightningkite.lightningserver.runtime.executeInlineWithMetrics
@@ -433,7 +434,7 @@ private class ProbeEngine : EngineBase(TestServer.build()) {
 
     /** Runs [action] as this probe's own work, the way `TestRunner.execute` does. */
     suspend fun <T> direct(action: suspend context(ServerRuntime) () -> T): T =
-        execute("probe", Execution.Direct(newId())) { action(this) }
+        execute("probe", Invocation.Unrequested(Execution.Direct(newId()))) { action(this) }
 
     override suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(
         event: WebSocketSubscriptionMessage<PATH, T>,
