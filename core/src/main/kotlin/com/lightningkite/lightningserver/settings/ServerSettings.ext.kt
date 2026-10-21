@@ -112,8 +112,9 @@ public fun ServerSettings.loadFromFile(
 ) {
     val format: StringFormat = settingsFormat(file.extension, module)
 
+    // absoluteFile so a bare filename (e.g. "settings.json") still has a parent to resolve defaults against
     val serializer =
-        SettingsSerializer((settings - overrides.keys).sortedBy { it.name }, module, file.toJavaFile().parentFile)
+        SettingsSerializer((settings - overrides.keys).sortedBy { it.name }, module, file.toJavaFile().absoluteFile.parentFile)
 
     if (!file.exists()) {
         file.writeString(format.encodeToString(serializer, settings.associateWith { it.default }))
