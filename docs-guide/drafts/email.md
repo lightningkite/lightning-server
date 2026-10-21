@@ -284,22 +284,45 @@ The `password` field in `FinishProof` is the PIN the user received by email.  Th
 | `expiration` | `15 minutes` | How long a PIN remains valid |
 | `maxAttempts` | `5` | Incorrect guesses before the PIN is invalidated |
 
-### Optional: email address allow-listing
+### Optional: screening email addresses
 
-Pass a `verifyEmail` lambda to reject certain addresses before sending:
+Pass a `screenEmail` lambda to decide what happens for each address before a PIN is sent. It
+receives the normalized `EmailAddress` and returns a `PinBasedProofEndpoints.ScreeningResult`:
+
+| Result | Response to the client | Email sent |
+|---|---|---|
+| `ScreeningResult.Allow` (default) | `200` with the lookup key | Yes |
+| `ScreeningResult.Suppress` | `200` with a lookup key, as if successful | No |
+| `ScreeningResult.Reject(message, detail = "target-rejected")` | `400` with your `message` and `detail` | No |
 
 ```kotlin
 // Illustrative.
+import com.lightningkite.lightningserver.sessions.proofs.PinBasedProofEndpoints.ScreeningResult
+
 EmailProofEndpoints(
     pin = pins,
     email = email,
     emailTemplate = { to, pin -> /* ... */ },
-    verifyEmail = { address ->
-        // return false to silently drop the send (no error exposed to caller)
-        !address.endsWith("@disposable-provider.example")
+    screenEmail = { address ->
+        when {
+            // Shown to the user, e.g. as a form error.
+            address.raw.endsWith("@disposable-provider.example") ->
+                ScreeningResult.Reject("Please use a permanent email address")
+            // Unknown accounts get a normal-looking response, so callers can't probe for accounts.
+            userTable().findOne(condition { it.email eq address }) == null -> ScreeningResult.Suppress
+            else -> ScreeningResult.Allow
+        }
     }
 )
 ```
+
+Choose `Suppress` whenever an error would reveal whether an account exists; `Reject` is for
+rules the user can act on, such as requiring a work address. Rejections count toward the `start`
+endpoint's attempt rate limit, and the `target-rejected` error is listed in the generated API
+docs and SDKs. Invalid email addresses are rejected with a `400` before `screenEmail` is called.
+
+> The former `verifyEmail: (String) -> Boolean` parameter is deprecated. It still compiles, with
+> `true` mapping to `Allow` and `false` to `Suppress`.
 
 ### Advanced: embedding a proof in a magic link
 

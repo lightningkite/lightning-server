@@ -1,6 +1,7 @@
 // by Claude
 package com.lightningkite.lightningserver.sessions.proofs
 
+import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.register
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
@@ -9,6 +10,7 @@ import com.lightningkite.lightningserver.encryption.SecretBasis
 import com.lightningkite.lightningserver.encryption.signer
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.lightningserver.sessions.proofs.PinBasedProofEndpoints.ScreeningResult
 import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.database.HasId
@@ -307,6 +309,124 @@ class SmsProofEndpointsTest {
 
                 val msg = smsService.messageHistory[0]
                 assertEquals("+15551234567", msg.to.raw)
+            }
+        }
+    }
+
+    @Test
+    fun `suppressed phone returns key without sending`() = runBlocking {
+        object : ServerBuilder() {
+            val cache = setting("cache", Cache.Settings("ram"))
+            val sms = setting("sms", SMS.Settings("test"))
+
+            init {
+                register(TestUser)
+            }
+
+            val smsProof = path.path("auth").path("sms") include SmsProofEndpoints(
+                pin = PinHandler(
+                    cache = cache,
+                    keyPrefix = "sms-test-suppress",
+                    expiration = 15.minutes,
+                    maxAttempts = 5
+                ),
+                sms = sms,
+                smsTemplate = { pin -> "Your code is: $pin" },
+                proofSigner = RuntimeDeferred.Cached { testBasis.signer("proof") },
+                proofExpiration = 1.hours,
+                screenPhone = { phone ->
+                    if (phone.raw == "+15551234567") ScreeningResult.Allow else ScreeningResult.Suppress
+                }
+            )
+        }.let { server ->
+            server.test({}) {
+                val smsService = server.sms() as TestSMS
+                smsService.reset()
+
+                assertNotNull(server.smsProof.start.test(null, "+15559876543"))
+                assertEquals(0, smsService.messageHistory.size, "Suppressed number should not receive an SMS")
+
+                server.smsProof.start.test(null, "+15551234567")
+                assertEquals(1, smsService.messageHistory.size, "Allowed number should receive an SMS")
+            }
+        }
+    }
+
+    @Test
+    fun `rejected phone returns error with custom message`() = runBlocking {
+        object : ServerBuilder() {
+            val cache = setting("cache", Cache.Settings("ram"))
+            val sms = setting("sms", SMS.Settings("test"))
+
+            init {
+                register(TestUser)
+            }
+
+            val smsProof = path.path("auth").path("sms") include SmsProofEndpoints(
+                pin = PinHandler(
+                    cache = cache,
+                    keyPrefix = "sms-test-reject",
+                    expiration = 15.minutes,
+                    maxAttempts = 5
+                ),
+                sms = sms,
+                smsTemplate = { pin -> "Your code is: $pin" },
+                proofSigner = RuntimeDeferred.Cached { testBasis.signer("proof") },
+                proofExpiration = 1.hours,
+                screenPhone = { phone ->
+                    if (phone.raw.startsWith("+1")) ScreeningResult.Allow
+                    else ScreeningResult.Reject("Only US numbers are supported", detail = "unsupported-country")
+                }
+            )
+        }.let { server ->
+            server.test({}) {
+                val smsService = server.sms() as TestSMS
+                smsService.reset()
+
+                val error = assertFailsWith<BadRequestException> {
+                    server.smsProof.start.test(null, "+442079460958")
+                }
+                assertEquals("unsupported-country", error.detail)
+                assertEquals("Only US numbers are supported", error.message)
+                assertEquals(0, smsService.messageHistory.size)
+            }
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    @Test
+    fun `deprecated verifyPhone returning false suppresses the SMS`() = runBlocking {
+        object : ServerBuilder() {
+            val cache = setting("cache", Cache.Settings("ram"))
+            val sms = setting("sms", SMS.Settings("test"))
+
+            init {
+                register(TestUser)
+            }
+
+            val smsProof = path.path("auth").path("sms") include SmsProofEndpoints(
+                pin = PinHandler(
+                    cache = cache,
+                    keyPrefix = "sms-test-deprecated",
+                    expiration = 15.minutes,
+                    maxAttempts = 5
+                ),
+                sms = sms,
+                smsTemplate = { pin -> "Your code is: $pin" },
+                proofSigner = RuntimeDeferred.Cached { testBasis.signer("proof") },
+                proofExpiration = 1.hours,
+                verifyPhone = { phone -> phone == "+15551234567" }
+            )
+        }.let { server ->
+            server.test({}) {
+                val smsService = server.sms() as TestSMS
+                smsService.reset()
+
+                assertNotNull(server.smsProof.start.test(null, "+15559876543"))
+                assertEquals(0, smsService.messageHistory.size)
+
+                server.smsProof.start.test(null, "+15551234567")
+                assertEquals(1, smsService.messageHistory.size)
             }
         }
     }

@@ -16,10 +16,15 @@ Each release groups entries under:
 
 ### API
 
+- Added `PinBasedProofEndpoints.ScreeningResult` (`Allow`, `Suppress`, `Reject(message, detail)`) and an open `PinBasedProofEndpoints.screen(to)` hook, called before a PIN is created. `start` responds 400 with the given `message` and `detail` (default `"target-rejected"`) on `Reject`, and lists that error in its `errorCases`.
+- `EmailProofEndpoints`: replaced `verifyEmail: (String) -> Boolean` with `screenEmail: (EmailAddress) -> ScreeningResult`, and `emailTemplate` now receives an `EmailAddress` instead of a `String`. A deprecated `EmailProofEndpoints(..., verifyEmail = ...)` overload maps `true`/`false` to `Allow`/`Suppress`.
+- `SmsProofEndpoints`: replaced `verifyPhone: (String) -> Boolean` with `screenPhone: (PhoneNumber) -> ScreeningResult`. A deprecated `SmsProofEndpoints(..., verifyPhone = ...)` overload maps `true`/`false` to `Allow`/`Suppress`.
+- `WebAuthNProofEndpoints`: renamed the `expiration` parameter to `challengeExpiration`. A deprecated `WebAuthNProofEndpoints(..., expiration = ...)` overload is kept for named-argument callers.
 - Added `Session.authenticatedAt: Instant?` and an `authenticatedAt` parameter on `SessionManager.newSession` (defaults to now). `Session.toAuth()` now uses it for `Authentication.issuedAt`, falling back to `createdAt` when it is null (sessions stored before this release). It is nullable so Postgres can add the column to an existing session table.
 
 ### Behavior
 
+- **Email and SMS proof screening runs before the PIN is created.** Previously the PIN was created and the `verifyEmail`/`verifyPhone` check ran afterward in `send`. Suppressed requests still create a PIN, so their lookup key behaves exactly like a real one. Invalid email addresses passed to `EmailProofEndpoints.start` now respond 400 before screening.
 - **Security: sub-sessions no longer reset the re-authentication clock.** A sub-session inherits its parent's `authenticatedAt`, so `maxAge` requirements (e.g. the 10-minute gate on proof-method credential management) measure time since the user actually proved identity rather than since the sub-session was minted.
 - **Security: sub-session scopes must be within the parent's.** `POST /sub-session` now responds 403 when the requested scopes are not all met by the parent session's scopes, and 401 when the parent session has been terminated. Omitting `scopes` (the default, root) now grants the parent's scopes rather than root, so callers of a narrower-scoped session that omit scopes keep working.
 - **Terminating a session terminates its derived sessions.** Terminating or deleting a session through the session table (`sessionInfo.table()`, `table(auth)`, the logout endpoints, a superuser's REST update or delete) now also terminates every session transitively derived from it. Writes through `sessionInfo.baseTable()` or straight to the database do not cascade. Sub-sessions no longer outlive their parent's logout; use a separate session for integrations that must.
@@ -42,6 +47,7 @@ Each release groups entries under:
 
 ### Tests
 
+- Added `EmailProofEndpointsTest` and `SmsProofEndpointsTest` cases covering suppressed and rejected destinations, invalid email addresses, and the deprecated `verifyEmail`/`verifyPhone` overloads.
 - Added `SessionManagerTest` cases covering sub-session `maxAge` inheritance through the refresh-to-access-token flow, legacy sessions without `authenticatedAt`, cascading termination and deletion (directly and through a superuser's REST update and delete), sub-sessions from terminated parents, and sub-session scope defaulting and escalation.
 - Added an `AuthenticationCacheKeyTest` case verifying a masqueraded authentication keeps the original `issuedAt`.
 - Added `MetaEndpointsTest` in `typed` verifying `/meta/ws-tester` does not reflect its `path` query parameter and is served with `frame-ancestors 'none'`.

@@ -79,7 +79,7 @@ import kotlin.uuid.Uuid
  * - **origin** — matched against [allowedOrigins]. rpId alone is *not* sufficient, because a browser
  *   will mint an assertion for an rpId from any origin whose effective domain is subordinate to it.
  * - **challenge** — server-generated from [SecureRandom], [challengeLength] bytes wide, single-use,
- *   and valid only for [expiration].
+ *   and valid only for [challengeExpiration].
  *
  * Beyond that, a credential is scoped to one principal type: [prove] resolves the credential by id
  * *and* [WebAuthNCredential.subjectType], and labels the resulting proof with the type the credential
@@ -118,7 +118,7 @@ import kotlin.uuid.Uuid
  * @param proofSigner Signs the [Proof] this method issues
  * @param proofExpiration How long an issued [Proof] remains valid
  * @param challengeLength Challenge size in bytes
- * @param expiration How long an issued challenge stays usable. Sent to the client as `timeout` AND
+ * @param challengeExpiration How long an issued challenge stays usable. Sent to the client as `timeout` AND
  *   enforced server-side as the challenge's cache lifetime, so the two cannot drift apart.
  * @param rpId The relying party id the credentials are scoped to — your registrable domain, or a
  *   subdomain if you do not need credentials shared across subdomains
@@ -155,7 +155,7 @@ public class WebAuthNProofEndpoints(
     override val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
     override val proofExpiration: Duration = 1.hours,
     private val challengeLength: Int = 64,
-    private val expiration: Duration = 5.minutes,
+    private val challengeExpiration: Duration = 5.minutes,
     private val rpId: context(ServerRuntime) () -> String,
     private val allowedOrigins: context(ServerRuntime) () -> Set<String>,
     private val registrationForUser: context(ServerRuntime) (HasId<*>, WebAuthN.GeneralPreference) -> WebAuthN.Registration.RegistrationOptions,
@@ -345,7 +345,7 @@ public class WebAuthNProofEndpoints(
      * lists the subject's existing credentials so an authenticator that already holds one for this
      * account declines rather than silently creating a duplicate.
      *
-     * The challenge is cached for [expiration] under a random id and consumed exactly once.
+     * The challenge is cached for [challengeExpiration] under a random id and consumed exactly once.
      *
      * @see registerFinish
      */
@@ -372,7 +372,7 @@ public class WebAuthNProofEndpoints(
                         allowedAlgorithms = options.pubKeyCredParams,
                         userVerification = options.authenticatorSelection.userVerification == WebAuthN.GeneralPreference.Required
                     ),
-                    timeToLive = expiration
+                    timeToLive = challengeExpiration
                 )
 
                 WebAuthN.Registration.RegistrationResponse(
@@ -396,7 +396,7 @@ public class WebAuthNProofEndpoints(
                             id = rpId(),
                             name = generalSettings().projectName
                         ),
-                        timeout = expiration.inWholeMilliseconds.toInt(),
+                        timeout = challengeExpiration.inWholeMilliseconds.toInt(),
                         user = options.user,
                     )
                 )
@@ -622,7 +622,7 @@ public class WebAuthNProofEndpoints(
                         subjectType = subjectType,
                         allowCredentials = existingCreds.map { it.id },
                     ),
-                    timeToLive = expiration
+                    timeToLive = challengeExpiration
                 )
 
                 WebAuthN.Authentication.StartResponse(
@@ -633,7 +633,7 @@ public class WebAuthNProofEndpoints(
                         extensions = options.extensions,
                         hints = options.hints,
                         rpId = rpId(),
-                        timeout = expiration.inWholeMilliseconds.toInt(),
+                        timeout = challengeExpiration.inWholeMilliseconds.toInt(),
                         userVerification = options.userVerification,
                     )
                 )
@@ -784,3 +784,33 @@ public class WebAuthNProofEndpoints(
             }
         )
 }
+
+
+@Deprecated("Use the \"challengeExpiration\" parameter instead of \"expiration\".")
+public fun WebAuthNProofEndpoints(
+    database: Runtime<Database>,
+    cache: Runtime<Cache>,
+    proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
+    proofExpiration: Duration = 1.hours,
+    challengeLength: Int = 64,
+    rpId: context(ServerRuntime) () -> String,
+    allowedOrigins: context(ServerRuntime) () -> Set<String>,
+    registrationForUser: context(ServerRuntime) (HasId<*>, WebAuthN.GeneralPreference) -> WebAuthN.Registration.RegistrationOptions,
+    proveOptions: context(ServerRuntime) (String?) -> WebAuthN.Authentication.ProveOptions = { WebAuthN.Authentication.ProveOptions() },
+    webAuthnManager: WebAuthnManager = WebAuthnManager.createNonStrictWebAuthnManager(),
+    signals: (context(ServerRuntime) (Table<WebAuthNCredential>) -> Table<WebAuthNCredential>)? = null,
+    expiration: Duration,
+): WebAuthNProofEndpoints = WebAuthNProofEndpoints(
+    database = database,
+    cache = cache,
+    proofSigner = proofSigner,
+    proofExpiration = proofExpiration,
+    challengeLength = challengeLength,
+    challengeExpiration = expiration,
+    rpId = rpId,
+    allowedOrigins = allowedOrigins,
+    registrationForUser = registrationForUser,
+    proveOptions = proveOptions,
+    webAuthnManager = webAuthnManager,
+    signals = signals,
+)

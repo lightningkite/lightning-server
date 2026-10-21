@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.encryption.signer
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
+import com.lightningkite.services.data.PhoneNumber
 import com.lightningkite.services.data.toPhoneNumber
 import com.lightningkite.services.sms.SMS
 import kotlin.time.Duration
@@ -26,7 +27,9 @@ import kotlin.time.Duration.Companion.hours
  * @param sms SMS service for sending PIN codes
  * @param smsTemplate Template function to generate SMS text from PIN code
  * @param proofSigner Signer for creating cryptographically signed proofs
- * @param verifyPhone Optional validation function to check if phone should be allowed (e.g., country restrictions)
+ * @param screenPhone Optional function deciding whether to send to a number: [ScreeningResult.Allow] sends,
+ *   [ScreeningResult.Suppress] silently sends nothing, and [ScreeningResult.Reject] returns an error to the client
+ *   (e.g., country restrictions)
  *
  * Security considerations:
  * - PINs expire after a configurable duration (see PinHandler)
@@ -34,7 +37,8 @@ import kotlin.time.Duration.Companion.hours
  * - Rate limiting should be applied to prevent SMS bombing
  * - Phone numbers are normalized to E.164 format (+[country][number])
  * - 10-digit US numbers are automatically prefixed with +1
- * - Use verifyPhone to block premium rate or international numbers if needed
+ * - Use screenPhone to block premium rate or international numbers if needed
+ * - Prefer [ScreeningResult.Suppress] over [ScreeningResult.Reject] when rejecting would reveal whether an account exists
  *
  * Cost considerations:
  * - SMS messages have per-message costs
@@ -47,7 +51,7 @@ public class SmsProofEndpoints(
     private val smsTemplate: suspend context(ServerRuntime) (pin: String) -> String = { code -> "Your ${generalSettings().projectName} code is ${code}. Don't share this with anyone." },
     proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
     proofExpiration: Duration = 1.hours,
-    private val verifyPhone: suspend context(ServerRuntime) (String) -> Boolean = { true },
+    private val screenPhone: suspend context(ServerRuntime) (PhoneNumber) -> ScreeningResult = { ScreeningResult.Allow },
 ) : PinBasedProofEndpoints(
     name = "sms",
     property = "phone",
@@ -96,16 +100,21 @@ public class SmsProofEndpoints(
         }
 
     /**
+     * Applies [screenPhone] to the normalized phone number.
+     */
+    context(_: ServerRuntime)
+    public override suspend fun screen(to: String): ScreeningResult = screenPhone(to.toPhoneNumber())
+
+    /**
      * Send a PIN code to the specified phone number via SMS.
-     * Only sends if verifyPhone returns true for the number.
+     * Only called if [screen] returned [ScreeningResult.Allow] for the number.
      *
      * @param to Phone number to send PIN to (will be normalized)
      * @param pin PIN code to include in the SMS
      */
     context(_: ServerRuntime)
     override suspend fun send(to: String, pin: String) {
-        if (verifyPhone(to))
-            sms().send(to.toPhoneNumber(), smsTemplate(pin))
+        sms().send(to.toPhoneNumber(), smsTemplate(pin))
     }
 
     /**
@@ -125,6 +134,26 @@ public class SmsProofEndpoints(
         sms().send(destination.toPhoneNumber(), content(issueProof(destination)))
     }
 }
+
+@Deprecated("Use the \"screenPhone\" parameter instead of \"verifyPhone\".")
+public fun SmsProofEndpoints(
+    pin: PinHandler,
+    sms: Runtime<SMS>,
+    smsTemplate: suspend context(ServerRuntime) (pin: String) -> String = { code -> "Your ${generalSettings().projectName} code is ${code}. Don't share this with anyone." },
+    proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
+    proofExpiration: Duration = 1.hours,
+    verifyPhone: suspend context(ServerRuntime) (String) -> Boolean,
+): SmsProofEndpoints = SmsProofEndpoints(
+    pin = pin,
+    sms = sms,
+    smsTemplate = smsTemplate,
+    proofSigner = proofSigner,
+    proofExpiration = proofExpiration,
+    screenPhone = { phone: PhoneNumber ->
+        if (verifyPhone(phone.raw)) PinBasedProofEndpoints.ScreeningResult.Allow
+        else PinBasedProofEndpoints.ScreeningResult.Suppress
+    }
+)
 
 /*
  * TODO API Recommendations:

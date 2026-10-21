@@ -65,9 +65,9 @@ object Server : ServerBuilder() {
     val pins = PinHandler(cache, "pins")
 
     val proofEmail = path.path("proof").path("email") module EmailProofEndpoints(
-        pins = pins,
+        pin = pins,
         email = email,
-        emailBuilder = { to, pin ->
+        emailTemplate = { to, pin ->
             Email(
                 subject = "Your Login Code",
                 to = listOf(EmailAddressWithName(to)),
@@ -134,9 +134,9 @@ Lightning Server supports multiple authentication methods ("proofs"):
 val pins = PinHandler(cache, "pins")
 
 val proofEmail = path.path("proof").path("email") module EmailProofEndpoints(
-    pins = pins,
+    pin = pins,
     email = email,
-    emailBuilder = { to, pin ->
+    emailTemplate = { to, pin ->
         Email(
             subject = "Your Login Code",
             to = listOf(EmailAddressWithName(to)),
@@ -151,7 +151,7 @@ val proofEmail = path.path("proof").path("email") module EmailProofEndpoints(
 
 ```kotlin
 val proofSms = path.path("proof").path("sms") module SmsProofEndpoints(
-    pins = pins,
+    pin = pins,
     sms = sms
 )
 ```

@@ -1,11 +1,13 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
+import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.encryption.Signer
 import com.lightningkite.lightningserver.encryption.signer
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
+import com.lightningkite.services.data.*
 import com.lightningkite.services.email.Email
 import com.lightningkite.services.email.EmailService
 import kotlin.time.Duration
@@ -26,21 +28,24 @@ import kotlin.time.Duration.Companion.hours
  * @param email Email service for sending PIN codes
  * @param emailTemplate Template function to generate email content from recipient and PIN
  * @param proofSigner Signer for creating cryptographically signed proofs
- * @param verifyEmail Optional validation function to check if email should be allowed (e.g., domain restrictions)
+ * @param screenEmail Optional function deciding whether to send to an address: [ScreeningResult.Allow] sends,
+ *   [ScreeningResult.Suppress] silently sends nothing, and [ScreeningResult.Reject] returns an error to the client
+ *   (e.g., domain restrictions or "Please use your work email address")
  *
  * Security considerations:
  * - PINs expire after a configurable duration (see PinHandler)
  * - Rate limiting should be applied to prevent abuse
  * - Email addresses are normalized to lowercase for consistency
- * - Use verifyEmail to block disposable email providers if needed
+ * - Use screenEmail to block disposable email providers if needed
+ * - Prefer [ScreeningResult.Suppress] over [ScreeningResult.Reject] when rejecting would reveal whether an account exists
  */
 public class EmailProofEndpoints(
     pin: PinHandler,
     private val email: Runtime<EmailService>,
-    private val emailTemplate: suspend context(ServerRuntime) (String, String) -> Email,
+    private val emailTemplate: suspend context(ServerRuntime) (EmailAddress, String) -> Email,
     proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
     proofExpiration: Duration = 1.hours,
-    private val verifyEmail: suspend context(ServerRuntime) (String) -> Boolean = { true },
+    private val screenEmail: suspend context(ServerRuntime) (EmailAddress) -> ScreeningResult = { ScreeningResult.Allow },
 ) : PinBasedProofEndpoints(
     name = "email",
     property = "email",
@@ -58,16 +63,27 @@ public class EmailProofEndpoints(
     }
 
     /**
+     * Validates the address and applies [screenEmail].
+     *
+     * @throws BadRequestException if [to] is not a valid email address
+     */
+    context(_: ServerRuntime)
+    public override suspend fun screen(to: String): ScreeningResult {
+        val address =
+            to.toEmailAddressOrNull() ?: throw BadRequestException(message = "$to is not a valid email address")
+        return screenEmail(address)
+    }
+
+    /**
      * Send a PIN code to the specified email address.
-     * Only sends if verifyEmail returns true for the address.
+     * Only called if [screen] returned [ScreeningResult.Allow] for the address.
      *
      * @param to Email address to send PIN to
      * @param pin PIN code to include in the email
      */
     context(_: ServerRuntime)
     override suspend fun send(to: String, pin: String) {
-        if (verifyEmail(to))
-            email().send(emailTemplate(to, pin))
+        email().send(emailTemplate(to.toEmailAddress(), pin))
     }
 
     /**
@@ -93,6 +109,26 @@ public class EmailProofEndpoints(
     }
 }
 
+@Deprecated("Use the \"screenEmail\" parameter instead of \"verifyEmail\".")
+public fun EmailProofEndpoints(
+    pin: PinHandler,
+    email: Runtime<EmailService>,
+    emailTemplate: suspend context(ServerRuntime) (String, String) -> Email,
+    proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
+    proofExpiration: Duration = 1.hours,
+    verifyEmail: suspend context(ServerRuntime) (String) -> Boolean,
+): EmailProofEndpoints = EmailProofEndpoints(
+    pin = pin,
+    email = email,
+    emailTemplate = { to: EmailAddress, pin: String -> emailTemplate(to.raw, pin) },
+    proofSigner = proofSigner,
+    proofExpiration = proofExpiration,
+    screenEmail = { address: EmailAddress ->
+        if (verifyEmail(address.raw)) PinBasedProofEndpoints.ScreeningResult.Allow
+        else PinBasedProofEndpoints.ScreeningResult.Suppress
+    }
+)
+
 /*
  * TODO API Recommendations:
  *
@@ -100,10 +136,7 @@ public class EmailProofEndpoints(
  *
  * 2. Consider adding email normalization beyond lowercase (e.g., Gmail dot/plus address handling).
  *
- * 3. The verifyEmail function could be enhanced to return an error message that can be displayed
- *    to the user (e.g., "Please use your work email address").
+ * 3. Consider adding support for HTML email templates in addition to the current plain text support.
  *
- * 4. Consider adding support for HTML email templates in addition to the current plain text support.
- *
- * 5. Consider adding a rate limiter parameter to prevent email bombing attacks.
+ * 4. Consider adding a rate limiter parameter to prevent email bombing attacks.
  */
