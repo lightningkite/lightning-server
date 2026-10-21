@@ -67,7 +67,7 @@ class LoginFlowTest {
 
         // 5. UserAuth.fetchByProperty creates the User row on first login - verify it landed.
         val user = assertNotNull(
-            execute { Server.userInfo.table().findOne(condition { it.email eq address }) },
+            execute { Server.userInfo.table().findOne(Condition { it.email eq address }) },
             "logging in for the first time should have created the user",
         )
 
@@ -124,7 +124,7 @@ class LoginFlowTest {
 
         assertEquals(
             1,
-            execute { Server.userInfo.table().count(condition { it.email eq address }) },
+            execute { Server.userInfo.table().count(Condition { it.email eq address }) },
             "the second login should reuse the user created by the first",
         )
     }

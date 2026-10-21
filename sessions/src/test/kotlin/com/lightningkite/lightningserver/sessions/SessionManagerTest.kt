@@ -30,6 +30,7 @@ import com.lightningkite.lightningserver.sessions.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.typed.ModelRestEndpoints
 import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.lightningserver.typed.AuthAccess
+import com.lightningkite.services.database.optics.*
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
@@ -759,7 +760,7 @@ class SessionManagerTest {
         val adminId = Uuid.random()
         SessionTestUser.users[userId] = SessionTestUser(userId, "user@example.com")
         SessionTestUser.users[adminId] = SessionTestUser(adminId, "admin@example.com")
-        val spath = Session.path(SessionTestUser.serializer(), Uuid.serializer())
+        val spath = IdentityLens(Session.serializer(SessionTestUser.serializer(), Uuid.serializer()))
 
         object : ServerBuilder() {
             init {
@@ -783,7 +784,7 @@ class SessionManagerTest {
                 server.rest.modify.test(
                     terminated._id,
                     adminAuth,
-                    modification(spath) { it.terminated assign com.lightningkite.lightningserver.runtime.now() }
+                    Modification(spath) { it.terminated assign com.lightningkite.lightningserver.runtime.now() }
                 )
                 assertFailsWith<UnauthorizedException> { server.sessions.tokenSimple.test(null, terminatedChild) }
 

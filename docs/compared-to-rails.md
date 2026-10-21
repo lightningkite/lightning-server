@@ -71,11 +71,11 @@ data class Post(
 ) : HasId<Uuid>
 
 // Scopes as extension functions
-fun FieldCollection<Post>.published() = find(condition { it.published eq true })
+fun FieldCollection<Post>.published() = find(Condition { it.published eq true })
 fun Query<Post>.recent() = sort(Post::createdAt.descending()).take(10)
 
 // Usage
-posts.find(condition { it.authorId eq currentUser._id }).published().recent()
+posts.find(Condition { it.authorId eq currentUser._id }).published().recent()
 ```
 
 The `@Queryable` annotation enables the type-safe query DSL. Typos in field names become compile errors,
@@ -98,8 +98,8 @@ val migrateData = path.path("predeploy").path("migrate-posts-2025-01") bind PreD
     dependencies = { listOf(postTable.preDeployTask) },
 ) {
     postTable().updateMany(
-        condition { it.newField eq null },
-        modification { it.newField assign "default" }
+        Condition { it.newField eq null },
+        Modification { it.newField assign "default" }
     )
 }
 ```
@@ -247,7 +247,7 @@ SendWelcomeEmailJob.perform_later(user)
 
 ```kotlin
 val sendWelcomeEmail = path.path("tasks").path("send-welcome-email") bind Task { userId: Uuid ->
-    val user = users.findOne(condition { it._id eq userId })!!
+    val user = users.findOne(Condition { it._id eq userId })!!
     email().send(Email(
         subject = "Welcome!",
         to = listOf(EmailAddressWithName(user.email.toEmailAddress())),
@@ -281,7 +281,7 @@ end
 ```kotlin
 // Every 15 minutes
 val cleanup = path.path("schedules").path("cleanup") bind ScheduledTask(schedule = Schedule.Frequency(15.minutes)) {
-    expiredSessions.deleteMany(condition { it.expiresAt lt Clock.System.now() })
+    expiredSessions.deleteMany(Condition { it.expiresAt lt Clock.System.now() })
 }
 
 // Daily at 3 AM in a specific timezone
@@ -466,8 +466,8 @@ fun main(args: Array<String>) {
 
 The biggest difference you'll notice is how many runtime errors become compile-time errors:
 
-- **Query typos** - `condition { it.titel eq "x" }` won't compile
-- **Type mismatches** - `condition { it.age eq "five" }` won't compile
+- **Query typos** - `Condition { it.titel eq "x" }` won't compile
+- **Type mismatches** - `Condition { it.age eq "five" }` won't compile
 - **Missing fields** - Forgetting a required field in a data class won't compile
 
 This catches bugs before your code ever runs.

@@ -62,7 +62,7 @@ data class Post(
 ```
 
 `@Queryable` is processed by KSP at build time.  It produces typed field references
-(`Post.path.title`, etc.) used by `condition {}` and `modification {}`.
+(`Post.title`, etc.) used by `Condition {}` and `Modification {}`.
 
 ### Query DSL vs QuerySet API
 
@@ -76,8 +76,8 @@ Post.objects.filter(author="user@example.com").order_by("-created_at")
 ```kotlin
 // Lightning Server — illustrative
 posts.find(
-    condition { it.author eq "user@example.com" },
-    orderBy = listOf(SortPart(Post.path.createdAt, ascending = false))
+    Condition { it.author eq "user@example.com" },
+    orderBy = listOf(SortPart(Post.createdAt, ascending = false))
 ).toList()
 ```
 
@@ -86,7 +86,7 @@ runtime.
 
 Common operator mapping:
 
-| Django QuerySet | Lightning Server `condition {}` |
+| Django QuerySet | Lightning Server `Condition {}` |
 |---|---|
 | `filter(field=value)` | `it.field eq value` |
 | `exclude(field=value)` | `it.field neq value` |
@@ -218,7 +218,7 @@ is declared explicitly in a `ServerBuilder`; the compiler enforces it.
 
 Concretely:
 
-- Django's `Post.objects.filter(author='x')` is a string internally.  LS's `condition { it.author eq "x" }` is
+- Django's `Post.objects.filter(author='x')` is a string internally.  LS's `Condition { it.author eq "x" }` is
   type-checked — rename `author` to `authorEmail` and the build fails until you update the query.
 - Django migrations are required for every schema change.  With MongoDB as the backend, LS models are schemaless —
   add a nullable field, and existing documents just return `null` for it.
@@ -230,7 +230,7 @@ Concretely:
 
 - [Overview](../guide/overview.md) — the complete building-block inventory
 - [Typed Endpoints](../guide/typed-endpoints.md) — `ApiHttpHandler`, error cases, SDK generation
-- [Database](../guide/database.md) — `condition {}`, `modification {}`, model setup
+- [Database](../guide/database.md) — `Condition {}`, `Modification {}`, model setup
 - [Authentication & Sessions](../guide/auth.md) — `PrincipalType`, `testAuth`, proof system
 - [Tasks](../guide/tasks.md) — `Task`, `launch()`
 - [Schedules](../guide/schedules.md) — `ScheduledTask`, schedule types

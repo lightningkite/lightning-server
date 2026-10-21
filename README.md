@@ -97,7 +97,7 @@ drift-checked against the compiled source on every CI run.
 | [Routing & Path Parameters](docs-guide/guide/routing.md) | Nested paths, all HTTP methods, typed path args, sub-builders, query params |
 | [Typed Endpoints, Errors & SDK Generation](docs-guide/guide/typed-endpoints.md) | `ApiHttpHandler`, `LSError`, `errorCases`, success codes, SDK generation |
 | [Services & Settings](docs-guide/guide/services.md) | Declaring and swapping service settings; in-process RAM mocks for tests |
-| [Database & the Query DSL](docs-guide/guide/database.md) | Type-safe `condition {}` / `modification {}` DSL, `@Queryable`, CRUD |
+| [Database & the Query DSL](docs-guide/guide/database.md) | Type-safe `Condition {}` / `Modification {}` DSL, `@Queryable`, CRUD |
 | [Authentication & Sessions](docs-guide/guide/auth.md) | `PrincipalType`, `User.require()`, reading `auth.id` / `auth.fetch()` in handlers |
 | [Testing Your Server](docs-guide/guide/testing.md) | `SERVER.test {}`, `HttpHandler.test()`, `ApiHttpHandler.test(auth, input)`, `@Test` |
 | [Deploying to AWS](docs-guide/guide/aws-deployment.md) | `AwsAdapter`, `TerraformAwsServerlessBuilder`, service → Terraform, deploy workflow |

@@ -160,8 +160,8 @@ See: [Proof & Session Authentication](proof-session.md)
 ### Database & Query DSL
 
 `Database` is a service abstraction over MongoDB, Postgres, and in-memory / JSON-file backends.
-Models annotated with `@Queryable` get a compile-time query DSL — `condition {}`,
-`modification {}` — that prevents typos and field-rename drift.
+Models annotated with `@Queryable` get a compile-time query DSL — `Condition {}`,
+`Modification {}` — that prevents typos and field-rename drift.
 
 See: [Database](database.md)
 

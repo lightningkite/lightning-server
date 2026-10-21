@@ -1,7 +1,6 @@
 package com.lightningkite.lightningserver.audit
 
 import com.lightningkite.services.database.Condition
-import com.lightningkite.services.database.condition
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -114,7 +113,7 @@ class BitIndicesTest {
 
     @Test
     fun `containsAny condition matches a value holding any requested index`() {
-        val condition = condition<BitIndices> { it.containsAny(bitIndicesOf(3, 31)) }
+        val condition = Condition<BitIndices> { it.containsAny(bitIndicesOf(3, 31)) }
         assertTrue(condition(bitIndicesOf(3)))
         assertTrue(condition(bitIndicesOf(31)))
         assertTrue(condition(bitIndicesOf(0, 3, 31)))
@@ -124,7 +123,7 @@ class BitIndicesTest {
 
     @Test
     fun `containsAll condition matches only a value holding every requested index`() {
-        val condition = condition<BitIndices> { it.containsAll(bitIndicesOf(0, 31)) }
+        val condition = Condition<BitIndices> { it.containsAll(bitIndicesOf(0, 31)) }
         assertTrue(condition(bitIndicesOf(0, 31)))
         assertTrue(condition(bitIndicesOf(0, 5, 31)))
         assertFalse(condition(bitIndicesOf(0)))
@@ -134,7 +133,7 @@ class BitIndicesTest {
 
     @Test
     fun `conditions query the mask directly`() {
-        val condition = condition<BitIndices> { it.containsAll(bitIndicesOf(0)) }
+        val condition = Condition<BitIndices> { it.containsAll(bitIndicesOf(0)) }
         assertEquals(Condition.IntBitsSet(1 shl 31), (condition as Condition.OnField<*, *>).condition)
     }
 }

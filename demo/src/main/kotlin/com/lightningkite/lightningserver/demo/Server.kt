@@ -141,7 +141,7 @@ object Server : ServerBuilder() {
         context(server: ServerRuntime)
         override suspend fun fetchByProperty(property: String, value: String): User? {
             return when (property) {
-                "email" -> return userInfo.table().findOne(condition { it.email eq value }) ?: userInfo.table()
+                "email" -> return userInfo.table().findOne(Condition { it.email eq value }) ?: userInfo.table()
                     .insertOne(User(email = value))
 
                 else -> super.fetchByProperty(property, value)
@@ -155,7 +155,7 @@ object Server : ServerBuilder() {
         permissions = {
             val user = authOrNull?.fetch()
             val everyone: Condition<User> = Condition.Always
-            val self: Condition<User> = condition { it._id eqNn user?._id }
+            val self: Condition<User> = Condition { it._id eqNn user?._id }
             val admin: Condition<User> = if (user?.isSuperUser == true) Condition.Always else Condition.Never
             ModelPermissions(
                 create = Condition.Never,

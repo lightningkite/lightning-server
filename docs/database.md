@@ -68,16 +68,16 @@ posts.insertOne(Post(
 ))
 
 // Query posts
-posts.find(condition { it.title eq "Test" }).toList()
+posts.find(Condition { it.title eq "Test" }).toList()
 
 // Update a post
 posts.updateOne(
-    condition { it.title eq "Test" },
-    modification { it.title assign "Test Post" }
+    Condition { it.title eq "Test" },
+    Modification { it.title assign "Test Post" }
 )
 
 // Delete posts
-posts.deleteMany(condition { it.always })
+posts.deleteMany(Condition { it.always() })
 
 // Count posts
 posts.count()
@@ -94,10 +94,10 @@ val postInfo = database.modelInfo(
     permissions = {
         val user = auth.fetch()
         ModelPermissions(
-            create = condition { it.author eq user.email },
+            create = Condition { it.author eq user.email },
             read = Condition.Always,
-            update = condition { it.author eq user.email },
-            delete = condition { it.author eq user.email }
+            update = Condition { it.author eq user.email },
+            delete = Condition { it.author eq user.email }
         )
     }
 )
@@ -107,21 +107,21 @@ val postInfo = database.modelInfo(
 
 There are many conditions and modifications available.
 
-To write a condition or modification, use the `condition { it }` and `modification { it }` DSL:
+To write a condition or modification, use the `Condition { it }` and `Modification { it }` DSL:
 
 ```kotlin
 import kotlin.time.Duration.Companion.days
 
 // Conditions
-condition { it.title eq "Test" }
-condition { it.author eq "joe@example.com" }
-condition { it.updatedAt gt Clock.System.now() - 1.days }
-condition { (it.title eq "Test") and (it.author eq "joe@example.com") }
+Condition { it.title eq "Test" }
+Condition { it.author eq "joe@example.com" }
+Condition { it.updatedAt gt Clock.System.now() - 1.days }
+Condition { (it.title eq "Test") and (it.author eq "joe@example.com") }
 
 // Modifications
-modification { it.title assign "New Title" }
-modification { it.updatedAt assign Clock.System.now() }
-modification { it.body += " - Updated" }
+Modification { it.title assign "New Title" }
+Modification { it.updatedAt assign Clock.System.now() }
+Modification { it.body += " - Updated" }
 ```
 
 ### Common Condition Operations

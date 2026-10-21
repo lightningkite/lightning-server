@@ -163,18 +163,18 @@ data class User(
 val users = userTable()
 
 // Find by email containing
-users.find(condition { it.email.contains("@example.com") }).toList()
+users.find(Condition { it.email.contains("@example.com") }).toList()
 
 // Find by date
-users.find(condition { it.createdAt gt someDate }).toList()
+users.find(Condition { it.createdAt gt someDate }).toList()
 
 // Compound conditions
-users.findOne(condition { (it.email eq email) and (it.active eq true) })
+users.findOne(Condition { (it.email eq email) and (it.active eq true) })
 
 // Updates with type-safe modifications
 users.updateOne(
-    condition { it._id eq userId },
-    modification { it.active assign false }
+    Condition { it._id eq userId },
+    Modification { it.active assign false }
 )
 ```
 

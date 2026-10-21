@@ -63,7 +63,7 @@ fun modelRestTest() = PostRestServer.testBlocking(settings = { database set Data
     // Modify: apply a field-level update and receive the new document
     val modified = PostRestServer.posts.modify.test(
         post._id, null,
-        modification { it.title assign "Updated Title" }
+        Modification { it.title assign "Updated Title" }
     )
     check(modified.title == "Updated Title")
     check(modified.author == "alice")  // unchanged

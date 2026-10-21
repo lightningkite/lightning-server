@@ -236,10 +236,10 @@ class MutationLogTest {
         val bob = ada.copy(_id = Patient.ID(Uuid.random()), name = "Bob")
 
         table.insertOne(ada)
-        table.updateOneById(ada._id, modification { it.ssn assign "222" })
+        table.updateOneById(ada._id, Modification { it.ssn assign "222" })
         table.replaceOneById(ada._id, ada.copy(name = "Ann"))
         table.upsertOneById(bob._id, bob)
-        table.upsertOne(condition { it._id eq bob._id }, modification { it.ssn assign "333" }, bob)
+        table.upsertOne(Condition { it._id eq bob._id }, Modification { it.ssn assign "333" }, bob)
         table.deleteOneById(ada._id)
         table.deleteMany(Condition.Always)
 
@@ -255,9 +255,9 @@ class MutationLogTest {
         val bob = ada.copy(_id = Patient.ID(Uuid.random()), name = "Bob")
         table.insert(listOf(ada, bob))
 
-        assertEquals(2, table.updateManyIgnoringResult(Condition.Always, modification { it.ssn assign "x" }))
-        assertEquals(false, table.updateOneIgnoringResult(condition { it.name eq "Nobody" }, modification { it.ssn assign "y" }))
-        assertEquals(true, table.deleteOneIgnoringOld(condition { it._id eq ada._id }))
+        assertEquals(2, table.updateManyIgnoringResult(Condition.Always, Modification { it.ssn assign "x" }))
+        assertEquals(false, table.updateOneIgnoringResult(Condition { it.name eq "Nobody" }, Modification { it.ssn assign "y" }))
+        assertEquals(true, table.deleteOneIgnoringOld(Condition { it._id eq ada._id }))
         assertEquals(1, table.deleteManyIgnoringOld(Condition.Always))
 
         assertEquals(mapOf(Operation.Create to 2, Operation.Modify to 2, Operation.Delete to 2), operations().groupingBy { it }.eachCount())

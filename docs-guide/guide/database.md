@@ -59,9 +59,9 @@ data class Note(
 ```
 
 `@Queryable` is processed by the KSP plugin at build time.
-It generates a `Note.path` companion-object extension with a typed field for
-every property — `Note.path.title`, `Note.path._id`, `Note.path.body`.
-These path objects are what `condition {}` and `modification {}` use to build
+It generates a typed field on the companion object for every property —
+`Note.title`, `Note._id`, `Note.body`.
+These fields are what `Condition {}` and `Modification {}` use to build
 type-safe queries.
 
 The `_id` field is the primary key.  Defaulting it to `Uuid.random()` means
@@ -115,7 +115,7 @@ Key points:
   handler resolves the live `Table<Note>` from the current `ServerRuntime`. `registerTable` also
   created the once-per-deploy task that prepares the table's collection/indexes, so you don't wire
   that up yourself.
-- **`Condition.Always`** — matches every document.  Use `condition { }` to
+- **`Condition.Always`** — matches every document.  Use `Condition { }` to
   narrow the query (shown in the test below).
 - **`find()` returns a `Flow<Note>`** — call `.toList()` to collect all results
   eagerly, or `.collect { }` to stream them one at a time without loading the
@@ -148,36 +148,36 @@ fun databaseTest() = NoteDbServer.testBlocking(settings = { database set Databas
     // Direct table access for condition / modification / delete
     val table = NoteDbServer.notes()
 
-    // condition { } builds a type-safe query using generated path extensions
-    val found = table.find(condition { it.title eq "Shopping" }).toList()
+    // Condition { } builds a type-safe query using generated path extensions
+    val found = table.find(Condition { it.title eq "Shopping" }).toList()
     check(found.size == 1)
     check(found[0]._id == first!!._id)
 
-    // modification { } builds a type-safe update
+    // Modification { } builds a type-safe update
     table.updateOneIgnoringResult(
-        condition { it._id eq first._id },
-        modification { it.body assign "Eggs, milk, bread" }
+        Condition { it._id eq first._id },
+        Modification { it.body assign "Eggs, milk, bread" }
     )
     val updated = table.get(first._id)!!
     check(updated.body == "Eggs, milk, bread")
 
     // delete
-    table.deleteOneIgnoringOld(condition { it._id eq second!!._id })
+    table.deleteOneIgnoringOld(Condition { it._id eq second!!._id })
     check(table.count() == 1)
 }
 ```
 
 ### Query DSL mechanics
 
-**`condition { it.title eq "Shopping" }`**
-- `it` is a `DataClassPath<Note, Note>` — a typed handle on the whole document.
-- `.title` is a generated extension that narrows the path to `DataClassPath<Note, String>`.
+**`Condition { it.title eq "Shopping" }`**
+- `it` is a `Optic<Note, Note>` — a typed handle on the whole document.
+- `.title` is a generated extension that narrows the path to `Optic<Note, String>`.
 - `eq "Shopping"` builds a `Condition<Note>` that matches documents where the
   title field equals `"Shopping"`.
 - Other operators: `neq`, `lt`, `lte`, `gt`, `gte`, `inside` (IN list), `and`,
   `or`, `not`.
 
-**`modification { it.body assign "Eggs, milk, bread" }`**
+**`Modification { it.body assign "Eggs, milk, bread" }`**
 - `assign` replaces the field value.
 - Other operators: `+= 1` (numeric increment), `+= listOf(...)` (list append),
   `coerceAtLeast`, `coerceAtMost`.

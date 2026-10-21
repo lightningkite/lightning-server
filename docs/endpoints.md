@@ -194,7 +194,7 @@ val listUsers = path.path("users").get bind HttpHandler { request ->
     val limit = request.queryParameters["limit"]?.toIntOrNull() ?: 20
 
     val users = userTable()
-        .find(condition { /* ... */ }, skip = (page - 1) * limit, limit = limit)
+        .find(Condition { /* ... */ }, skip = (page - 1) * limit, limit = limit)
         .toList()
 
     HttpResponse(body = users.toTypedData(request.headers.accept))

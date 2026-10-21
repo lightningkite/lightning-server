@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.notifications.subscriptions
 
+import com.lightningkite.services.database.optics.*
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.auth.id
 import com.lightningkite.lightningserver.auth.subscope
@@ -61,7 +62,7 @@ public class FrequencyCustomizableSubscriptions<USER : HasId<UID>, UID : Compara
     public val defaultSms: Frequency? = Frequency.immediately(),
     public val defaultPush: Frequency? = Frequency.immediately(),
     public val defaultInApp: Frequency? = Frequency.immediately(),
-    webSocketKey: SerializableProperty<NotificationSendMethods<UID>, *>? = info.serializer.fieldInApp,
+    webSocketKey: Field<NotificationSendMethods<UID>, *>? = info.serializer.fieldInApp,
     userIdSerializer: KSerializer<UID>? = null,
 ) : ServerBuilder(), NotificationEndpoints.Subscriptions<USER, UID> {
     private val logger: KLogger =

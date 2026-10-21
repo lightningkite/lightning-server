@@ -57,9 +57,8 @@ import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
-import com.lightningkite.services.database.condition
 import com.lightningkite.services.database.eq
-import com.lightningkite.services.database.modification
+import com.lightningkite.services.database.Modification
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
@@ -110,14 +109,14 @@ class OriginRecordingTest {
 
     context(server: ServerRuntime)
     private suspend fun rowFor(id: Execution.ID): OriginRecord<OriginRecord.StandardRequestInfo>? =
-        OriginTestServer.audit.origins.table().find(condition { it._id eq id.originId }).toList().singleOrNull()
+        OriginTestServer.audit.origins.table().find(Condition { it._id eq id.originId }).toList().singleOrNull()
 
     /** Marks [id]'s row so that any later rewrite of it is visible. */
     context(server: ServerRuntime)
     private suspend fun tamper(id: Execution.ID) {
         val changed = OriginTestServer.audit.origins.table().updateOne(
-            condition { it._id eq id.originId },
-            modification { it.kind assign TAMPERED },
+            Condition { it._id eq id.originId },
+            Modification { it.kind assign TAMPERED },
         )
         assertNotNull(changed.new, "there was no row for $id to tamper with")
     }
@@ -591,8 +590,8 @@ private object OriginTestServer : ServerBuilder() {
         note()
         touch()
         audit.origins.table().updateOne(
-            condition { it._id eq serverRuntime.execution.id.originId },
-            modification { it.kind assign TAMPERED },
+            Condition { it._id eq serverRuntime.execution.id.originId },
+            Modification { it.kind assign TAMPERED },
         )
         touch()
         ok()
@@ -605,8 +604,8 @@ private object OriginTestServer : ServerBuilder() {
             note()
             touch()
             audit.origins.table().updateOne(
-                condition { it._id eq serverRuntime.execution.id.originId },
-                modification { it.kind assign TAMPERED },
+                Condition { it._id eq serverRuntime.execution.id.originId },
+                Modification { it.kind assign TAMPERED },
             )
             sub("/touch")
             ok()

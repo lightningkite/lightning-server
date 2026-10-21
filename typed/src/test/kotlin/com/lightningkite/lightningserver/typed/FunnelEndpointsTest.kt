@@ -297,7 +297,7 @@ class FunnelEndpointsTest {
 
             // Verify summary was created
             val summaries =
-                execute { TestServer.funnel.summaryInfo.table().find(condition<FunnelSummary> { it.date.eq(targetDate) }).toList() }
+                execute { TestServer.funnel.summaryInfo.table().find(Condition<FunnelSummary> { it.date.eq(targetDate) }).toList() }
             assertEquals(1, summaries.size)
 
             val summary = summaries.first()
@@ -425,7 +425,7 @@ class FunnelEndpointsTest {
             TestServer.funnel.summarizeNow.test(execute { adminAuth() }, targetDate)
 
             val summaries =
-                execute { TestServer.funnel.summaryInfo.table().find(condition<FunnelSummary> { it.date.eq(targetDate) }).toList() }
+                execute { TestServer.funnel.summaryInfo.table().find(Condition<FunnelSummary> { it.date.eq(targetDate) }).toList() }
             assertEquals(1, summaries.size)
 
             val summary = summaries.first()
@@ -488,7 +488,7 @@ class FunnelEndpointsTest {
             TestServer.funnel.summarizeNow.test(execute { adminAuth() }, targetDate)
 
             val summaries =
-                execute { TestServer.funnel.summaryInfo.table().find(condition<FunnelSummary> { it.date.eq(targetDate) }).toList() }
+                execute { TestServer.funnel.summaryInfo.table().find(Condition<FunnelSummary> { it.date.eq(targetDate) }).toList() }
             assertEquals(1, summaries.size)
 
             val summary = summaries.first()
@@ -551,7 +551,7 @@ class FunnelEndpointsTest {
             TestServer.funnel.summarizeNow.test(execute { adminAuth() }, targetDate)
 
             val summaries =
-                execute { TestServer.funnel.summaryInfo.table().find(condition<FunnelSummary> { it.date.eq(targetDate) }).toList() }
+                execute { TestServer.funnel.summaryInfo.table().find(Condition<FunnelSummary> { it.date.eq(targetDate) }).toList() }
             assertEquals(1, summaries.size)
 
             val summary = summaries.first()
@@ -608,7 +608,7 @@ class FunnelEndpointsTest {
             TestServer.funnel.summarizeNow.test(execute { adminAuth() }, targetDate)
 
             val summaries =
-                execute { TestServer.funnel.summaryInfo.table().find(condition<FunnelSummary> { it.date.eq(targetDate) }).toList() }
+                execute { TestServer.funnel.summaryInfo.table().find(Condition<FunnelSummary> { it.date.eq(targetDate) }).toList() }
             assertEquals(1, summaries.size)
 
             val summary = summaries.first()

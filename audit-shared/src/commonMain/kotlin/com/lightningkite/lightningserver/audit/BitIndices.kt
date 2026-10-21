@@ -1,8 +1,9 @@
 package com.lightningkite.lightningserver.audit
 
+import com.lightningkite.services.database.optics.*
 import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.database.Condition
-import com.lightningkite.services.database.DataClassPath
+import com.lightningkite.services.database.optics.Optic
 import com.lightningkite.services.database.InlineProperty
 import kotlin.jvm.JvmInline
 
@@ -99,13 +100,13 @@ private fun ensureValidIndex(index: Int) {
     if (index !in 0..<BitIndices.CAPACITY) throw IndexOutOfBoundsException("Index $index is out of range 0..${BitIndices.CAPACITY-1} for BitIndices")
 }
 
-public fun <T> DataClassPath<T, BitIndices>.containsAll(indices: BitIndices): Condition<T> =
+public fun <T> Optic<T, BitIndices>.containsAll(indices: BitIndices): Condition<T> =
     @OptIn(InlineProperty::class)
     mask.mapCondition(
         Condition.IntBitsSet(indices.mask)
     )
 
-public fun <T> DataClassPath<T, BitIndices>.containsAny(indices: BitIndices): Condition<T> =
+public fun <T> Optic<T, BitIndices>.containsAny(indices: BitIndices): Condition<T> =
     @OptIn(InlineProperty::class)
     mask.mapCondition(
         Condition.IntBitsAnySet(indices.mask)

@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.definition.StartupTask
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.database.*
+import com.lightningkite.services.database.optics.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -35,10 +36,10 @@ public suspend fun doOnce(
         table.insertOne(ActionHasOccurred(_id = key, started = now()))
     } else {
         val lock = table.updateOne(
-            condition<ActionHasOccurred> {
+            Condition<ActionHasOccurred> {
                 (it._id eq key) and (it.completed eq null) and (it.started eq null or (it.started.notNull lt (now() - timeout)))
             },
-            modification { it.started assign now() }
+            Modification { it.started assign now() }
         )
         if (lock.new == null) return
     }
@@ -47,7 +48,7 @@ public suspend fun doOnce(
         action(runtime)
         table.updateOneById(
             key,
-            modification {
+            Modification {
                 it.completed assign now()
                 it.errorMessage assign null
             }
@@ -57,7 +58,7 @@ public suspend fun doOnce(
             .error(e) { "doOnce($key) failed to complete" }
         table.updateOneById(
             key,
-            modification {
+            Modification {
                 (it.errorMessage assign e.message)
                 (it.started assign null)
             }

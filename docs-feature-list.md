@@ -112,7 +112,7 @@ HTTP response.
 
 ## Condition
 
-- `condition(): Condition` - creates a `Condition`
+- `Condition {}` - creates a `Condition`
 - `Condition::Always()` - returns true
 - `Condition::Never()` - returns false
 - `and` - returns true if both of the given `Conditions` are true
@@ -140,7 +140,7 @@ HTTP response.
 
 ## Modification
 
-- `modification(): Modification` - creates a `Modification`
+- `Modification {}` - creates a `Modification`
 - `then` - strings multiple `Modifications` together
 - `assign` - sets the given value to another value
 - `coerceAtMost` - restricts a given number to a given maximum

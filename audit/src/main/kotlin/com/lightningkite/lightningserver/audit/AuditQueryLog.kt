@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.audit
 
+import com.lightningkite.services.database.optics.*
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
@@ -88,7 +89,7 @@ private class AuditQueryLogTable<T : Any>(
 
     // Claude: overridden even though the default goes through find, because a backend may implement it directly.
     override suspend fun findPartial(
-        fields: Set<DataClassPathPartial<T>>,
+        fields: Set<AnyOptic<T>>,
         condition: Condition<T>,
         orderBy: List<SortPart<T>>,
         skip: Int,
@@ -103,7 +104,7 @@ private class AuditQueryLogTable<T : Any>(
     }
 
     override suspend fun findSimilar(
-        vectorField: DataClassPath<T, Embedding>,
+        vectorField: Optic<T, Embedding>,
         params: DenseVectorSearchParams,
         condition: Condition<T>,
         maxQueryMs: Long,
@@ -113,7 +114,7 @@ private class AuditQueryLogTable<T : Any>(
     }
 
     override suspend fun findSimilarSparse(
-        vectorField: DataClassPath<T, SparseEmbedding>,
+        vectorField: Optic<T, SparseEmbedding>,
         params: SparseVectorSearchParams,
         condition: Condition<T>,
         maxQueryMs: Long,
@@ -127,25 +128,25 @@ private class AuditQueryLogTable<T : Any>(
         return wraps.count(condition)
     }
 
-    override suspend fun <Key> groupCount(condition: Condition<T>, groupBy: DataClassPath<T, Key>): Map<Key, Int> {
+    override suspend fun <Key> groupCount(condition: Condition<T>, groupBy: Optic<T, Key>): Map<Key, Int> {
         record(AuditQueryRecord.Operation.GroupCount, condition, groupBy = groupBy.toString())
         return wraps.groupCount(condition, groupBy)
     }
 
-    override suspend fun <N : Number?> aggregate(
+    override suspend fun aggregate(
         aggregate: Aggregate,
         condition: Condition<T>,
-        property: DataClassPath<T, N>,
+        property: Optic<T, out Number?>,
     ): Double? {
         record(AuditQueryRecord.Operation.Aggregate, condition, groupBy = property.toString(), aggregate = aggregate.toString())
         return wraps.aggregate(aggregate, condition, property)
     }
 
-    override suspend fun <N : Number?, Key> groupAggregate(
+    override suspend fun <Key> groupAggregate(
         aggregate: Aggregate,
         condition: Condition<T>,
-        groupBy: DataClassPath<T, Key>,
-        property: DataClassPath<T, N>,
+        groupBy: Optic<T, Key>,
+        property: Optic<T, out Number?>,
     ): Map<Key, Double?> {
         record(
             AuditQueryRecord.Operation.GroupAggregate, condition, groupBy = groupBy.toString(),

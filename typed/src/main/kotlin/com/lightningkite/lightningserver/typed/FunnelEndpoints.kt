@@ -50,7 +50,7 @@ public class FunnelEndpoints(
             description = "Gets the current status of the funnels",
             errorCases = listOf(),
             implementation = { _: Unit ->
-                summaryInfo.table().find(condition { it.date.eq(route.arg1) }).toCollection(HashSet())
+                summaryInfo.table().find(Condition { it.date.eq(route.arg1) }).toCollection(HashSet())
             }
         )
 
@@ -70,7 +70,7 @@ public class FunnelEndpoints(
         }
 
         val data = HashMap<String, Data>()
-        info.table().find(condition { it.started.gt(start) and it.started.lt(end) })
+        info.table().find(Condition { it.started.gt(start) and it.started.lt(end) })
             .collect {
                 val d = data.getOrPut(it.funnel) { Data() }
                 d.expectedErrorRate = it.expectedErrorRate
@@ -89,8 +89,8 @@ public class FunnelEndpoints(
                 }
                 d.count++
             }
-        summaryInfo.table().deleteMany(condition { it.date.eq(targetDate) })
-        summaryInfo.table().insertMany(data.entries.map {
+        summaryInfo.table().deleteMany(Condition { it.date.eq(targetDate) })
+        summaryInfo.table().insert(data.entries.map {
             val errorRate = it.value.error / it.value.count.toFloat()
             FunnelSummary(
                 funnel = it.key,
@@ -148,7 +148,7 @@ public class FunnelEndpoints(
             auth = noAuth,
             summary = "Error Funnel Instance"
         ) { input: String ->
-            info.table().updateOneById(route.arg1, modification {
+            info.table().updateOneById(route.arg1, Modification {
                 it.errors += input
             })
             Unit
@@ -160,7 +160,7 @@ public class FunnelEndpoints(
             auth = noAuth,
             summary = "Set Step Funnel Instance"
         ) { step: Int ->
-            info.table().updateOneById(route.arg1, modification {
+            info.table().updateOneById(route.arg1, Modification {
                 it.step.coerceAtLeast(step)
             })
             Unit
@@ -171,7 +171,7 @@ public class FunnelEndpoints(
             auth = noAuth,
             summary = "Success Funnel Instance"
         ) { _: Unit ->
-            info.table().updateOneById(route.arg1, modification {
+            info.table().updateOneById(route.arg1, Modification {
                 it.success assign now()
             })
             Unit

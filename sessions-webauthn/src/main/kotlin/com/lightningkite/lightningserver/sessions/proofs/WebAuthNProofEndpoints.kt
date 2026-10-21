@@ -17,6 +17,7 @@ import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
 import com.lightningkite.services.cache.*
+import com.lightningkite.services.database.optics.*
 import com.lightningkite.services.database.*
 import com.webauthn4j.WebAuthnManager
 import com.webauthn4j.converter.AttestationObjectConverter
@@ -80,7 +81,7 @@ public class WebAuthNProofEndpoints(
 
     context(_: ServerRuntime)
     private val active
-        get() = condition<WebAuthNCredential> {
+        get() = Condition<WebAuthNCredential> {
             it.disabledAt.eq(null) and (it.expiresAt.eq(null) or it.expiresAt.notNull.gt(now()))
         }
 
@@ -94,9 +95,9 @@ public class WebAuthNProofEndpoints(
         auth = proofMethodAuth or AuthRequirement.IsAdmin,
         signals = { table -> signals?.invoke(serverRuntime, table) ?: table },
         permissions = {
-            val admin = condition(AuthRequirement.IsAdmin.accepts(authOrNull))
+            val admin = Condition(AuthRequirement.IsAdmin.accepts(authOrNull))
             val mine = authOrNull?.let { a ->
-                condition<WebAuthNCredential> {
+                Condition<WebAuthNCredential> {
                     it.subjectId.eq(a.rawId) and it.subjectType.eq(a.principalName)
                 }
             } ?: Condition.Never
@@ -164,7 +165,7 @@ public class WebAuthNProofEndpoints(
         principal: PrincipalType<SUBJECT, ID>,
         subject: SUBJECT,
     ): Boolean {
-        return modelInfo.table().findOne(condition {
+        return modelInfo.table().findOne(Condition {
             Condition.And(
                 it.subjectId eq principal.idString(subject._id),
                 it.subjectType eq principal.name,
@@ -177,7 +178,7 @@ public class WebAuthNProofEndpoints(
     context(server: ServerRuntime)
     private suspend fun userCredentials(subjectId: String, subjectType: String): List<WebAuthN.ExistingCredential> =
         modelInfo.table()
-            .find(condition {
+            .find(Condition {
                 it.subjectId.eq(subjectId) and
                         it.subjectType.eq(subjectType) and
                         active
@@ -480,7 +481,7 @@ public class WebAuthNProofEndpoints(
                 // asserting "<PrivilegedType>/_id = <their own id>" -- which AuthEndpoints.login will honour
                 // wherever the two types share an id space.
                 val publicKeyCredential: WebAuthNCredential = modelInfo.table()
-                    .find(condition {
+                    .find(Condition {
                         it._id.eq(credentials.id) and
                                 it.subjectType.eq(fromCache.subjectType) and
                                 active
@@ -552,7 +553,7 @@ public class WebAuthNProofEndpoints(
                 //  (passkey lock-out risk, clone detection, multi-device). Deferred intentionally.
                 modelInfo.table().updateOneById(
                     publicKeyCredential._id,
-                    modification {
+                    Modification {
                         it.lastUsedAt assign now()
                         it.lastSignCount assign (authData.authenticatorData?.signCount ?: 0L)
                         authData.authenticatorData?.let { flags ->

@@ -18,6 +18,7 @@ import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.data.DataSize
 import com.lightningkite.services.data.DataSize.Companion.gibibytes
 import com.lightningkite.services.data.EmailAddress
+import com.lightningkite.services.data.toEmailAddress
 import com.lightningkite.services.pubsub.PubSub
 import com.lightningkite.services.terraform.AwsVpc
 import com.lightningkite.services.terraform.terraformJsonObject
@@ -61,7 +62,7 @@ class Ec2BuilderGenerationTest {
         override val domainZone = "example.com"
         override val domain = "single.example.com"
         override val debug = true
-        override val emergencyContact = EmailAddress("ops@example.com")
+        override val emergencyContact = "ops@example.com".toEmailAddress()
         override val instanceType = "t4g.medium"
         override val instanceArchitecture = CPUArchitecture.Arm
         override val applicationVpc = AwsVpc.Default
@@ -78,7 +79,7 @@ class Ec2BuilderGenerationTest {
         override val domainZone = "example.com"
         override val domain = "scaling.example.com"
         override val debug = true
-        override val emergencyContact = EmailAddress("ops@example.com")
+        override val emergencyContact = "ops@example.com".toEmailAddress()
         override val instanceType = "t4g.medium"
         override val instanceArchitecture = CPUArchitecture.Arm
         override val applicationVpc = terraformManagedVPC(
@@ -97,7 +98,7 @@ class Ec2BuilderGenerationTest {
         override val domainZone = "example.com"
         override val domain = "online.example.com"
         override val debug = true
-        override val emergencyContact = EmailAddress("ops@example.com")
+        override val emergencyContact = "ops@example.com".toEmailAddress()
         override val instanceType = "t4g.medium"
         override val instanceArchitecture = CPUArchitecture.Arm
         override val applicationVpc = terraformManagedVPC(
@@ -118,7 +119,7 @@ class Ec2BuilderGenerationTest {
         override val domainZone = "example.com"
         override val domain = "swap-single.example.com"
         override val debug = true
-        override val emergencyContact = EmailAddress("ops@example.com")
+        override val emergencyContact = "ops@example.com".toEmailAddress()
         override val instanceType = "t4g.medium"
         override val instanceArchitecture = CPUArchitecture.Arm
         override val applicationVpc = AwsVpc.Default
@@ -135,7 +136,7 @@ class Ec2BuilderGenerationTest {
         override val domainZone = "example.com"
         override val domain = "swap-scaling.example.com"
         override val debug = true
-        override val emergencyContact = EmailAddress("ops@example.com")
+        override val emergencyContact = "ops@example.com".toEmailAddress()
         override val instanceType = "t4g.medium"
         override val instanceArchitecture = CPUArchitecture.Arm
         override val applicationVpc = terraformManagedVPC(
@@ -155,7 +156,7 @@ class Ec2BuilderGenerationTest {
         override val domainZone = "example.com"
         override val domain = "cmk.example.com"
         override val debug = true
-        override val emergencyContact = EmailAddress("ops@example.com")
+        override val emergencyContact = "ops@example.com".toEmailAddress()
         override val instanceType = "t4g.medium"
         override val instanceArchitecture = CPUArchitecture.Arm
         override val applicationVpc = terraformManagedVPC(
@@ -327,7 +328,7 @@ class Ec2BuilderGenerationTest {
                 override val domainZone = "example.com"
                 override val domain = "swap-big.example.com"
                 override val debug = true
-                override val emergencyContact = EmailAddress("ops@example.com")
+                override val emergencyContact = "ops@example.com".toEmailAddress()
                 override val instanceType = "t4g.medium"
                 override val instanceArchitecture = CPUArchitecture.Arm
                 override val applicationVpc = AwsVpc.Default
@@ -356,7 +357,7 @@ class Ec2BuilderGenerationTest {
         override val domainZone = "example.com"
         override val domain = "$name.example.com"
         override val debug = true
-        override val emergencyContact = EmailAddress("ops@example.com")
+        override val emergencyContact = "ops@example.com".toEmailAddress()
         override val instanceType = "t4g.medium"
         override val instanceArchitecture = CPUArchitecture.Arm
         override val applicationVpc = AwsVpc.Default
@@ -377,7 +378,7 @@ class Ec2BuilderGenerationTest {
         override val domainZone = "example.com"
         override val domain = "scaling-$name.example.com"
         override val debug = true
-        override val emergencyContact = EmailAddress("ops@example.com")
+        override val emergencyContact = "ops@example.com".toEmailAddress()
         override val instanceType = "t4g.medium"
         override val instanceArchitecture = CPUArchitecture.Arm
         override val applicationVpc = terraformManagedVPC(

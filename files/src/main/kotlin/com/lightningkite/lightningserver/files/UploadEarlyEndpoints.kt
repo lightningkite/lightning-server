@@ -122,7 +122,7 @@ public class UploadEarlyEndpoint(
                         // The row exists only to keep the file alive until something claims it; now that
                         // something has, drop it so the cleanup task doesn't delete a file in use.
                         runBlocking {
-                            table.deleteManyIgnoringOld(condition { it.file eq file.serverFile })
+                            table.deleteManyIgnoringOld(Condition { it.file eq file.serverFile })
                         }
                     }
                 }
@@ -240,7 +240,7 @@ public class UploadEarlyEndpoint(
      * Daily cleanup of expired uploads. Removes database entries and attempts to delete the associated file.
      */
     public val cleanupSchedule: ScheduledTask = path.path("cleanupUploads") bind ScheduledTask(frequency = 1.days) {
-        uploadForNextRequestTable().deleteMany(condition { it.expires lt now() }).forEach {
+        uploadForNextRequestTable().deleteMany(Condition { it.expires lt now() }).forEach {
             try {
                 it.file.externalFile.delete()
             } catch (e: Exception) {

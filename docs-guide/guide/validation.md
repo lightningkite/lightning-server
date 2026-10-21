@@ -261,7 +261,7 @@ For asynchronous checks (for example, checking a database for uniqueness):
 //     val users = database.registerTable<User>("User")
 AnnotationValidators {
     validateSuspending<MustBeUnique, String> { value ->
-        if (users().count(condition { it.email eq value }) > 0)
+        if (users().count(Condition { it.email eq value }) > 0)
             "Email is already registered"
         else null
     }

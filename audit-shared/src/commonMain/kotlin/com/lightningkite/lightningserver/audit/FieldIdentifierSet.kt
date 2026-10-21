@@ -1,10 +1,11 @@
 package com.lightningkite.lightningserver.audit
 
+import com.lightningkite.services.database.optics.*
 import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.database.Condition
-import com.lightningkite.services.database.DataClassPath
+import com.lightningkite.services.database.optics.Optic
 import com.lightningkite.services.database.InlineProperty
-import com.lightningkite.services.database.SerializableProperty
+import com.lightningkite.services.database.optics.Field
 import com.lightningkite.services.database.andNotNull
 import com.lightningkite.services.database.orNotNull
 import kotlinx.serialization.SerialName
@@ -81,7 +82,7 @@ public data class FieldIdentifierSet(
 
         public val EMPTY: FieldIdentifierSet = FieldIdentifierSet(Segment(0), Segment(0))
 
-        internal val segmentProperties: Array<SerializableProperty<FieldIdentifierSet, Segment>> = arrayOf(fields0, fields1)
+        internal val segmentProperties: Array<Field<FieldIdentifierSet, Segment>> = arrayOf(fields0, fields1)
 
         /**
          * Creates a [FieldIdentifierSet] set from a sequence of ids.
@@ -117,14 +118,14 @@ private inline fun FieldIdentifierSet.mapSegmentConditions(transform: (Int) -> C
     }
 }
 
-public fun <T> DataClassPath<T, FieldIdentifierSet>.containsAny(ids: FieldIdentifierSet): Condition<T> =
+public fun <T> Optic<T, FieldIdentifierSet>.containsAny(ids: FieldIdentifierSet): Condition<T> =
     mapCondition(
         Condition.orNotNull(
             *ids.mapSegmentConditions(Condition<Int>::IntBitsAnySet)
         )
     )
 
-public fun <T> DataClassPath<T, FieldIdentifierSet>.containsAll(ids: FieldIdentifierSet): Condition<T> =
+public fun <T> Optic<T, FieldIdentifierSet>.containsAll(ids: FieldIdentifierSet): Condition<T> =
     mapCondition(
         Condition.andNotNull(
             *ids.mapSegmentConditions(Condition<Int>::IntBitsSet)

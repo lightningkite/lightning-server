@@ -25,11 +25,11 @@ public class OauthClientEndpoints(
         permissions = {
             val isRoot = maintainPermissions.accepts(authOrNull)
             ModelPermissions(
-                read = condition(true),
+                read = Condition(true),
                 readMask = mask {
-                    it.secrets.maskedTo(setOf()).unless(condition(isRoot))
+                    it.secrets.maskedTo(setOf()).unless(Condition(isRoot))
                 },
-                manage = condition(isRoot)
+                manage = Condition(isRoot)
             )
         },
     )
@@ -41,7 +41,7 @@ public class OauthClientEndpoints(
             summary = "Create Secret",
             implementation = { _: Unit ->
                 val newSecret = Base64.getEncoder().encodeToString(Random.nextBytes(24))
-                modelInfo.table().updateOneById(request.arg1, modification {
+                modelInfo.table().updateOneById(request.arg1, Modification {
                     it.secrets += OauthClientSecret(
                         masked = newSecret.take(3) + "*".repeat(newSecret.length - 3),
                         secretHash = newSecret.secureHash(),

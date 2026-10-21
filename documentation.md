@@ -347,21 +347,21 @@ Conversely, you can also set the `Condition` to never be true (or rather to alwa
 
 <pre><code>Condition.Never()</code></pre>
 
-You can also create a `Condition` using the function `condition()`, which has an internal syntax using infix operators:
+You can also create a `Condition` using the function `Condition {}`, which has an internal syntax using infix operators:
 
-<pre><code>condition { it: User -> it.firstname eq "Test First Name" }</code></pre>
+<pre><code>Condition { it: User -> it.firstname eq "Test First Name" }</code></pre>
 
 Given a `User`, this `Condition` would return true if the `firstname` on it equals the string `"Test First Name"`.
 
 Like with normal if statements, you can test for multiple `Conditions` at once using the infix operators `and` and
 `or`, which work as you would expect. Note that you need to wrap individual conditions in parentheses:
 
-<pre><code>condition {
+<pre><code>Condition {
     (it.firstname eq "Test First Name") and
     (it.lastname eq "Test Last Name")
 }</code></pre>
 
-<pre><code>condition {
+<pre><code>Condition {
     (it.firstname eq "Test First Name") or
     (it.lastname eq "Test Last Name")
 }</code></pre>
@@ -369,7 +369,7 @@ Like with normal if statements, you can test for multiple `Conditions` at once u
 Here is an example of how you could use this to get a list of `Users` from the collection that are all admins using the
 function `find()`, which needs a `Condition`:
 
-<pre><code>val users = collection.find(condition = condition {
+<pre><code>val users = collection.find(condition = Condition {
     it.isAdmin eq true
 })</code></pre>
 
@@ -385,12 +385,12 @@ instance will not affect the data in the database. So how do you change existing
 `Modifications` are very similar to `Conditions` syntactically. If you wanted to modify the name of
 an existing `User` in the database, you could write this `Modification`:
 
-<pre><code>modification { it.firstname assign "New First Name" }</code></pre>
+<pre><code>Modification { it.firstname assign "New First Name" }</code></pre>
 
 You can also chain multiple `Modifications` together using the infix operator `then`. Like with `Conditions`, you have
 to wrap individual modifications with parentheses:
 
-<pre>modification {
+<pre>Modification {
     (it.firstname assign "New First Name") then
     (it.lastname assign "New Last Name")
 }</pre>
@@ -399,7 +399,7 @@ Here is an example of how you could use a `Modification` to modify the name of a
 the function `updateOneById()`:
 
 <pre><code>val userId = /* obtain user id */
-collection.updateOneById(id = userId, modification = modification {
+collection.updateOneById(id = userId, modification = Modification {
     it.firstname assign "New First Name"
 })</code></pre>
 
@@ -507,8 +507,8 @@ read and write their own fields, such as their `firstname` and `lastname`? To do
     return collection.withPermissions(
         ModelPermissions(
             create = admins,
-            read = if (principal != null) condition { it._id eq principal._id } else admins,
-            update = if (principal != null) condition { it._id eq principal._id } else admins,
+            read = if (principal != null) Condition { it._id eq principal._id } else admins,
+            update = if (principal != null) Condition { it._id eq principal._id } else admins,
             delete = admins
         )
     )
@@ -524,8 +524,8 @@ able to edit their `firstname` and `lastname` fields, but you definitely wouldn'
     return collection.withPermissions(
         ModelPermissions(
             create = admins,
-            read = if (principal != null) condition { it._id eq principal._id } else admins,
-            update = if (principal != null) condition { it._id eq principal._id } else admins,
+            read = if (principal != null) Condition { it._id eq principal._id } else admins,
+            update = if (principal != null) Condition { it._id eq principal._id } else admins,
             updateRestrictions = updateRestrictions {
                 it._id.cannotBeModified(),
                 it.isAdmin.cannotBeModified()
@@ -544,8 +544,8 @@ a `User`:
     return collection.withPermissions(
         ModelPermissions(
             create = admins,
-            read = if (principal != null) condition { it._id eq principal._id } else admins,
-            update = if (principal != null) condition { it._id eq principal._id } else admins,
+            read = if (principal != null) Condition { it._id eq principal._id } else admins,
+            update = if (principal != null) Condition { it._id eq principal._id } else admins,
             updateRestrictions = updateRestrictions {
                 it._id.cannotBeModified(),
                 it.isAdmin.requires(admins)
@@ -562,12 +562,12 @@ You can also apply similar granular restrictions to reading the fields as well. 
     return collection.withPermissions(
         ModelPermissions(
             create = admins,
-            read = if (principal != null) condition { it._id eq principal._id } else admins,
+            read = if (principal != null) Condition { it._id eq principal._id } else admins,
             readMask = mask {
                 it._id.maskedTo(null).unless(admins),
                 it.isAdmin.maskedTo(null).unless(admins)
             },
-            update = if (principal != null) condition { it._id eq principal._id } else admins,
+            update = if (principal != null) Condition { it._id eq principal._id } else admins,
             updateRestrictions = updateRestrictions {
                 it._id.cannotBeModified(),
                 it.isAdmin.requires(admins)

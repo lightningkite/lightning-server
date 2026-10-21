@@ -15,6 +15,7 @@ import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.sessions.token.*
 import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.services.database.optics.*
 import com.lightningkite.services.database.*
 import dev.whyoleg.cryptography.random.CryptographyRandom
 import io.opentelemetry.api.trace.Span
@@ -97,7 +98,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     context(server: ServerRuntime)
     public abstract suspend fun sessionStaleAfter(subject: SUBJECT): Duration?
 
-    private val spath = Session.path(principal.subjectSerializer, principal.idSerializer)
+    private val spath = IdentityLens(Session.serializer(principal.subjectSerializer, principal.idSerializer))
 
     public val sessionInfo: ModelInfo<SUBJECT, Session<SUBJECT, ID>, Uuid> =
         database.explicitModelInfo(
@@ -132,14 +133,14 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                     else -> spath.subjectId eq auth.id
                 }
 
-                val isRoot = condition(AuthRequirement.IsSuperUser.accepts(auth))
+                val isRoot = Condition(AuthRequirement.IsSuperUser.accepts(auth))
 
                 ModelPermissions(
                     create = isRoot,
                     read = canUse or isRoot,
                     readMask = Mask(
                         listOf(
-                            Condition.Never to modification(spath) { it.secretHash assign "" }
+                            Condition.Never to Modification(spath) { it.secretHash assign "" }
                         )
                     ),
                     update = isRoot,
@@ -257,7 +258,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             val owner = sessionInfo.table().get(id)?.subjectId ?: throw ForbiddenException()
             if (owner != requireOwnershipOf) throw ForbiddenException()
         }
-        sessionInfo.table().updateOneById(id, modification(spath) { it.terminated assign now() })
+        sessionInfo.table().updateOneById(id, Modification(spath) { it.terminated assign now() })
     }
 
     context(server: ServerRuntime)
@@ -289,7 +290,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         }
         sessionInfo.table().updateMany(
             (spath._id inside seen) and (spath.terminated eq null),
-            modification(spath) { it.terminated assign now() },
+            Modification(spath) { it.terminated assign now() },
         )
     }
 
@@ -342,7 +343,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         val shouldMigrate = session.secretHash.isSlowHash()
 
         // Update session metadata on each use for audit trail and sliding expiration
-        sessionInfo.table().updateOneById(_id, modification(spath) {
+        sessionInfo.table().updateOneById(_id, Modification(spath) {
             it.lastUsed assign now()
             // Record only what was actually observed. These sets are the closest thing the system
             // has to an authentication audit trail, and a placeholder in them is indistinguishable

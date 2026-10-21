@@ -285,7 +285,7 @@ object UserAuth : PrincipalType<User, Uuid> {
 ## The `ksp` processor
 
 `@Queryable` triggers a KSP (Kotlin Symbol Processing) annotation processor
-that generates the `DataClassPaths` DSL used by `condition {}` and `modification {}`.
+that generates the `DataClassPaths` DSL used by `Condition {}` and `Modification {}`.
 The processor artifact ships with the **Service Abstractions** library (not Lightning Server
 itself):
 

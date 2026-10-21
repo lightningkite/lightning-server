@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.audit
 
+import com.lightningkite.services.database.optics.*
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
@@ -10,9 +11,9 @@ import com.lightningkite.services.data.UuidV7
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.EntryChange
 import com.lightningkite.services.database.Partial
-import com.lightningkite.services.database.SerializableProperty
+import com.lightningkite.services.database.optics.Field
 import com.lightningkite.services.database.nullElement
-import com.lightningkite.services.database.serializableProperties
+import com.lightningkite.services.database.optics.fields
 import com.lightningkite.services.database.toPartialEntry
 import com.lightningkite.services.database.Table
 import com.lightningkite.services.database.partialOfDifference
@@ -112,16 +113,16 @@ private fun <T> partialOfAuditedDifference(serializer: KSerializer<T>, old: T?, 
     val unwrapped = (serializer.nullElement() ?: serializer) as KSerializer<T>
     val descriptor = unwrapped.descriptor
     val partial = Partial<T>()
-    for (property in unwrapped.serializableProperties!!) {
+    for (property in unwrapped.fields!!) {
         @Suppress("UNCHECKED_CAST")
-        property as SerializableProperty<T, Any?>
+        property as Field<T, Any?>
         val oldValue = old?.let(property::get)
         val newValue = property.get(new)
         if (old != null && oldValue == newValue) continue
 
         val index = descriptor.getElementIndex(property.name)
         val type = descriptor.getElementDescriptor(index)
-        val isComposite = !type.isInline && (property.serializer.nullElement() ?: property.serializer).serializableProperties != null
+        val isComposite = !type.isInline && (property.serializer.nullElement() ?: property.serializer).fields != null
         when {
             descriptor.isElementAudited(index) -> partial.parts[property] =
                 if (isComposite) partialOfDifference(property.serializer, oldValue, newValue) else newValue

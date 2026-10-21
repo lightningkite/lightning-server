@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.typed.sdk
 
+import com.lightningkite.services.database.optics.*
 import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.services.data.serialNameFQN
 import com.lightningkite.services.database.*
@@ -84,12 +85,12 @@ public fun KSerializer<*>.subSerializers(): Array<KSerializer<*>> = nullElement(
     ?: (this as? ModificationSerializer<*>)?.inner?.let { arrayOf(it) }
     ?: (this as? PartialSerializer<*>)?.source?.let { arrayOf(it) }
     ?: (this as? SortPartSerializer<*>)?.inner?.let { arrayOf(it) }
-    ?: (this as? DataClassPathSerializer<*>)?.inner?.let { arrayOf(it) }
+    ?: (this as? AnyOpticSerializer<*>)?.root?.let { arrayOf(it) }
     ?: arrayOf()
 
 @OptIn(InternalSerializationApi::class)
 public fun KSerializer<*>.subAndChildSerializers(): Array<KSerializer<*>> = nullElement()?.let { arrayOf(it) }
-    ?: serializableProperties?.map { it.serializer }?.toTypedArray()
+    ?: fields?.map { it.serializer }?.toTypedArray()
     ?: listElement()?.let { arrayOf(it) }
     ?: mapValueElement()?.let { arrayOf(it) }
     ?: (this as? GeneratedSerializer<*>)?.run { childSerializers() + typeParametersSerializers() }
@@ -97,7 +98,7 @@ public fun KSerializer<*>.subAndChildSerializers(): Array<KSerializer<*>> = null
     ?: (this as? ModificationSerializer<*>)?.inner?.let { arrayOf(it) }
     ?: (this as? PartialSerializer<*>)?.source?.let { arrayOf(it) }
     ?: (this as? SortPartSerializer<*>)?.inner?.let { arrayOf(it) }
-    ?: (this as? DataClassPathSerializer<*>)?.inner?.let { arrayOf(it) }
+    ?: (this as? AnyOpticSerializer<*>)?.root?.let { arrayOf(it) }
     // Recurse into sealed subtypes so their serializers (and the types they reference) are collected.
     ?: sealedOptionsOrNull()?.map { it.serializer }?.toTypedArray()
     ?: arrayOf()

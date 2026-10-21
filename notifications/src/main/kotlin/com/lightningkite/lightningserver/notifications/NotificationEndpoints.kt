@@ -168,7 +168,7 @@ public open class NotificationEndpoints<
             permissions = {
                 ModelPermissions(
                     read = Condition.Always,
-                    manage = condition(AuthRequirement.IsSuperUser.accepts(auth))
+                    manage = Condition(AuthRequirement.IsSuperUser.accepts(auth))
                 )
             }
         ).withSdkInfo(valueName = "events")

@@ -28,7 +28,7 @@ on that intersection.
 | **Endpoint style** | `@RestController` + `@GetMapping` / `@PostMapping` | `ServerBuilder` object with `path.method bind ApiHttpHandler(...)` | LS endpoints are stored as values — directly testable |
 | **Dependency injection** | `@Autowired` / constructor injection via IoC container | Direct Kotlin object access; services injected via `context(server: ServerRuntime)` | LS has no DI container |
 | **Configuration** | `application.yml` / `@ConfigurationProperties` | `settings.json` auto-generated on first run; `setting("key", Default)` in code | LS defaults are Kotlin types, not YAML strings |
-| **Data models / ORM** | Spring Data JPA — `@Entity` + `JpaRepository<T, ID>` | `@Queryable data class T : HasId<ID>`; query DSL via `condition {}` / `modification {}` | LS default backend is MongoDB; partial Postgres support exists |
+| **Data models / ORM** | Spring Data JPA — `@Entity` + `JpaRepository<T, ID>` | `@Queryable data class T : HasId<ID>`; query DSL via `Condition {}` / `Modification {}` | LS default backend is MongoDB; partial Postgres support exists |
 | **Migrations** | Flyway / Liquibase required for every schema change | Not required for MongoDB (schemaless) | Adding fields to a model is zero-effort in LS |
 | **Auto-CRUD** | Spring Data REST `@RepositoryRestResource` | `ModelRestEndpoints` (generates 8 endpoints: query, get, insert, update, delete, count, bulk upsert, bulk delete) | LS also generates typed client SDKs for the CRUD surface |
 | **Auto-admin panel** | None built-in (community projects exist) | Via `lightning-server-kiteui` companion package | Both auto-generate from model definitions |
@@ -130,12 +130,12 @@ data class User(
 // No repository interface — use the table directly:
 val users = userTable()
 
-users.find(condition { it.email.contains("@example.com") }).toList()
-users.findOne(condition { (it.email eq email) and (it.active eq true) })
-users.updateOne(condition { it._id eq id }, modification { it.active assign false })
+users.find(Condition { it.email.contains("@example.com") }).toList()
+users.findOne(Condition { (it.email eq email) and (it.active eq true) })
+users.updateOne(Condition { it._id eq id }, Modification { it.active assign false })
 ```
 
-Renaming `email` to `emailAddress` in the data class will cause every `condition { it.email … }` call to fail
+Renaming `email` to `emailAddress` in the data class will cause every `Condition { it.email … }` call to fail
 at compile time — no runtime surprises.
 
 ### Configuration Properties
@@ -395,7 +395,7 @@ If you're porting a Spring Boot service to Lightning Server, the largest concept
 | Classpath scanning finds `@Component` / `@Controller` | You add endpoints to `ServerBuilder` explicitly |
 | `@Autowired` injects the dependency | You call `database()` / `cache()` / `email()` directly |
 | `@Cacheable` / `@CacheEvict` annotates a method | You write `cache().get(key) ?: ...` / `cache().set(key, ...)` |
-| Method-name conventions generate JPA queries | You write `condition { it.field eq value }` |
+| Method-name conventions generate JPA queries | You write `Condition { it.field eq value }` |
 | `@Scheduled` annotates a component method | You declare `path.path("schedules").path("name") bind ScheduledTask(schedule = Schedule.Frequency(...)) { }` |
 | Profiles (`dev`, `prod`) switch configurations | You deploy different `settings.json` files |
 

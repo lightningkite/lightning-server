@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.notifications.subscriptions
 
+import com.lightningkite.services.database.optics.*
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.StartupTask
@@ -79,7 +80,7 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
     info: ModelInfo<AUTH, NotificationEventSubscription<UID>, UserEventType<UID>>,
     users: ModelInfo<*, USER, UID>,
     private val principal: PrincipalType<USER, UID>,
-    webSocketKey: SerializableProperty<NotificationEventSubscription<UID>, *> = info.serializer.field_id,
+    webSocketKey: Field<NotificationEventSubscription<UID>, *> = info.serializer.field_id,
     private val suppressRejectedAuthenticationWarnings: Boolean = false,
 ) : NotificationEndpoints.Subscriptions<USER, UID>, ServerBuilder() {
 
@@ -117,7 +118,7 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
     public val rest: ModelRestEndpointsAndUpdatesWebSocket<AUTH, NotificationEventSubscription<UID>, UserEventType<UID>> =
         path.path("rest") include ModelRestEndpointsAndUpdatesWebSocket(info, webSocketKey)
 
-    private val self = DataClassPathSelf(info.serializer)
+    private val self = IdentityLens(info.serializer)
 
     /**
      * Configuration for a default subscription that is automatically created for new users.
@@ -340,7 +341,7 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
 
             val inserted =
                 toInsert + withUserChanges.values + toReplace.values.filterNotNull() + justReadPermissions.values
-            if (inserted.isNotEmpty()) insertMany(inserted)
+            if (inserted.isNotEmpty()) insert(inserted)
         }
     }
 

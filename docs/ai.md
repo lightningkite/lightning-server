@@ -57,16 +57,16 @@ object MyChatBot : LLMChatEndpoints<User>(
         // Only allow access to your own conversations
         ModelPermissions.create().also {
             it.create { true }
-            it.read { condition { it.subjectId eq auth.rawId.toString() } }
-            it.update { condition { it.subjectId eq auth.rawId.toString() } }
-            it.delete { condition { it.subjectId eq auth.rawId.toString() } }
+            it.read { Condition { it.subjectId eq auth.rawId.toString() } }
+            it.update { Condition { it.subjectId eq auth.rawId.toString() } }
+            it.delete { Condition { it.subjectId eq auth.rawId.toString() } }
         }
     },
     messagePermissions = {
         // Only allow access to messages in your own conversations
         ModelPermissions.create().also {
             it.create { true }
-            it.read { condition { it.subjectId eq auth.rawId.toString() } }
+            it.read { Condition { it.subjectId eq auth.rawId.toString() } }
             it.update { Condition.Never }
             it.delete { Condition.Never }
         }
@@ -336,7 +336,7 @@ object MyVoiceSupport : VoiceChannelSupport<User, Uuid>(
     turnDetection = TurnDetection.ServerVAD(),
     resolveSubjectByPhone = { phone ->
         // Resolve user from phone number for incoming calls
-        Server.usersTable().findOne(condition { it.phone eq phone.raw })
+        Server.usersTable().findOne(Condition { it.phone eq phone.raw })
     },
     voiceInstructions = "Greet the user and ask how you can help.",
     historyMessageLimit = 20,
@@ -367,10 +367,10 @@ object MyExternalChannels : ExternalChannelSupport<User, Uuid>(
     emailOutbound = Server.emailOutbound,
     emailFromAddress = EmailAddressWithName("bot@example.com", "My Bot"),
     resolveSubjectByPhone = { phone ->
-        Server.usersTable().findOne(condition { it.phone eq phone.raw })
+        Server.usersTable().findOne(Condition { it.phone eq phone.raw })
     },
     resolveSubjectByEmail = { email ->
-        Server.usersTable().findOne(condition { it.email eq email.raw })
+        Server.usersTable().findOne(Condition { it.email eq email.raw })
     },
 )
 

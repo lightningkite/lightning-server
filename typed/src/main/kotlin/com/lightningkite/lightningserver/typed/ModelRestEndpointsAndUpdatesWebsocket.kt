@@ -1,10 +1,11 @@
 package com.lightningkite.lightningserver.typed
 
+import com.lightningkite.services.database.optics.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
 import com.lightningkite.services.database.HasId
-import com.lightningkite.services.database.SerializableProperty
+import com.lightningkite.services.database.optics.Field
 
 public class ModelRestEndpointsAndUpdatesWebSocket<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
     endpoints: ModelRestEndpoints<USER, T, ID>,
@@ -25,7 +26,7 @@ public class ModelRestEndpointsAndUpdatesWebSocket<USER : HasId<*>?, T : HasId<I
     public val endpoints: ModelRestEndpoints<USER, T, ID> = path include endpoints
     public val webSocket: ModelRestUpdatesWebSocket<USER, T, ID> = path include webSocket
 
-    public constructor(info: ModelInfo<USER, T, ID>, key: SerializableProperty<T, *>? = null) : this(
+    public constructor(info: ModelInfo<USER, T, ID>, key: Field<T, *>? = null) : this(
         ModelRestEndpoints(info),
         ModelRestUpdatesWebSocket(info, key)
     )

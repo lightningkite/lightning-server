@@ -104,7 +104,7 @@ val postInfo = database.modelInfo(
     auth = UserAuth.require() or AuthRequirement.None,
     permissions = {
         val user = authOrNull?.fetch()
-        val isOwner = condition { it.authorId eqNn user?._id }
+        val isOwner = Condition { it.authorId eqNn user?._id }
 
         ModelPermissions(
             create = if (user != null) Condition.Always else Condition.Never,
@@ -172,23 +172,23 @@ val posts = postTable()                                // inside a handler: the 
 posts.insertOne(Post(title = "Hello", content = "World"))
 
 // Query
-posts.find(condition { it.title eq "Hello" }).toList()
+posts.find(Condition { it.title eq "Hello" }).toList()
 
 // Update
 posts.updateOne(
-    condition { it._id eq id },
-    modification { it.title assign "Updated" }
+    Condition { it._id eq id },
+    Modification { it.title assign "Updated" }
 )
 
 // Delete
-posts.deleteMany(condition { it.authorId eq userId })
+posts.deleteMany(Condition { it.authorId eq userId })
 
 // Complex queries
 posts.find(
-    condition = condition {
+    condition = Condition {
         (it.title.contains("Kotlin")) and (it.createdAt gt yesterday)
     },
-    orderBy = listOf(SortPart(Post.path.createdAt, false)),
+    orderBy = listOf(SortPart(Post.createdAt, false)),
     skip = page * pageSize,
     limit = pageSize
 ).toList()
@@ -229,7 +229,7 @@ val userInfo: ModelInfo<User?, User, Uuid> = database.modelInfo(
     auth = UserAuth.require() or AuthRequirement.None,
     permissions = {
         val user = authOrNull?.fetch()
-        val self = condition { it._id eqNn user?._id }
+        val self = Condition { it._id eqNn user?._id }
         val admin = if (user?.isSuperUser == true) Condition.Always else Condition.Never
 
         ModelPermissions(
@@ -334,7 +334,7 @@ val cleanup = path.path("scheduled-cleanup") bind ScheduledTask(
     frequency = 1.hours
 ) {
     println("Running cleanup...")
-    oldDataTable().deleteMany(condition {
+    oldDataTable().deleteMany(Condition {
         it.createdAt lt Clock.System.now() - 30.days
     })
 }

@@ -386,7 +386,7 @@ val subs = FrequencyCustomizableSubscriptions<User, Uuid>(
     info         = Server.database.modelInfo<User, NotificationSendMethods<Uuid>, UserEventType<Uuid>>(
         auth        = Server.auth,
         tableName   = "NotificationSendMethods",
-        permissions = { ModelPermissions(read = condition { it.user eq auth.id }) }
+        permissions = { ModelPermissions(read = Condition { it.user eq auth.id }) }
     ),
     defaultEmail = Frequency.batch(60),   // hourly by default
     defaultPush  = Frequency.immediately(),
@@ -450,7 +450,7 @@ object MyDispatcher : NotificationBulkDispatcher<User, Uuid, String>(
     info              = Server.database.modelInfo<HasId<*>, Notification<Uuid, String>, Uuid>(
         auth        = Server.auth,
         tableName   = "Notification",
-        permissions = { ModelPermissions(read = condition { it.user eq auth.id }) }
+        permissions = { ModelPermissions(read = Condition { it.user eq auth.id }) }
     ),
     cache             = Server.cache,
     database          = Server.database,
@@ -480,8 +480,8 @@ object MyDispatcher : NotificationBulkDispatcher<User, Uuid, String>(
     context(server: ServerRuntime)
     override suspend fun onFcmTokensDead(user: User, deadTokens: Set<String>) {
         Server.userInfo.table().updateOne(
-            condition { it._id eq user._id },
-            modification { it.fcmTokens remove deadTokens }
+            Condition { it._id eq user._id },
+            Modification { it.fcmTokens remove deadTokens }
         )
     }
 
@@ -567,7 +567,7 @@ val registerToken = path.path("push").path("register").post bind ApiHttpHandler(
     implementation = { token: String ->
         Server.userInfo.table().updateOne(
             condition  { it._id eq auth.fetch()._id },
-            modification { it.fcmTokens add token }
+            Modification { it.fcmTokens add token }
         )
     }
 )

@@ -113,7 +113,7 @@ Two secondary constructors let you express common patterns more concisely:
 // Separate read and manage conditions (manage = create + update + delete)
 ModelPermissions(
     read = Condition.Always,
-    manage = condition { it.authorId eq currentUserId },
+    manage = Condition { it.authorId eq currentUserId },
 )
 
 // Same condition for all four operations
@@ -138,12 +138,12 @@ val postInfo = database.modelInfo(
     permissions = {
         val user: User? = authOrNull?.fetch()
         val isAdmin: Boolean = user?.isSuperUser == true
-        val selfCondition: Condition<Post> = condition { it.authorId eqNn user?._id }
+        val selfCondition: Condition<Post> = Condition { it.authorId eqNn user?._id }
 
         ModelPermissions(
             // Anyone (even anonymous) may read published posts
             read = if (isAdmin) Condition.Always
-                   else condition { it.published eq true } or selfCondition,
+                   else Condition { it.published eq true } or selfCondition,
 
             // Only the author (or admin) may create / update / delete
             create = if (isAdmin) Condition.Always else selfCondition,
@@ -210,7 +210,7 @@ caller from inferring secret field values by issuing queries like
 `internalNotes neq ""` and observing which records come back.
 
 Concretely: if `internalNotes` is masked (overwritten with `""`) for a caller,
-then a `find(condition { it.internalNotes eq "secret" })` will match nothing,
+then a `find(Condition { it.internalNotes eq "secret" })` will match nothing,
 because the `self or admin` condition is added to the database query,
 restricting the result set to only those rows where the field is actually
 visible to the caller.
@@ -320,14 +320,14 @@ object PostServer : ServerBuilder() {
             val isAdmin = user?.isSuperUser == true
 
             val selfCondition: Condition<Post> =
-                condition { it.authorId eqNn user?._id }
+                Condition { it.authorId eqNn user?._id }
             val adminOrSelf: Condition<Post> =
                 if (isAdmin) Condition.Always else selfCondition
 
             ModelPermissions(
                 create = adminOrSelf,
                 read = if (isAdmin) Condition.Always
-                       else condition { it.published eq true } or selfCondition,
+                       else Condition { it.published eq true } or selfCondition,
                 readMask = mask {
                     // Visitors (not the author) see internalNotes redacted to ""
                     it.internalNotes.mask("", unless = adminOrSelf)
@@ -490,5 +490,5 @@ ModelPermissions(
   for how `PrincipalType`, proofs, and session tokens are established before
   permissions are evaluated.
 - **Database DSL** — see [Database & the Query DSL](../guide/database.md) for
-  the full set of `condition { }` and `modification { }` operators used in
+  the full set of `Condition { }` and `Modification { }` operators used in
   permission rules and update restrictions.

@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.audit
 
+import com.lightningkite.services.database.optics.*
 import com.lightningkite.lightningserver.audit.AuditDisclosureLog.Disclosure
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
@@ -13,7 +14,7 @@ import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.Partial
 import com.lightningkite.services.database.PartialSerializer
 import com.lightningkite.services.database.partialOf
-import com.lightningkite.services.database.serializableProperties
+import com.lightningkite.services.database.optics.fields
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
@@ -82,7 +83,7 @@ class DisclosureEncoderTest {
     /** A `Patient` reduced to just the named fields, as `queryPartial` would return it. */
     private fun patientPartial(fields: Set<String>): Partial<Patient> = partialOf(
         Patient(_id = Patient.ID(id), name = "Ada", ssn = "secret"),
-        Patient.serializer().serializableProperties!!.filter { it.name in fields },
+        Patient.serializer().fields!!.filter { it.name in fields },
     )
 
     private val id = Uuid.parse("00000000-0000-0000-0000-0000000000a1")

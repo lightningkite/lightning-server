@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.typed.sdk
 
+import com.lightningkite.services.database.optics.*
 import com.lightningkite.lightningserver.auth.naturalLanguage
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.plus
@@ -256,14 +257,14 @@ public class TypescriptFetcherSdk(
 
                 if (type.descriptor.isInline) {
                     val valueType =
-                        type.serializableProperties?.firstOrNull()?.serializer?.tsType()?.replaceGenerics()
+                        type.fields?.firstOrNull()?.serializer?.tsType()?.replaceGenerics()
                     val name = type.tsType().replaceGenerics()
                     appendDecl(name, { localName, depth ->
                         appendIdtLine(depth, "export type $localName = Brand<${valueType}, \"$name\">")
                     })
                 } else {
                     val properties = type
-                        .serializableProperties?.map { it.serializer }
+                        .fields?.map { it.serializer }
                         ?: type.childSerializersOrNull()?.toList()
                         ?: emptyList()
 
@@ -601,8 +602,13 @@ public class TypescriptFetcherSdk(
         }
     }
 
+    // Claude: the TS package still exports optics under their pre-1.4 names.
     private val SerialDescriptor.simpleSerialName: String
-        get() = serialName.substringBefore('<').substringBefore('/').substringAfterLast('.').removeSuffix("?")
+        get() = when (serialName) {
+            "com.lightningkite.services.database.optics.AnyOptic" -> "DataClassPathPartial"
+            "com.lightningkite.services.database.optics.Optic" -> "DataClassPath"
+            else -> serialName.substringBefore('<').substringBefore('/').substringAfterLast('.').removeSuffix("?")
+        }
 
     private val SerialDescriptor.nestedTsTypeName: String?
         get() {

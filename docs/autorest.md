@@ -37,10 +37,10 @@ object Server : ServerBuilder() {
             permissions = {
                 val user = auth.fetch()
                 ModelPermissions(
-                    create = condition { it.author eq user.email },
-                    read = condition { it.always },
-                    update = condition { it.author eq user.email },
-                    delete = condition { it.author eq user.email }
+                    create = Condition { it.author eq user.email },
+                    read = Condition { it.always() },
+                    update = Condition { it.author eq user.email },
+                    delete = Condition { it.author eq user.email }
                 )
             }
         )
@@ -65,10 +65,10 @@ val postInfo = database.modelInfo(
         // Context: `auth` is the authenticated user
         val user = auth.fetch()
         ModelPermissions(
-            create = condition { it.author eq user.email },
-            read = condition { it.always },
-            update = condition { it.author eq user.email },
-            delete = condition { it.author eq user.email }
+            create = Condition { it.author eq user.email },
+            read = Condition { it.always() },
+            update = Condition { it.author eq user.email },
+            delete = Condition { it.author eq user.email }
         )
     }
 )
@@ -103,14 +103,14 @@ val postInfo = database.modelInfo(
     permissions = {
         val user = authOrNull?.fetch()
         ModelPermissions(
-            create = condition { it.always },
-            read = condition { it.always },
+            create = Condition { it.always() },
+            read = Condition { it.always() },
             readMask = mask {
                 // Hide private notes unless you're the author
-                it.privateNotes.mask(value = null, unless = condition { it.author eq user?.email })
+                it.privateNotes.mask(value = null, unless = Condition { it.author eq user?.email })
             },
-            update = condition { it.author eq user?.email },
-            delete = condition { it.author eq user?.email }
+            update = Condition { it.author eq user?.email },
+            delete = Condition { it.author eq user?.email }
         )
     }
 )
@@ -176,16 +176,16 @@ val postInfo = database.modelInfo(
         val isAuthenticated = user != null
 
         ModelPermissions(
-            create = if (isAuthenticated) condition { it.always } else condition { it.never },
-            read = condition { it.always },  // Anyone can read
+            create = if (isAuthenticated) Condition { it.always() } else Condition { it.never() },
+            read = Condition { it.always() },  // Anyone can read
             update = if (isAuthenticated)
-                condition { it.author eq user!!.email }
+                Condition { it.author eq user!!.email }
             else
-                condition { it.never },
+                Condition { it.never() },
             delete = if (isAuthenticated)
-                condition { it.author eq user!!.email }
+                Condition { it.author eq user!!.email }
             else
-                condition { it.never }
+                Condition { it.never() }
         )
     }
 )

@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.notifications
 
+import com.lightningkite.services.database.optics.*
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.data.Schedule
@@ -64,7 +65,7 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
     public val push: (Runtime<NotificationService>)? = null,
     public val refreshSchedule: Schedule = Schedule.Frequency(1.minutes),
     public val timeout: Duration = 5.minutes,
-    webSocketKey: SerializableProperty<Notification<UID, CONTENT>, *>? = info.serializer.fieldInApp,
+    webSocketKey: Field<Notification<UID, CONTENT>, *>? = info.serializer.fieldInApp,
 ) : ServerBuilder(), NotificationEndpoints.Dispatcher<UID, CONTENT> {
     init {
         sdkSettings.defaultInfo = SdkModule.Info("NotificationsApi")
@@ -162,7 +163,7 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
     override suspend fun dispatch(notifications: List<Notification<UID, CONTENT>>) {
         val now = now()
 
-        info.table().insertMany(notifications)
+        info.table().insert(notifications)
 
         notifications
             .filter {
@@ -191,7 +192,7 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
     // Checking for queued notifications and sending them is split into two actions: refreshNotifications
     // and sendNotifications.
 
-    private val self = DataClassPathSelf(info.serializer)
+    private val self = IdentityLens(info.serializer)
 
     private val sendLogger = KotlinLogging.logger("${logger.name}.send")
 
@@ -312,7 +313,7 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
                                 sendEmailNotifications(user, toEmail)
                                 info.table().updateManyIgnoringResult(
                                     self._id inside toEmail.map { it._id },
-                                    modification(self) {
+                                    Modification(self) {
                                         it.email.notNull.sent assign true
                                     }
                                 )
@@ -327,7 +328,7 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
                                 sendSmsNotifications(user, toSms)
                                 info.table().updateManyIgnoringResult(
                                     self._id inside toSms.map { it._id },
-                                    modification(self) {
+                                    Modification(self) {
                                         it.sms.notNull.sent assign true
                                     }
                                 )
@@ -342,7 +343,7 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
                                 sendPushNotifications(user, toPush)
                                 info.table().updateManyIgnoringResult(
                                     self._id inside toPush.map { it._id },
-                                    modification(self) {
+                                    Modification(self) {
                                         it.push.notNull.sent assign true
                                     }
                                 )
@@ -356,7 +357,7 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
                             try {
                                 info.table().updateManyIgnoringResult(
                                     self._id inside inApp.map { it._id },
-                                    modification(self) {
+                                    Modification(self) {
                                         it.inApp.notNull.sent assign true
                                     }
                                 )
@@ -421,7 +422,7 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
     context(_: ServerRuntime)
     private val scheduleLockKey get() = "${refreshNotifications.location}.lockKey"
 
-    private fun <K> DataClassPath<K, SendInfo>.shouldBeSentNow(lower: Instant, upper: Instant) =
+    private fun <K> Optic<K, SendInfo>.shouldBeSentNow(lower: Instant, upper: Instant) =
         Condition.And(sent eq false, sendAt gt lower, sendAt lte upper)
 
     private suspend fun <T> runFor(timeout: Duration, startingValue: T, action: suspend (T) -> T?): T? {
@@ -451,8 +452,8 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
     }
 
     private fun <T> sort(
-        path: DataClassPath<T, T>,
-        setup: SortBuilder<T>.(DataClassPath<T, T>) -> Unit,
+        path: Optic<T, T>,
+        setup: SortBuilder<T>.(Optic<T, T>) -> Unit,
     ): List<SortPart<T>> =
         SortBuilder<T>().apply { setup(path) }.build()
 
@@ -477,7 +478,7 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
 
             lastRunInfo.table().updateOne(
                 Condition.Always,
-                modification<RunInstant> { it.instant assign now - 10.seconds /*10 seconds in the past, giving some overlap prevents issues with NotificationFrequency.Now*/ }
+                Modification<RunInstant> { it.instant assign now - 10.seconds /*10 seconds in the past, giving some overlap prevents issues with NotificationFrequency.Now*/ }
             )
 
             val endPage = runFor(timeout, startInfo.page) { currentPage ->

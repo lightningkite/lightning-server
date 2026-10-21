@@ -72,7 +72,7 @@ class DataAccessLogTest {
 
     @Test
     fun `a group count over a sensitive field is recorded`() = onServer {
-        auditedTable().groupCount(Condition.Always, Patient.path.ssn)
+        auditedTable().groupCount(Condition.Always, Patient.ssn)
 
         val row = logged().single()
         assertEquals(AuditQueryRecord.Operation.GroupCount, row.operation)
@@ -81,7 +81,7 @@ class DataAccessLogTest {
 
     @Test
     fun `a find that matches nothing is recorded with its condition`() = onServer {
-        assertEquals(0, auditedTable().find(condition<Patient> { it.ssn.eq("guess") }).count())
+        assertEquals(0, auditedTable().find(Condition<Patient> { it.ssn.eq("guess") }).count())
 
         val row = logged().single()
         assertEquals(AuditQueryRecord.Operation.Find, row.operation)
@@ -90,14 +90,14 @@ class DataAccessLogTest {
 
     @Test
     fun `a count is recorded`() = onServer {
-        auditedTable().count(condition<Patient> { it.ssn.eq("probe") })
+        auditedTable().count(Condition<Patient> { it.ssn.eq("probe") })
 
         assertEquals(AuditQueryRecord.Operation.Count, logged().single().operation)
     }
 
     @Test
     fun `a sort and its paging are recorded`() = onServer {
-        val sort = listOf(SortPart(Patient.path.ssn))
+        val sort = listOf(SortPart(Patient.ssn))
         auditedTable().find(Condition.Always, orderBy = sort, skip = 0, limit = 1).toList()
         auditedTable().find(Condition.Always, orderBy = sort, skip = 4_000, limit = 1).toList()
 
@@ -130,7 +130,7 @@ class DataAccessLogTest {
         val ada = patient()
         val table = auditedTable()
         table.insert(listOf(ada))
-        table.updateOneById(ada._id, modification<Patient> { it.ssn assign "changed" })
+        table.updateOneById(ada._id, Modification<Patient> { it.ssn assign "changed" })
 
         val update = logged().single { it.operation == AuditQueryRecord.Operation.Update }
         assertTrue(update.modification?.contains("changed") == true, "the modification was not recorded: ${update.modification}")
@@ -167,7 +167,7 @@ class DataAccessLogTest {
 
     @Test
     fun `a partial find records the fields it asked for`() = onServer {
-        auditedTable().findPartial(setOf(Patient.path.ssn), Condition.Always).toList()
+        auditedTable().findPartial(setOf(Patient.ssn), Condition.Always).toList()
 
         val row = logged().single()
         assertEquals(AuditQueryRecord.Operation.Find, row.operation)
@@ -176,7 +176,7 @@ class DataAccessLogTest {
 
     @Test
     fun `an aggregate records the aggregate and its field`() = onServer {
-        auditedTable().aggregate(Aggregate.Average, Condition.Always, Patient.path.visits)
+        auditedTable().aggregate(Aggregate.Average, Condition.Always, Patient.visits)
 
         val row = logged().single()
         assertEquals(AuditQueryRecord.Operation.Aggregate, row.operation)
@@ -186,7 +186,7 @@ class DataAccessLogTest {
 
     @Test
     fun `a group aggregate records its grouping, aggregate and field`() = onServer {
-        auditedTable().groupAggregate(Aggregate.Sum, Condition.Always, Patient.path.ssn, Patient.path.visits)
+        auditedTable().groupAggregate(Aggregate.Sum, Condition.Always, Patient.ssn, Patient.visits)
 
         val row = logged().single()
         assertEquals(AuditQueryRecord.Operation.GroupAggregate, row.operation)
@@ -211,10 +211,10 @@ class DataAccessLogTest {
     fun `the ignoring variants are recorded`() = onServer {
         val ada = patient()
         val table = auditedTable()
-        table.updateManyIgnoringResult(Condition.Always, modification { it.ssn assign "x" })
-        table.updateOneIgnoringResult(Condition.Always, modification { it.ssn assign "y" })
+        table.updateManyIgnoringResult(Condition.Always, Modification { it.ssn assign "x" })
+        table.updateOneIgnoringResult(Condition.Always, Modification { it.ssn assign "y" })
         table.replaceOneIgnoringResult(Condition.Always, ada)
-        table.upsertOneIgnoringResult(condition { it._id eq ada._id }, modification { it.ssn assign "z" }, ada)
+        table.upsertOneIgnoringResult(Condition { it._id eq ada._id }, Modification { it.ssn assign "z" }, ada)
         table.deleteOneIgnoringOld(Condition.Always)
 
         assertEquals(

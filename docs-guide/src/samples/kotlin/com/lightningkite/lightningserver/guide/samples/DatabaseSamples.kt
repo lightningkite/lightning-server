@@ -73,21 +73,21 @@ fun databaseTest() = NoteDbServer.testBlocking(settings = { database set Databas
     // Direct table access for condition / modification / delete
     val table = NoteDbServer.notes()
 
-    // condition { } builds a type-safe query using generated path extensions
-    val found = table.find(condition { it.title eq "Shopping" }).toList()
+    // Condition { } builds a type-safe query using generated path extensions
+    val found = table.find(Condition { it.title eq "Shopping" }).toList()
     check(found.size == 1)
     check(found[0]._id == first!!._id)
 
-    // modification { } builds a type-safe update
+    // Modification { } builds a type-safe update
     table.updateOneIgnoringResult(
-        condition { it._id eq first._id },
-        modification { it.body assign "Eggs, milk, bread" }
+        Condition { it._id eq first._id },
+        Modification { it.body assign "Eggs, milk, bread" }
     )
     val updated = table.get(first._id)!!
     check(updated.body == "Eggs, milk, bread")
 
     // delete
-    table.deleteOneIgnoringOld(condition { it._id eq second!!._id })
+    table.deleteOneIgnoringOld(Condition { it._id eq second!!._id })
     check(table.count() == 1)
 }
 // endregion db-test

@@ -87,7 +87,7 @@ object TestServerBuilder : ServerBuilder() {
     val suspendingSource = path.path("suspendingsource").get bind HttpHandler<PathSpec0> {
         val content = "suspending-content"
         HttpResponse(
-            body = TypedData.suspending(
+            body = TypedData.suspendingSource(
                 source = Buffer().also { it.writeString(content) }.asSuspendingSource(),
                 mediaType = MediaType.Text.Plain,
                 size = content.length.toLong(),
@@ -100,7 +100,7 @@ object TestServerBuilder : ServerBuilder() {
     val suspendingProducer = path.path("suspendingproducer").get bind HttpHandler<PathSpec0> {
         val content = "y".repeat(100_000)
         HttpResponse(
-            body = TypedData.suspendingProducer(MediaType.Text.Plain) { sink ->
+            body = TypedData.suspendingSink(MediaType.Text.Plain) { sink ->
                 sink.write(Buffer().also { it.writeString(content) })
             },
             status = HttpStatus.OK,

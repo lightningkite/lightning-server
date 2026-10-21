@@ -57,8 +57,8 @@ data class Post(
 - **`HasId<Uuid>`** — declares the primary-key type.  Any `Comparable` type works:
   `Uuid`, `String`, `Int`, `Long`.
 - **`@Queryable`** — makes the class `@Serializable` (every field must be
-  serializable) and KSP generates `Post.path.title`, `Post.path.author`,
-  etc. — the typed handles used by `condition {}` and `modification {}` queries.
+  serializable) and KSP generates `Post.title`, `Post.author`,
+  etc. — the typed handles used by `Condition {}` and `Modification {}` queries.
   See [Database & the Query DSL](database.md) for how these work.
 - **Default `_id`** — defaulting to `Uuid.random()` means callers can omit the ID;
   the framework assigns one automatically on insert.
@@ -154,7 +154,7 @@ one object.  `list` accepts it via query parameters (limited to simple
 conditions); `query` accepts it as a POST body (full condition DSL supported).
 
 **`Modification<T>`** — a serialisable field-level update built with the
-`modification { }` builder.  `modify` applies it to one document by ID;
+`Modification { }` builder.  `modify` applies it to one document by ID;
 `bulkModify` wraps it in `MassModification<T>` (condition + modification) and
 applies it to many documents at once.
 
@@ -189,7 +189,7 @@ fun modelRestTest() = PostRestServer.testBlocking(settings = { database set Data
     // Modify: apply a field-level update and receive the new document
     val modified = PostRestServer.posts.modify.test(
         post._id, null,
-        modification { it.title assign "Updated Title" }
+        Modification { it.title assign "Updated Title" }
     )
     check(modified.title == "Updated Title")
     check(modified.author == "alice")  // unchanged
@@ -266,10 +266,10 @@ object AuthPostServer : ServerBuilder() {
         permissions = {
             val user = auth.fetch()
             ModelPermissions(
-                create = condition { it.author eq user.email },
+                create = Condition { it.author eq user.email },
                 read = Condition.Always,
-                update = condition { it.author eq user.email },
-                delete = condition { it.author eq user.email },
+                update = Condition { it.author eq user.email },
+                delete = Condition { it.author eq user.email },
             )
         }
     )
@@ -294,10 +294,10 @@ val postInfo = database.modelInfo<UserProfile, Post, Uuid>(
     permissions = {
         val user = authOrNull?.fetch()
         ModelPermissions(
-            create = if (user != null) condition { it.author eq user.email } else Condition.Never,
+            create = if (user != null) Condition { it.author eq user.email } else Condition.Never,
             read = Condition.Always,
-            update = if (user != null) condition { it.author eq user.email } else Condition.Never,
-            delete = if (user != null) condition { it.author eq user.email } else Condition.Never,
+            update = if (user != null) Condition { it.author eq user.email } else Condition.Never,
+            delete = if (user != null) Condition { it.author eq user.email } else Condition.Never,
         )
     }
 )
@@ -319,7 +319,7 @@ val postInfo = database.modelInfo<UserProfile, Post, Uuid>(
     tableName = "Post",
     permissions = {
         val user = authOrNull?.fetch()
-        val self: Condition<Post> = condition { it.author eq (user?.email ?: "") }
+        val self: Condition<Post> = Condition { it.author eq (user?.email ?: "") }
         ModelPermissions(
             read = Condition.Always,
             readMask = mask {
@@ -332,7 +332,7 @@ val postInfo = database.modelInfo<UserProfile, Post, Uuid>(
 )
 ```
 
-`mask { }` builds a `Mask<T>`.  The `DataClassPath<T, V>.mask(value, unless)`
+`mask { }` builds a `Mask<T>`.  The `Optic<T, V>.mask(value, unless)`
 extension sets the field to `value` whenever the `unless` condition is false.
 
 ### Update Restrictions
@@ -391,7 +391,7 @@ See [Typed Endpoints, Errors & SDK Generation](typed-endpoints.md) for details.
 - **Typed endpoints** — understand how `ApiHttpHandler` metadata (summaries,
   error cases, examples) flows into the generated SDK:
   [Typed Endpoints, Errors & SDK Generation](typed-endpoints.md).
-- **Database DSL** — `condition {}` and `modification {}` reference:
+- **Database DSL** — `Condition {}` and `Modification {}` reference:
   [Database & the Query DSL](database.md).
 - **Authentication** — setting up `PrincipalType` and `UserAuth.require()`:
   [Authentication & Sessions](auth.md).

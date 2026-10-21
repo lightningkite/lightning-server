@@ -48,7 +48,7 @@ object Server : ServerBuilder() {
             return when (property) {
                 "email" -> {
                     val existing = userTable()
-                        .findOne(condition { it.email eq value })
+                        .findOne(Condition { it.email eq value })
                     existing ?: userTable()
                         .insertOne(User(email = value))
                 }
@@ -112,7 +112,7 @@ object UserAuth : PrincipalType<User, Uuid> {
         return when (property) {
             "email" -> {
                 // Find or create user by email
-                userTable().findOne(condition { it.email eq value })
+                userTable().findOne(Condition { it.email eq value })
                     ?: userTable().insertOne(User(email = value))
             }
             else -> super.fetchByProperty(property, value)
@@ -234,7 +234,7 @@ val userInfo = database.modelInfo(
     tableName = "User",
     permissions = {
         val user = authOrNull?.fetch()
-        val self = condition<User> { it._id eqNn user?._id }
+        val self = Condition<User> { it._id eqNn user?._id }
         val admin: Condition<User> = if (user?.isSuperUser == true) Condition.Always else Condition.Never
 
         ModelPermissions(

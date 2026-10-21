@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.typed
 
+import com.lightningkite.services.database.optics.*
 import com.lightningkite.lightningserver.auth.options
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
@@ -286,7 +287,7 @@ public class ApiDocs(private val packageName: String) : ServerBuilder() {
                         when (desc.kind) {
                             StructureKind.CLASS -> {
                                 documentType(serializer) {
-                                    serializer.serializableProperties?.toList()?.forEachIndexed { index, item ->
+                                    serializer.fields?.toList()?.forEachIndexed { index, item ->
                                         p {
                                             +item.name
                                             +": "

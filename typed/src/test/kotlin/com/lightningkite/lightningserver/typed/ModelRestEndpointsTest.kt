@@ -65,7 +65,7 @@ class ModelRestEndpointsTest {
             val item = CrudItem(name = "Partial Test", category = "Books", price = 1.0, quantity = 1)
             CrudTestServer.rest.insert.test(null, item)
 
-            val nameOnly = CrudItem.path.name
+            val nameOnly = CrudItem.name
             val results = CrudTestServer.rest.queryPartial.test(null, QueryPartial(fields = setOf(nameOnly)))
 
             val returned = results.single()
@@ -156,7 +156,7 @@ class ModelRestEndpointsTest {
             // Query for CategoryA only
             val results = CrudTestServer.rest.query.test(
                 null, Query(
-                condition = condition { it.category eq "CategoryA" }
+                condition = Condition { it.category eq "CategoryA" }
             ))
 
             assertEquals(2, results.size)
@@ -252,7 +252,7 @@ class ModelRestEndpointsTest {
             CrudTestServer.rest.insert.test(null, item)
 
             // Only modify the price
-            val result = CrudTestServer.rest.modify.test(item._id, null, modification {
+            val result = CrudTestServer.rest.modify.test(item._id, null, Modification {
                 it.price assign 75.0
             })
 
@@ -271,7 +271,7 @@ class ModelRestEndpointsTest {
             val nonexistentId = Uuid.random()
 
             assertFailsWith<NotFoundException>("Should throw NotFoundException") {
-                CrudTestServer.rest.modify.test(nonexistentId, null, modification {
+                CrudTestServer.rest.modify.test(nonexistentId, null, Modification {
                     it.name assign "Updated"
                 })
             }
@@ -287,7 +287,7 @@ class ModelRestEndpointsTest {
             val item = CrudItem(name = "DiffTest", category = "Test", price = 100.0, quantity = 10)
             CrudTestServer.rest.insert.test(null, item)
 
-            val result = CrudTestServer.rest.modifyWithDiff.test(item._id, null, modification {
+            val result = CrudTestServer.rest.modifyWithDiff.test(item._id, null, Modification {
                 it.name assign "DiffTestModified"
             })
 
@@ -356,7 +356,7 @@ class ModelRestEndpointsTest {
             CrudTestServer.rest.insert.test(null, item4)
 
             // Delete all items in "Delete" category
-            val deletedCount = CrudTestServer.rest.bulkDelete.test(null, condition {
+            val deletedCount = CrudTestServer.rest.bulkDelete.test(null, Condition {
                 it.category eq "Delete"
             })
 
@@ -386,8 +386,8 @@ class ModelRestEndpointsTest {
             // Modify all items in "ToModify" category
             val modifiedCount = CrudTestServer.rest.bulkModify.test(
                 null, MassModification(
-                condition = condition { it.category eq "ToModify" },
-                modification = modification { it.price assign 99.0 }
+                condition = Condition { it.category eq "ToModify" },
+                modification = Modification { it.price assign 99.0 }
             ))
 
             assertEquals(2, modifiedCount)
@@ -395,7 +395,7 @@ class ModelRestEndpointsTest {
             // Verify the modifications
             val modified = CrudTestServer.rest.query.test(
                 null, Query(
-                condition = condition { it.category eq "ToModify" }
+                condition = Condition { it.category eq "ToModify" }
             ))
             assertTrue(modified.all { it.price == 99.0 })
 
@@ -418,8 +418,8 @@ class ModelRestEndpointsTest {
             repeat(3) { CrudTestServer.rest.insert.test(null, CrudItem(category = "A")) }
             repeat(5) { CrudTestServer.rest.insert.test(null, CrudItem(category = "B")) }
 
-            val countA = CrudTestServer.rest.count.test(null, condition { it.category eq "A" })
-            val countB = CrudTestServer.rest.count.test(null, condition { it.category eq "B" })
+            val countA = CrudTestServer.rest.count.test(null, Condition { it.category eq "A" })
+            val countB = CrudTestServer.rest.count.test(null, Condition { it.category eq "B" })
             val countAll = CrudTestServer.rest.count.test(null, Condition.Always)
 
             assertEquals(3, countA)

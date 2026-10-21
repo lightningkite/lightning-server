@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.typed
 
+import com.lightningkite.services.database.optics.*
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.Authentication
@@ -60,7 +61,7 @@ private const val OVERLOAD_THRESHOLD_BYTES: Int = 24000
  */
 public class ModelRestUpdatesWebSocket<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
     public val info: ModelInfo<USER, T, ID>,
-    public val key: SerializableProperty<T, *>? = null,
+    public val key: Field<T, *>? = null,
     public val permissionRevalidation: Duration = 5.minutes,
 ) : ServerBuilder() {
     init {
@@ -251,7 +252,7 @@ public class ModelRestUpdatesWebSocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
 }
 
 
-private fun <T, V> Condition<T>.relevantHashCodesForKey(key: SerializableProperty<T, V>): Set<Int>? = when (this) {
+private fun <T, V> Condition<T>.relevantHashCodesForKey(key: Field<T, V>): Set<Int>? = when (this) {
     is Condition.And<T> -> conditions
         .asSequence()
         .mapNotNull { it.relevantHashCodesForKey(key) }

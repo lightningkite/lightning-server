@@ -80,7 +80,7 @@ class TestModelTest {
             collection.insertOne(item3)
 
             // Query for draft items
-            val drafts = collection.find(condition { it.status eq Status.DRAFT }).toList()
+            val drafts = collection.find(Condition { it.status eq Status.DRAFT }).toList()
             assertTrue(drafts.size >= 2)
         }
     }
@@ -95,8 +95,8 @@ class TestModelTest {
             collection.insertOne(testItem)
 
             collection.updateOne(
-                condition { it._id eq testItem._id },
-                modification { it.name assign "Updated Name" }
+                Condition { it._id eq testItem._id },
+                Modification { it.name assign "Updated Name" }
             )
 
             val updated = collection.get(testItem._id)
@@ -118,7 +118,7 @@ class TestModelTest {
             val beforeDelete = collection.get(testItem._id)
             assertNotNull(beforeDelete)
 
-            collection.deleteOne(condition { it._id eq testItem._id })
+            collection.deleteOne(Condition { it._id eq testItem._id })
 
             val afterDelete = collection.get(testItem._id)
             assertNull(afterDelete)
@@ -152,7 +152,7 @@ class TestModelTest {
 
             users.insertOne(newUser)
 
-            val found = users.findOne(condition { it.email eq "newuser@example.com" })
+            val found = users.findOne(Condition { it.email eq "newuser@example.com" })
             assertNotNull(found)
             assertEquals("newuser@example.com", found.email)
         }

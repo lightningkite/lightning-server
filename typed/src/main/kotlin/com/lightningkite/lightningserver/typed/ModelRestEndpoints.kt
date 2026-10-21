@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.typed
 
+import com.lightningkite.services.database.optics.*
 import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.subscope
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
@@ -116,7 +117,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
      * that behaviour does not depend on whether a model happens to be audited.
      */
     private fun QueryPartial<T>.withId(): QueryPartial<T> =
-        copy(fields = fields + DataClassPathSelf(info.serializer)[info.serializer._id()])
+        copy(fields = fields + info.serializer._id())
 
     public val detail: ApiHttpHandler<PathSpec1<ID>, USER, Unit, T> =
         detailPath.get bind explicitApiHttpHandler(
@@ -417,7 +418,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             implementation = { condition: GroupCountQuery<T> ->
                 @Suppress("UNCHECKED_CAST")
                 info.table(this)
-                    .groupCount(condition.condition, condition.groupBy as DataClassPath<T, Any?>)
+                    .groupCount(condition.condition, condition.groupBy as Optic<T, Any?>)
                     .mapKeys { it.key.toString() }
             }
         )
@@ -438,7 +439,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
                     .aggregate(
                         condition.aggregate,
                         condition.condition,
-                        condition.property as DataClassPath<T, Number>
+                        condition.property
                     )
             }
         )
@@ -459,8 +460,8 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
                     .groupAggregate(
                         condition.aggregate,
                         condition.condition,
-                        condition.groupBy as DataClassPath<T, Any?>,
-                        condition.property as DataClassPath<T, Number>
+                        condition.groupBy.coerceToOptic(),
+                        condition.property
                     )
                     .mapKeys { it.key.toString() }
             }
@@ -478,10 +479,10 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             examples = emptyList(),
             implementation = { condition: GroupCountQuery<T> ->
                 @Suppress("UNCHECKED_CAST")
-                val keySerializer = condition.groupBy.serializerAny as KSerializer<Any?>
+                val keySerializer = condition.groupBy.coerceToOptic().serializer as KSerializer<Any?>
                 @Suppress("UNCHECKED_CAST")
                 info.table(this)
-                    .groupCount(condition.condition, condition.groupBy as DataClassPath<T, Any?>)
+                    .groupCount(condition.condition, condition.groupBy.coerceToOptic())
                     .mapKeys { serverRuntime.externalSerialization.json.encodeToString(keySerializer, it.key) }
             }
         )
@@ -498,14 +499,14 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             examples = emptyList(),
             implementation = { condition: GroupAggregateQuery<T> ->
                 @Suppress("UNCHECKED_CAST")
-                val keySerializer = condition.groupBy.serializerAny as KSerializer<Any?>
+                val keySerializer = condition.groupBy.coerceToOptic().serializer as KSerializer<Any?>
                 @Suppress("UNCHECKED_CAST")
                 info.table(this)
                     .groupAggregate(
                         condition.aggregate,
                         condition.condition,
-                        condition.groupBy as DataClassPath<T, Any?>,
-                        condition.property as DataClassPath<T, Number>
+                        condition.groupBy.coerceToOptic(),
+                        condition.property
                     )
                     .mapKeys { serverRuntime.externalSerialization.json.encodeToString(keySerializer, it.key) }
             }

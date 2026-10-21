@@ -4,7 +4,7 @@
 # Advanced Database
 
 This chapter extends [Database & the Query DSL](../guide/database.md), which covers
-model definition, basic CRUD, and the `condition {}`/`modification {}` DSL.
+model definition, basic CRUD, and the `Condition {}`/`Modification {}` DSL.
 Read that chapter first.  Here you will learn how to sort and paginate large
 result sets, run aggregations, declare database indexes, issue bulk writes, and
 react to table changes with interceptor hooks.
@@ -71,14 +71,14 @@ val posts = postTable()
 // Ten most-recently updated posts.
 val recent = posts.find(
     condition = Condition.Always,
-    orderBy = listOf(SortPart(Post.path.updatedAt, ascending = false)),
+    orderBy = listOf(SortPart(Post.updatedAt, ascending = false)),
     limit = 10,
 ).toList()
 
 // Next page — skip the first ten.
 val page2 = posts.find(
     condition = Condition.Always,
-    orderBy = listOf(SortPart(Post.path.updatedAt, ascending = false)),
+    orderBy = listOf(SortPart(Post.updatedAt, ascending = false)),
     skip = 10,
     limit = 10,
 ).toList()
@@ -87,15 +87,15 @@ val page2 = posts.find(
 val byAuthor = posts.find(
     condition = Condition.Always,
     orderBy = listOf(
-        SortPart(Post.path.author, ascending = true),
-        SortPart(Post.path.title, ascending = false),
+        SortPart(Post.author, ascending = true),
+        SortPart(Post.title, ascending = false),
     ),
 ).toList()
 
 // Case-insensitive sort — ignoreCase = true only applies to String fields.
 val caseInsensitive = posts.find(
     condition = Condition.Always,
-    orderBy = listOf(SortPart(Post.path.title, ascending = true, ignoreCase = true)),
+    orderBy = listOf(SortPart(Post.title, ascending = true, ignoreCase = true)),
 ).toList()
 ```
 
@@ -125,7 +125,7 @@ val table = postTable()
 val total: Int = table.count()
 
 // Posts from a specific author.
-val alicePosts: Int = table.count(condition { it.author eq "alice@example.com" })
+val alicePosts: Int = table.count(Condition { it.author eq "alice@example.com" })
 ```
 
 ### aggregate
@@ -138,13 +138,13 @@ Compute a single statistic over a numeric field:
 val totalViews: Double? = table.aggregate(
     aggregate = Aggregate.Sum,
     condition = Condition.Always,
-    property = Post.path.viewCount,
+    property = Post.viewCount,
 )
 
 val avgViews: Double? = table.aggregate(
     aggregate = Aggregate.Average,
-    condition = condition { it.author eq "alice@example.com" },
-    property = Post.path.viewCount,
+    condition = Condition { it.author eq "alice@example.com" },
+    property = Post.viewCount,
 )
 ```
 
@@ -159,7 +159,7 @@ Count documents broken down by a field value:
 // Returns Map<String, Int> — author email -> post count.
 val countByAuthor: Map<String, Int> = table.groupCount(
     condition = Condition.Always,
-    groupBy = Post.path.author,
+    groupBy = Post.author,
 )
 ```
 
@@ -173,8 +173,8 @@ Combine grouping and a numeric aggregation:
 val viewsByAuthor: Map<String, Double?> = table.groupAggregate(
     aggregate = Aggregate.Sum,
     condition = Condition.Always,
-    groupBy = Post.path.author,
-    property = Post.path.viewCount,
+    groupBy = Post.author,
+    property = Post.viewCount,
 )
 ```
 
@@ -285,14 +285,14 @@ Apply a modification to every document matching a condition:
 // Illustrative.
 // Bump the viewCount on all of Alice's posts.
 val updatedCount: Int = table.updateManyIgnoringResult(
-    condition { it.author eq "alice@example.com" },
-    modification { it.viewCount += 1 },
+    Condition { it.author eq "alice@example.com" },
+    Modification { it.viewCount += 1 },
 )
 
 // If you need the before/after values of every changed document:
 val changes: CollectionChanges<Post> = table.updateMany(
-    condition { it.author eq "alice@example.com" },
-    modification { it.viewCount += 1 },
+    Condition { it.author eq "alice@example.com" },
+    Modification { it.viewCount += 1 },
 )
 // changes.changes is List<EntryChange<Post>>
 // Each EntryChange has .old and .new — both may be null (null old = insert, null new = delete).
@@ -309,12 +309,12 @@ Remove all documents matching a condition:
 // Illustrative.
 // Remove all posts by a deleted author.
 val deletedCount: Int = table.deleteManyIgnoringOld(
-    condition { it.author eq "alice@example.com" },
+    Condition { it.author eq "alice@example.com" },
 )
 
 // Or retrieve the deleted documents:
 val deletedPosts: List<Post> = table.deleteMany(
-    condition { it.author eq "alice@example.com" },
+    Condition { it.author eq "alice@example.com" },
 )
 ```
 
@@ -328,8 +328,8 @@ insert on miss:
 // Illustrative.
 // Insert a post, or bump its viewCount if the slug already exists.
 val change: EntryChange<Post> = table.upsertOne(
-    condition = condition { it.slug eq "hello-world" },
-    modification = modification { it.viewCount += 1 },
+    condition = Condition { it.slug eq "hello-world" },
+    modification = Modification { it.viewCount += 1 },
     model = Post(
         title = "Hello World",
         slug = "hello-world",

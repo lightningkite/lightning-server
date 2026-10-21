@@ -527,10 +527,10 @@ class WebAuthNProofEndpointsTest {
                 assertEquals(1L, server.webAuthN.stored(key).lastSignCount)
 
                 val ownersView = server.webAuthN.modelInfo.table(AuthAccess(authFor(user)))
-                runCatching { ownersView.updateOneById(key.id, modification { it.lastSignCount assign 0L }) }
+                runCatching { ownersView.updateOneById(key.id, Modification { it.lastSignCount assign 0L }) }
                 assertEquals(1L, server.webAuthN.stored(key).lastSignCount)
 
-                ownersView.updateOneById(key.id, modification { it.disabledAt assign Clock.System.now() })
+                ownersView.updateOneById(key.id, Modification { it.disabledAt assign Clock.System.now() })
                 assertNotNull(server.webAuthN.stored(key).disabledAt)
             }
         }
@@ -544,7 +544,7 @@ class WebAuthNProofEndpointsTest {
             server.webAuthN.register(newUser(), key)
             execute {
                 server.webAuthN.modelInfo.table()
-                    .updateOneById(key.id, modification { it.disabledAt assign Clock.System.now() })
+                    .updateOneById(key.id, Modification { it.disabledAt assign Clock.System.now() })
             }
 
             val started = server.webAuthN.start()
@@ -615,7 +615,7 @@ class WebAuthNProofEndpointsTest {
                 assertFalse(server.webAuthN.established(TestAdmin, TestAdmin(user._id)))
 
                 server.webAuthN.modelInfo.table()
-                    .updateOneById(key.id, modification { it.disabledAt assign Clock.System.now() })
+                    .updateOneById(key.id, Modification { it.disabledAt assign Clock.System.now() })
 
                 assertFalse(server.webAuthN.established(TestUser, user))
             }

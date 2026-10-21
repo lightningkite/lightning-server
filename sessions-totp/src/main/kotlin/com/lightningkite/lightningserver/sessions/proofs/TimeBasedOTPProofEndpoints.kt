@@ -19,6 +19,7 @@ import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
 import com.lightningkite.services.cache.Cache
+import com.lightningkite.services.database.optics.*
 import com.lightningkite.services.database.*
 import dev.turingcomplete.kotlinonetimepassword.HmacAlgorithm
 import dev.turingcomplete.kotlinonetimepassword.TimeBasedOneTimePasswordConfig
@@ -66,7 +67,7 @@ public class TimeBasedOTPProofEndpoints(
 
     context(_: ServerRuntime)
     private val active
-        get() = condition<TotpSecret> {
+        get() = Condition<TotpSecret> {
             it.disabledAt.eq(null) and (it.expiresAt.eq(null) or it.expiresAt.notNull.gte(now()))
         }
 
@@ -75,8 +76,8 @@ public class TimeBasedOTPProofEndpoints(
         auth = proofMethodAuth or AuthRequirement.IsAdmin,
         signals = { table -> signals?.invoke(serverRuntime, table) ?: table },
         permissions = {
-            val admin = condition(AuthRequirement.IsAdmin.accepts(authOrNull))
-            val mine = condition<TotpSecret> {
+            val admin = Condition(AuthRequirement.IsAdmin.accepts(authOrNull))
+            val mine = Condition<TotpSecret> {
                 it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName)
             }
             ModelPermissions(
@@ -109,9 +110,9 @@ public class TimeBasedOTPProofEndpoints(
             examples = listOf(),
             implementation = { input: EstablishTotp ->
                 // Only an unfinished setup is replaced here; a confirmed secret is retired once its replacement is used
-                modelInfo.table().updateMany(condition {
+                modelInfo.table().updateMany(Condition {
                     it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) and it.lastUsedAt.eq(null)
-                }, modification {
+                }, Modification {
                     it.disabledAt assign now()
                     it.secretBase32 assign ""
                 })
@@ -180,7 +181,7 @@ public class TimeBasedOTPProofEndpoints(
                             throw BadRequestException("User ID and code do not match")
                         }
 
-                    val confirmed = modelInfo.table().find(condition {
+                    val confirmed = modelInfo.table().find(Condition {
                         it.subjectId.eq(subjectId) and it.subjectType.eq(subject) and active and it.lastUsedAt.neq(null)
                     }).toList()
 
@@ -216,7 +217,7 @@ public class TimeBasedOTPProofEndpoints(
             implementation = { code: String ->
                 // Only the unfinished setup can be confirmed; a code from the authenticator being replaced must not
                 // count, or the replacement would never become active
-                val pending = modelInfo.table().find(condition {
+                val pending = modelInfo.table().find(Condition {
                     it.subjectId.eq(auth.rawId) and
                             it.subjectType.eq(auth.principalName) and
                             active and
@@ -305,17 +306,17 @@ public class TimeBasedOTPProofEndpoints(
             )
         }
 
-        modelInfo.table().updateOneById(matched._id, modification {
+        modelInfo.table().updateOneById(matched._id, Modification {
             it.lastUsedAt assign now
         })
 
         if (matched.lastUsedAt == null) {
-            modelInfo.table().updateMany(condition {
+            modelInfo.table().updateMany(Condition {
                 it.subjectId.eq(matched.subjectId) and
                         it.subjectType.eq(matched.subjectType) and
                         it._id.neq(matched._id) and
                         it.disabledAt.eq(null)
-            }, modification {
+            }, Modification {
                 it.disabledAt assign now
                 it.secretBase32 assign ""
             })
@@ -330,7 +331,7 @@ public class TimeBasedOTPProofEndpoints(
         subject: SUBJECT,
     ): Boolean {
         @Suppress("UNCHECKED_CAST")
-        return modelInfo.table().count(condition {
+        return modelInfo.table().count(Condition {
             it.subjectId.eq(principal.idString(subject._id)) and
                     it.subjectType.eq(principal.name) and
                     active and

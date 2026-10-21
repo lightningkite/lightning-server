@@ -11,7 +11,7 @@ endpoints — only items the caller can read are ever sent.
 
 This page assumes you have already read
 [Model REST Endpoints](../guide/model-rest.md) and are familiar with `ModelInfo`,
-`ModelPermissions`, and the `condition { }` DSL.
+`ModelPermissions`, and the `Condition { }` DSL.
 
 ## Imports
 
@@ -134,7 +134,7 @@ single **general topic** and filtered per-connection.  For high-write
 collections this can be expensive: every connected client is woken up to check
 whether a change concerns them.
 
-Pass a `key: SerializableProperty<T, *>` to `ModelRestUpdatesWebsocket` to
+Pass a `key: Field<T, *>` to `ModelRestUpdatesWebsocket` to
 enable **hash-partitioned topics**.  When a key is provided, changes are bucketed
 by the hash of the key field, and a client's subscription is mapped to the
 bucket(s) whose conditions include specific key values.
@@ -144,12 +144,12 @@ bucket(s) whose conditions include specific key values.
 // each author's changes are isolated to a small set of topic buckets.
 val liveUpdates = ModelRestUpdatesWebsocket(
     info = blogInfo,
-    key = BlogPost.path.authorId,   // SerializableProperty<BlogPost, Uuid>
+    key = BlogPost.authorId,   // Field<BlogPost, Uuid>
 )
 ```
 
 When the client subscribes with a condition that has an equality or `inside`
-check on `authorId` (e.g. `condition { it.authorId eq currentUserId }`), the
+check on `authorId` (e.g. `Condition { it.authorId eq currentUserId }`), the
 server maps the subscription to the specific hash bucket for that author rather
 than the general broadcast topic.  Unrelated authors' changes never wake the
 connection.
@@ -194,14 +194,14 @@ val client = BlogRestEndpointsAndUpdatesWebsocket(httpFetcher, wsFetcher)
 val socket = client.websocket.connect()
 
 // Send a subscription condition: "give me all published posts".
-socket.send(condition<BlogPost> { it.status eq PostStatus.PUBLISHED })
+socket.send(Condition<BlogPost> { it.status eq PostStatus.PUBLISHED })
 
 // The server sends the current state in the condition-ack frame plus subsequent deltas.
 socket.incoming.collect { updates: CollectionUpdates<BlogPost, Uuid> ->
     when {
         updates.overload -> {
             // Delta was too large; re-fetch from REST.
-            val allPosts = client.rest.query(Query(condition<BlogPost> { it.status eq PostStatus.PUBLISHED }))
+            val allPosts = client.rest.query(Query(Condition<BlogPost> { it.status eq PostStatus.PUBLISHED }))
             localCache.reset(allPosts)
         }
         else -> {

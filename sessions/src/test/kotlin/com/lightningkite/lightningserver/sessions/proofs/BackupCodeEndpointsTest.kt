@@ -160,7 +160,7 @@ class BackupCodeEndpointsTest {
                     )
 
                     // Verify code was stored
-                    table.find(condition<BackupCodeSecret> {
+                    table.find(Condition<BackupCodeSecret> {
                         it.subjectId.eq(TestUser.idString(userId)) and it.subjectType.eq(TestUser.name)
                     }).toList()
                 }
@@ -267,7 +267,7 @@ class BackupCodeEndpointsTest {
                     )
 
                     // Verify code exists
-                    table.find(condition<BackupCodeSecret> {
+                    table.find(Condition<BackupCodeSecret> {
                         it.subjectId.eq(TestUser.idString(userId))
                     }).count()
                 }
@@ -285,7 +285,7 @@ class BackupCodeEndpointsTest {
 
                 // The row survives — it is the only evidence the code was ever used — but is spent.
                 val after = execute {
-                    server.backupCodes.modelInfo.table().find(condition<BackupCodeSecret> {
+                    server.backupCodes.modelInfo.table().find(Condition<BackupCodeSecret> {
                         it.subjectId.eq(TestUser.idString(userId))
                     }).toList()
                 }
@@ -296,7 +296,7 @@ class BackupCodeEndpointsTest {
                 assertEquals(
                     0,
                     execute {
-                        server.backupCodes.modelInfo.table().find(condition<BackupCodeSecret> {
+                        server.backupCodes.modelInfo.table().find(Condition<BackupCodeSecret> {
                             it.subjectId.eq(TestUser.idString(userId)) and it.usedAt.eq(null)
                         }).count()
                     },
@@ -508,7 +508,7 @@ class BackupCodeEndpointsTest {
 
                 // Codes are stored hashed, never as the plaintext that was handed out
                 val stored = execute {
-                    server.backupCodes.modelInfo.table().find(condition<BackupCodeSecret> {
+                    server.backupCodes.modelInfo.table().find(Condition<BackupCodeSecret> {
                         it.subjectId.eq(TestUser.idString(userId))
                     }).toList().map { it.code }
                 }
@@ -535,7 +535,7 @@ class BackupCodeEndpointsTest {
                 }
 
                 assertEquals(0, execute {
-                    server.backupCodes.modelInfo.table().find(condition<BackupCodeSecret> {
+                    server.backupCodes.modelInfo.table().find(Condition<BackupCodeSecret> {
                         it.subjectId.eq(TestUser.idString(userId)) and it.usedAt.eq(null)
                     }).count()
                 })
@@ -755,7 +755,7 @@ class BackupCodeEndpointsTest {
 
                 // Every row survives; only the redeemed one is spent, and the others stay usable.
                 val allCodes = execute {
-                    server.backupCodes.modelInfo.table().find(condition<BackupCodeSecret> {
+                    server.backupCodes.modelInfo.table().find(Condition<BackupCodeSecret> {
                         it.subjectId.eq(TestUser.idString(userId))
                     }).toList()
                 }
@@ -763,7 +763,7 @@ class BackupCodeEndpointsTest {
                 assertEquals(listOf("secondcode"), allCodes.filter { it.usedAt != null }.map { it.code })
 
                 val stillUsable = execute {
-                    server.backupCodes.modelInfo.table().find(condition<BackupCodeSecret> {
+                    server.backupCodes.modelInfo.table().find(Condition<BackupCodeSecret> {
                         it.subjectId.eq(TestUser.idString(userId)) and it.usedAt.eq(null)
                     }).toList()
                 }
@@ -834,7 +834,7 @@ class BackupCodeEndpointsTest {
                             )
                         )
                     )
-                    table.find(condition<BackupCodeSecret> { it.usedAt.eq(null) }).count()
+                    table.find(Condition<BackupCodeSecret> { it.usedAt.eq(null) }).count()
                 }
                 assertEquals(1, liveCodes, "there is no live code to contest")
 
@@ -941,7 +941,7 @@ class BackupCodeEndpointsTest {
 
                     // The fixture has to actually be in the state the test claims, or every assertion
                     // below would hold just as well against an empty table.
-                    table.find(condition<BackupCodeSecret> {
+                    table.find(Condition<BackupCodeSecret> {
                         it.subjectId.eq(TestUser.idString(userId))
                     }).toList()
                 }
@@ -953,7 +953,7 @@ class BackupCodeEndpointsTest {
                 assertEquals(5, issued.size, "reset did not issue a fresh set of codes")
 
                 val after = execute {
-                    server.backupCodes.modelInfo.table().find(condition<BackupCodeSecret> {
+                    server.backupCodes.modelInfo.table().find(Condition<BackupCodeSecret> {
                         it.subjectId.eq(TestUser.idString(userId))
                     }).toList()
                 }
@@ -1018,7 +1018,7 @@ class BackupCodeEndpointsTest {
                             ),
                         )
                     )
-                    table.find(condition<BackupCodeSecret> {
+                    table.find(Condition<BackupCodeSecret> {
                         it.subjectId.eq(TestUser.idString(userId))
                     }).toList()
                 }
@@ -1029,7 +1029,7 @@ class BackupCodeEndpointsTest {
                 server.backupCodes.clearCodes.test(auth, Unit)
 
                 val after = execute {
-                    server.backupCodes.modelInfo.table().find(condition<BackupCodeSecret> {
+                    server.backupCodes.modelInfo.table().find(Condition<BackupCodeSecret> {
                         it.subjectId.eq(TestUser.idString(userId))
                     }).toList()
                 }
@@ -1096,7 +1096,7 @@ class BackupCodeEndpointsTest {
                         )
                     )
                 }
-                val ownersLiveCodes = condition<BackupCodeSecret> {
+                val ownersLiveCodes = Condition<BackupCodeSecret> {
                     it.subjectId.eq(TestUser.idString(ownerId)) and it.usedAt.eq(null)
                 }
                 assertEquals(

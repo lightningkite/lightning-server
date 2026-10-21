@@ -17,6 +17,7 @@ import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
 import com.lightningkite.services.cache.Cache
+import com.lightningkite.services.database.optics.*
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.datetime.LocalDate
@@ -60,7 +61,7 @@ public class PasswordProofEndpoints(
 
     context(_: ServerRuntime)
     private val active
-        get() = condition<PasswordSecret> {
+        get() = Condition<PasswordSecret> {
             it.disabledAt.eq(null) and ((it.expiresAt.eq(null) or it.expiresAt.notNull.gt(now())))
         }
 
@@ -79,9 +80,9 @@ public class PasswordProofEndpoints(
                 }
             },
             permissions = {
-                val admin = condition(AuthRequirement.IsAdmin.accepts(authOrNull))
+                val admin = Condition(AuthRequirement.IsAdmin.accepts(authOrNull))
                 val mine = authOrNull?.let { a ->
-                    condition<PasswordSecret> {
+                    Condition<PasswordSecret> {
                         it.subjectId.eq(a.rawId) and it.subjectType.eq(a.principalName)
                     }
                 } ?: Condition.Never
@@ -119,7 +120,7 @@ public class PasswordProofEndpoints(
         )
         modelInfo.table().insertOne(secret)
         modelInfo.table().updateMany(
-            condition {
+            Condition {
                 Condition.And(
                     it.subjectId eq secret.subjectId,
                     it.subjectType eq secret.subjectType,
@@ -127,7 +128,7 @@ public class PasswordProofEndpoints(
                     it._id neq secret._id,
                 )
             },
-            modification { it.disabledAt assign now }
+            Modification { it.disabledAt assign now }
         )
     }
 
@@ -203,7 +204,7 @@ public class PasswordProofEndpoints(
                             throw BadRequestException("User ID and code do not match")
                         }
 
-                    val active = modelInfo.table().find(condition {
+                    val active = modelInfo.table().find(Condition {
                         it.subjectId.eq(subjectId) and it.subjectType.eq(subject) and active
                     }).toList()
 
@@ -218,7 +219,7 @@ public class PasswordProofEndpoints(
                             throw BadRequestException("User ID and code do not match")
                         }
 
-                    modelInfo.table().updateOneById(matching._id, modification {
+                    modelInfo.table().updateOneById(matching._id, Modification {
                         it.lastUsedAt assign now
                     })
 
@@ -237,7 +238,7 @@ public class PasswordProofEndpoints(
         subject: SUBJECT,
     ): Boolean {
         @Suppress("UNCHECKED_CAST")
-        return modelInfo.table().count(condition {
+        return modelInfo.table().count(Condition {
             Condition.And(
                 it.subjectId eq principal.idString(subject._id),
                 it.subjectType eq principal.name,

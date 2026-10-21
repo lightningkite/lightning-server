@@ -4,7 +4,6 @@ import com.lightningkite.services.data.Unsafe
 import com.lightningkite.services.data.UuidV7
 import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.InlineProperty
-import com.lightningkite.services.database.condition
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -128,7 +127,7 @@ class FieldIdentifierSetTests {
 
     @Test
     fun `containsAny condition matches a value holding any requested index`() {
-        val condition = condition<FieldIdentifierSet> { it.containsAny(fieldIds(3, 40)) }
+        val condition = Condition<FieldIdentifierSet> { it.containsAny(fieldIds(3, 40)) }
         assertTrue(condition(fieldIds(3)))
         assertTrue(condition(fieldIds(40)))
         assertTrue(condition(fieldIds(3, 40)))
@@ -138,7 +137,7 @@ class FieldIdentifierSetTests {
 
     @Test
     fun `containsAll condition matches only a value holding every requested index`() {
-        val condition = condition<FieldIdentifierSet> { it.containsAll(fieldIds(3, 40)) }
+        val condition = Condition<FieldIdentifierSet> { it.containsAll(fieldIds(3, 40)) }
         assertTrue(condition(fieldIds(3, 40)))
         assertTrue(condition(fieldIds(3, 40, 50)), "extra indices must not exclude a value")
         assertFalse(condition(fieldIds(3)))
@@ -148,19 +147,19 @@ class FieldIdentifierSetTests {
 
     @Test
     fun `conditions only touch the segments the query uses`() {
-        val any = condition<FieldIdentifierSet> { it.containsAny(fieldIds(1, 33)) }
+        val any = Condition<FieldIdentifierSet> { it.containsAny(fieldIds(1, 33)) }
         assertEquals(2, (any as Condition.Or).conditions.size, "expected one condition per segment; was $any")
 
-        val all = condition<FieldIdentifierSet> { it.containsAll(fieldIds(1, 2)) }
+        val all = Condition<FieldIdentifierSet> { it.containsAll(fieldIds(1, 2)) }
         assertTrue(all !is Condition.And, "same-segment indices belong in one mask; was $all")
     }
 
     /** A field past the first segment is the case a single-Int layout would silently drop. */
     @Test
     fun `queries reach ids in the second segment alone`() {
-        assertTrue(condition<FieldIdentifierSet> { it.containsAny(fieldIds(40)) }(fieldIds(40)))
-        assertTrue(condition<FieldIdentifierSet> { it.containsAll(fieldIds(40, 50)) }(fieldIds(40, 50)))
-        assertFalse(condition<FieldIdentifierSet> { it.containsAll(fieldIds(40, 50)) }(fieldIds(40)))
+        assertTrue(Condition<FieldIdentifierSet> { it.containsAny(fieldIds(40)) }(fieldIds(40)))
+        assertTrue(Condition<FieldIdentifierSet> { it.containsAll(fieldIds(40, 50)) }(fieldIds(40, 50)))
+        assertFalse(Condition<FieldIdentifierSet> { it.containsAll(fieldIds(40, 50)) }(fieldIds(40)))
     }
 
     /**
@@ -173,11 +172,11 @@ class FieldIdentifierSetTests {
     fun `the top bit of a segment produces the mask and segment the layout promises`() {
         assertEquals(
             Condition.OnField(FieldIdentifierSet.fields1, Condition.OnField(BitIndices.mask, Condition.IntBitsAnySet(1 shl 31))),
-            condition<FieldIdentifierSet> { it.containsAny(fieldIds(32)) },
+            Condition<FieldIdentifierSet> { it.containsAny(fieldIds(32)) },
         )
         assertEquals(
             Condition.OnField(FieldIdentifierSet.fields0, Condition.OnField(BitIndices.mask, Condition.IntBitsSet(1 shl 31))),
-            condition<FieldIdentifierSet> { it.containsAll(fieldIds(0)) },
+            Condition<FieldIdentifierSet> { it.containsAll(fieldIds(0)) },
         )
     }
 
@@ -193,13 +192,13 @@ class FieldIdentifierSetTests {
     /** Through the record's path, which is how real queries reach the set. */
     @Test
     fun `conditions on a record's disclosed fields match the records they should`() {
-        val all = condition<AuditDisclosureRecord> { it.disclosed.containsAll(fieldIds(3, 40)) }
+        val all = Condition<AuditDisclosureRecord> { it.disclosed.containsAll(fieldIds(3, 40)) }
         assertTrue(all(record(3, 40)))
         assertTrue(all(record(3, 40, 50)), "extra disclosed fields must not exclude a record")
         assertFalse(all(record(3)))
         assertFalse(all(record()))
 
-        val any = condition<AuditDisclosureRecord> { it.disclosed.containsAny(fieldIds(3, 40)) }
+        val any = Condition<AuditDisclosureRecord> { it.disclosed.containsAny(fieldIds(3, 40)) }
         assertTrue(any(record(40)))
         assertFalse(any(record(4, 41)))
         assertFalse(any(record()))
@@ -207,7 +206,7 @@ class FieldIdentifierSetTests {
 
     @Test
     fun `an empty query is the identity of its operator`() {
-        assertEquals(Condition.Always, condition<FieldIdentifierSet> { it.containsAll(empty) })
-        assertEquals(Condition.Never, condition<FieldIdentifierSet> { it.containsAny(empty) })
+        assertEquals(Condition.Always, Condition<FieldIdentifierSet> { it.containsAll(empty) })
+        assertEquals(Condition.Never, Condition<FieldIdentifierSet> { it.containsAny(empty) })
     }
 }

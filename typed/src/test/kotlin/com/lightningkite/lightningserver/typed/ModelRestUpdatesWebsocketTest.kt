@@ -154,7 +154,7 @@ class ModelRestUpdatesWebSocketTest {
             val json = engine.externalSerialization.json
 
             // An Equal condition on the key is what lets the server shard onto the hash topic.
-            val narrowed: Condition<Sample> = condition { it.name eq "shared" }
+            val narrowed: Condition<Sample> = Condition { it.name eq "shared" }
             socket.send(
                 WebSocketFrame.Text(json.encodeToString(Condition.serializer(Sample.serializer()), narrowed))
             )
@@ -165,8 +165,8 @@ class ModelRestUpdatesWebSocketTest {
             // One database write touching every row, all of which share the key value "shared".
             execute {
                 KeyedServer.info.table().updateMany(
-                    condition { it.name eq "shared" },
-                    modification { it.note assign "after" }
+                    Condition { it.name eq "shared" },
+                    Modification { it.note assign "after" }
                 )
             }
 

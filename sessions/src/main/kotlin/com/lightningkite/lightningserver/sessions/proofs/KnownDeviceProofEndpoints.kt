@@ -17,6 +17,7 @@ import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
 import com.lightningkite.services.cache.Cache
+import com.lightningkite.services.database.optics.*
 import com.lightningkite.services.database.*
 import kotlinx.serialization.builtins.serializer
 import kotlin.time.Clock
@@ -51,7 +52,7 @@ public class KnownDeviceProofEndpoints(
 
     context(_: ServerRuntime)
     private val active
-        get() = condition<KnownDeviceSecret> {
+        get() = Condition<KnownDeviceSecret> {
             it.disabledAt.eq(null) and ((it.expiresAt.eq(null) or it.expiresAt.notNull.gte(now())))
         }
 
@@ -65,9 +66,9 @@ public class KnownDeviceProofEndpoints(
             }
         },
         permissions = {
-            val admin = condition(AuthRequirement.IsAdmin.accepts(authOrNull))
+            val admin = Condition(AuthRequirement.IsAdmin.accepts(authOrNull))
             val mine = authOrNull?.let { a ->
-                condition<KnownDeviceSecret> {
+                Condition<KnownDeviceSecret> {
                     it.subjectId.eq(a.rawId) and it.subjectType.eq(a.principalName)
                 }
             } ?: Condition.Never
@@ -200,7 +201,7 @@ public class KnownDeviceProofEndpoints(
                     // Lazy migration: if using old slow PBKDF2 hash, upgrade to fast SHA-256 hash
                     val shouldMigrate = active.hash.isSlowHash()
 
-                    modelInfo.table().updateOneById(id, modification {
+                    modelInfo.table().updateOneById(id, Modification {
                         it.lastUsedAt assign now
                         if (shouldMigrate) {
                             it.hash assign secret.fastHash()

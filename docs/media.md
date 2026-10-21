@@ -48,7 +48,7 @@ data class Post(
 ```
 
 The processing helpers below address the field through a
-`DataClassPath<T, ServerFileWithMetadata?>`, so a nullable field is the path of least
+`Optic<T, ServerFileWithMetadata?>`, so a nullable field is the path of least
 resistance.  For a non-nullable field, use `interceptImagesForProcessingNotNull`
 instead of `interceptImagesForProcessing`; `processImagesInBackground` has no
 non-nullable variant and requires a nullable field.

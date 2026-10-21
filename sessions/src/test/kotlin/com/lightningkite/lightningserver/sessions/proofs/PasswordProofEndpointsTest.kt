@@ -91,7 +91,7 @@ class PasswordProofEndpointsTest {
                 // Verify password secret was created
                 val secrets = execute {
                     server.passwordProof.modelInfo.table()
-                        .find(condition<PasswordSecret> { it.subjectId eq userId.toString() })
+                        .find(Condition<PasswordSecret> { it.subjectId eq userId.toString() })
                         .firstOrNull()
                 }
 
@@ -259,7 +259,7 @@ class PasswordProofEndpointsTest {
 
                     // Get the stored secret
                     server.passwordProof.modelInfo.table()
-                        .find(condition<PasswordSecret> { it.subjectId eq userId.toString() })
+                        .find(Condition<PasswordSecret> { it.subjectId eq userId.toString() })
                         .firstOrNull()
                 }
 

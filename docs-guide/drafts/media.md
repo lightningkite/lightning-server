@@ -146,8 +146,8 @@ object Server : ServerBuilder() {
 
 Use `interceptImagesForProcessing` (with the trailing-`NotNull` dropped) when
 the field is nullable (`ServerFileWithMetadata?`).  The `NotNull` variant exists
-because `makePath` must produce a `DataClassPath<T, ServerFileWithMetadata?>` and
-`DataClassPath` is invariant in its value type — a path to a non-nullable field
+because `makePath` must produce a `Optic<T, ServerFileWithMetadata?>` and
+`Optic` is invariant in its value type — a path to a non-nullable field
 does not fit without it.
 
 **When to use this strategy:**

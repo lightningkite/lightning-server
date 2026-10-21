@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.typed.jsonschema
 
+import com.lightningkite.services.database.optics.*
 import com.lightningkite.lightningserver.typed.sdk.titleCase
 import com.lightningkite.services.data.*
 import com.lightningkite.services.database.*
@@ -377,7 +378,7 @@ internal class JsonSchemaBuilder(
                         title = ser.descriptor.serialName.substringBefore('/').substringBefore('<')
                             .substringAfterLast('.').titleCase(),
                         type = JavascriptCoreTypeWithNullability(JavascriptCoreType.OBJECT),
-                        properties = ser.serializableProperties?.associate {
+                        properties = ser.fields?.associate {
                             val propTitle = it.name.titleCase()
                             it.name to get(
                                 it.serializer,

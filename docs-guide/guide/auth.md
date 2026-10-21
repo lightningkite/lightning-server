@@ -245,7 +245,7 @@ object IsAdmin : AuthCacheKey<UserProfile, Boolean> {
     context(server: ServerRuntime)
     override suspend fun calculate(input: Authentication<UserProfile>): Boolean =
         UserProfileServer.userProfiles()
-            .count(condition { (it._id eq input.id) and (it.role eq "admin") }) > 0
+            .count(Condition { (it._id eq input.id) and (it.role eq "admin") }) > 0
 }
 ```
 

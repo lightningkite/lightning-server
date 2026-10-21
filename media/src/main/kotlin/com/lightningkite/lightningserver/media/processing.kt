@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.media
 
+import com.lightningkite.services.database.optics.*
 import com.lightningkite.lightningserver.data.toKFile
 import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.files.externalFile
@@ -118,9 +119,9 @@ public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> processImagesI
     info: ModelInfo<USER, T, ID>,
     vararg options: MediaPreviewOptions,
     timeout: Duration = 5.minutes,
-    makePath: (DataClassPath<T, T>) -> DataClassPath<T, ServerFileWithMetadata?>,
+    makePath: (Optic<T, T>) -> Optic<T, ServerFileWithMetadata?>,
 ): Task<T> {
-    val path = makePath(DataClassPathSelf(info.serializer))
+    val path = makePath(IdentityLens(info.serializer))
 
     val task = Task(info.serializer, timeout) { model ->
         val new = path.get(model) ?: return@Task
@@ -181,9 +182,9 @@ public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> processImagesI
 context(_: ServerRuntime)
 public fun <T : Any> Table<T>.interceptImagesForProcessing(
     vararg options: MediaPreviewOptions,
-    makePath: (DataClassPath<T, T>) -> DataClassPath<T, ServerFileWithMetadata?>,
+    makePath: (Optic<T, T>) -> Optic<T, ServerFileWithMetadata?>,
 ): Table<T> {
-    val path = makePath(DataClassPathSelf(serializer))
+    val path = makePath(IdentityLens(serializer))
     return this
         .interceptCreate {
             path.set(
@@ -192,7 +193,7 @@ public fun <T : Any> Table<T>.interceptImagesForProcessing(
             )
         }
         .interceptChange {
-            val new = it.valueSetForDataClassPath(path) ?: return@interceptChange it
+            val new = it.valueSetForOptic(path) ?: return@interceptChange it
 
             Modification.Chain(
                 listOf(
@@ -225,11 +226,11 @@ public fun <T : Any> Table<T>.interceptImagesForProcessing(
 context(_: ServerRuntime)
 public fun <T : Any> Table<T>.interceptImagesForProcessingNotNull(
     vararg options: MediaPreviewOptions,
-    makePath: (DataClassPath<T, T>) -> DataClassPath<T, ServerFileWithMetadata>,
+    makePath: (Optic<T, T>) -> Optic<T, ServerFileWithMetadata>,
 ): Table<T> =
     interceptImagesForProcessing(
         *options,
-        makePath = makePath as (DataClassPath<T, T>) -> DataClassPath<T, ServerFileWithMetadata?>
+        makePath = makePath as (Optic<T, T>) -> Optic<T, ServerFileWithMetadata?>
     )
 
 /*

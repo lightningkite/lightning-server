@@ -164,7 +164,7 @@ public class BackupCodeEndpoints(
                 // Revokes the codes that are still live. Redeemed rows stay: they are a record of an
                 // authentication that happened, not a secret that needs withdrawing.
                 modelInfo.table().deleteManyIgnoringOld(
-                    condition {
+                    Condition {
                         it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) and
                                 it.usedAt.eq(null)
                     }
@@ -217,7 +217,7 @@ public class BackupCodeEndpoints(
             implementation = { _: Unit ->
                 // As above: clearing withdraws live codes, it does not erase redemption history.
                 modelInfo.table().deleteManyIgnoringOld(
-                    condition {
+                    Condition {
                         it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) and
                                 it.usedAt.eq(null)
                     }
@@ -247,7 +247,7 @@ public class BackupCodeEndpoints(
             examples = listOf(),
             implementation = { _: Unit ->
                 modelInfo.table().findOne(
-                    condition {
+                    Condition {
                         it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) and
                                 it.usedAt.eq(null)
                     }
@@ -337,7 +337,7 @@ public class BackupCodeEndpoints(
                     val normalizedCode = normalizeCode(input.password)
 
                     // Codes stored before hashing was introduced are plain text.
-                    val match = modelInfo.table().findOne(condition {
+                    val match = modelInfo.table().findOne(Condition {
                         it.subjectId.eq(subjectId) and
                                 it.subjectType.eq(subject) and
                                 it.usedAt.eq(null) and
@@ -357,8 +357,8 @@ public class BackupCodeEndpoints(
                     // concurrent redemptions of the same code cannot both succeed. Losing this race is
                     // indistinguishable from presenting an already-spent code, and answers the same.
                     val claimed = modelInfo.table().updateOne(
-                        condition { it._id.eq(match._id) and it.usedAt.eq(null) },
-                        modification { it.usedAt assign now() },
+                        Condition { it._id.eq(match._id) and it.usedAt.eq(null) },
+                        Modification { it.usedAt assign now() },
                     )
                     if (claimed.old == null) {
                         serverRuntime.reportAuthEvent(AuthEvent.ProofCredentialRejected(
@@ -387,7 +387,7 @@ public class BackupCodeEndpoints(
         subject: SUBJECT,
     ): Boolean =
         modelInfo.table().findOne(
-            condition {
+            Condition {
                 it.subjectId.eq(principal.idString(subject._id)) and
                         it.subjectType.eq(principal.name) and
                         it.usedAt.eq(null)

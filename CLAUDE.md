@@ -284,16 +284,16 @@ val posts = postTable()
 posts.insertOne(Post(title = "Test", author = "user@example.com", body = "Content"))
 
 // Query
-posts.find(condition { it.title eq "Test" }).toList()
+posts.find(Condition { it.title eq "Test" }).toList()
 
 // Update
 posts.updateOne(
-    condition { it.title eq "Test" },
-    modification { it.title assign "Updated Title" }
+    Condition { it.title eq "Test" },
+    Modification { it.title assign "Updated Title" }
 )
 
 // Delete
-posts.deleteMany(condition { it.author eq "user@example.com" })
+posts.deleteMany(Condition { it.author eq "user@example.com" })
 ```
 
 ### Service Abstractions

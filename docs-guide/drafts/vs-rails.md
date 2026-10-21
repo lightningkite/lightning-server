@@ -71,11 +71,11 @@ data class Post(
 ) : HasId<Uuid>
 
 // "Scope" as an extension function
-fun FieldCollection<Post>.published() = find(condition { it.published eq true })
+fun FieldCollection<Post>.published() = find(Condition { it.published eq true })
 ```
 
 `@Queryable` is processed by KSP at build time.  It produces typed field references
-used by `condition {}` and `modification {}`.  A typo like `it.titel` is a compile error, not a runtime bug.
+used by `Condition {}` and `Modification {}`.  A typo like `it.titel` is a compile error, not a runtime bug.
 
 ### Migrations
 
@@ -328,7 +328,7 @@ every query, every endpoint input type, and every generated SDK call that refere
 
 - [Overview](../guide/overview.md) — complete building-block inventory
 - [Typed Endpoints](../guide/typed-endpoints.md) — `ApiHttpHandler`, error cases, SDK generation
-- [Database](../guide/database.md) — `condition {}`, `modification {}`, model setup
+- [Database](../guide/database.md) — `Condition {}`, `Modification {}`, model setup
 - [Authentication & Sessions](../guide/auth.md) — `PrincipalType`, proofs, `testAuth`
 - [Tasks](../guide/tasks.md) — `Task`, `launch()`
 - [Schedules](../guide/schedules.md) — `ScheduledTask`, schedule types

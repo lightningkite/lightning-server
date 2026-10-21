@@ -26,7 +26,7 @@ Before diving in, it's helpful to understand the key philosophical differences:
 | Django Feature           | Lightning Server Equivalent                                         |
 |--------------------------|---------------------------------------------------------------------|
 | Django Admin             | Admin UI in lightning-server-kiteui                                 |
-| Django ORM               | Type-safe query DSL with `condition {}` and `modification {}`       |
+| Django ORM               | Type-safe query DSL with `Condition {}` and `Modification {}`       |
 | Models                   | `@Queryable` data classes                                           |
 | Signals                  | Database lifecycle hooks (`postCreate`, `postChange`, `postDelete`) |
 | Named URLs / `reverse()` | Endpoint constants with type-safe path construction                 |
@@ -180,11 +180,11 @@ Post.objects.filter(author='user@example.com').delete()
 val posts = postTable()
 
 // Get all posts by an author
-posts.find(condition { it.author eq "user@example.com" }).toList()
+posts.find(Condition { it.author eq "user@example.com" }).toList()
 
 // Chain conditions
 posts.find(
-    condition {
+    Condition {
         (it.author eq "user@example.com") and (it.createdAt gte someDate)
     },
     orderBy = listOf(SortPart(Post::createdAt, ascending = false))
@@ -192,26 +192,26 @@ posts.find(
 
 // Update
 posts.updateMany(
-    condition { it.title eq "Test" },
-    modification { it.title assign "Updated Title" }
+    Condition { it.title eq "Test" },
+    Modification { it.title assign "Updated Title" }
 )
 
 // Delete
-posts.deleteMany(condition { it.author eq "user@example.com" })
+posts.deleteMany(Condition { it.author eq "user@example.com" })
 ```
 
 ### Common Query Operations
 
 | Django                         | Lightning Server                                |
 |--------------------------------|-------------------------------------------------|
-| `filter(field=value)`          | `condition { it.field eq value }`               |
-| `exclude(field=value)`         | `condition { it.field neq value }`              |
-| `filter(field__gt=value)`      | `condition { it.field gt value }`               |
-| `filter(field__gte=value)`     | `condition { it.field gte value }`              |
-| `filter(field__lt=value)`      | `condition { it.field lt value }`               |
-| `filter(field__in=[...])`      | `condition { it.field inside listOf(...) }`     |
-| `filter(field__contains='x')`  | `condition { it.field contains "x" }`           |
-| `filter(field__icontains='x')` | `condition { it.field containsIgnoreCase "x" }` |
+| `filter(field=value)`          | `Condition { it.field eq value }`               |
+| `exclude(field=value)`         | `Condition { it.field neq value }`              |
+| `filter(field__gt=value)`      | `Condition { it.field gt value }`               |
+| `filter(field__gte=value)`     | `Condition { it.field gte value }`              |
+| `filter(field__lt=value)`      | `Condition { it.field lt value }`               |
+| `filter(field__in=[...])`      | `Condition { it.field inside listOf(...) }`     |
+| `filter(field__contains='x')`  | `Condition { it.field contains "x" }`           |
+| `filter(field__icontains='x')` | `Condition { it.field containsIgnoreCase "x" }` |
 | `Q(a) \| Q(b)`                 | `(conditionA) or (conditionB)`                  |
 | `Q(a) & Q(b)`                  | `(conditionA) and (conditionB)`                 |
 
@@ -300,7 +300,7 @@ url = reverse('post-detail', args=[123])  # '/posts/123/'
 object Server : ServerBuilder() {
     // Endpoints are stored as constants
     val postList = path.path("posts").get bind HttpHandler { request ->
-        val posts = postTable().find(condition { it.always }).toList()
+        val posts = postTable().find(Condition { it.always() }).toList()
         HttpResponse(body = posts.toTypedData(request.headers.accept))
     }
 
@@ -312,7 +312,7 @@ object Server : ServerBuilder() {
 
     val userPosts = path.path("users").arg<String>("userId").path("posts").get bind HttpHandler { request ->
         val userId = request.path.arg1
-        val posts = postTable().find(condition { it.author eq userId }).toList()
+        val posts = postTable().find(Condition { it.author eq userId }).toList()
         HttpResponse(body = posts.toTypedData(request.headers.accept))
     }
 }
@@ -351,7 +351,7 @@ class PostListView(View):
 ```kotlin
 object PostEndpoints : ServerBuilder() {
     val list = path.get bind HttpHandler { request ->
-        val posts = postTable().find(condition { it.always }).toList()
+        val posts = postTable().find(Condition { it.always() }).toList()
         HttpResponse(body = posts.toTypedData(request.headers.accept))
     }
 
@@ -414,10 +414,10 @@ object PostApi : ServerBuilder() {
         permissions = {
             val user = authOrNull?.fetch()
             ModelPermissions(
-                create = condition { it.author eq user?.email },
-                read = condition { it.always },
-                update = condition { it.author eq user?.email },
-                delete = condition { it.author eq user?.email }
+                create = Condition { it.author eq user?.email },
+                read = Condition { it.always() },
+                update = Condition { it.author eq user?.email },
+                delete = Condition { it.author eq user?.email }
             )
         }
     )
@@ -824,7 +824,7 @@ Gateway, DynamoDB tables, and S3 buckets.
 
 3. **Models are simpler** - Data classes with annotations, no complex ORM metaclasses.
 
-4. **Query DSL is different but capable** - `condition { }` and `modification { }` replace Django's QuerySet API.
+4. **Query DSL is different but capable** - `Condition { }` and `Modification { }` replace Django's QuerySet API.
 
 5. **API-first design** - Lightning Server excels at building APIs with auto-generated SDKs and documentation.
 
