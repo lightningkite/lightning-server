@@ -1,5 +1,8 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
+import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.sessions.reportAuthEvent
+import com.lightningkite.lightningserver.sessions.AuthEvent
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.*
@@ -26,24 +29,10 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.Uuid
 
 /**
- * Provides OAuth-based authentication proof endpoints for external identity providers.
+ * Provides endpoints that prove a user's email through an external OAuth identity provider such as Google, Apple, Microsoft or GitHub.
  *
- * This class creates endpoints that enable users to authenticate via OAuth providers like
- * Google, Apple, Microsoft, and GitHub. OAuth authentication provides the highest proof
- * strength (10) because the identity is verified by a trusted third party.
+ * `start` or `loginApi` returns the provider's authorization URL, and after the user authenticates, the callback exchanges the code, reads the profile, and redirects to the UI with a signed [Proof] in the query. The proof has a strength of 10. A single-use `state` nonce guards against CSRF and PKCE (RFC 7636) against code interception, both held in [cache] until the callback.
  *
- * **Authentication Flow:**
- * 1. Client calls `start` or `loginApi` to get an OAuth authorization URL
- * 2. User is redirected to the provider (Google, Apple, etc.)
- * 3. Provider authenticates the user and redirects back to the callback endpoint
- * 4. Callback exchanges the authorization code for an access token
- * 5. User profile is retrieved from the provider
- * 6. Email is extracted and wrapped in a cryptographically signed proof
- * 7. User is redirected back to the UI with the proof as a query parameter
- *
- * **Proof Strength:** 10 (highest) - OAuth verification by trusted identity provider
- *
- * **Example usage:**
  * ```kotlin
  * val googleAuth = OauthProofEndpoints(
  *     provider = OauthProviderInfo.google,
@@ -52,18 +41,10 @@ import kotlin.uuid.Uuid
  * )
  * ```
  *
- * **Security:** The flow is protected against CSRF via a single-use `state` nonce and against
- * authorization-code interception via PKCE (RFC 7636). Both are held in [cache] for the duration of
- * the redirect round-trip and validated/consumed on the callback.
- *
- * @param proofSigner The signer used to create cryptographic proofs (defaults to derived from secretBasis)
- * @param provider The OAuth provider configuration (Google, Apple, Microsoft, GitHub, or custom)
- * @param cache Cache holding the transient CSRF `state` and PKCE verifier between redirect and callback
- * @param credentials Function that returns the OAuth client credentials (ID and secret)
- * @param continueUiAuthUrl Function that returns the UI URL to redirect to after successful authentication
- *
- * @see OauthProviderInfo for built-in providers (Google, Apple, Microsoft, GitHub)
- * @see ExternalProofMethod
+ * @param provider The provider to authenticate with, such as [OauthProviderInfo.google].
+ * @param cache Holds the `state` nonce and PKCE verifier between the redirect and the callback.
+ * @param credentials Returns the OAuth client ID and secret.
+ * @param continueUiAuthUrl Returns the UI URL to redirect to after authentication.
  */
 public class OauthProofEndpoints(
     private val provider: OauthProviderInfo,
@@ -102,11 +83,13 @@ public class OauthProofEndpoints(
         cache = cache,
     ) { response: OauthResponse, _: Uuid ->
         val profile = provider.getProfile(response, credentials())
+        val proof = makeProof(profile)
+        serverRuntime.reportAuthEvent(AuthEvent.ProofAccepted(info, principal = proof.value))
         // Open-redirect note: the final destination is produced entirely by the app-supplied
         // `continueUiAuthUrl` from a server-generated, signed Proof. No user- or attacker-controllable
         // value (query param or `state`) feeds into it, so the redirect target is app-controlled and
         // does not require redirect-URI whitelisting here.
-        HttpResponse.redirectToGet(continueUiAuthUrl(makeProof(profile)))
+        HttpResponse.redirectToGet(continueUiAuthUrl(proof))
     }
 
     public val openEndpoint: HttpHandler<*> = path.path("open").get bind HttpHandler {

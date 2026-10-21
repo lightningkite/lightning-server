@@ -63,7 +63,7 @@ object ValidationServer : ServerBuilder() {
 fun validationRejectTest() = ValidationServer.testBlocking(settings = {}) {
     // Encode a CreateUserRequest whose name exceeds @MaxLength(50).
     val body = TypedData.text(
-        serverRuntime.externalSerialization.json.encodeToString(
+        engine.externalSerialization.json.encodeToString(
             CreateUserRequest.serializer(),
             CreateUserRequest(name = "A".repeat(51), email = "user@example.com", age = 25, tags = emptyList())
         ),
@@ -71,8 +71,6 @@ fun validationRejectTest() = ValidationServer.testBlocking(settings = {}) {
     )
     // HttpHandler.test(body = ...) drives the full HTTP pipeline, including the validation
     // step that runs before the implementation lambda.
-    // The typed ApiHttpHandler.test(auth, input) helper bypasses validation — always use
-    // HttpHandler.test() when testing constraint enforcement.
     val response = ValidationServer.createUser.test(body = body)
     check(response.status.code == 400)
 }
@@ -81,7 +79,7 @@ fun validationRejectTest() = ValidationServer.testBlocking(settings = {}) {
 // region validation-pass-test
 fun validationPassTest() = ValidationServer.testBlocking(settings = {}) {
     val body = TypedData.text(
-        serverRuntime.externalSerialization.json.encodeToString(
+        engine.externalSerialization.json.encodeToString(
             CreateUserRequest.serializer(),
             CreateUserRequest(name = "Alice", email = "alice@example.com", age = 30, tags = emptyList())
         ),

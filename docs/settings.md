@@ -1,7 +1,5 @@
 # Settings
 
-Last updated October 29, 2025 (`version-5`)
-
 Settings in Lightning Server are defined programmatically, are fully customizable, and are strictly typed. They leverage
 the KotlinX serialization system, and are usually placed into some form of `settings.json` file.
 
@@ -40,7 +38,7 @@ object Server : ServerBuilder() {
 Now, rerun your application and you'll see that it does not run and gives you the following error:
 
 ```output
-Settings were incorrect.  Suggested updates are inside settings.suggested.json.
+Missing keys settingName. Created suggested settings at .../settings.suggested.json
 ```
 
 Now, take a look at that generated file and you'll see the setting is now there populated to its default value. You will
@@ -62,10 +60,12 @@ The default and recommended format. Files are detected as JSON unless they conta
 
 ```json
 {
-  "webUrl": "http://localhost:8080",
+  "general": {
+    "projectName": "My Project",
+    "publicUrl": "http://localhost:8080"
+  },
   "database": {
-    "host": "localhost",
-    "port": 5432
+    "url": "ram"
   }
 }
 ```
@@ -76,9 +76,8 @@ Java properties format is also supported for simpler configurations:
 
 ```properties
 # This is a comment
-webUrl=http://localhost:8080
-database.host=localhost
-database.port=5432
+general.publicUrl=http://localhost:8080
+database.url=ram
 
 # Empty lines and lines starting with # are ignored
 # Inline comments are also supported
@@ -89,7 +88,7 @@ setting=value # comment
 
 - Comments start with `#` (both full-line and inline)
 - Empty lines are automatically ignored
-- Nested properties use dot notation (e.g., `database.host`)
+- Nested properties use dot notation (e.g., `database.url`)
 
 ## Advanced Features
 
@@ -135,7 +134,7 @@ You can reference a defaults file from your main configuration using the special
 ```json
 {
   "defaults": "~/shared-config.json",
-  "webUrl": "http://localhost:8080"
+  "general": { "publicUrl": "http://localhost:8080" }
 }
 ```
 
@@ -162,7 +161,7 @@ You can reference a defaults file from your main configuration using the special
 {
   "defaults": "../base.json",
   "database": {
-    "host": "prod-db.example.com"
+    "url": "mongodb://prod-db.example.com/app"
   }
 }
 ```
@@ -182,34 +181,27 @@ Optional settings that are missing from the configuration file will use their de
 Settings can include a transformation function that converts the serialized value into a different runtime value:
 
 ```kotlin
-val transformedSetting = setting(
-    "password",
-    "default",
-    getter = { plaintext -> hashPassword(plaintext) }
-)
+val maxUploadBytes = setting("maxUploadMegabytes", 10) { megabytes -> megabytes * 1024L * 1024L }
 ```
 
 The transformation happens once during the ready phase and is cached for subsequent accesses.
 
 ## Settings in Tests
 
-To override a setting's value in a unit test, pass a `settings` lambda to the `test { }` block. The
-`settings` lambda runs in a `ServerSettings` context, so you can call `.set()` on any setting:
+To override a setting's value in a unit test, pass a `settings` lambda to `test` or `testBlocking`. The `settings`
+lambda runs in a `ServerSettings` context, so you can `set` any setting, or `setStatic` one to a ready-made value such as
+a test service:
 
 ```kotlin
 class ServerTest {
     @Test
-    fun testSetting() {
-        Server.test(
-            settings = {
-                Server.settingName.set("Unit Test")
-            }
-        ) {
-            runBlocking {
-                val response = Server.seeSampleSetting.test()
-                assertEquals("Unit Test", response.body!!.text())
-            }
+    fun testSetting() = Server.testBlocking(
+        settings = {
+            Server.settingName set "Unit Test"
         }
+    ) {
+        val response = Server.seeSampleSetting.test()
+        assertEquals("Unit Test", response.body!!.text())
     }
 }
 ```

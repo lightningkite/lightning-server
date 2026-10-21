@@ -5,6 +5,9 @@ This shared module provides simple models used by the files module and any clien
 Files
 
 - models.kt — UploadForNextRequest and UploadInformation used to power the early-upload flow.
+- ClientUploadEarlyEndpoints.kt — The client interface for the early-upload endpoints.
+- LiveClientModelRestEndpoints.kt — LiveClientUploadEarlyEndpoints, the Fetcher-backed implementation of that
+  interface.
 
 Overview
 

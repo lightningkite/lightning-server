@@ -404,20 +404,17 @@ public class MetaEndpoints(
                                     ?: QueryParameters.EMPTY,
                                 body = sub.body?.let { TypedData.text(it, MediaType.Application.Json) }
                             )
-                            // Route the sub-request through the shared logical-request pipeline rather
-                            // than invoking its handler directly, so it passes every
-                            // HttpLogicalInterceptor (access logging, auditing, rate limiting)
-                            // instead of executing unobserved. handleSubRequest maps exceptions to
-                            // responses itself, so nothing escapes here.
-                            val response = serverRuntime.handleSubRequest(properRequest)
+                            // Routed as its own execution so the execution interceptors (access logging,
+                            // auditing) see it. handle maps exceptions to responses, so nothing escapes here.
+                            val response = serverRuntime.handle(properRequest)
                             val durationMs = start.elapsedNow().inWholeMilliseconds
                             entry.key to if (response.status.success) {
                                 BulkResponse(durationMs = durationMs, result = response.body?.text())
                             } else {
-                                BulkResponse(durationMs = durationMs, error = with(serverRuntime) { response.toLSError() })
+                                BulkResponse(durationMs = durationMs, error = response.toLSError())
                             }
                         }
-                    }.awaitAll().associate { it }
+                    }.awaitAll().toMap()
                 }
             }
         )

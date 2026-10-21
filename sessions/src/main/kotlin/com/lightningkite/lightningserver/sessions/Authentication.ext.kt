@@ -15,7 +15,7 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
     issuedAt: Instant = server.clock.now(),
     expiration: Instant? = null,
     scopes: Set<GrantedScope> = setOf(GrantedScope.root),
-    cache: SerializableCache? = null,
+    cache: SerializableCache<Authentication<SUBJECT>>? = null,
 ): Authentication<SUBJECT> =
     Authentication(
         principalType = principalType,

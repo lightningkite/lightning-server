@@ -41,7 +41,7 @@ public class JwtTokenFormat(
                 nbf = now().epochSeconds,
                 scope = auth.scopes.joinToString(" "),
                 thp = null, // TODO: Third parties
-                cache = server.internalSerialization.json.encodeToString(auth.cache)
+                cache = server.internalSerialization.json.encodeToString(principal.cacheSerializer(), auth.cache)
             )
         )
 
@@ -63,7 +63,7 @@ public class JwtTokenFormat(
             issuedAt = Instant.fromEpochSeconds(claims.iat),
             expiration = Instant.fromEpochSeconds(claims.exp),
             scopes = claims.scope!!.split(' ').mapTo(HashSet(), ::GrantedScope),
-            cache = claims.cache?.let { server.internalSerialization.json.decodeFromString<SerializableCache>(it) }
+            cache = claims.cache?.let { server.internalSerialization.json.decodeFromString(principal.cacheSerializer(), it) }
         )
     }
 
@@ -123,3 +123,5 @@ public class JwtTokenFormat(
         return claims
     }
 }
+private fun <SUBJECT : HasId<*>> PrincipalType<SUBJECT, *>.cacheSerializer() =
+    SerializableCache.Serializer(Authentication.serializer(subjectSerializer))

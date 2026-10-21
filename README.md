@@ -29,8 +29,12 @@ are still possible.  The nightly badge above tracks the latest published build.
   CloudWatch alarms, and more.  The Terraform configuration is derived, not
   hand-written.
 - **First-class unit testing** — `SERVER.test {}` starts an ephemeral
-  in-process runtime; `endpoint.test(auth, input)` returns typed output
+  in-process engine; `endpoint.test(auth, input)` returns typed output
   directly.  No Docker, no ports, no external services needed.
+- **Traceable executions** — every request, WebSocket phase, task, and schedule
+  tick runs as an execution that records what caused it, even across task
+  queues, so logs, telemetry, and the optional audit log can trace work back to
+  the request that started it.
 
 ---
 
@@ -93,14 +97,13 @@ drift-checked against the compiled source on every CI run.
 | [Routing & Path Parameters](docs-guide/guide/routing.md) | Nested paths, all HTTP methods, typed path args, sub-builders, query params |
 | [Typed Endpoints, Errors & SDK Generation](docs-guide/guide/typed-endpoints.md) | `ApiHttpHandler`, `LSError`, `errorCases`, success codes, SDK generation |
 | [Services & Settings](docs-guide/guide/services.md) | Declaring and swapping service settings; in-process RAM mocks for tests |
-| [Database & the Query DSL](docs-guide/guide/database.md) | Type-safe `condition {}` / `modification {}` DSL, `@GenerateDataClassPaths`, CRUD |
+| [Database & the Query DSL](docs-guide/guide/database.md) | Type-safe `condition {}` / `modification {}` DSL, `@Queryable`, CRUD |
 | [Authentication & Sessions](docs-guide/guide/auth.md) | `PrincipalType`, `User.require()`, reading `auth.id` / `auth.fetch()` in handlers |
 | [Testing Your Server](docs-guide/guide/testing.md) | `SERVER.test {}`, `HttpHandler.test()`, `ApiHttpHandler.test(auth, input)`, `@Test` |
 | [Deploying to AWS](docs-guide/guide/aws-deployment.md) | `AwsAdapter`, `TerraformAwsServerlessBuilder`, service → Terraform, deploy workflow |
 
-> The older `docs/` directory contains reference documentation for the previous
-> API surface.  It is retained for background but may not match the current
-> version-5 API.
+> The `docs/` directory contains reference documentation by topic.  Its code
+> samples are not compiled, so where it and the guide differ, trust the guide.
 
 ---
 
@@ -150,14 +153,18 @@ multiplatform module (KMP; used by client SDKs) and a JVM module.
 | `core` / `core-shared` | Base HTTP types, routing, settings, serialization |
 | `typed` / `typed-shared` | Typed `ApiHttpHandler`, OpenAPI spec, SDK generation |
 | `auth` / `auth-shared` | `PrincipalType`, `AuthRequirement`, token handling |
-| `sessions*` | Pre-built session flows: email magic link, SMS PIN, OAuth, OpenID |
+| `audit` / `audit-shared` | Audit logging: request origins, which fields of which records reached clients, queries, changes, and auth events |
+| `sessions*` | Pre-built session flows: password, email and SMS PINs, TOTP, WebAuthn, backup codes, known devices, OAuth |
 | `files` / `files-shared` | File upload/download with S3, Azure, and local backends |
 | `media` / `media-shared` | Image processing |
-| `engine-local` | In-process engine for unit testing |
+| `notifications` / `notifications-shared` | Event-driven notifications over email, SMS, push, and in-app |
+| `ratelimit` | Request rate limiting |
+| `engine-local` | Base engine for single-process deployments (unit tests use `TestRunner` from `core`) |
 | `engine-ktor` | Ktor-based HTTP server (Netty or CIO) |
 | `engine-netty` | Standalone Netty HTTP server |
 | `engine-jdk-server` | Pure JDK HTTP server |
 | `engine-aws-serverless` | AWS Lambda handler (`AwsAdapter`) + Terraform generation |
+| `deploy-aws-ec2` | Terraform generation for EC2 deployments, single-instance or auto-scaling |
 | `secret-source-aws` | AWS Secrets Manager integration for deployment secrets |
 | `demo` | Reference implementation and integration test bed |
 | `docs-guide` | Compiled-sample documentation harness |

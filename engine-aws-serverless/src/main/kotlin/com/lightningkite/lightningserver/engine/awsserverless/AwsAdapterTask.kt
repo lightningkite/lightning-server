@@ -1,9 +1,11 @@
 package com.lightningkite.lightningserver.engine.awsserverless
 
 import com.lightningkite.lightningserver.AnonType
+import com.lightningkite.lightningserver.EngineApi
 import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.runtime.executeWithMetrics
+import com.lightningkite.lightningserver.runtime.Execution
+import com.lightningkite.lightningserver.runtime.executeInlineWithMetrics
 import com.lightningkite.services.serializers.KotlinBytesFormat
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.Serializable
@@ -16,10 +18,19 @@ internal class AwsAdapterTask(val root: AwsAdapter) {
     val json: Json get() = root.internalSerialization.json
     val format: KotlinBytesFormat get() = root.internalSerialization.kotlinBytesFormat
 
+    /**
+     * The queued payload, and the only thing that survives to the invocation that runs the task.
+     * [cause] rides along because on Lambda the launching invocation is gone by then: parentage that
+     * is not serialized here cannot be recovered on the other side at all.
+     */
     @Serializable
-    data class TaskInvoke(val taskName: String, val input: AnonType) : AwsLambdaInput
+    data class TaskInvoke(
+        val taskName: String,
+        val input: AnonType,
+        val cause: Execution,
+    ) : AwsLambdaInput
 
-    suspend fun <T> launchTask(location: PathSpec0, task: Task<T>, input: T) {
+    suspend fun <T> launchTask(location: PathSpec0, task: Task<T>, input: T, cause: Execution) {
         try {
             root.invokeLambda(InvokeRequest.builder().also {
                 it.functionName(System.getenv("AWS_LAMBDA_FUNCTION_NAME"))
@@ -29,7 +40,7 @@ internal class AwsAdapterTask(val root: AwsAdapter) {
                     SdkBytes.fromUtf8String(
                         json.encodeToString(
                             TaskInvoke.serializer(),
-                            TaskInvoke(location.toString(), AnonType(format, input, task.serializer))
+                            TaskInvoke(location.toString(), AnonType(format, input, task.serializer), cause)
                         )
                     )
                 )
@@ -50,9 +61,10 @@ internal class AwsAdapterTask(val root: AwsAdapter) {
                 @Suppress("UNCHECKED_CAST")
                 task as Task<Any?>
                 with(root) {
-                    task.executeWithMetrics(
-                        p,
-                        event.input.value(root.internalSerialization.kotlinBytesFormat, task.serializer)
+                    @OptIn(EngineApi::class)
+                    task.executeInlineWithMetrics(
+                        event.input.value(root.internalSerialization.kotlinBytesFormat, task.serializer),
+                        event.cause,
                     )
                 }
                 APIGatewayV2HTTPResponse(statusCode = 204)

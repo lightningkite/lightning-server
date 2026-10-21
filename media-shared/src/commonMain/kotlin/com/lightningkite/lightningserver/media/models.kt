@@ -1,9 +1,8 @@
 package com.lightningkite.lightningserver.media
 
-import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.data.MediaType
+import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.files.ServerFile
-import kotlinx.serialization.Serializable
 
 /**
  * Represents a server file with associated metadata and optional preview variants.
@@ -19,8 +18,7 @@ import kotlinx.serialization.Serializable
  * @property height The height in pixels for image files, if applicable
  * @property previews List of generated preview variants
  */
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 public data class ServerFileWithMetadata(
     val original: ServerFile,
     val mimeType: MediaType? = null,
@@ -79,8 +77,7 @@ public data class ServerFileWithMetadata(
  * @property width The width in pixels for image previews, if applicable
  * @property height The height in pixels for image previews, if applicable
  */
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 public data class ServerFileWithMetadataPreview(
     val file: ServerFile,
     val mimeType: MediaType,

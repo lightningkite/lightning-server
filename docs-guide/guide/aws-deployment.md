@@ -248,7 +248,7 @@ is the only step required to provision that infrastructure.
 | `Database.Settings` | `mongodbAtlasFree(orgId)` | Atlas free cluster, DB user, password |
 | `Database.Settings` | `mongodbAtlas(orgId, minSize, maxSize)` | Atlas auto-scaling cluster |
 | `Cache.Settings` | `awsDynamoDb()` | No table (auto-created by DynamoDbCache) |
-| `PublicFileSystem.Settings` | `awsS3Bucket(signedUrlDuration)` | S3 bucket, CORS, IAM policy |
+| `ExternalFileSystem.Settings` | `awsS3Bucket(signedUrlDuration)` | S3 bucket, CORS, IAM policy |
 | `TerraformNeed<SecretBasis>` | `secretBasis.generated()` | `random_password` (32 chars) |
 
 Always confirm the extension function is imported from the correct service

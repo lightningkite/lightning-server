@@ -1,7 +1,5 @@
 # Automatically Generated REST Endpoints
 
-Last updated January 2025 (`version-5`)
-
 By combining [typed endpoints](typed-endpoints.md), [authentication](authentication.md), and [databases](database.md),
 we can conveniently generate REST endpoints for any given model automatically.
 
@@ -13,14 +11,13 @@ Here's a complete example showing how to create REST endpoints for a Post model:
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.typed.ModelRestEndpoints
 import com.lightningkite.services.database.*
-import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.services.data.Queryable
 import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
 import kotlin.time.Instant
 import kotlin.time.Clock
 
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 @AdminTableColumns(["title", "author", "createdAt"])
 data class Post(
     override val _id: Uuid = Uuid.random(),
@@ -81,15 +78,19 @@ val postInfo = database.modelInfo(
 
 When you create `ModelRestEndpoints`, the following endpoints are automatically generated:
 
-- `GET /posts/rest` - List all posts (respecting read permissions)
+- `GET /posts/rest` - List posts (respecting read permissions)
     - Supports query parameters for filtering, sorting, and pagination
 - `POST /posts/rest` - Create a new post (respecting create permissions)
 - `GET /posts/rest/{id}` - Get a specific post
+- `PUT /posts/rest/{id}` - Replace a specific post
 - `PATCH /posts/rest/{id}` - Update a specific post (respecting update permissions)
 - `DELETE /posts/rest/{id}` - Delete a specific post (respecting delete permissions)
 - `POST /posts/rest/query` - Advanced query endpoint
-- `POST /posts/rest/count` - Count posts matching a condition
+- `POST /posts/rest/query-partial` - Query returning only selected fields
+- `POST /posts/rest/count`, `/group-count`, `/aggregate`, `/group-aggregate` - Counting and aggregation
+- `POST`/`PUT`/`PATCH /posts/rest/bulk` - Insert, replace, or modify many posts
 - `POST /posts/rest/bulk-delete` - Delete multiple posts
+- `GET /posts/rest/_permissions_` - The caller's permissions on this model
 
 ## Permission Masks
 
@@ -106,9 +107,7 @@ val postInfo = database.modelInfo(
             read = condition { it.always },
             readMask = mask {
                 // Hide private notes unless you're the author
-                it.privateNotes.maskedTo(null).unless(
-                    condition { it.author eq user?.email }
-                )
+                it.privateNotes.mask(value = null, unless = condition { it.author eq user?.email })
             },
             update = condition { it.author eq user?.email },
             delete = condition { it.author eq user?.email }
@@ -139,22 +138,22 @@ You can add real-time WebSocket updates to your REST endpoints to enable live da
 
 ```kotlin
 import com.lightningkite.lightningserver.typed.ModelRestEndpoints
-import com.lightningkite.lightningserver.typed.ModelRestUpdatesWebsocket
-import com.lightningkite.lightningserver.typed.ModelRestEndpointsAndUpdatesWebsocket.Companion.plus
+import com.lightningkite.lightningserver.typed.ModelRestUpdatesWebSocket
+import com.lightningkite.lightningserver.typed.ModelRestEndpointsAndUpdatesWebSocket.Companion.plus
 
 val rest = path.path("rest") module (
-    ModelRestEndpoints(info) + ModelRestUpdatesWebsocket(info)
+    ModelRestEndpoints(info) + ModelRestUpdatesWebSocket(info)
 )
 ```
 
-### Using ModelRestEndpointsAndUpdatesWebsocket
+### Using ModelRestEndpointsAndUpdatesWebSocket
 
 Alternatively, use the combined class directly:
 
 ```kotlin
-import com.lightningkite.lightningserver.typed.ModelRestEndpointsAndUpdatesWebsocket
+import com.lightningkite.lightningserver.typed.ModelRestEndpointsAndUpdatesWebSocket
 
-val rest = path.path("rest") module ModelRestEndpointsAndUpdatesWebsocket(info)
+val rest = path.path("rest") module ModelRestEndpointsAndUpdatesWebSocket(info)
 ```
 
 Both patterns add a WebSocket endpoint at `/posts/rest/updates` that provides:

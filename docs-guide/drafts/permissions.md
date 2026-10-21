@@ -51,8 +51,7 @@ a published flag, and a sensitive `internalNotes` field that should only be
 visible to the post's author:
 
 ```kotlin
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class Post(
     override val _id: Uuid = Uuid.random(),
     val authorId: Uuid,
@@ -66,8 +65,7 @@ data class Post(
 And a minimal `User` model:
 
 ```kotlin
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class User(
     override val _id: Uuid = Uuid.random(),
     val email: String,
@@ -127,7 +125,7 @@ ModelPermissions.allowAll<Post>()
 
 ### Row-level conditions in practice
 
-Conditions use the same DSL documented in the [Database chapter](database.md).
+Conditions use the same DSL documented in the [Database chapter](../guide/database.md).
 Inside the `permissions` lambda of `modelInfo(...)`, you have access to
 `authOrNull` (the raw `Authentication<USER>?` token) and `auth` (non-null form,
 only safe to access if `SUBJECT` is non-nullable).  Call `auth.fetch()` to load

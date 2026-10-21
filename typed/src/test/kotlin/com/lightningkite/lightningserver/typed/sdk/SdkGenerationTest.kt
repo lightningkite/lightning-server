@@ -5,7 +5,7 @@ import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
-import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.engine
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.sdk.SDK.processToModules
@@ -142,7 +142,7 @@ class SdkGenerationTest {
     @Test
     fun sdk_extracts_data_from_server_definition() {
         SimpleServer.test({}) {
-            val data = serverRuntime.server.sdk(SdkModule.Info("TestApi"))
+            val data = engine.server.sdk(SdkModule.Info("TestApi"))
 
             assertNotNull(data)
             assertEquals("TestApi", data.layer.info.interfaceName)
@@ -152,7 +152,7 @@ class SdkGenerationTest {
     @Test
     fun sdk_data_contains_endpoints() {
         SimpleServer.test({}) {
-            val data = serverRuntime.server.sdk(SdkModule.Info("TestApi"))
+            val data = engine.server.sdk(SdkModule.Info("TestApi"))
 
             // Should have endpoints
             assertTrue(data.layer.endpoints.isNotEmpty())
@@ -162,7 +162,7 @@ class SdkGenerationTest {
     @Test
     fun processToModules_creates_module_structure() {
         SimpleServer.test({}) {
-            val data = serverRuntime.server.sdk(SdkModule.Info("TestApi"))
+            val data = engine.server.sdk(SdkModule.Info("TestApi"))
             val module = data.processToModules()
 
             assertEquals("TestApi", module.info.interfaceName)
@@ -173,7 +173,7 @@ class SdkGenerationTest {
     @Test
     fun processToModules_extracts_function_names() {
         SimpleServer.test({}) {
-            val data = serverRuntime.server.sdk(SdkModule.Info("TestApi"))
+            val data = engine.server.sdk(SdkModule.Info("TestApi"))
             val module = data.processToModules()
 
             val functionNames = module.functions.map { it.functionName }
@@ -207,7 +207,7 @@ class SdkGenerationTest {
     @Test
     fun sdk_extracts_nested_modules() {
         ParentServer.test({}) {
-            val data = serverRuntime.server.sdk(SdkModule.Info("ParentApi"))
+            val data = engine.server.sdk(SdkModule.Info("ParentApi"))
 
             // Check for child modules
             assertTrue(data.children.isNotEmpty(), "Should have child modules")
@@ -217,7 +217,7 @@ class SdkGenerationTest {
     @Test
     fun processToModules_includes_child_modules() {
         ParentServer.test({}) {
-            val data = serverRuntime.server.sdk(SdkModule.Info("ParentApi"))
+            val data = engine.server.sdk(SdkModule.Info("ParentApi"))
             val module = data.processToModules()
 
             assertTrue(module.children.isNotEmpty(), "Processed module should have children")
@@ -233,7 +233,7 @@ class SdkGenerationTest {
     @Test
     fun sdk_function_endpoint_has_correct_properties() {
         SimpleServer.test({}) {
-            val data = serverRuntime.server.sdk(SdkModule.Info("TestApi"))
+            val data = engine.server.sdk(SdkModule.Info("TestApi"))
             val module = data.processToModules()
 
             val endpoint = module.functions.filterIsInstance<SDK.Function.Endpoint>().first()
@@ -247,7 +247,7 @@ class SdkGenerationTest {
     @Test
     fun sdk_function_arguments_extracted_correctly() {
         SimpleServer.test({}) {
-            val data = serverRuntime.server.sdk(SdkModule.Info("TestApi"))
+            val data = engine.server.sdk(SdkModule.Info("TestApi"))
             val module = data.processToModules()
 
             // The POST endpoint has String input
@@ -268,7 +268,7 @@ class SdkGenerationTest {
     @Test
     fun sdk_data_asSequence_returns_all_nodes() {
         ParentServer.test({}) {
-            val data = serverRuntime.server.sdk(SdkModule.Info("ParentApi"))
+            val data = engine.server.sdk(SdkModule.Info("ParentApi"))
             val nodes = data.asSequence().toList()
 
             // Should have at least parent and child
@@ -282,7 +282,7 @@ class SdkGenerationTest {
     @Test
     fun sdk_data_node_tracks_ancestors() {
         ParentServer.test({}) {
-            val data = serverRuntime.server.sdk(SdkModule.Info("ParentApi"))
+            val data = engine.server.sdk(SdkModule.Info("ParentApi"))
             val nodes = data.asSequence().toList()
 
             val rootNode = nodes.first()

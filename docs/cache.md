@@ -1,12 +1,10 @@
 # Cache
 
-Last updated January 2025 (`version-5`)
-
 When building servers, it is frequently necessary to keep some information on hand that is shared between every
 instance.
 
 That's where the cache comes in. It uses `kotlinx.serialization` to serialize values in and out of the cache, which
-could be local, Memcached, Redis, or DynamoDB.
+could be in-memory, Memcached, Redis, or DynamoDB.
 
 ## Declaring the need for a cache
 
@@ -22,7 +20,7 @@ object Server : ServerBuilder() {
 
 ## Using the cache
 
-Make sure you import the shortcuts (alt + enter).
+Invoke the setting inside a handler or other runtime context to get the `Cache`.
 
 ```kotlin
 import kotlinx.serialization.Serializable
@@ -40,9 +38,24 @@ c.remove("value2")
 
 ## More operations
 
-You can increment numerical types, set if it doesn't exist, and set values that expire as well.
+You can increment numerical types, set if it doesn't exist, and set values that expire as well:
 
-TODO: Document further
+```kotlin
+// Expire after a duration
+c.set("session-hint", "abc", timeToLive = 15.minutes)
+
+// Only set if absent; returns whether it was set
+val claimed = c.setIfNotExists("lock:report", true, timeToLive = 5.minutes)
+
+// Atomic increment; returns the new value
+val attempts = c.add("attempts:user123", 1, timeToLive = 1.hours)
+
+// Read-modify-write; returns whether it succeeded. Pass maxTries to retry on contention
+c.modify<Int>("counter", maxTries = 3) { (it ?: 0) * 2 }
+
+// Read and delete in one step
+val pending = c.getAndRemove<String>("one-time-token")
+```
 
 ## Available Backends
 
@@ -54,7 +67,7 @@ it's useful for testing only.
 ```json5
 // settings.json
 {
-  "cache": { "url": "local" }
+  "cache": { "url": "ram" }
 }
 ```
 
@@ -101,16 +114,6 @@ object Server: ServerBuilder() {
 }
 ```
 
-#### Testing locally
-
-```json5
-// settings.json
-{
-  // Standard redis connection string
-  "cache": { "url": "redis-test" }
-}
-```
-
 ### Memcached
 
 ```kotlin
@@ -128,7 +131,6 @@ object Server: ServerBuilder() {
 ```json5
 // settings.json
 {
-  // Standard redis connection string
   "cache": { "url": "memcached://host:port" }
 }
 ```
@@ -138,7 +140,7 @@ object Server: ServerBuilder() {
 ```json5
 // settings.json
 {
-  // Standard redis connection string
+  // Starts a local memcached for the duration of the process
   "cache": { "url": "memcached-test" }
 }
 ```

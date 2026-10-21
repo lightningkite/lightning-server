@@ -42,8 +42,7 @@ public data class FunnelStart(
  * @property abandoned Percentage of funnels that were started but never completed (0.0-1.0)
  * @property count Total number of funnel instances tracked
  */
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 public data class FunnelSummary(
     override val _id: Uuid = Uuid.random(),
     val funnel: String,
@@ -72,8 +71,7 @@ public data class FunnelSummary(
  * @property expiry Timestamp after which this funnel instance expires if not completed
  * @property expectedErrorRate Expected error rate for this funnel, used for health monitoring
  */
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 public data class FunnelInstance(
     override val _id: Uuid = Uuid.random(),
     val funnel: String,

@@ -24,7 +24,7 @@ problem space Lightning Server targets.
 | Feature | Django (+ DRF) | Lightning Server | Notes |
 |---|---|---|---|
 | **Language** | Python 3 | Kotlin (JVM) | Static vs dynamic typing |
-| **Models / ORM** | `class Post(models.Model)` with field descriptors | `@Serializable data class Post : HasId<Uuid>` + `@GenerateDataClassPaths` | LS uses a DSL; no SQL ORM by default |
+| **Models / ORM** | `class Post(models.Model)` with field descriptors | `@Queryable data class Post : HasId<Uuid>` | LS uses a DSL; no SQL ORM by default |
 | **Default database** | SQL (PostgreSQL recommended) | MongoDB (RAM / JSON-file for dev) | LS has partial Postgres support |
 | **Migrations** | Required for every schema change | Not needed for MongoDB (schemaless) | Adding fields is zero-effort in LS |
 | **Auto-admin panel** | Built-in Django Admin | Via `lightning-server-kiteui` (separate package) | Both auto-generate from model definitions |
@@ -52,8 +52,7 @@ serialization and compile-time query path generation:
 
 ```kotlin
 // Illustrative — not drift-checked
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class Post(
     override val _id: Uuid = Uuid.random(),
     val title: String,
@@ -62,7 +61,7 @@ data class Post(
 ) : HasId<Uuid>
 ```
 
-`@GenerateDataClassPaths` is processed by KSP at build time.  It produces typed field references
+`@Queryable` is processed by KSP at build time.  It produces typed field references
 (`Post.path.title`, etc.) used by `condition {}` and `modification {}`.
 
 ### Query DSL vs QuerySet API

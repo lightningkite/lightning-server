@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.runtime.test.*
+import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.*
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.services.data.*
@@ -17,8 +18,7 @@ import kotlin.uuid.*
 // endregion db-imports
 
 // region note-model
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class Note(
     override val _id: Uuid = Uuid.random(),
     val title: String,
@@ -28,6 +28,8 @@ data class Note(
 
 // region note-server
 object NoteDbServer : ServerBuilder() {
+    init { registerBasicMediaTypeCoders() }
+
     val database = setting("database", Database.Settings())
 
     // registerTable defines the table, registers it, and creates its once-per-deploy prepare task.

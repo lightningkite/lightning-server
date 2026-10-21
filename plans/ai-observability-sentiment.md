@@ -31,8 +31,7 @@ for proactive escalation. This builds on the existing OTel infrastructure in Lig
 Add fields to track conversation outcomes:
 
 ```kotlin
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 @IndexSet(["subjectId", "createdAt"])
 public data class SystemChatConversation(
     // ...existing fields...
@@ -69,8 +68,7 @@ public data class SystemChatConversation(
 /**
  * Tracks sentiment signals throughout a conversation.
  */
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 public data class ConversationSentiment(
     /**
      * Current frustration level (0-10).

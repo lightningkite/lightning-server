@@ -6,12 +6,13 @@ import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.GeneralServerSettings
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
-import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.Serializable
 import kotlin.test.*
 import kotlin.uuid.Uuid
 
@@ -21,6 +22,8 @@ import kotlin.uuid.Uuid
 class ModelRestEndpointsTest {
 
     object CrudTestServer : ServerBuilder() {
+        init { registerBasicMediaTypeCoders() }
+
         val database = setting("database", Database.Settings())
         val info = database.modelInfo<HasId<*>?, CrudItem, Uuid>(
             tableName = "CrudItem",
@@ -45,6 +48,36 @@ class ModelRestEndpointsTest {
             assertEquals("Electronics", result.category)
             assertEquals(99.99, result.price)
             assertEquals(10, result.quantity)
+        }
+    }
+
+    /**
+     * A partial that omits `_id` returns rows nobody can attribute to a record, which defeats
+     * disclosure auditing — one row is written per record disclosed — and is rarely what the caller
+     * meant. `_id` is added regardless of what was asked for.
+     */
+    @Test
+    fun query_partial_always_includes_the_id() = runBlocking {
+        CrudTestServer.test(settings = {
+            generalSettings set GeneralServerSettings()
+            database set Database.Settings()
+        }) {
+            val item = CrudItem(name = "Partial Test", category = "Books", price = 1.0, quantity = 1)
+            CrudTestServer.rest.insert.test(null, item)
+
+            val nameOnly = CrudItem.path.name
+            val results = CrudTestServer.rest.queryPartial.test(null, QueryPartial(fields = setOf(nameOnly)))
+
+            val returned = results.single()
+            assertEquals(
+                item._id,
+                returned.parts.entries.single { it.key.name == "_id" }.value,
+                "_id was not returned even though every partial must carry one",
+            )
+            assertTrue(
+                returned.parts.keys.any { it.name == "name" },
+                "the requested field went missing; was ${returned.parts.keys.map { it.name }}",
+            )
         }
     }
 
@@ -86,7 +119,7 @@ class ModelRestEndpointsTest {
             database set Database.Settings()
         }) {
             // Clear any existing data
-            CrudTestServer.info.table().deleteManyIgnoringOld(Condition.Always)
+            execute { CrudTestServer.info.table().deleteManyIgnoringOld(Condition.Always) }
 
             // Insert multiple items
             val item1 = CrudItem(name = "Item 1", category = "A", price = 10.0, quantity = 1)
@@ -309,7 +342,7 @@ class ModelRestEndpointsTest {
             database set Database.Settings()
         }) {
             // Clear any existing data
-            CrudTestServer.info.table().deleteManyIgnoringOld(Condition.Always)
+            execute { CrudTestServer.info.table().deleteManyIgnoringOld(Condition.Always) }
 
             // Insert items in different categories
             val item1 = CrudItem(name = "Keep 1", category = "Keep", price = 10.0, quantity = 1)
@@ -379,7 +412,7 @@ class ModelRestEndpointsTest {
             database set Database.Settings()
         }) {
             // Clear any existing data
-            CrudTestServer.info.table().deleteManyIgnoringOld(Condition.Always)
+            execute { CrudTestServer.info.table().deleteManyIgnoringOld(Condition.Always) }
 
             // Insert items in different categories
             repeat(3) { CrudTestServer.rest.insert.test(null, CrudItem(category = "A")) }
@@ -520,7 +553,7 @@ class ModelRestEndpointsTest {
             database set Database.Settings()
         }) {
             // Clear any existing data
-            CrudTestServer.info.table().deleteManyIgnoringOld(Condition.Always)
+            execute { CrudTestServer.info.table().deleteManyIgnoringOld(Condition.Always) }
 
             val results = CrudTestServer.rest.list.test(null, Query(Condition.Always))
             assertEquals(0, results.size)
@@ -591,7 +624,7 @@ class ModelRestEndpointsTest {
             database set Database.Settings()
         }) {
             // Clear any existing data
-            CrudTestServer.info.table().deleteManyIgnoringOld(Condition.Always)
+            execute { CrudTestServer.info.table().deleteManyIgnoringOld(Condition.Always) }
 
             CrudTestServer.rest.insert.test(null, CrudItem(name = "Test"))
 
@@ -606,8 +639,7 @@ class ModelRestEndpointsTest {
 }
 
 // Data class for CRUD tests - defined outside test class to avoid KSP conflicts
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class CrudItem(
     override val _id: Uuid = Uuid.random(),
     val name: String = "",

@@ -6,7 +6,7 @@ package com.lightningkite.lightningserver
  */
 @RequiresOptIn(
     "This is essentially internal, and its usage is unstable and may change at any time.",
-    RequiresOptIn.Level.WARNING
+    RequiresOptIn.Level.ERROR
 )
 @Target(
     AnnotationTarget.PROPERTY,
@@ -16,6 +16,36 @@ package com.lightningkite.lightningserver
     AnnotationTarget.FUNCTION,
 )
 public annotation class InternalLightningServerApi
+
+/**
+ * Marks declarations meant for engine implementations, such as starting the root execution for
+ * something that arrived from outside the server. Server code should use the corresponding
+ * `WithMetrics` functions instead.
+ */
+@RequiresOptIn(
+    "This is for engine implementations. Server code should use the corresponding WithMetrics function.",
+    RequiresOptIn.Level.ERROR
+)
+@Target(
+    AnnotationTarget.PROPERTY,
+    AnnotationTarget.CLASS,
+    AnnotationTarget.CONSTRUCTOR,
+    AnnotationTarget.FUNCTION,
+)
+public annotation class EngineApi
+
+/**
+ * Marks a method meant to be overridden but not called directly, like `protected`. Call the corresponding
+ * `WithMetrics` function instead, which runs it as its own execution through the server's interceptors.
+ *
+ * Overrides repeat the annotation, which keeps calls through the subclass restricted too.
+ */
+@RequiresOptIn(
+    "This is meant to be overridden, not called. Use the corresponding WithMetrics function.",
+    RequiresOptIn.Level.ERROR
+)
+@Target(AnnotationTarget.FUNCTION)
+public annotation class OverrideOnly
 
 /**
  * Marks the Lightning Server DSL for defining servers and endpoints.

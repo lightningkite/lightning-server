@@ -1,6 +1,7 @@
+@file:OptIn(InternalLightningServerApi::class, EngineApi::class)
+
 package com.lightningkite.lightningserver.engine.ktor
 
-import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerSetting
@@ -11,14 +12,16 @@ import com.lightningkite.lightningserver.engine.local.WsOversizePolicy
 import com.lightningkite.lightningserver.engine.local.forceWebSocketPubSub
 import com.lightningkite.lightningserver.engine.local.LocalWebSocketConnection
 import com.lightningkite.lightningserver.http.*
-import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.RawWebSocketPath
-import com.lightningkite.lightningserver.runtime.didConnectWithMetrics
-import com.lightningkite.lightningserver.runtime.disconnectWithMetrics
-import com.lightningkite.lightningserver.runtime.handle
-import com.lightningkite.lightningserver.runtime.messageFromClientWithMetrics
-import com.lightningkite.lightningserver.runtime.willConnectWithMetrics
+import com.lightningkite.lightningserver.EngineApi
+import com.lightningkite.lightningserver.InternalLightningServerApi
+import com.lightningkite.lightningserver.runtime.didConnectAsRoot
+import com.lightningkite.lightningserver.runtime.disconnectAndCloseAsRoot
+import com.lightningkite.lightningserver.runtime.handleRoot
+import com.lightningkite.lightningserver.runtime.messageFromClientAsRoot
+import com.lightningkite.lightningserver.runtime.willConnectAsRoot
+import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.handleDirectAsRoot
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.data.Data
@@ -27,12 +30,10 @@ import io.ktor.http.*
 import io.ktor.http.HttpHeaders
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
-import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
-import io.ktor.util.*
 import io.ktor.utils.io.asSink
 import io.ktor.websocket.*
 import kotlinx.coroutines.*
@@ -50,8 +51,8 @@ import kotlin.time.Clock
  *                        Common values: "X-Forwarded-For", "X-Real-IP"
  * @property requestIdHeader Optional header name carrying a request ID stamped by a **trusted**
  *   reverse proxy, adopted as the authoritative request ID. Leave null (the default) to always
- *   generate one; a client-supplied ID is never trusted. Set to "X-Request-ID" behind Envoy so the
- *   proxy's capture and the server's logs share an identifier.
+ *   generate one; a client-supplied ID is never trusted. The proxy must stamp version 7 UUIDs
+ *   (Envoy's built-in X-Request-ID is version 4); see [requestIdentity].
  * @property reliability Shared engine reliability settings (request timeout, max body size, graceful
  *   shutdown drain, WebSocket backpressure). See [EngineReliabilitySettings]. Note that
  *   [EngineReliabilitySettings.idleTimeout] and [EngineReliabilitySettings.workerThreads] are
@@ -140,10 +141,10 @@ public class KtorEngine(
                         call.respondText("Payload Too Large", status = HttpStatusCode.PayloadTooLarge)
                         return@handle
                     }
-                    val request = call.adapt(maxBody)
+                    val (request, executionId) = call.adaptHttpRequest(maxBody)
                     // Request timeout is enforced centrally in ServerRuntime.handle (per-handler HttpHandler.timeout).
                     val result: HttpResponse = try {
-                        this@KtorEngine.handle(request)
+                        this@KtorEngine.handleRoot(request, executionId)
                     } catch (_: BodyTooLargeException) {
                         // 2.5: streamed body exceeded the cap mid-read.
                         HttpResponse.plainText("Payload Too Large", HttpStatus.PayloadTooLarge)
@@ -181,6 +182,7 @@ public class KtorEngine(
                                 val channel = this
                                 withContext(Dispatchers.IO) { channel.asSink().buffered().use { body.emit(it) } }
                             }
+
                             is Data.Source -> call.respondBytesWriter(contentType = type, status = code) {
                                 // Blocking streaming source: copy it to the channel on the IO pool (no full buffering).
                                 val channel = this
@@ -188,6 +190,7 @@ public class KtorEngine(
                                     channel.asSink().buffered().use { sink -> body.source.use { sink.transferFrom(it) } }
                                 }
                             }
+
                             is Data.SuspendingSource, is Data.SuspendingSink -> call.respondBytesWriter(contentType = type, status = code) {
                                 // Fully cooperative: stream the body into the ByteWriteChannel via a SuspendingSink so
                                 // response writes suspend for backpressure instead of blocking the event loop.
@@ -199,38 +202,7 @@ public class KtorEngine(
                 }
             }
             webSocket("{...}") {
-
-                // TODO: Remove this fugly hack. It's around for backwards compatibility.
-                fun parseQueryParams(): QueryParameters = QueryParameters(
-                    call.request.queryParameters.flattenEntries()
-                        .flatMap {
-                            if (it.first == "path" && it.second.contains('?')) {
-                                listOf(it.first to it.second.substringBefore('?')) +
-                                        QueryParameters.parse(
-                                            it.second.substringAfter('?')
-                                        ).entries
-                            } else
-                                listOf(it)
-                        })
-
-                val queryParams = parseQueryParams()
-                val adaptedHeaders = call.request.headers.adapt()
-                val identity = adaptedHeaders.requestIdentity(runConfig.requestIdHeader) {
-                    logger.warn { "Request ID header for proxy '${runConfig.requestIdHeader}' was missing from the request." }
-                }
-                val request = WebSocketConnectRequest(
-                    path = RawWebSocketPath(queryParams["path"] ?: call.request.path().decodeURLPart()),
-                    queryParameters = queryParams,
-                    headers = adaptedHeaders,
-                    requestId = identity.requestId,
-                    upstreamRequestId = identity.upstreamRequestId,
-                    domain = call.request.origin.serverHost,
-                    protocol = call.request.origin.scheme,
-                    sourceIp = runConfig.realIpHeader?.let {
-                        call.request.header(it)
-                            ?: run { logger.warn { "Real IP address header for proxy '$it' was missing from the request." }; null }
-                    } ?: call.request.origin.remoteAddress,
-                )
+                val request = call.adaptWebSocketConnectRequest()
 
                 val match = server.endpoints.match(
                     externalSerialization.stringArrayFormat,
@@ -247,9 +219,9 @@ public class KtorEngine(
                 val socketHandler = server.interceptIncomingSocket(match.value)
 
                 // Check for direct execution capability - bypasses pub/sub overhead
-                if (socketHandler is DirectExecutableWebSocketHandler<*> && !forceWebSocketPubSub()) {
+                if (socketHandler is DirectExecutableWebSocketHandler<*, *> && !forceWebSocketPubSub()) {
                     @Suppress("UNCHECKED_CAST")
-                    val directHandler = socketHandler as DirectExecutableWebSocketHandler<PathSpec>
+                    val directHandler = socketHandler as DirectExecutableWebSocketHandler<PathSpec, Any?>
 
                     // 2.10: bounded inbound channel with backpressure instead of Channel.UNLIMITED.
                     val incomingChannel = newWebSocketInboundChannel<WebSocketFrame>(reliability)
@@ -281,9 +253,7 @@ public class KtorEngine(
                         }
                     }
 
-                    // Run handler directly - no pub/sub, no task indirection
-                    directHandler.handleDirect(
-                        serverRuntime = this@KtorEngine,
+                    directHandler.handleDirectAsRoot(
                         request = request,
                         incoming = incomingChannel,
                         send = { frame ->
@@ -293,7 +263,7 @@ public class KtorEngine(
                             }
                         },
                         close = { reason ->
-                            close(CloseReason(reason.code, reason.name))
+                            close(reason.adapt())
                         }
                     )
                 } else {
@@ -301,34 +271,34 @@ public class KtorEngine(
                     @Suppress("UNCHECKED_CAST")
                     socketHandler as WebSocketHandler<PathSpec, Any?>
 
-                    val startingState = socketHandler.willConnectWithMetrics(match.pathSpec, this@KtorEngine, request)
-                    var closingMid: WebSocketConnection<PathSpec, Any?>? = null
-                    try {
+                    val storage = socketHandler.willConnectAsRoot(request)
 
-                        val mid = object : LocalWebSocketConnection<PathSpec, Any?>(
-                            startingState = startingState,
-                            request = request,
-                            handler = socketHandler,
-                            scope = this@webSocket,
-                            server = this@KtorEngine,
-                            pubSub = { pubSubChannel(it) }
-                        ) {
-                            override suspend fun send(frame: WebSocketFrame) {
-                                this@webSocket.send(
-                                    when (frame) {
-                                        is WebSocketFrame.Binary -> Frame.Binary(true, frame.content)
-                                        is WebSocketFrame.Text -> Frame.Text(frame.content)
-                                    }
-                                )
-                            }
-
-                            override suspend fun close(reason: WebSocketClose) {
-                                this@webSocket.close(CloseReason(reason.code, reason.name))
-                            }
+                    val connection = object : LocalWebSocketConnection<PathSpec, Any?>(
+                        startingState = storage,
+                        request = request,
+                        handler = socketHandler,
+                        scope = this@webSocket,
+                        pubSub = { pubSubChannel(it) }
+                    ) {
+                        context(server: ServerRuntime)
+                        override suspend fun send(frame: WebSocketFrame) {
+                            this@webSocket.send(
+                                when (frame) {
+                                    is WebSocketFrame.Binary -> Frame.Binary(true, frame.content)
+                                    is WebSocketFrame.Text -> Frame.Text(frame.content)
+                                }
+                            )
                         }
-                        closingMid = mid
 
-                        socketHandler.didConnectWithMetrics(match.pathSpec, mid)
+                        context(server: ServerRuntime)
+                        override suspend fun close(reason: WebSocketClose) {
+                            this@webSocket.close(reason.adapt())
+                        }
+                    }
+
+                    var exception: Throwable? = null
+                    try {
+                        socketHandler.didConnectAsRoot(connection)
 
                         for (incoming in this.incoming) {
                             val m = when (incoming) {
@@ -338,29 +308,19 @@ public class KtorEngine(
                                 is Frame.Ping -> continue
                                 is Frame.Pong -> continue
                             }
-                            socketHandler.messageFromClientWithMetrics(match.pathSpec, mid, m)
-                        }
-
-                        // NonCancellable: the session can be cancelled mid-disconnect (e.g. shutdown), which
-                        // would abort the app's disconnect cleanup at its first suspension point.
-                        withContext(NonCancellable) {
-                            socketHandler.disconnectWithMetrics(match.pathSpec, closingMid, WebSocketClose.NORMAL)
+                            socketHandler.messageFromClientAsRoot(connection, m)
                         }
                     } catch (e: Throwable) {
-                        // A cancelled session lands here without ever leaving the incoming loop, so this is
-                        // the only chance to run the app's disconnect cleanup; NonCancellable keeps the
-                        // already-cancelled coroutine from aborting it immediately.
-                        closingMid?.let { mid ->
-                            withContext(NonCancellable) {
-                                socketHandler.disconnectWithMetrics(
-                                    match.pathSpec,
-                                    mid,
-                                    ((e as? HttpStatusException)?.status
-                                        ?: HttpStatus.InternalServerError).bestWebSocketCloseCode
-                                )
-                            }
+                        exception = e
+
+                        currentCoroutineContext().ensureActive()
+                    } finally {
+                        withContext(NonCancellable) {
+                            socketHandler.disconnectAndCloseAsRoot(
+                                connection,
+                                reason = exception?.let(WebSocketClose::exceptional) ?: WebSocketClose.NORMAL
+                            )
                         }
-                        if (e is CancellationException) throw e
                     }
                 }
             }

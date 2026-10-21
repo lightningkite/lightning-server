@@ -19,6 +19,10 @@ import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultIn
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toList
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.Month
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
 import kotlinx.serialization.builtins.serializer
 import kotlin.time.Clock
 import kotlin.time.Duration
@@ -75,7 +79,7 @@ public class PasswordProofEndpoints(
                 }
             },
             permissions = {
-                val admin = condition<PasswordSecret>(AuthRequirement.IsAdmin.accepts(authOrNull))
+                val admin = condition(AuthRequirement.IsAdmin.accepts(authOrNull))
                 val mine = authOrNull?.let { a ->
                     condition<PasswordSecret> {
                         it.subjectId.eq(a.rawId) and it.subjectType.eq(a.principalName)
@@ -165,7 +169,7 @@ public class PasswordProofEndpoints(
                         property = "email",
                         strength = info.strength,
                         value = "test@test.com",
-                        at = Clock.System.now(),
+                        at = LocalDate(2002, Month.SEPTEMBER, 19).atStartOfDayIn(TimeZone.currentSystemDefault()),
                         expiresAt = Clock.System.now() + proofExpiration,
                         signature = "opaquesignaturevalue"
                     )
@@ -176,30 +180,49 @@ public class PasswordProofEndpoints(
                 val now = now()
                 val subject = input.type
                 val handler = serverRuntime.server.principalTypes.values.find { it.name == subject }
-                    ?: throw IllegalArgumentException("No subject $subject recognized")
+                    ?: run {
+                        serverRuntime.reportAuthEvent(AuthEvent.ProofRejected(info, AuthEvent.ProofRejected.Reason.MalformedRequest, request = request))
+                        throw BadRequestException("No subject $subject recognized")
+                    }
                 // Normalize BEFORE building the rate-limit key: the key must be derived from the canonical
                 // identifier so that case/whitespace variants (e.g. "Bob@x.com" vs "bob@x.com ") of the same
                 // account share one bucket. Keying on the raw value would let an attacker dodge the limiter
                 // (and its exponential backoff) simply by varying case or whitespace.
                 val normalizedValue = handler.normalizePropertyValue(input.property, input.value)
-                cache().constrainAttemptRate(
-                    "password-${input.property}-${normalizedValue}",
-                    minFailureDuration = 1.seconds
+                cache().constrainProofAttemptRate(
+                    cacheKey = "password-${input.property}-${normalizedValue}",
+                    method = info,
+                    request = request,
+                    minFailureDuration = 1.seconds,
                 ) {
                     val subjectId = handler.fetchUserIdString(input.property, normalizedValue)
-                        ?: throw BadRequestException("User ID and code do not match")
+                        ?: run {
+                            // No account resolved, so no principal to name. Recorded anyway: a run of
+                            // these against different values is what enumeration looks like.
+                            serverRuntime.reportAuthEvent(AuthEvent.ProofRejected(info, AuthEvent.ProofRejected.Reason.NoSuchSubject, request = request))
+                            throw BadRequestException("User ID and code do not match")
+                        }
 
                     val active = modelInfo.table().find(condition {
                         it.subjectId.eq(subjectId) and it.subjectType.eq(subject) and active
                     }).toList()
 
                     val matching = active.find { input.password.checkAgainstHash(it.hash) }
-                        ?: throw BadRequestException("User ID and code do not match")
+                        ?: run {
+                            serverRuntime.reportAuthEvent(AuthEvent.ProofCredentialRejected(
+                                info,
+                                AuthEvent.ProofCredentialRejected.Reason.SecretMismatch,
+                                principal = subjectId,
+                                request = request,
+                            ))
+                            throw BadRequestException("User ID and code do not match")
+                        }
 
                     modelInfo.table().updateOneById(matching._id, modification {
                         it.lastUsedAt assign now
                     })
 
+                    serverRuntime.reportAuthEvent(AuthEvent.ProofAccepted(info, principal = subjectId, request = request))
                     proofSigner.await().makeProof(
                         property = input.property,
                         value = normalizedValue,

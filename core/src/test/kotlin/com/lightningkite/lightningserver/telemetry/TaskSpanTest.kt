@@ -1,3 +1,5 @@
+@file:OptIn(com.lightningkite.lightningserver.EngineApi::class)
+
 package com.lightningkite.lightningserver.telemetry
 
 import com.lightningkite.lightningserver.definition.PreDeployTask
@@ -7,7 +9,10 @@ import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.telemetrySettings
 import com.lightningkite.lightningserver.runtime.executeWithMetrics
+import com.lightningkite.lightningserver.runtime.executeInlineWithMetrics
 import com.lightningkite.lightningserver.runtime.location
+import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.testBlocking
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.services.telemetry.TelemetryBackend
@@ -47,11 +52,11 @@ class TaskSpanTest {
                 telemetrySettings.set(TelemetryBackend.Settings(url = "memory"))
             }
         ) {
-            cleanup.executeWithMetrics(cleanup.location)
-            reindex.executeWithMetrics(reindex.location)
-            sendEmail.executeWithMetrics(sendEmail.location, Unit)
-            migrate.executeWithMetrics(migrate.location)
-            warmup.executeWithMetrics(warmup.location)
+            cleanup.executeWithMetrics()
+            reindex.executeWithMetrics()
+            execute { sendEmail.executeInlineWithMetrics(Unit) }
+            migrate.executeWithMetrics()
+            warmup.executeWithMetrics()
 
             // Two schedules must produce two distinguishable trace names, not one shared one.
             val cleanupSpan = spanNamed("lightningserver.schedule /cleanup")

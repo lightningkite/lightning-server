@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.definition
 
+import com.lightningkite.lightningserver.OverrideOnly
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -24,6 +25,7 @@ public interface StartupTask {
     public val dependencies: Collection<StartupTask> get() = emptyList()
     public val timeout: Duration get() = 5.minutes
 
+    @OverrideOnly
     context(server: ServerRuntime)
     public suspend fun execute()
 }
@@ -45,6 +47,7 @@ public fun StartupTask(
         override val timeout: Duration = timeout
         override val dependencies: Collection<StartupTask> = dependencies
 
+        @OverrideOnly
         context(server: ServerRuntime)
         override suspend fun execute() {
             return handler()

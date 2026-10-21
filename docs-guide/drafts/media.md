@@ -35,8 +35,7 @@ It wraps the original reference together with lazily populated metadata and a li
 of generated preview variants:
 
 ```kotlin
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class ServerFileWithMetadata(
     val original: ServerFile,
     val mimeType: MediaType? = null,
@@ -46,8 +45,7 @@ data class ServerFileWithMetadata(
     val previews: List<ServerFileWithMetadataPreview> = listOf(),
 )
 
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class ServerFileWithMetadataPreview(
     val file: ServerFile,
     val mimeType: MediaType,
@@ -60,8 +58,7 @@ data class ServerFileWithMetadataPreview(
 Use it in your model the same way you would use `ServerFile`:
 
 ```kotlin
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class Product(
     override val _id: Uuid = Uuid.random(),
     val name: String,

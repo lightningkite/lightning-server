@@ -45,7 +45,7 @@ kotlin {
     sourceSets.main {
         // Natural sample functions live here; compiled and exercised from tests
         kotlin.srcDir("src/samples/kotlin")
-        // KSP-generated code for @GenerateDataClassPaths (used in Ch5 database samples)
+        // KSP-generated code for @Queryable (used in Ch5 database samples)
         kotlin.srcDir("build/generated/ksp/main/kotlin")
     }
 }

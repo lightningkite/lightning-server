@@ -4,28 +4,27 @@ Server-side implementation for type-safe event handling in the notification syst
 
 ## Files
 
-### TypedEvent.kt
+### Event.kt
 
-Type-safe event wrappers:
-
-- **TypedEventType**: Event type definition with model information and auto-registration
-- **TypedEvent**: Type-safe event occurrence with full subject entity (not just ID)
-- Conversion methods to transform between typed and untyped events
+- **EventDefinition**: A type-safe event type, pairing an `EventType` with the model information for its subject
+- **Event**: A type-safe event occurrence carrying the full subject entity, not just its ID. Converts to an untyped
+  `EventData` for storage
 
 ### EventHandler.kt
 
-Event processing infrastructure:
-
-- **EventHandler**: Interface for handling typed events
-- **EventLauncher**: Provides task-based event launching with inline and asynchronous options
-- DSL for defining event types with automatic endpoint creation
+- **EventHandler**: Interface for handling events. `NotificationEndpoints` implements it
+- **EventLauncher**: Launches one event type, either through its task (`launcher(subject)`) or inline
+  (`handleInline(subject)`)
+- **`EventHandler.event(name, info) { ... }`**: Defines an event type, registers it, and returns its `EventLauncher`. The
+  setup block is where content generators and subscribers are attached
 
 ### EventRegistry.kt
 
-Event type registration and querying:
+- **EventRegistry**: The registry of every event definition on the server
 
-- **EventRegistry**: Type-safe registry for managing event types
+### EventEndpoints.kt
+
 - **EventEndpoints**: REST API for querying registered event types with permissions
 
-These classes work together to enable type-safe, asynchronous event processing with automatic task endpoint generation
-at `/events/{eventName}`.
+Each event's task is mounted at `/events/{event-name}`, so launching an event is a queued task that runs as a child of
+whatever launched it.

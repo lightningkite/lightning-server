@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.plainText
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.serializerOrContextual
 import com.lightningkite.lightningserver.sessions.proofs.oauth.*
@@ -116,7 +117,7 @@ class OauthTokenExchangeTest {
                 server.test({}) {
                     // Register a real state + PKCE pair the way OauthProofEndpoints does at flow-start.
                     val callerState = Uuid.random()
-                    val loginUrl = server.callback.loginUrl(callerState)
+                    val loginUrl = execute { server.callback.loginUrl(callerState) }
                     val params = Url(loginUrl).parameters
                     val nonce = params["state"]!!
                     val challengeSent = params["code_challenge"]!!
@@ -128,7 +129,7 @@ class OauthTokenExchangeTest {
                         "sanity check: the stored verifier must actually hash to the sent challenge",
                     )
 
-                    val httpResponse = server.callback.handle(OauthCode(code = "auth-code-xyz", state = nonce))
+                    val httpResponse = execute { server.callback.handle(OauthCode(code = "auth-code-xyz", state = nonce)) }
 
                     assertEquals("welcome:at-123", httpResponse.body!!.text())
                     assertEquals("at-123", server.lastAccessResponse?.access_token, "onAccess must complete the login flow with the exchanged token")
@@ -158,13 +159,13 @@ class OauthTokenExchangeTest {
         }).use { fake ->
             val server = testServer(fake.tokenUrl)
             server.test({}) {
-                val loginUrl = server.callback.loginUrl(Uuid.random())
+                val loginUrl = execute { server.callback.loginUrl(Uuid.random()) }
                 val nonce = Url(loginUrl).parameters["state"]!!
 
                 val error = assertFailsWith<BadRequestException>(
                     "a provider token-endpoint error must surface as a clean BadRequestException, not an unrelated internal exception",
                 ) {
-                    server.callback.handle(OauthCode(code = "auth-code-xyz", state = nonce))
+                    execute { server.callback.handle(OauthCode(code = "auth-code-xyz", state = nonce)) }
                 }
                 assertTrue(
                     error.message.orEmpty().contains("invalid_grant"),

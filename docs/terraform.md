@@ -1,7 +1,5 @@
 # Terraform Integration
 
-Last updated January 2025 (`version-5`)
-
 Lightning Server provides a comprehensive Terraform integration layer for Infrastructure-as-Code deployments. This
 allows you to define your infrastructure programmatically and manage it through Terraform.
 
@@ -45,9 +43,9 @@ object MyDeployment : BaseTerraformEmitter<MyServer>() {
     override val secretsSource = EncryptedFileSecretSource("production")
 
     override fun MyServer.settings() {
-        // Configure your services here
-        database.direct(DatabaseSettings(...))
-        cache.direct(CacheSettings(...))
+        // Choose infrastructure for each service setting, e.g.:
+        database.awsDocumentDb(kmsKey = KmsKeySource.AwsManaged, instanceClass = "db.t4g.medium")
+        secretBasis.generated()
         // ... other settings
     }
 }
@@ -67,9 +65,14 @@ fun main() {
 ```kotlin
 fun main() {
     MyDeployment.deploy()
-    // This runs: terraform init, plan (with confirmation), and apply
+    // This runs terraform init, then terraform apply, which shows the plan and waits for you to type "yes"
 }
 ```
+
+`deploy(autoApprove = true)` skips the confirmation, for CI. The plan is never written to a file, because a saved plan
+holds secrets in plain text. `destroy()` tears the deployment down after you type `destroy <project>` to confirm.
+
+Override `useTofu` to run OpenTofu instead of Terraform.
 
 Or manually:
 
@@ -156,14 +159,13 @@ fun MyService.Settings.configureInfrastructure() {
 }
 ```
 
-### Terraform Shell
+### Running Terraform Commands
 
-For debugging and manual operations:
+For debugging and manual operations, run any command with the deployment's credentials in the environment:
 
 ```kotlin
 fun main() {
-    MyDeployment.terraformShell()
-    // Enter terraform commands interactively (without "terraform" prefix)
+    MyDeployment.terraform("state", "list")
 }
 ```
 
@@ -183,8 +185,7 @@ A typical deployment follows these steps:
 1. **Initial Setup**: Create your deployment configuration extending `BaseTerraformEmitter`
 2. **Configure Secrets**: Run `editVars()` to set up credentials
 3. **Generate Config**: Call `write()` to generate Terraform files
-4. **Review Plan**: Run `terraform plan` to see what will be created
-5. **Apply**: Run `deploy()` or `terraform apply` to create infrastructure
+4. **Apply**: Run `deploy()`, review the plan it shows, and type `yes` to create infrastructure
 6. **Updates**: Modify your code, regenerate config, and apply changes
 
 ## Security Considerations
@@ -240,10 +241,11 @@ If you see errors about missing secrets:
 
 If Terraform commands fail:
 
-1. Ensure Terraform is installed and on your PATH
+1. Ensure Terraform (or OpenTofu with `useTofu`) is installed and on your PATH, or set `TERRAFORM_BINARY` /
+   `TOFU_BINARY`
 2. Check that AWS credentials are configured correctly
 3. Review Terraform logs for specific errors
-4. Run `terraformShell()` to debug with manual commands
+4. Run `terraform(...)` on the deployment to debug with manual commands
 
 ### File Not Found
 
@@ -263,9 +265,10 @@ See also:
 
 - **`BaseTerraformEmitter<S>`**: Base class for Terraform generation
     - `write()`: Generate Terraform JSON files
-    - `deploy()`: Full deployment workflow (init/plan/apply)
+    - `deploy(autoApprove)`: Full deployment workflow (init, then apply with confirmation)
+    - `destroy()`: Destroys the deployment's infrastructure, with confirmation
     - `editVars()`: Interactive secret editor
-    - `terraformShell()`: Interactive Terraform command shell
+    - `terraform(vararg command)`: Runs a Terraform command with the deployment's environment
 
 - **`SecretSource`**: Interface for secret retrieval
     - `get(need)`: Get required secret or throw
@@ -280,5 +283,5 @@ See also:
 ## Next Steps
 
 - [AWS Deployment Guide](deploy-aws.md) - Deploy to AWS Lambda
-- [Server Configuration](server-configuration.md) - Configure your server settings
-- [Service Abstractions](services.md) - Available service implementations
+- [Settings](settings.md) - Configure your server settings
+- [Service Abstractions](../docs-guide/guide/services.md) - Available service implementations

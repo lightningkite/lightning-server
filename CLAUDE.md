@@ -54,28 +54,24 @@ This is a Gradle-based multi-module Kotlin project.
 
 Unit tests use mock services to avoid external dependencies. Tests should:
 
-- Use the `ServerBuilder.test { }` extension for testing endpoints
-- Use `JsonFileDatabase` or similar mock implementations for services
+- Use the `ServerBuilder.testBlocking { }` extension (or `test { }` with your own `runBlocking`) for testing endpoints
+- Use in-memory service implementations (`Database.Settings("ram")`, `Cache.Settings("ram")`)
 - Be runnable without any external service dependencies
-- Test typed endpoints using `apiHandler.test(auth = ..., input = ...)` inside a `test { }` block
-- Test raw HTTP handlers using `handler.test()` inside a `test { }` block
+- Test typed endpoints using `apiHandler.test(auth = ..., input = ...)` inside a `testBlocking { }` block
+- Test raw HTTP handlers using `handler.test()` inside a `testBlocking { }` block
 
 Example test pattern:
 
 ```kotlin
 class ServerTest {
     @Test
-    fun testEndpoint() {
-        Server.test(
-            settings = {
-                // configure settings, e.g.: database.set(Database.Settings("ram"))
-            }
-        ) {
-            runBlocking {
-                val response = Server.someEndpoint.test()
-                assertEquals(expectedValue, response.body!!.text())
-            }
+    fun testEndpoint() = Server.testBlocking(
+        settings = {
+            // configure settings, e.g.: database set Database.Settings("ram")
         }
+    ) {
+        val response = Server.someEndpoint.test()
+        assertEquals(expectedValue, response.body!!.text())
     }
 }
 ```
@@ -83,20 +79,31 @@ class ServerTest {
 For typed endpoints requiring authentication:
 
 ```kotlin
-Server.test(settings = {}) {
-    runBlocking {
-        val user = User(email = "test@example.com")
-        Server.userInfo.table().insertOne(user)
+Server.testBlocking(settings = {}) {
+    val user = User(email = "test@example.com")
+    execute { Server.userInfo.table().insertOne(user) }
 
-        val auth = Server.userPrincipal.testAuth(user)
-        val result = Server.someProtectedEndpoint.test(auth = auth, input = Unit)
-        assertEquals(expectedValue, result)
-    }
+    val auth = Server.userPrincipal.testAuth(user)
+    val result = Server.someProtectedEndpoint.test(auth = auth, input = Unit)
+    assertEquals(expectedValue, result)
 }
 ```
 
-`testAuth` is a `context(server: ServerRuntime)` extension on `PrincipalType`, so it must be called
-inside a `test { }` block where a `ServerRuntime` is in context.
+Inside a `test { }` or `testBlocking { }` block the only context is the `TestRunner`, which is an `Engine`, not a `ServerRuntime`:
+
+- The `.test()` helpers on handlers run the call the way an engine would, as a root execution through the server's
+  interceptors, so they need no runtime.
+- Anything the test does itself that needs a `ServerRuntime` — database access, auth fetches, sessions, launching
+  tasks, sending topic messages — goes inside `execute { }`, which runs it as an `Execution.Direct`. Keep database work
+  inside the block; don't return a `Table` from `execute` and use it afterwards.
+- Engine members such as `externalSerialization` or `server` are reached with `engine.X`, and simulating an incoming
+  request is `engine.handleRoot(request, Execution.ID.generate())`. `handleRoot`, the `AsRoot` WebSocket helpers, and
+  the task/schedule/startup/pre-deploy `WithMetrics` runners are `@EngineApi`, so a test calling them directly needs
+  `@OptIn(EngineApi::class)`.
+- `testAuth` only needs an `Engine`, so it can be called directly in the test body.
+
+Test servers whose typed endpoints are exercised must call `registerBasicMediaTypeCoders()` in `init`, since typed
+calls encode their output.
 
 #### Common Testing Pitfalls
 
@@ -120,16 +127,23 @@ module:
   SDKs
 - **Auth modules** (`auth`, `auth-shared`): Pre-built authentication functionality
 - **Session modules** (`sessions`, `sessions-shared`, `sessions-email`, `sessions-sms`, `sessions-totp`,
-  `sessions-webauthn`): Session management with various authentication methods (email magic links, PIN codes, SMS,
-  TOTP, WebAuthn/passkeys, OAuth)
+  `sessions-webauthn`, `sessions-oauth`, `sessions-oauth-shared`): Session management with various authentication
+  methods (passwords, email and SMS PIN codes, TOTP, WebAuthn/passkeys, backup codes, known devices, OAuth)
 - **File modules** (`files`, `files-shared`): File upload/download handling with multiple backend support
 - **Media modules** (`media`, `media-shared`): Media processing capabilities
+- **Notification modules** (`notifications`, `notifications-shared`): Event-driven notifications over email, SMS, push,
+  and in-app channels
+- **Audit modules** (`audit`, `audit-shared`): Audit logging of request origins, disclosures, queries, mutations, and
+  auth events
+- **Rate limiting** (`ratelimit`): Request rate limiting
 - **Engine modules**: Different deployment targets
-    - `engine-local`: For unit testing
+    - `engine-local`: The base engine for single-process deployments; the Ktor, Netty, and JDK engines extend it (unit
+      tests use `TestRunner` from `core`)
     - `engine-ktor`: Ktor-based HTTP server (recommended for development)
     - `engine-netty`: Netty-based HTTP server
     - `engine-jdk-server`: Pure JDK HTTP server
     - `engine-aws-serverless`: AWS Lambda deployment with Terraform generation
+- **Deployment** (`deploy-aws-ec2`): Terraform generation for EC2 deployments
 - **Secret sources** (`secret-source-aws`): Integration with AWS Secrets Manager
 
 ### Server Definition Pattern
@@ -158,7 +172,7 @@ object Server : ServerBuilder() {
 ```kotlin
 object ApiEndpoints : ServerBuilder() {
     val example = path.path("example").get bind HttpHandler {
-        HttpResponse.json(ExampleData())
+        HttpResponse.plainText("example")
     }
 }
 ```
@@ -174,6 +188,25 @@ fun main() {
     }
 }
 ```
+
+### Engine, ServerRuntime, and Executions
+
+- An `Engine` is the running server, one per process: settings, serialization, clock, task dispatch.
+- A `ServerRuntime` is an engine performing one `Execution` (an HTTP request, one WebSocket phase, a task, a schedule
+  tick, a startup or pre-deploy task). Only the framework creates one; handlers, interceptors, and task bodies receive
+  it as context.
+- Each execution records its `parent`, `rootExecution`, and `origin`, and carries a `context` cache that is copied to
+  the executions it starts and serialized into queued tasks. This is what lets logs and audit records trace work back
+  to the request that caused it.
+- Require `context(ServerRuntime)` for code that does work (database, services, launching tasks, topic messages), and
+  `context(Engine)` for setup or reading shared state.
+- Raw entry points such as `HttpHandler.handle` and `WebSocketHandler.willConnect` are `@OverrideOnly`. Run them through
+  the `WithMetrics` helpers (child executions) or, in engines, the `@EngineApi` root helpers, never directly.
+- Interceptor chains: `HttpInterceptor` and `WebSocketInterceptor` are physical: they run only for requests and
+  sockets the engine received, never for `/meta/bulk` sub-requests, internal endpoint calls, or virtual sockets.
+  `ExecutionInterceptor` is logical: it wraps every execution of every kind, and its `Invocation` carries the HTTP or
+  WebSocket request when there is one. It runs outside the physical chains, so a rejection that needs CORS headers
+  belongs in an `HttpInterceptor`.
 
 ### Endpoint Definition
 
@@ -206,17 +239,17 @@ val getUserPost = path.path("users").arg<String>("userId")
 Use typed endpoints for API development to get automatic documentation, SDK generation, and OpenAPI specs:
 
 ```kotlin
-val typedEndpoint = path.path("api").path("action").post.api(
+val typedEndpoint = path.path("api").path("action").post bind ApiHttpHandler(
     summary = "Short description",
     description = "Detailed description of what this endpoint does",
-    authOptions = noAuth,  // or authOptions<User>() for authenticated endpoints
+    auth = noAuth,  // or User.require() for authenticated endpoints
     errorCases = listOf(
         LSError(http = 404, detail = "not-found", message = "Resource not found")
     ),
     successCode = HttpStatus.OK,
     implementation = { input: InputType ->
-        // Implementation here
-        return@api OutputType()
+        // Implementation here; the last expression is the output
+        OutputType()
     }
 )
 ```
@@ -226,8 +259,7 @@ val typedEndpoint = path.path("api").path("action").post.api(
 Models use KotlinX Serialization with additional annotations:
 
 ```kotlin
-@Serializable
-@GenerateDataClassPaths  // Required for query DSL
+@Queryable  // Required for query DSL
 data class Post(
     override val _id: Uuid = Uuid.random(),
     val title: String,
@@ -268,7 +300,7 @@ posts.deleteMany(condition { it.author eq "user@example.com" })
 
 The framework provides abstractions for common services that can be swapped via settings:
 
-- **Database**: MongoDB, Postgres (partial), JSON files, RAM mock
+- **Database**: MongoDB, Postgres (partial), SQL, Cassandra, JSON files, RAM mock
 - **Cache**: Redis, Memcached, DynamoDB, RAM mock
 - **Files**: Local, AWS S3, Azure Blob Storage
 - **Email**: SMTP, Amazon SES, console mock
@@ -319,10 +351,10 @@ The AWS serverless engine generates Terraform configuration automatically:
 1. **Settings file should work out-of-the-box**: Generated `settings.json` should allow the application to run
    immediately without manual configuration
 2. **Use abstractions**: Prefer service abstractions over direct implementations to maintain deployment flexibility
-3. **Test with mocks**: Unit tests should use mock service implementations (JsonFileDatabase, RAM cache, etc.)
+3. **Test with mocks**: Unit tests should use in-memory service implementations (the `ram` database and cache)
 4. **Store endpoint references**: Always store endpoint definitions in constants for testing and internal calls
 5. **Group endpoints logically**: Use separate ServerBuilder objects for different API sections
-6. **Type safety**: Use `@GenerateDataClassPaths` on all database models for type-safe queries
+6. **Type safety**: Use `@Queryable` on all database models for type-safe queries
 7. **Document typed endpoints**: Use the typed endpoint API with good summaries and descriptions for auto-generated
    documentation
 

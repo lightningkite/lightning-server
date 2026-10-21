@@ -6,7 +6,7 @@ import com.lightningkite.lightningserver.engine.ktor.KtorEngine
 import com.lightningkite.lightningserver.engine.netty.NettyEngine
 import com.lightningkite.lightningserver.settings.loadFromFile
 import com.lightningkite.lightningserver.typed.contract.ApiAllowlist
-import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.typed.LightningServerKSchema
 import com.lightningkite.lightningserver.typed.contract.apiBaselineJson
 import com.lightningkite.lightningserver.typed.contract.diffApiContract
@@ -123,7 +123,7 @@ fun settingsSchema(output: File = File("settings.schema.json")) {
     println("Writing settings schema to ${output.absolutePath}")
     // Resolve the serializers module offline (default settings, no port, no service connections), then JSONify.
     val schema = SDK.withDefaultRuntime(Server) {
-        Server.settingsSchemaJson(contextOf<ServerRuntime>().internalSerializersModule)
+        Server.settingsSchemaJson(contextOf<Engine>().internalSerializersModule)
     }
     output.writeText(Json { prettyPrint = true }.encodeToString(JsonObject.serializer(), schema))
     println("Finished")

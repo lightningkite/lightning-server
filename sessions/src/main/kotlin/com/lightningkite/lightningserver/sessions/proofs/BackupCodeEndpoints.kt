@@ -1,5 +1,7 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
+import com.lightningkite.lightningserver.sessions.reportAuthEvent
+import com.lightningkite.lightningserver.sessions.AuthEvent
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.*
@@ -10,16 +12,15 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.serverRuntime
-import com.lightningkite.lightningserver.sessions.proofs.extensions.constrainAttemptRate
+import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
 import com.lightningkite.services.cache.Cache
-import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.data.IndexSet
+import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.database.*
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import java.security.MessageDigest
@@ -27,25 +28,32 @@ import java.security.SecureRandom
 import java.util.Base64
 import kotlin.time.Clock
 import kotlin.time.Duration
+import kotlin.time.Instant
 import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.Uuid
 
 /**
- * One unused backup code belonging to a subject. Each row is deleted as the code is used.
+ * One backup code belonging to a subject. The row is kept after the code is redeemed, marked by [usedAt].
  *
  * @property code The Base64 SHA-256 hash of the normalized code (letters only, lowercase). Rows written before
  * hashing was introduced hold the normalized code in plain text instead; [BackupCodeEndpoints.prove] accepts both.
  * @property subjectId The owning subject's id, as produced by [PrincipalType.idString].
  * @property subjectType The owning subject's [PrincipalType.name].
  */
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 @IndexSet(["subjectId", "subjectType"])
 public data class BackupCodeSecret(
     override val _id: Uuid = Uuid.random(),
     val code: String,
     val subjectId: String,
     val subjectType: String,
+    val createdAt: Instant = Instant.fromEpochMilliseconds(0),
+    /**
+     * Returns when this code was redeemed, or `null` while it is still usable.
+     *
+     * The row is kept after redemption, so this field, not the row's absence, is what makes a code single-use.
+     */
+    val usedAt: Instant? = null,
 ) : HasId<Uuid>
 
 /**
@@ -55,7 +63,7 @@ public data class BackupCodeSecret(
  *
  * 1. An authenticated subject calls [resetCodes] and receives [generateCount] new codes
  * 2. The client shows them once; the server keeps only their hashes, so they can never be shown again
- * 3. Calling [resetCodes] again replaces every existing code, and [clearCodes] removes them all
+ * 3. Calling [resetCodes] again replaces every unused code, and [clearCodes] removes them all
  *
  * All management endpoints require [proofMethodAuth], whose `maxAge` is 10 minutes: codes can only be
  * viewed or replaced by someone who authenticated *recently*, not merely by someone holding a long-lived session.
@@ -141,7 +149,7 @@ public class BackupCodeEndpoints(
      * **Response:** The new codes in plain text, formatted as groups of five letters separated by dashes
      * (e.g. `ABCDE-FGHJK-LMNPQ-RSTUV`). This is the only time they are available; only their hashes are stored.
      *
-     * Every existing code for the subject is deleted first, used or not.
+     * Every unused code for the subject is deleted first. Redeemed codes are kept as a record of the authentication.
      */
     public val resetCodes: ApiHttpHandler<PathSpec0, HasId<*>, Unit, List<String>> =
         path.path("reset-codes").post bind explicitApiHttpHandler(
@@ -153,8 +161,13 @@ public class BackupCodeEndpoints(
             errorCases = listOf(),
             examples = listOf(),
             implementation = { _: Unit ->
+                // Revokes the codes that are still live. Redeemed rows stay: they are a record of an
+                // authentication that happened, not a secret that needs withdrawing.
                 modelInfo.table().deleteManyIgnoringOld(
-                    condition { it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) }
+                    condition {
+                        it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) and
+                                it.usedAt.eq(null)
+                    }
                 )
 
                 val r = SecureRandom()
@@ -173,6 +186,7 @@ public class BackupCodeEndpoints(
                         code = codeHash(normalizeCode(it)),
                         subjectId = auth.rawId,
                         subjectType = auth.principalName,
+                        createdAt = now(),
                     )
                 })
 
@@ -183,7 +197,7 @@ public class BackupCodeEndpoints(
     /**
      * POST /clear-codes
      *
-     * Deletes all of the calling subject's backup codes, after which [established] reports `false`.
+     * Deletes all of the calling subject's unused backup codes, after which [established] reports `false`.
      *
      * **Authentication:** [proofMethodAuth].
      *
@@ -201,8 +215,12 @@ public class BackupCodeEndpoints(
             errorCases = listOf(),
             examples = listOf(),
             implementation = { _: Unit ->
+                // As above: clearing withdraws live codes, it does not erase redemption history.
                 modelInfo.table().deleteManyIgnoringOld(
-                    condition { it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) }
+                    condition {
+                        it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) and
+                                it.usedAt.eq(null)
+                    }
                 )
             }
         )
@@ -229,7 +247,10 @@ public class BackupCodeEndpoints(
             examples = listOf(),
             implementation = { _: Unit ->
                 modelInfo.table().findOne(
-                    condition { it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) }
+                    condition {
+                        it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) and
+                                it.usedAt.eq(null)
+                    }
                 ) != null
             }
         )
@@ -256,8 +277,8 @@ public class BackupCodeEndpoints(
      * [constrainAttemptRate]). Each failed attempt also takes a minimum amount of time, so response timing does
      * not reveal whether an account exists either.
      *
-     * The code is claimed by deleting its row, so it cannot be used twice. This relies on the database backend's
-     * `deleteOne` being atomic.
+     * The code is claimed by setting [BackupCodeSecret.usedAt] only if it is still `null`, so it cannot be used twice.
+     * This relies on the database backend's `updateOne` being atomic.
      */
     public override val prove: ApiHttpHandler<PathSpec0, HasId<*>?, IdentificationAndPassword, Proof> =
         path.path("prove").post bind ApiHttpHandler(
@@ -290,28 +311,66 @@ public class BackupCodeEndpoints(
                 val subject = input.type
 
                 val handler = serverRuntime.server.principalTypes.values.find { it.name == subject }
-                    ?: throw BadRequestException("No subject $subject recognized")
+                    ?: run {
+                        serverRuntime.reportAuthEvent(AuthEvent.ProofRejected(info, AuthEvent.ProofRejected.Reason.MalformedRequest, request = request))
+                        throw BadRequestException("No subject $subject recognized")
+                    }
 
                 // Normalize BEFORE building the rate-limit key: the key must be derived from the canonical
                 // identifier so that case/whitespace variants of the same account share one bucket. Keying on
                 // the raw value would let an attacker dodge the limiter (and its exponential backoff) simply
                 // by varying case or whitespace.
                 val normalizedValue = handler.normalizePropertyValue(input.property, input.value)
-                cache().constrainAttemptRate(
-                    cacheKey = "backup-code-count-${input.property}-${normalizedValue}"
+                cache().constrainProofAttemptRate(
+                    cacheKey = "backup-code-count-${input.property}-${normalizedValue}",
+                    method = info,
+                    request = request,
                 ) {
                     val subjectId = handler.fetchUserIdString(input.property, normalizedValue)
-                        ?: throw BadRequestException("Invalid Backup Code")
+                        ?: run {
+                            // No account resolved, so no principal to name. Recorded anyway: a run of these
+                            // against different values is what enumeration looks like.
+                            serverRuntime.reportAuthEvent(AuthEvent.ProofRejected(info, AuthEvent.ProofRejected.Reason.NoSuchSubject, request = request))
+                            throw BadRequestException("Invalid Backup Code")
+                        }
 
                     val normalizedCode = normalizeCode(input.password)
 
                     // Codes stored before hashing was introduced are plain text.
-                    modelInfo.table().deleteOne(condition {
+                    val match = modelInfo.table().findOne(condition {
                         it.subjectId.eq(subjectId) and
                                 it.subjectType.eq(subject) and
+                                it.usedAt.eq(null) and
                                 it.code.inside(listOf(codeHash(normalizedCode), normalizedCode))
-                    }) ?: throw BadRequestException("Invalid Backup Code")
+                    })
+                        ?: run {
+                            serverRuntime.reportAuthEvent(AuthEvent.ProofCredentialRejected(
+                                info,
+                                AuthEvent.ProofCredentialRejected.Reason.SecretMismatch,
+                                principal = subjectId,
+                                request = request,
+                            ))
+                            throw BadRequestException("Invalid Backup Code")
+                        }
 
+                    // Claim the code by marking it, conditional on it still being unused, so that two
+                    // concurrent redemptions of the same code cannot both succeed. Losing this race is
+                    // indistinguishable from presenting an already-spent code, and answers the same.
+                    val claimed = modelInfo.table().updateOne(
+                        condition { it._id.eq(match._id) and it.usedAt.eq(null) },
+                        modification { it.usedAt assign now() },
+                    )
+                    if (claimed.old == null) {
+                        serverRuntime.reportAuthEvent(AuthEvent.ProofCredentialRejected(
+                            info,
+                            AuthEvent.ProofCredentialRejected.Reason.SecretAlreadyUsed,
+                            principal = subjectId,
+                            request = request,
+                        ))
+                        throw BadRequestException("Invalid Backup Code")
+                    }
+
+                    serverRuntime.reportAuthEvent(AuthEvent.ProofAccepted(info, principal = subjectId, request = request))
                     proofSigner.await().makeProof(
                         info = info.copy(strength = 10),
                         property = input.property,
@@ -330,7 +389,8 @@ public class BackupCodeEndpoints(
         modelInfo.table().findOne(
             condition {
                 it.subjectId.eq(principal.idString(subject._id)) and
-                        it.subjectType.eq(principal.name)
+                        it.subjectType.eq(principal.name) and
+                        it.usedAt.eq(null)
             }
         ) != null
 }

@@ -108,13 +108,13 @@ val isValid = signer.verify("message".encodeToByteArray(), signature)
 ### Password Hashing
 
 ```kotlin
-// During registration
-val hash = password.secureHash()
-database.saveUser(User(email, hash))
+// During registration: store only the hash
+val user = User(email = email, passwordHash = password.secureHash())
+userTable().insertOne(user)
 
 // During login
-val user = database.getUser(email)
-val isValid = password.checkAgainstHash(user.passwordHash)
+val stored = userTable().findOne(condition { it.email eq email }) ?: throw UnauthorizedException()
+val isValid = password.checkAgainstHash(stored.passwordHash)
 ```
 
 ## Security Recommendations
@@ -127,6 +127,6 @@ val isValid = password.checkAgainstHash(user.passwordHash)
 
 ## See Also
 
-- [Full Encryption Documentation](../../../../docs/encryption.md)
-- [Authentication Documentation](../../../../docs/authentication.md)
-- [Settings Documentation](../../../../docs/settings.md)
+- [Full Encryption Documentation](../../../../../../../../docs/encryption.md)
+- [Authentication Documentation](../../../../../../../../docs/authentication.md)
+- [Settings Documentation](../../../../../../../../docs/settings.md)

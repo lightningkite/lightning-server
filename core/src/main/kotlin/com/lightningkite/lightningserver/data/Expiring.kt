@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.data
 
-import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.Engine
 import kotlinx.serialization.Serializable
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -37,7 +37,7 @@ public data class Expiring<T>(
      *
      * Note: Requires ServerRuntime context to access the server's clock.
      */
-    context(server: ServerRuntime)
+    context(server: Engine)
     public val expired: Boolean get() = expiresAt != null && expiresAt <= server.clock.now()
 }
 
@@ -50,7 +50,7 @@ public data class Expiring<T>(
  *
  * Note: Requires ServerRuntime context to access the server's clock for calculating expiration time.
  */
-context(server: ServerRuntime)
+context(server: Engine)
 public fun <T> Expiring(value: T, expireAfter: Duration?): Expiring<T> =
     Expiring(value, expireAfter?.let { server.clock.now() + it })
 

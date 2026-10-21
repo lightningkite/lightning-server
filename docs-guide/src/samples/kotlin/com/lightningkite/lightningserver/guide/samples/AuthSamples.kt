@@ -19,8 +19,7 @@ import kotlin.uuid.*
 // endregion auth-imports
 
 // region user-model
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class UserProfile(
     override val _id: Uuid = Uuid.random(),
     val name: String,
@@ -82,7 +81,6 @@ fun authTest() = UserProfileServer.testBlocking(settings = { database set Databa
         .insertOne(UserProfile(name = "Alice", email = "alice@example.com"))
 
     // testAuth() creates an Authentication<UserProfile> for use in tests.
-    // It must be called inside a testBlocking {} block because it needs a ServerRuntime in context.
     val aliceAuth = UserAuth.testAuth(alice)
 
     // Pass the auth token as the first argument to the typed .test() call.

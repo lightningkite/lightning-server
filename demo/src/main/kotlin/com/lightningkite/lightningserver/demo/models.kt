@@ -8,8 +8,7 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 @AdminTableColumns(["name", "number", "status"])
 @Description("A model for testing Lightning Server.")
 data class TestModel(
@@ -34,8 +33,7 @@ enum class Status {
     PUBLISHED
 }
 
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class User(
     override val _id: Uuid = Uuid.random(),
     override val email: String,
@@ -44,8 +42,7 @@ data class User(
     val isSuperUser: Boolean = false,
 ) : HasId<Uuid>, HasEmail, HasPassword
 
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 data class UserAlt(
     override val _id: Uuid = Uuid.random(),
     override val email: String,

@@ -138,16 +138,22 @@ continuation — call `cont(request)` to proceed to the next interceptor (or the
 modify the result, or return early:
 
 ```kotlin
-val requestLogger = HttpInterceptor { request, cont ->
-    println("→ ${request.path.method} /${request.path.pathSegments.joinToString("/")}")
-    val response = cont(request)
-    println("← ${response.status}")
-    response
+object RequestLogger : HttpInterceptor {
+    context(runtime: ServerRuntime)
+    override suspend fun <PATH : PathSpec> intercept(
+        request: HttpRequest<PATH>,
+        cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
+    ): HttpResponse {
+        println("→ ${request.path.method} /${request.path.pathSegments}")
+        val response = cont(request)
+        println("← ${response.status}")
+        return response
+    }
 }
 
 object LoggedServer : ServerBuilder() {
     init {
-        install(requestLogger)
+        install(RequestLogger)
     }
 
     val hello = path.path("hello").get bind HttpHandler {
@@ -156,8 +162,7 @@ object LoggedServer : ServerBuilder() {
 }
 ```
 
-For a stateful interceptor, or one that needs a meaningful `name` for instrumentation,
-implement the interface as a class:
+For a configurable interceptor, implement the interface as a class:
 
 ```kotlin
 class HeaderInjector(
@@ -167,9 +172,9 @@ class HeaderInjector(
     override val name: String = "HeaderInjector($headerName)"
 
     context(runtime: ServerRuntime)
-    override suspend fun intercept(
-        request: HttpRequest<*>,
-        cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
+    override suspend fun <PATH : PathSpec> intercept(
+        request: HttpRequest<PATH>,
+        cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
     ): HttpResponse {
         val response = cont(request)
         return response.copy(
@@ -190,14 +195,20 @@ init {
 Interceptors can also short-circuit and return a response without calling `cont`:
 
 ```kotlin
-val maintenanceMode = HttpInterceptor { _, _ ->
-    HttpResponse(HttpStatus.ServiceUnavailable, body = HttpBody.text("Down for maintenance"))
+object MaintenanceMode : HttpInterceptor {
+    context(runtime: ServerRuntime)
+    override suspend fun <PATH : PathSpec> intercept(
+        request: HttpRequest<PATH>,
+        cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
+    ): HttpResponse = HttpResponse.plainText("Down for maintenance", status = HttpStatus.ServiceUnavailable)
 }
 ```
 
-> The `name` property on `HttpInterceptor` defaults to `this::class.simpleName ?: "anonymous"`.
-> Lambda interceptors get `"anonymous"`.  Name your interceptors via a class if you want
-> them to appear meaningfully in telemetry traces.
+> The `name` property on `HttpInterceptor` defaults to `this::class.simpleName ?: "anonymous"`,
+> and appears in telemetry traces. Override it to tell instances of one class apart.
+
+Interceptors run once for each request the engine receives, not for the sub-requests inside `/meta/bulk` or internal
+endpoint calls. A concern that must cover those, such as access logging, belongs in an `ExecutionInterceptor`.
 
 ## Interceptor Ordering
 

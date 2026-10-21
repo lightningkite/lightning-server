@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.plainText
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.serializerOrContextual
 import com.lightningkite.lightningserver.sessions.proofs.oauth.*
@@ -51,7 +52,7 @@ class OauthCallbackSecurityTest {
         val server = testServer()
         server.test({}) {
             val state = Uuid.random()
-            val url = server.callback.loginUrl(state)
+            val url = execute { server.callback.loginUrl(state) }
             val params = Url(url).parameters
 
             assertEquals("S256", params["code_challenge_method"])
@@ -70,7 +71,7 @@ class OauthCallbackSecurityTest {
     fun `pkce can be disabled per provider`() = runBlocking {
         val server = testServer(supportsPkce = false)
         server.test({}) {
-            val url = server.callback.loginUrl(Uuid.random())
+            val url = execute { server.callback.loginUrl(Uuid.random()) }
             val params = Url(url).parameters
             assertNull(params["code_challenge"])
             assertNull(params["code_challenge_method"])
@@ -84,7 +85,7 @@ class OauthCallbackSecurityTest {
         val server = testServer()
         server.test({}) {
             assertFailsWith<BadRequestException> {
-                server.callback.handle(OauthCode(code = "any", state = "never-issued"))
+                execute { server.callback.handle(OauthCode(code = "any", state = "never-issued")) }
             }
         }
     }
@@ -94,7 +95,7 @@ class OauthCallbackSecurityTest {
         val server = testServer()
         server.test({}) {
             assertFailsWith<BadRequestException> {
-                server.callback.handle(OauthCode(code = "any", state = null))
+                execute { server.callback.handle(OauthCode(code = "any", state = null)) }
             }
         }
     }
@@ -103,13 +104,13 @@ class OauthCallbackSecurityTest {
     fun `state is single-use`() = runBlocking {
         val server = testServer()
         server.test({}) {
-            val url = server.callback.loginUrl(Uuid.random())
+            val url = execute { server.callback.loginUrl(Uuid.random()) }
             val nonce = Url(url).parameters["state"]!!
             // Simulate the first callback consuming the flow (getAndRemove is the single-use mechanism).
             assertNotNull(server.cache().getAndRemove<OauthCallbackEndpoint.FlowRecord>(server.callback.flowKey(nonce)))
             // A second callback with the same state must be rejected before any token exchange.
             assertFailsWith<BadRequestException> {
-                server.callback.handle(OauthCode(code = "any", state = nonce))
+                execute { server.callback.handle(OauthCode(code = "any", state = nonce)) }
             }
         }
     }

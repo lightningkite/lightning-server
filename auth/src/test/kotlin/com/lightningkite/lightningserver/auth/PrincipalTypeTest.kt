@@ -3,7 +3,8 @@ package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.engine
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.services.database.HasId
 import kotlinx.coroutines.runBlocking
@@ -109,7 +110,7 @@ class PrincipalTypeTest {
                 register(TestPrincipal)
             }
         }.test({}) {
-            val fetched = TestPrincipal.fetch(id)
+            val fetched = execute { TestPrincipal.fetch(id) }
             assertEquals(principal, fetched)
             assertEquals("test@example.com", fetched.email)
             assertEquals("Test User", fetched.displayName)
@@ -127,7 +128,7 @@ class PrincipalTypeTest {
             }
         }.test({}) {
             assertFailsWith<IllegalArgumentException>("Should throw for nonexistent ID") {
-                TestPrincipal.fetch(nonexistentId)
+                execute { TestPrincipal.fetch(nonexistentId) }
             }
         }
     }
@@ -144,7 +145,7 @@ class PrincipalTypeTest {
                 register(TestPrincipal)
             }
         }.test({}) {
-            val fetched = TestPrincipal.fetchByProperty("email", "user@example.com")
+            val fetched = execute { TestPrincipal.fetchByProperty("email", "user@example.com") }
             assertNotNull(fetched)
             assertEquals(principal, fetched)
         }
@@ -162,7 +163,7 @@ class PrincipalTypeTest {
                 register(TestPrincipal)
             }
         }.test({}) {
-            val fetched = TestPrincipal.fetchByProperty("email", "nonexistent@example.com")
+            val fetched = execute { TestPrincipal.fetchByProperty("email", "nonexistent@example.com") }
             assertNull(fetched)
         }
     }
@@ -180,12 +181,12 @@ class PrincipalTypeTest {
             }
         }.test({}) {
             // Email should be case-insensitive
-            val byUpperEmail = TestPrincipal.fetchByProperty("email", "USER@EXAMPLE.COM")
+            val byUpperEmail = execute { TestPrincipal.fetchByProperty("email", "USER@EXAMPLE.COM") }
             assertNotNull(byUpperEmail)
             assertEquals(principal, byUpperEmail)
 
             // Phone should ignore non-digits
-            val byFormattedPhone = TestPrincipal.fetchByProperty("phone", "555-12-34")
+            val byFormattedPhone = execute { TestPrincipal.fetchByProperty("phone", "555-12-34") }
             assertNotNull(byFormattedPhone)
             assertEquals(principal, byFormattedPhone)
         }
@@ -342,7 +343,7 @@ class PrincipalTypeTest {
             )
 
             // Default implementation returns false
-            val permitted = TestPrincipal.permitMasquerade(fromAuth, intoAuth)
+            val permitted = execute { TestPrincipal.permitMasquerade(fromAuth, intoAuth) }
             assertFalse(permitted, "Default permitMasquerade should return false")
         }
     }
@@ -365,7 +366,7 @@ class PrincipalTypeTest {
                 register(TestPrincipal)
             }
         }.test({}) {
-            val idProperty = TestPrincipal.getProperty(principal, "TestPrincipal/_id")
+            val idProperty = execute { TestPrincipal.getProperty(principal, "TestPrincipal/_id") }
             assertNotNull(idProperty)
             // idString returns JSON-encoded UUID which includes the UUID string with dashes
             assertTrue(idProperty.contains(id.toString()), "Should contain the UUID")
@@ -394,7 +395,7 @@ class PrincipalTypeTest {
             }
         }.test({}) {
             // Default fetchByProperty returns null for properties other than TypeName/_id
-            val result = IntIdPrincipal.fetchByProperty("name", "Test")
+            val result = execute { IntIdPrincipal.fetchByProperty("name", "Test") }
             assertNull(result, "Default fetchByProperty should return null for non-ID properties")
         }
     }
@@ -421,7 +422,7 @@ class PrincipalTypeTest {
                 sessionId = null
             )
 
-            assertFalse(IntIdPrincipal.permitMasquerade(fromAuth, intoAuth))
+            assertFalse(execute { IntIdPrincipal.permitMasquerade(fromAuth, intoAuth) })
         }
     }
 
@@ -443,11 +444,11 @@ class PrincipalTypeTest {
                 register(TestPrincipal)
             }
         }.test({}) {
-            val email = TestPrincipal.getProperty(principal, "email")
+            val email = execute { TestPrincipal.getProperty(principal, "email") }
             assertNotNull(email)
             assertEquals("user@example.com", email)
 
-            val displayName = TestPrincipal.getProperty(principal, "displayName")
+            val displayName = execute { TestPrincipal.getProperty(principal, "displayName") }
             assertNotNull(displayName)
             assertEquals("Test User", displayName)
         }
@@ -465,7 +466,7 @@ class PrincipalTypeTest {
                 register(TestPrincipal)
             }
         }.test({}) {
-            val nonexistent = TestPrincipal.getProperty(principal, "nonexistent")
+            val nonexistent = execute { TestPrincipal.getProperty(principal, "nonexistent") }
             assertNull(nonexistent)
         }
     }
@@ -483,7 +484,7 @@ class PrincipalTypeTest {
             }
         }.test({}) {
             val idString = IntIdPrincipal.idString(id)
-            val fetched = IntIdPrincipal.fetchByProperty("IntIdPrincipal/_id", idString)
+            val fetched = execute { IntIdPrincipal.fetchByProperty("IntIdPrincipal/_id", idString) }
             assertNotNull(fetched)
             assertEquals(principal, fetched)
         }
@@ -503,7 +504,7 @@ class PrincipalTypeTest {
                 register(IntIdPrincipal)
             }
         }.test({}) {
-            val fetched = IntIdPrincipal.fetch(id)
+            val fetched = execute { IntIdPrincipal.fetch(id) }
             assertEquals(principal, fetched)
             assertEquals("Test Entity", fetched.name)
         }
@@ -521,7 +522,7 @@ class PrincipalTypeTest {
                 register(StringIdPrincipal)
             }
         }.test({}) {
-            val fetched = StringIdPrincipal.fetch(id)
+            val fetched = execute { StringIdPrincipal.fetch(id) }
             assertEquals(principal, fetched)
             assertEquals("Custom Label", fetched.label)
         }
@@ -541,7 +542,7 @@ class PrincipalTypeTest {
         }.test({}) {
             // The default fetchByProperty supports "TypeName/_id" lookup
             val idString = TestPrincipal.idString(id)
-            val fetched = TestPrincipal.fetchByProperty("TestPrincipal/_id", idString)
+            val fetched = execute { TestPrincipal.fetchByProperty("TestPrincipal/_id", idString) }
             assertNotNull(fetched)
             assertEquals(principal, fetched)
         }
@@ -561,7 +562,7 @@ class PrincipalTypeTest {
                 register(TestPrincipal)
             }
         }.test({}) {
-            val result = TestPrincipal.fetchUserIdString("email", "user@example.com")
+            val result = execute { TestPrincipal.fetchUserIdString("email", "user@example.com") }
             assertNotNull(result)
             // The result should be the serialized ID, which matches idString output
             assertEquals(TestPrincipal.idString(id), result)
@@ -580,7 +581,7 @@ class PrincipalTypeTest {
                 register(TestPrincipal)
             }
         }.test({}) {
-            val result = TestPrincipal.fetchUserIdString("email", "nonexistent@example.com")
+            val result = execute { TestPrincipal.fetchUserIdString("email", "nonexistent@example.com") }
             assertNull(result)
         }
     }
@@ -599,7 +600,7 @@ class PrincipalTypeTest {
         }.test({}) {
             // IntIdPrincipal only supports ID lookup via "IntIdPrincipal/_id"
             val idString = IntIdPrincipal.idString(id)
-            val result = IntIdPrincipal.fetchUserIdString("IntIdPrincipal/_id", idString)
+            val result = execute { IntIdPrincipal.fetchUserIdString("IntIdPrincipal/_id", idString) }
             assertNotNull(result)
             assertEquals(idString, result)
         }
@@ -618,7 +619,7 @@ class PrincipalTypeTest {
             }
         }.test({}) {
             // IntIdPrincipal uses default fetchByProperty which only supports "IntIdPrincipal/_id"
-            val result = IntIdPrincipal.fetchUserIdString("name", "Test Entity")
+            val result = execute { IntIdPrincipal.fetchUserIdString("name", "Test Entity") }
             assertNull(result, "fetchUserIdString should return null for unsupported property lookups")
         }
     }
@@ -638,7 +639,7 @@ class PrincipalTypeTest {
         }.test({}) {
             // TestPrincipal.fetchByProperty normalizes email to lowercase
             // So this should find the user even with uppercase input
-            val result = TestPrincipal.fetchUserIdString("email", "USER@EXAMPLE.COM")
+            val result = execute { TestPrincipal.fetchUserIdString("email", "USER@EXAMPLE.COM") }
             assertNotNull(result, "Should find user even with different case email")
             assertEquals(TestPrincipal.idString(id), result)
         }
@@ -657,7 +658,7 @@ class PrincipalTypeTest {
             }
         }.test({}) {
             val idString = StringIdPrincipal.idString(id)
-            val result = StringIdPrincipal.fetchUserIdString("StringIdPrincipal/_id", idString)
+            val result = execute { StringIdPrincipal.fetchUserIdString("StringIdPrincipal/_id", idString) }
             assertNotNull(result)
             assertEquals(idString, result)
         }
@@ -673,7 +674,7 @@ class PrincipalTypeTest {
                 register(IntIdPrincipal)
             }
         }.test({}) {
-            val types = serverRuntime.server.principalTypes
+            val types = engine.server.principalTypes
             assertNotNull(types)
             assertTrue(types.containsKey("TestPrincipal"))
             assertTrue(types.containsKey("IntIdPrincipal"))
@@ -685,7 +686,7 @@ class PrincipalTypeTest {
     @Test
     fun `principalTypes is empty when no types registered`() = runBlocking {
         object : ServerBuilder() {}.test({}) {
-            val types = serverRuntime.server.principalTypes
+            val types = engine.server.principalTypes
             assertNotNull(types)
             assertTrue(types.isEmpty())
         }
@@ -700,7 +701,7 @@ class PrincipalTypeTest {
                 register(TestPrincipal)
             }
         }.test({}) {
-            val type = principalTypeFor<TestPrincipal, Uuid>()
+            val type = execute { principalTypeFor<TestPrincipal, Uuid>() }
             assertEquals(TestPrincipal, type)
         }
     }
@@ -712,7 +713,7 @@ class PrincipalTypeTest {
                 register(IntIdPrincipal)
             }
         }.test({}) {
-            val type = principalTypeFor<IntIdPrincipal, Int>()
+            val type = execute { principalTypeFor<IntIdPrincipal, Int>() }
             assertEquals(IntIdPrincipal, type)
         }
     }
@@ -725,7 +726,7 @@ class PrincipalTypeTest {
             }
         }.test({}) {
             assertFailsWith<IllegalArgumentException> {
-                principalTypeFor<IntIdPrincipal, Int>() // Not registered
+                execute { principalTypeFor<IntIdPrincipal, Int>() } // Not registered
             }
         }
     }
@@ -739,9 +740,9 @@ class PrincipalTypeTest {
                 register(StringIdPrincipal)
             }
         }.test({}) {
-            assertEquals(TestPrincipal, principalTypeFor<TestPrincipal, Uuid>())
-            assertEquals(IntIdPrincipal, principalTypeFor<IntIdPrincipal, Int>())
-            assertEquals(StringIdPrincipal, principalTypeFor<StringIdPrincipal, String>())
+            assertEquals(TestPrincipal, execute { principalTypeFor<TestPrincipal, Uuid>() })
+            assertEquals(IntIdPrincipal, execute { principalTypeFor<IntIdPrincipal, Int>() })
+            assertEquals(StringIdPrincipal, execute { principalTypeFor<StringIdPrincipal, String>() })
         }
     }
 }

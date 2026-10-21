@@ -1,27 +1,22 @@
 package com.lightningkite.lightningserver.sessions.proofs.oauth
 
-import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.Serializable
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
- * Represents an OAuth 2.0 client application that can authenticate users via this server.
+ * Represents an OAuth 2.0 client application that authenticates users through this server.
  *
- * This model stores client credentials and configuration for applications that integrate
- * with your server as an OAuth provider. Each client can have multiple secrets (for rotation)
- * and multiple redirect URIs.
- *
- * @property _id The client ID, used publicly in OAuth flows
- * @property niceName Human-readable name of the client application
- * @property logo Optional URL to the client's logo (for consent screens)
- * @property scopes Set of OAuth scopes this client is allowed to request
- * @property secrets Set of client secrets with rotation support
- * @property redirectUris Allowed redirect URIs for this client (must match exactly)
+ * @property _id The client ID, which is public in OAuth flows.
+ * @property niceName The name of the client application.
+ * @property logo The URL of the client's logo for consent screens.
+ * @property scopes The scopes the client may request.
+ * @property secrets The client's secrets, of which there can be several for rotation.
+ * @property redirectUris The redirect URIs the client may use, which must match exactly.
  */
-@GenerateDataClassPaths
-@Serializable
+@Queryable
 public data class OauthClient(
     override val _id: String,
     val niceName: String,
@@ -34,18 +29,15 @@ public data class OauthClient(
 }
 
 /**
- * Represents a client secret for OAuth authentication with rotation support.
+ * Represents a client secret, which can be disabled without deletion.
  *
- * Clients can have multiple secrets active simultaneously to enable zero-downtime rotation.
- * Secrets are hashed (never stored in plain text) and can be disabled without deletion.
+ * A client can have several active secrets to rotate them without downtime.
  *
- * @property createdAt When this secret was created
- * @property masked Partially masked version for display (e.g., "abc***xyz")
- * @property secretHash Hash of the actual secret (for verification)
- * @property disabledAt If set, this secret is no longer valid for authentication
+ * @property masked A partially masked form for display, such as `abc***xyz`.
+ * @property secretHash The hash of the secret, which is never stored in plaintext.
+ * @property disabledAt When the secret stopped being valid, or `null` if it is still valid.
  */
-@GenerateDataClassPaths
-@Serializable
+@Queryable
 public data class OauthClientSecret(
     val createdAt: Instant,
     val masked: String,
@@ -54,13 +46,12 @@ public data class OauthClientSecret(
 )
 
 /**
- * OAuth 2.0 token response containing access tokens and optional refresh/ID tokens.
+ * Represents an OAuth 2.0 token response.
  *
- * @property access_token The access token for API requests
- * @property scope Space-separated list of granted scopes
- * @property token_type Type of token (typically "Bearer")
- * @property id_token Optional OpenID Connect ID token (JWT)
- * @property refresh_token Optional token for obtaining new access tokens
+ * @property scope The granted scopes, separated by spaces.
+ * @property token_type The type of token, typically `Bearer`.
+ * @property id_token The OpenID Connect ID token (JWT), if issued.
+ * @property refresh_token The token for obtaining new access tokens, if issued.
  */
 @Serializable
 public data class OauthResponse(
@@ -79,7 +70,7 @@ public data class OauthTokenRequest(
     val client_secret: String,
     val redirect_uri: String? = null,
     val grant_type: String = "authorization_code",
-    /** PKCE (RFC 7636) code verifier proving this client started the flow. Omitted when PKCE is disabled. */
+    /** Holds the PKCE (RFC 7636) code verifier that proves this client started the flow, or `null` if PKCE is disabled. */
     val code_verifier: String? = null,
 )
 
@@ -103,9 +94,9 @@ public data class OauthCodeRequest(
     val prompt: OauthPromptType? = null,
     val login_hint: String? = null,
     val sessionExpiration: Instant? = null,
-    /** PKCE (RFC 7636) code challenge = BASE64URL-NOPAD(SHA256(code_verifier)). Omitted when PKCE is disabled. */
+    /** Holds the PKCE (RFC 7636) code challenge, the unpadded base64url of the SHA-256 of the code verifier, or `null` if PKCE is disabled. */
     val code_challenge: String? = null,
-    /** PKCE transformation method; always "S256" when [code_challenge] is present. */
+    /** Holds the PKCE transformation method, which is always `S256` when [code_challenge] is present. */
     val code_challenge_method: String? = null,
 )
 
@@ -124,14 +115,12 @@ public enum class OauthAccessType {
     online, offline
 }
 
-/**
- * Constants for OAuth 2.0 grant type values used in token requests.
- */
+/** Provides the grant type values used in OAuth 2.0 token requests. */
 public object OauthGrantTypes {
-    /** Authorization code grant type for initial token exchange */
+    /** Is the grant type for the initial token exchange. */
     public const val authorizationCode: String = "authorization_code"
 
-    /** Refresh token grant type for obtaining new access tokens */
+    /** Is the grant type for obtaining new access tokens. */
     public const val refreshToken: String = "refresh_token"
 }
 

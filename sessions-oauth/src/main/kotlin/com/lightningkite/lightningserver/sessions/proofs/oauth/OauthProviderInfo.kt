@@ -26,45 +26,30 @@ import kotlinx.serialization.modules.EmptySerializersModule
 import kotlin.uuid.Uuid
 
 /**
- * Configuration for an OAuth 2.0 identity provider.
+ * Describes an OAuth 2.0 identity provider and how to run the authorization code flow, token exchange and profile retrieval against it.
  *
- * This class encapsulates all the information needed to integrate with an OAuth provider
- * like Google, Apple, Microsoft, or GitHub. It handles the OAuth authorization code flow,
- * token exchange, and profile retrieval.
+ * Built-in providers are [google], [apple], [microsoft] and [github]. Any other OAuth 2.0 service can be described directly:
  *
- * **Built-in Providers:**
- * - [google] - Google OAuth with email verification
- * - [apple] - Apple Sign In with email verification
- * - [microsoft] - Microsoft/Azure AD with OpenID Connect
- * - [github] - GitHub OAuth with email verification
- *
- * **Custom Providers:**
- * You can create custom provider configurations for any OAuth 2.0 compliant service:
  * ```kotlin
  * val customProvider = OauthProviderInfo(
  *     niceName = "MyProvider",
  *     loginUrl = "https://provider.com/oauth/authorize",
  *     tokenUrl = "https://provider.com/oauth/token",
  *     scopeForProfile = "email profile",
- *     getProfile = { response ->
- *         // Fetch user profile using access token
- *         ExternalProfile(email = "user@example.com")
- *     }
+ *     getProfile = { response -> ExternalProfile(email = "user@example.com") }
  * )
  * ```
  *
- * @property niceName Human-readable name (e.g., "Google", "Apple")
- * @property pathName URL-safe name derived from niceName (e.g., "google", "my-provider")
- * @property identifierName Code-safe identifier derived from niceName (e.g., "google", "my_provider")
- * @property loginUrl OAuth authorization endpoint URL
- * @property tokenUrl OAuth token exchange endpoint URL
- * @property mode How the OAuth provider sends the authorization code (form_post or query)
- * @property settings Configuration for credentials serialization (standard or provider-specific)
- * @property scopeForProfile OAuth scopes required to retrieve user profile information
- * @property supportsPkce Whether this provider accepts PKCE (RFC 7636) parameters on the authorization
- *   and token requests. Defaults to `true`; all major providers support (and recommend) PKCE. Set to
- *   `false` only for a non-compliant provider that rejects unknown `code_challenge`/`code_verifier` params.
- * @property getProfile Async function that retrieves user profile from the provider
+ * @property niceName The human-readable name, such as `Google`.
+ * @property pathName The URL-safe form of [niceName], such as `my-provider`.
+ * @property identifierName The code-safe form of [niceName], such as `my_provider`.
+ * @property loginUrl The authorization endpoint.
+ * @property tokenUrl The token exchange endpoint.
+ * @property mode How the provider sends the authorization code, `form_post` or query.
+ * @property settings Describes how the credentials are serialized, either standard or provider-specific.
+ * @property scopeForProfile The scopes needed to retrieve the user's profile.
+ * @property supportsPkce Whether the provider accepts PKCE parameters. Set this to `false` only for a provider that rejects unknown `code_challenge` and `code_verifier` parameters.
+ * @property getProfile Retrieves the user's profile from the provider.
  */
 public class OauthProviderInfo(
     public val niceName: String,

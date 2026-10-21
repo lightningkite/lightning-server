@@ -1,10 +1,11 @@
 package com.lightningkite.lightningserver.auth
 
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.HasId
 
 
-context(server: ServerRuntime)
+context(server: Engine)
 public fun <ID : Comparable<ID>> PrincipalType<*, ID>.idString(id: ID): String =
     server.internalSerialization.stringArrayFormat.encodeToString(idSerializer, id)
 

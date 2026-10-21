@@ -25,25 +25,19 @@ public class OauthCallbackEndpoint<STATE>(
     public val oauthProviderInfo: OauthProviderInfo,
     public val credentials: Runtime<OauthProviderCredentials>,
     /**
-     * Cache used to hold transient per-flow data (the CSRF `state` marker and the PKCE code verifier)
-     * between the authorization redirect and the callback. Entries are single-use and short-lived.
+     * Holds the `state` marker and PKCE code verifier between the authorization redirect and the callback.
      *
-     * In multi-instance or serverless deployments this MUST be a shared cache (e.g. Redis, DynamoDB),
-     * not the in-memory `"ram"` cache: the callback can land on a different instance than the one that
-     * started the flow, and an unshared cache would fail to find the flow record, breaking login.
+     * In multi-instance or serverless deployments this must be a shared cache such as Redis, not the in-memory `"ram"` cache, since the callback can land on a different instance than the one that started the flow.
      */
     public val cache: Runtime<Cache>,
     public val defaultScope: String = oauthProviderInfo.scopeForProfile,
     public val defaultAccessType: OauthAccessType = OauthAccessType.online,
-    /**
-     * How long an in-progress OAuth flow may sit in the cache before its `state`/verifier expire.
-     * Must comfortably cover the user's time at the provider (login, consent, MFA).
-     */
+    /** Returns how long an in-progress flow stays in the cache, which must cover the user's time at the provider. */
     public val flowExpiration: Duration = 10.minutes,
     /**
-     * Invoked when the provider redirects back with an error. NOTE: this runs before `state` is
-     * validated, so the [OauthCode] passed here is unauthenticated and fully attacker-controllable —
-     * do not trust its fields for anything security-sensitive. The default simply throws.
+     * Handles the provider redirecting back with an error, by default throwing.
+     *
+     * This runs before `state` is validated, so the [OauthCode] is attacker-controllable and none of its fields can be trusted.
      */
     public val onError: suspend context(ServerRuntime) (OauthCode) -> HttpResponse = {
         throw Exception("Got Oauth error from ${oauthProviderInfo.niceName}: $it")
@@ -52,17 +46,15 @@ public class OauthCallbackEndpoint<STATE>(
 ) : ServerBuilder() {
 
     /**
-     * Transient record for a single in-progress OAuth flow, keyed in the cache by the opaque `state`
-     * nonce that the provider echoes back. Storing both values together means one cache lookup on the
-     * callback validates the CSRF `state` and retrieves the PKCE verifier and caller state.
+     * Holds the data of one in-progress OAuth flow, keyed in the cache by the `state` nonce the provider echoes back.
      *
-     * `internal` (not `public`) so in-module tests can inspect stored flows; not part of the public API.
+     * One cache lookup on the callback therefore validates the `state` and retrieves the PKCE verifier and the caller's state.
      */
     @Serializable
     internal data class FlowRecord(
-        /** The caller's `STATE` value, serialized with [stateSerializer], preserved across the round-trip. */
+        /** Holds the caller's `STATE` value, serialized with [stateSerializer]. */
         val state: String,
-        /** The PKCE code verifier for this flow, or null when the provider does not support PKCE. */
+        /** Holds the PKCE code verifier, or `null` if the provider does not support PKCE. */
         val codeVerifier: String?,
     )
 

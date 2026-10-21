@@ -3,7 +3,7 @@ package com.lightningkite.lightningserver
 import com.lightningkite.lightningserver.definition.MutableExtensions
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.Engine
 import io.github.oshai.kotlinlogging.KLogger
 import io.github.oshai.kotlinlogging.KotlinLogging
 
@@ -33,6 +33,6 @@ public val ServerDefinition.logger: KLogger
     get() = extensions[LoggerKey] ?: LoggerKey.default()
 
 /**
- * Gets the logger for this ServerRuntime, delegating to the underlying server definition's logger.
+ * Gets the logger for this Engine, delegating to the underlying server definition's logger.
  */
-public val ServerRuntime.logger: KLogger get() = server.logger
+public val Engine.logger: KLogger get() = server.logger

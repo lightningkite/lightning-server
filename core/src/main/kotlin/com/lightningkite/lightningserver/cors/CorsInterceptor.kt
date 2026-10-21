@@ -59,7 +59,7 @@ internal fun originMatches(allowed: List<String>, origin: String): Boolean {
  *
  * @param config Runtime configuration for CORS behavior
  **/
-public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpConnectionInterceptor, WebSocketConnectionInterceptor {
+public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpInterceptor, WebSocketInterceptor {
     override val name: String = "CORS"
 
     public companion object {
@@ -67,9 +67,9 @@ public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpCo
     }
 
     context(runtime: ServerRuntime)
-    override suspend fun intercept(
-        request: HttpRequest<*>,
-        cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
+    override suspend fun <PATH : PathSpec> intercept(
+        request: HttpRequest<PATH>,
+        cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
     ): HttpResponse {
         val config = config()
         // If no Origin header, request is not cross-origin - pass through without CORS headers
@@ -176,11 +176,15 @@ public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpCo
      * regardless of the [CorsSettings.forbidOnMatchFail] setting. This is because
      * WebSocket connections are persistent and must be validated at connection time.
      *
+     * Only the socket the client actually opened is checked; a virtual socket multiplexed inside it
+     * carries no origin of its own.
+     *
      * @param handler The WebSocket handler to intercept
      * @return A wrapped handler that validates origins before connecting
      */
     override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> {
         return object : WebSocketHandler<PATH, T> by handler {
+            @OverrideOnly
             context(serverRuntime: ServerRuntime)
             override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
                 val origin = request.headers[HttpHeader.Origin]?.root ?: return handler.willConnect(request)

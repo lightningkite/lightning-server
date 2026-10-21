@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.ratelimit
 
 import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.LSError
+import com.lightningkite.lightningserver.OverrideOnly
 import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.http.*
@@ -74,6 +75,9 @@ public data class RequestLimits(
  * is invoked). When [settings] resolves to `null`, or [requestLimits] returns `null` for a given
  * request, the interceptor passes the request through unmodified.
  *
+ * It sees only requests and sockets the engine received, so a `/meta/bulk` call or a multiplexed
+ * connection is charged once for its whole duration, not again for each part.
+ *
  * @property settings Runtime-resolved [RateLimitSettings]; if `null`, rate limiting is disabled.
  * @property cache Runtime-resolved [Cache] used to persist per-key reservation state.
  * @property requestLimits Function that computes the [RequestLimits] for a request, or returns
@@ -83,16 +87,16 @@ public class RateLimitInterceptor(
     private val settings: Runtime<RateLimitSettings?>,
     private val cache: Runtime<Cache>,
     private val requestLimits: suspend context(ServerRuntime) (Request<*>) -> RequestLimits?,
-) : HttpLogicalInterceptor, WebSocketLogicalInterceptor {
+) : HttpInterceptor, WebSocketInterceptor {
 
     private val logger = KotlinLogging.logger("com.lightningkite.lightningserver.ratelimit")
 
     override val name: String = "RateLimit"
 
     context(runtime: ServerRuntime)
-    override suspend fun intercept(
-        request: HttpRequest<*>,
-        cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
+    override suspend fun <PATH : PathSpec> intercept(
+        request: HttpRequest<PATH>,
+        cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
     ): HttpResponse {
         val settings = settings() ?: return cont(request)
 
@@ -115,6 +119,7 @@ public class RateLimitInterceptor(
 
     override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> {
         return object : WebSocketHandler<PATH, T> by handler {
+            @OverrideOnly
             context(serverRuntime: ServerRuntime)
             override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
                 val settings = settings() ?: return handler.willConnect(request)

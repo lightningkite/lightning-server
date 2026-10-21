@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.sessions.proofs
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.encryption.Signer
@@ -74,7 +75,7 @@ public class TimeBasedOTPProofEndpoints(
         auth = proofMethodAuth or AuthRequirement.IsAdmin,
         signals = { table -> signals?.invoke(serverRuntime, table) ?: table },
         permissions = {
-            val admin = condition<TotpSecret>(AuthRequirement.IsAdmin.accepts(authOrNull))
+            val admin = condition(AuthRequirement.IsAdmin.accepts(authOrNull))
             val mine = condition<TotpSecret> {
                 it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName)
             }
@@ -157,22 +158,36 @@ public class TimeBasedOTPProofEndpoints(
             implementation = { input: IdentificationAndPassword ->
                 val subject = input.type
                 val handler = serverRuntime.server.principalTypes[subject]
-                    ?: throw IllegalArgumentException("No subject $subject recognized")
+                    ?: run {
+                        serverRuntime.reportAuthEvent(AuthEvent.ProofRejected(info, AuthEvent.ProofRejected.Reason.MalformedRequest, request = request))
+                        throw IllegalArgumentException("No subject $subject recognized")
+                    }
                 // Normalize BEFORE building the rate-limit key: the key must be derived from the canonical
                 // identifier so that case/whitespace variants of the same account share one bucket. Keying on
                 // the raw value would let an attacker dodge the limiter (and its exponential backoff) simply
                 // by varying case or whitespace.
                 val normalizedValue = handler.normalizePropertyValue(input.property, input.value)
-                cache().constrainAttemptRate(cacheKey = attemptKey(input.property, normalizedValue)) {
+                cache().constrainProofAttemptRate(
+                    cacheKey = attemptKey(input.property, normalizedValue),
+                    method = info,
+                    request = request,
+                ) {
                     val subjectId = handler.fetchUserIdString(input.property, normalizedValue)
-                        ?: throw BadRequestException("User ID and code do not match")
+                        ?: run {
+                            // No account resolved, so no principal to name. Recorded anyway: a run of these
+                            // against different values is what enumeration looks like.
+                            serverRuntime.reportAuthEvent(AuthEvent.ProofRejected(info, AuthEvent.ProofRejected.Reason.NoSuchSubject, request = request))
+                            throw BadRequestException("User ID and code do not match")
+                        }
 
                     val confirmed = modelInfo.table().find(condition {
                         it.subjectId.eq(subjectId) and it.subjectType.eq(subject) and active and it.lastUsedAt.neq(null)
                     }).toList()
 
-                    useCode(confirmed, input.password) ?: throw BadRequestException("User ID and code do not match")
+                    useCode(confirmed, input.password, principal = subjectId, request = request)
+                        ?: throw BadRequestException("User ID and code do not match")
 
+                    serverRuntime.reportAuthEvent(AuthEvent.ProofAccepted(info, principal = subjectId, request = request))
                     proofSigner.await().makeProof(
                         property = input.property,
                         value = normalizedValue,
@@ -214,10 +229,13 @@ public class TimeBasedOTPProofEndpoints(
                 val property = "${auth.principalName}/_id"
                 val handler = serverRuntime.server.principalTypes[auth.principalName]
                     ?: throw IllegalArgumentException("No subject ${auth.principalName} recognized")
-                cache().constrainAttemptRate(
-                    cacheKey = attemptKey(property, handler.normalizePropertyValue(property, auth.rawId))
+                cache().constrainProofAttemptRate(
+                    cacheKey = attemptKey(property, handler.normalizePropertyValue(property, auth.rawId)),
+                    method = info,
+                    request = request,
                 ) {
-                    useCode(pending, code) ?: throw BadRequestException("That code does not match. Please try again.")
+                    useCode(pending, code, principal = auth.rawId, request = request)
+                        ?: throw BadRequestException("That code does not match. Please try again.")
                 }
 
                 Unit
@@ -229,12 +247,15 @@ public class TimeBasedOTPProofEndpoints(
     /**
      * Checks [code] against [candidates] and marks the matching secret used, returning it, or null if none match.
      *
+     * A code that matches nothing or was already used is reported as an [AuthEvent.ProofCredentialRejected] for
+     * [principal].
+     *
      * The first use of a new secret is what confirms it (only [confirm] offers unconfirmed ones), so that also retires
      * the subject's other secrets. This keeps a single authenticator active without disabling the old one before its
      * replacement is known to work.
      */
     context(_: ServerRuntime)
-    private suspend fun useCode(candidates: List<TotpSecret>, code: String): TotpSecret? {
+    private suspend fun useCode(candidates: List<TotpSecret>, code: String, principal: String, request: Request<*>?): TotpSecret? {
         val now = now()
         val gracePeriod = now.minus(5.seconds)
 
@@ -251,7 +272,15 @@ public class TimeBasedOTPProofEndpoints(
             matching = secret
             break
         }
-        val matched = matching ?: return null
+        val matched = matching ?: run {
+            serverRuntime.reportAuthEvent(AuthEvent.ProofCredentialRejected(
+                info,
+                AuthEvent.ProofCredentialRejected.Reason.SecretMismatch,
+                principal = principal,
+                request = request,
+            ))
+            return null
+        }
 
         // Enforce single-use (RFC 6238 §5.2): a code is valid for exactly one time-step, so the same
         // code must not mint two proofs. Key on the secret + the time-step that validated. claimOnce is
@@ -264,9 +293,17 @@ public class TimeBasedOTPProofEndpoints(
         // A reused code is reported plainly (unlike a wrong code, which stays opaque): revealing reuse
         // is harmless here — it only confirms a code the caller already supplied was once valid — and
         // a clear "wait for the next code" is far better UX than a misleading "does not match".
-        if (!claimed) throw BadRequestException(
-            "That code was already used. Please wait for your authenticator to show a new code."
-        )
+        if (!claimed) {
+            serverRuntime.reportAuthEvent(AuthEvent.ProofCredentialRejected(
+                info,
+                AuthEvent.ProofCredentialRejected.Reason.SecretAlreadyUsed,
+                principal = principal,
+                request = request,
+            ))
+            throw BadRequestException(
+                "That code was already used. Please wait for your authenticator to show a new code."
+            )
+        }
 
         modelInfo.table().updateOneById(matched._id, modification {
             it.lastUsedAt assign now

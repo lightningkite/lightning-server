@@ -395,8 +395,7 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
      * Used to avoid re-sending notifications that have already been processed.
      * @property instant The timestamp of the last refresh
      */
-    @Serializable
-    @GenerateDataClassPaths
+    @Queryable
     public data class RunInstant(
         override val _id: String = ID,
         val instant: kotlin.time.Instant,

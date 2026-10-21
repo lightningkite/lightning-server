@@ -17,6 +17,7 @@ import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.test.*
+import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.typed.*
 import kotlinx.coroutines.*
 import kotlinx.serialization.*
@@ -118,6 +119,7 @@ Then bind the endpoint with `ApiHttpHandler`:
 <!-- sample: com/lightningkite/lightningserver/guide/samples/FirstEndpointSamples.kt#echo-server -->
 ```kotlin
 object EchoServer : ServerBuilder() {
+    init { registerBasicMediaTypeCoders() }
 
     // POST /echo — accepts typed JSON, returns typed JSON
     val echo = path.path("echo").post bind ApiHttpHandler(
@@ -161,7 +163,7 @@ session object.  For authenticated endpoints you pass an
 
 ## What's Next
 
-- **Authenticated endpoints** — swap `noAuth` for `authOptions<YourUser>()`
+- **Authenticated endpoints** — swap `noAuth` for `YourUser.require()`
   to require a valid session token.
 - **Database access** — define a `setting("database", Database.Settings())`
   and query it with the type-safe condition/modification DSL inside any handler.

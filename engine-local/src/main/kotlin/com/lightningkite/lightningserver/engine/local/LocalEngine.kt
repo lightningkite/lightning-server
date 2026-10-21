@@ -1,5 +1,8 @@
+@file:OptIn(com.lightningkite.lightningserver.EngineApi::class)
+
 package com.lightningkite.lightningserver.engine.local
 
+import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.data.Schedule
 import com.lightningkite.lightningserver.data.plus
 import com.lightningkite.lightningserver.definition.*
@@ -11,6 +14,7 @@ import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.lightningserver.websockets.webSocketSettings
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionRequest
+import com.lightningkite.lightningserver.websockets.topicPath
 import com.lightningkite.services.telemetry.TelemetryAttributes
 import com.lightningkite.services.telemetry.TelemetryKey
 import com.lightningkite.services.Service
@@ -75,13 +79,27 @@ public val forceWebSocketPubSub: ServerSetting.Direct<Boolean> = ServerSetting(
  *
  * @param server The server definition to run
  */
-public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(server) {
+public abstract class LocalEngine(server: ServerDefinition) : EngineBase(server) {
     /**
      * The coroutine scope used for launching background tasks and schedules.
      * Defaults to GlobalScope but can be overridden for testing or custom lifecycle management.
      */
     @OptIn(DelicateCoroutinesApi::class)
     protected open val scope: CoroutineScope = GlobalScope
+
+    /**
+     * Scope for work that is *triggered by* teardown and therefore cannot live under [scope].
+     *
+     * A socket's disconnect phase is the motivating case: shutdown closes the channel, closing the
+     * channel is what asks us to run disconnect, and shutdown also cancels [scope]. Launching that
+     * cleanup into [scope] yields a coroutine that is born already cancelled and never runs its body
+     * at all, so the socket's final phase — its unsubscribes, its span, its audit row — is silently
+     * lost for every socket still open at shutdown.
+     *
+     * [gracefulShutdown] drains this scope while the services those handlers write to are still
+     * connected, and cancels it last.
+     */
+    protected val cleanupScope: CoroutineScope = CoroutineScope(SupervisorJob() + CoroutineName("engine-cleanup"))
 
     /**
      * A unique identifier for this server instance, derived from the network interface's hardware address.
@@ -130,13 +148,13 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
      * Gets a PubSub channel for a WebSocket subscription message.
      */
     protected fun <PATH : PathSpec, T> pubSubChannel(event: WebSocketSubscriptionMessage<PATH, T>): PubSubChannel<T> =
-        pubSub.get(event.path(), event.topic.type)
+        pubSub.get(event.topicPath(), event.topic.type)
 
     /**
      * Gets a PubSub channel for a WebSocket subscription request.
      */
     protected fun <PATH : PathSpec, T> pubSubChannel(event: WebSocketSubscriptionRequest<PATH, T>): PubSubChannel<T> =
-        pubSub.get(event.path(), event.topic.type)
+        pubSub.get(event.topicPath(), event.topic.type)
 
     /**
      * Sends a WebSocket subscription message by emitting it to the appropriate PubSub channel.
@@ -163,13 +181,16 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
      * The task is launched in the engine's coroutine scope and errors are caught and reported.
      *
      * @param input The input value for the task
+     * @param from The execution launching it, carried straight through: a single-process engine
+     *   hands the task to a coroutine rather than a queue, but the parentage recorded is the same.
      */
-    override suspend fun <T> Task<T>.invoke(input: T) {
+    override suspend fun <T> dispatchTask(task: Task<T>, input: T, from: Execution) {
         scope.launch {
             try {
-                logger.debug { "Handling task: $location" }
-                executeWithMetrics(location, input)
-            } catch (e: Exception) {
+                logger.debug { "Handling task: ${task.location}" }
+                @OptIn(InternalLightningServerApi::class)
+                task.executeInlineWithMetrics(input, from)
+            } catch (_: Exception) {
                 /*squish; already reported*/
             }
         }
@@ -236,7 +257,7 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
                             cache.set("$name-lock", true, scheduleLockTtl)
                             try {
                                 logger.debug { "Running Schedule: $name" }
-                                it.executeWithMetrics(location)
+                                it.executeWithMetrics()
                                 cache.set<Long>("$name-nextRun", nextRun)
                             } catch (e: CancellationException) {
                                 // Shutdown (or scope cancellation) interrupted this tick — honor it and stop the
@@ -293,9 +314,11 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
      *    [EngineReliabilitySettings.shutdownDrainTimeout]) for in-flight requests to finish. Each
      *    engine supplies its own drain because the mechanism is engine-specific (Netty event-loop
      *    shutdown, JDK `HttpServer.stop`, Ktor `ApplicationEngine.stop`).
-     * 3. Disconnects every service goal (mirrors the AWS adapter's connect/disconnect loop) so
+     * 3. Drains [cleanupScope] — the socket disconnects this shutdown just raised — so they complete
+     *    while the services they depend on are still connected.
+     * 4. Disconnects every service goal (mirrors the AWS adapter's connect/disconnect loop) so
      *    pooled connections are released cleanly.
-     * 4. Cancels the engine [scope].
+     * 5. Cancels the engine [scope], then [cleanupScope].
      *
      * Idempotent: only the first invocation runs; subsequent calls return immediately.
      *
@@ -323,6 +346,22 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
             // services they depend on are still connected. A tick longer than the window is abandoned — a
             // bounded shutdown grace period cannot guarantee completion of arbitrarily long tasks.
             withTimeoutOrNull(drainTimeout) { cancelledScheduleJobs.joinAll() }
+            // Socket disconnects raised by this shutdown run in cleanupScope. Let them finish here,
+            // while the services they write to are still connected. Bounded by the same drain window:
+            // a handler that outlasts it is abandoned, same as an over-long schedule tick.
+            withTimeoutOrNull(drainTimeout) {
+                // A plain join, because the engine is expected to have raised this work *before* its
+                // drain returned rather than as a side effect of closing something. An earlier version
+                // polled for the scope to look empty twice in a row, which was a timing guess: it
+                // could miss a late arrival and then cancel it outright, which is the bug it was
+                // added to prevent. Re-read between rounds all the same — finishing one batch can
+                // enqueue another.
+                while (true) {
+                    val pending = cleanupScope.coroutineContext.job.children.toList()
+                    if (pending.isEmpty()) break
+                    pending.joinAll()
+                }
+            }
             settings.allGoals().values.forEach { goal ->
                 (goal as? Service)?.let {
                     try {
@@ -337,6 +376,9 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
         // Cancel the engine scope's Job if it has one. The default scope is GlobalScope, which has no
         // Job and cannot be cancelled; engines with a managed scope (e.g. Netty) get cancelled here.
         scope.coroutineContext[Job]?.cancel()
+        // Last, so that a disconnect raised late — a channel that finished closing after the drain
+        // window above — still has somewhere live to run rather than being discarded on arrival.
+        cleanupScope.cancel()
         logger.info { "Graceful shutdown complete." }
     }
 

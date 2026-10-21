@@ -359,7 +359,7 @@ internal fun <T> readInput(process: (String) -> T): T {
     while (true) {
         val input = readln()
         try {
-            return process(input ?: "")
+            return process(input)
         } catch (e: IllegalArgumentException) {
             println("Try again: " + e.message)
         }

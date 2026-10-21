@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.websockets
 
 import com.lightningkite.lightningserver.HttpStatusException
+import com.lightningkite.lightningserver.OverrideOnly
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
@@ -134,15 +135,16 @@ public abstract class CoroutineWebSocketHandler : ServerBuilder() {
     }
 
     public val webSocketHandler: WebSocketHandler<PathSpec0, Storage> =
-        path bind (object : WebSocketHandler<PathSpec0, Storage>, DirectExecutableWebSocketHandler<PathSpec0> {
+        path bind (object : WebSocketHandler<PathSpec0, Storage>, DirectExecutableWebSocketHandler<PathSpec0, Storage> {
 
             override val storageSerializer: KSerializer<Storage> = Storage.serializer()
 
             // --- DirectExecutableWebSocketHandler implementation ---
             // Used by local engines (Ktor, Netty) to bypass pub/sub overhead
 
+            @OverrideOnly
+            context(server: ServerRuntime)
             override suspend fun handleDirect(
-                serverRuntime: ServerRuntime,
                 request: WebSocketConnectRequest<PathSpec0>,
                 incoming: ReceiveChannel<WebSocketFrame>,
                 send: suspend (WebSocketFrame) -> Unit,
@@ -150,35 +152,35 @@ public abstract class CoroutineWebSocketHandler : ServerBuilder() {
             ) {
                 logger.info { "handleDirect: starting direct execution (bypassing pub/sub)" }
                 try {
-                    with(serverRuntime) {
-                        handle(
-                            request = request,
-                            waitForFullConnect = { /* Already connected in direct mode */ },
-                            incoming = flow {
-                                incoming.consumeEach { emit(it) }
-                            },
-                            send = send
-                        )
-                    }
+                    handle(
+                        request = request,
+                        waitForFullConnect = { /* Already connected in direct mode */ },
+                        incoming = flow {
+                            incoming.consumeEach { emit(it) }
+                        },
+                        send = send
+                    )
                     logger.info { "handleDirect: handler completed normally" }
                     close(WebSocketClose.NORMAL)
-                } catch (e: CancellationException) {
+                } catch (_: CancellationException) {
                     logger.info { "handleDirect: cancelled" }
                     close(WebSocketClose.GOING_AWAY)
+                    currentCoroutineContext().ensureActive()
                 } catch (e: HttpStatusException) {
                     logger.warn(e) { "handleDirect: HTTP exception" }
-                    close(e.status.bestWebSocketCloseCode)
+                    close(WebSocketClose.exceptional(e))
                 } catch (e: Exception) {
                     logger.error(e) { "handleDirect: unexpected exception" }
-                    close(WebSocketClose.INTERNAL_ERROR)
+                    close(WebSocketClose.exceptional(e))
                 }
             }
 
             // --- Standard WebSocketHandler implementation ---
             // Used by distributed engines (AWS Lambda) that need pub/sub
 
-            context(connection: WebSocketConnection<PathSpec0, Storage>)
-            override suspend fun didConnect() {
+            @OverrideOnly
+            context(serverRuntime: ServerRuntime)
+            override suspend fun didConnect(connection: WebSocketConnection<PathSpec0, Storage>) {
                 // Only subscribe to outbound topic if direct send is not available
                 // This avoids unnecessary DynamoDB subscription when using direct API Gateway
                 if (connection.currentState.request.engineSocketId == null) {
@@ -186,6 +188,7 @@ public abstract class CoroutineWebSocketHandler : ServerBuilder() {
                 }
             }
 
+            @OverrideOnly
             context(serverRuntime: ServerRuntime)
             override suspend fun willConnect(request: WebSocketConnectRequest<PathSpec0>): Storage = coroutineScope {
                 val s = Storage(request = request)
@@ -230,20 +233,32 @@ public abstract class CoroutineWebSocketHandler : ServerBuilder() {
                 return@coroutineScope s
             }
 
-            context(connection: WebSocketConnection<PathSpec0, Storage>)
-            override suspend fun messageFromClient(frame: WebSocketFrame) {
+            @OverrideOnly
+            context(serverRuntime: ServerRuntime)
+            override suspend fun messageFromClient(
+                connection: WebSocketConnection<PathSpec0, Storage>,
+                frame: WebSocketFrame,
+            ) {
                 connection.currentState.inbound().emit(frame.serializable())
             }
 
-            context(connection: WebSocketConnection<PathSpec0, Storage>)
-            override suspend fun messageFromSubscription(topic: WebSocketSubscriptionMessage<*, *>) {
+            @OverrideOnly
+            context(serverRuntime: ServerRuntime)
+            override suspend fun messageFromSubscription(
+                connection: WebSocketConnection<PathSpec0, Storage>,
+                topic: WebSocketSubscriptionMessage<*, *>,
+            ) {
                 if (topic.topic == outboundTopic) {
                     connection.send((topic.value as SerializableWebSocketFrame).standard())
                 }
             }
 
-            context(connection: WebSocketConnection<PathSpec0, Storage>)
-            override suspend fun disconnect(reason: WebSocketClose) {
+            @OverrideOnly
+            context(serverRuntime: ServerRuntime)
+            override suspend fun disconnect(
+                connection: WebSocketConnection<PathSpec0, Storage>,
+                reason: WebSocketClose,
+            ) {
                 connection.currentState.inbound().emit(SerializableWebSocketFrame(close = true))
             }
         })

@@ -14,6 +14,9 @@ graph TB
         files-shared["files-shared<br/><i>File types</i>"]
         media-shared["media-shared<br/><i>Media types</i>"]
         sessions-shared["sessions-shared<br/><i>Session types</i>"]
+        notifications-shared["notifications-shared<br/><i>Notification types</i>"]
+        audit-shared["audit-shared<br/><i>Audit record types</i>"]
+        sessions-oauth-shared["sessions-oauth-shared<br/><i>OAuth types</i>"]
     end
 
     %% JVM Implementation Modules
@@ -24,19 +27,23 @@ graph TB
         files["files<br/><i>File uploads</i>"]
         media["media<br/><i>Image processing</i>"]
         sessions["sessions<br/><i>Session management</i>"]
+        notifications["notifications<br/><i>Event notifications</i>"]
+        audit["audit<br/><i>Audit logging</i>"]
+        ratelimit["ratelimit<br/><i>Request rate limiting</i>"]
     end
 
     %% Session Extension Modules
     subgraph session-ext["Session Extensions"]
-        sessions-email["sessions-email<br/><i>Email magic links</i>"]
+        sessions-email["sessions-email<br/><i>Email PIN codes</i>"]
         sessions-sms["sessions-sms<br/><i>SMS authentication</i>"]
         sessions-totp["sessions-totp<br/><i>TOTP authentication</i>"]
         sessions-webauthn["sessions-webauthn<br/><i>WebAuthn / passkeys</i>"]
+        sessions-oauth["sessions-oauth<br/><i>OAuth login</i>"]
     end
 
     %% Engine Modules
     subgraph engines["Engine Implementations"]
-        engine-local["engine-local<br/><i>Testing engine</i>"]
+        engine-local["engine-local<br/><i>Base single-process engine</i>"]
         engine-ktor["engine-ktor<br/><i>Ktor HTTP server</i>"]
         engine-netty["engine-netty<br/><i>Netty HTTP server</i>"]
         engine-jdk["engine-jdk-server<br/><i>JDK HTTP server</i>"]
@@ -45,6 +52,7 @@ graph TB
 
     %% Other Modules
     secret-source-aws["secret-source-aws<br/><i>AWS Secrets Manager</i>"]
+    deploy-aws-ec2["deploy-aws-ec2<br/><i>EC2 deployment</i>"]
     demo["demo<br/><i>Example application</i>"]
 
     %% Shared module dependencies
@@ -56,6 +64,9 @@ graph TB
     sessions-shared --> core-shared
     sessions-shared --> auth-shared
     sessions-shared --> typed-shared
+    notifications-shared --> core-shared
+    notifications-shared --> typed-shared
+    audit-shared --> auth-shared
 
     %% JVM implementation dependencies on shared
     core --> core-shared
@@ -72,12 +83,22 @@ graph TB
     sessions --> core
     sessions --> auth
     sessions --> typed
+    notifications --> notifications-shared
+    notifications --> typed
+    audit --> audit-shared
+    audit --> core
+    audit --> typed
+    audit --> sessions
+    ratelimit --> core
+    ratelimit --> engine-local
 
     %% Session extensions
     sessions-email --> sessions
     sessions-sms --> sessions
     sessions-totp --> sessions
     sessions-webauthn --> sessions
+    sessions-oauth --> sessions
+    sessions-oauth --> sessions-oauth-shared
 
     %% Engine dependencies
     engine-local --> core
@@ -88,6 +109,8 @@ graph TB
     engine-jdk --> core
     engine-jdk --> engine-local
     engine-aws --> core
+    deploy-aws-ec2 --> core
+    deploy-aws-ec2 --> engine-local
 
     %% Other dependencies
     secret-source-aws --> core
@@ -113,11 +136,11 @@ graph TB
     classDef sessionStyle fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
     classDef otherStyle fill:#fce4ec,stroke:#c2185b,stroke-width:2px
 
-    class core-shared,auth-shared,typed-shared,files-shared,media-shared,sessions-shared sharedStyle
-    class core,auth,typed,files,media,sessions jvmStyle
+    class core-shared,auth-shared,typed-shared,files-shared,media-shared,sessions-shared,notifications-shared,audit-shared,sessions-oauth-shared sharedStyle
+    class core,auth,typed,files,media,sessions,notifications,audit,ratelimit jvmStyle
     class engine-local,engine-ktor,engine-netty,engine-jdk,engine-aws engineStyle
-    class sessions-email,sessions-sms,sessions-totp,sessions-webauthn sessionStyle
-    class secret-source-aws,demo otherStyle
+    class sessions-email,sessions-sms,sessions-totp,sessions-webauthn,sessions-oauth sessionStyle
+    class secret-source-aws,deploy-aws-ec2,demo otherStyle
 ```
 
 ## Module Categories
@@ -133,6 +156,9 @@ and types.
 - **files-shared**: File-related types
 - **media-shared**: Media processing types
 - **sessions-shared**: Session management types
+- **notifications-shared**: Notification, event, and subscription models
+- **audit-shared**: Audit record shapes and the `AuditedModel` / `@Audited` markers
+- **sessions-oauth-shared**: OAuth models
 
 ### JVM Implementation Modules
 
@@ -143,22 +169,27 @@ These modules provide JVM-specific implementations and server functionality.
 - **typed**: Type-safe API endpoints with OpenAPI/SDK generation
 - **files**: File upload/download handling with multiple storage backends
 - **media**: Image processing using Scrimage
-- **sessions**: Session management with cache and database support
+- **sessions**: Session management with the password, backup code, and known device proof methods
+- **notifications**: Event-driven notifications over email, SMS, push, and in-app channels
+- **audit**: Audit logging of request origins, disclosures, queries, mutations, and auth events
+- **ratelimit**: Request rate limiting
 
 ### Session Extensions
 
 Authentication method implementations built on top of the sessions module.
 
-- **sessions-email**: Email-based authentication (magic links)
+- **sessions-email**: Email-based authentication (PIN codes)
 - **sessions-sms**: SMS-based authentication (PIN codes)
 - **sessions-totp**: Time-based one-time passwords from authenticator apps
 - **sessions-webauthn**: WebAuthn / passkey authentication
+- **sessions-oauth**: Logging in through OAuth providers
 
 ### Engine Implementations
 
 Different deployment targets for Lightning Server applications.
 
-- **engine-local**: In-memory engine for unit testing
+- **engine-local**: The base engine for single-process deployments, which the Ktor, Netty, and JDK engines extend.
+  Unit tests use `TestRunner` from `core` instead
 - **engine-ktor**: Ktor-based HTTP server (recommended for development)
 - **engine-netty**: Netty-based HTTP server
 - **engine-jdk-server**: Pure JDK HTTP server
@@ -167,7 +198,10 @@ Different deployment targets for Lightning Server applications.
 ### Other Modules
 
 - **secret-source-aws**: AWS Secrets Manager integration
+- **deploy-aws-ec2**: Deploying to EC2 with auto scaling and load balancing
 - **demo**: Example application showcasing all features
+- **docs-guide**: The guide, whose code samples are compiled and checked against the Markdown
+- **load-test**: Load testing tools
 
 ## Paired Module Pattern
 

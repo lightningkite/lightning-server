@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.http
 
+import com.lightningkite.lightningserver.OverrideOnly
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import kotlin.time.Duration
@@ -36,6 +37,7 @@ public interface HttpHandler<PATH : PathSpec> {
      * @param request The incoming HTTP request
      * @return The HTTP response to send back to the client
      */
+    @OverrideOnly
     context(server: ServerRuntime)
     public suspend fun handle(request: HttpRequest<PATH>): HttpResponse
 }
@@ -67,6 +69,7 @@ public fun <PATH : PathSpec> HttpHandler(
 ): HttpHandler<PATH> = object : HttpHandler<PATH> {
     override val timeout: Duration = timeout
 
+    @OverrideOnly
     context(server: ServerRuntime)
     override suspend fun handle(request: HttpRequest<PATH>): HttpResponse {
         return handler(server, request)

@@ -22,6 +22,7 @@ class StartupTaskCircularDependencyTest {
         override val dependencies: Collection<StartupTask> get() = deps
         fun addDependency(task: StartupTask) = deps.add(task)
 
+        @com.lightningkite.lightningserver.OverrideOnly
         context(server: com.lightningkite.lightningserver.runtime.ServerRuntime)
         override suspend fun execute() {
         }

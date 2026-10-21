@@ -1,3 +1,5 @@
+@file:OptIn(com.lightningkite.lightningserver.EngineApi::class)
+
 package com.lightningkite.lightningserver.engine.awsserverless
 
 import com.lightningkite.lightningserver.pathing.PathSpec0
@@ -18,7 +20,7 @@ internal class AwsAdapterSchedule(val root: AwsAdapter) {
             )
         try {
             with(root) {
-                schedule.executeWithMetrics(p)
+                schedule.executeWithMetrics()
             }
             return APIGatewayV2HTTPResponse(statusCode = 200)
         } catch (e: Exception) {

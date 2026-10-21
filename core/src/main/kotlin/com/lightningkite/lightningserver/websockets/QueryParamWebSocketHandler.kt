@@ -1,11 +1,14 @@
 package com.lightningkite.lightningserver.websockets
 
 import com.lightningkite.lightningserver.AnonType
+import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.NotFoundException
+import com.lightningkite.lightningserver.OverrideOnly
 import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.*
+import com.lightningkite.services.data.Unsafe
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 
@@ -16,84 +19,100 @@ public data class QueryParamWebSocketHandlerData(
     val underlyingData: AnonType,
 )
 
+@OptIn(InternalLightningServerApi::class)
 public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryParamWebSocketHandlerData> {
     override val storageSerializer: KSerializer<QueryParamWebSocketHandlerData> =
         QueryParamWebSocketHandlerData.serializer()
 
-    private class ConnectionWrapped<T>(
-        val wrapped: WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>,
-        val handler: WebSocketHandler<PathSpec, T>,
-    ) : WebSocketConnection<PathSpec, T>, ServerRuntime by wrapped {
-        @Suppress("UNCHECKED_CAST")
-        override val request: WebSocketConnectRequest<PathSpec>
-            get() = wrapped.currentState.request as WebSocketConnectRequest<PathSpec>
-        override var currentState: T = wrapped.currentState.underlyingData.value(
-            wrapped.internalSerialization.kotlinBytesFormat,
-            handler.storageSerializer
-        )
-            private set
-
-        override suspend fun close(reason: WebSocketClose) = wrapped.close(reason)
-        override suspend fun send(frame: WebSocketFrame) = wrapped.send(frame)
-        override suspend fun repullState(): T =
-            wrapped.repullState().underlyingData.value(
-                wrapped.internalSerialization.kotlinBytesFormat,
+    context(runtime: ServerRuntime)
+    private suspend fun <T> WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>.withWrapped(
+        handler: WebSocketHandler<PathSpec, T>,
+        physicalSocketClosing: Boolean,
+        action: suspend (WebSocketConnection<PathSpec, T>) -> Unit,
+    ): WebSocketConnection<PathSpec, T> {
+        class ConnectionWrapped(
+            val wrapped: WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>,
+            val handler: WebSocketHandler<PathSpec, T>,
+        ) : WebSocketConnection<PathSpec, T> {
+            @Suppress("UNCHECKED_CAST")
+            override val request: WebSocketConnectRequest<PathSpec>
+                get() = wrapped.currentState.request as WebSocketConnectRequest<PathSpec>
+            override var currentState: T = wrapped.currentState.underlyingData.value(
+                runtime.internalSerialization.kotlinBytesFormat,
                 handler.storageSerializer
             )
+                private set
 
-        override suspend fun queueStateUpdate(modification: (T) -> T) {
-            wrapped.queueStateUpdate { data ->
-                val underlying =
-                    data.underlyingData.value(
-                        wrapped.internalSerialization.kotlinBytesFormat,
-                        handler.storageSerializer
-                    )
-                data.copy(
-                    underlyingData = AnonType(
-                        wrapped.internalSerialization.kotlinBytesFormat,
-                        modification(underlying),
-                        handler.storageSerializer
-                    )
-                )
+            context(server: ServerRuntime)
+            override suspend fun close(reason: WebSocketClose) {
+                // Whatever is disconnecting the physical socket closes it once that finishes.
+                if (physicalSocketClosing) return
+                wrapped.close(reason)
             }
-        }
 
-        override suspend fun updateStateImmediately(modification: (T) -> T): T {
-            wrapped.updateStateImmediately { data ->
-                val underlying =
-                    data.underlyingData.value(
-                        wrapped.internalSerialization.kotlinBytesFormat,
-                        handler.storageSerializer
-                    )
-                data.copy(
-                    underlyingData = AnonType(
-                        wrapped.internalSerialization.kotlinBytesFormat,
-                        modification(underlying).also { currentState = it },
-                        handler.storageSerializer
-                    )
+            context(server: ServerRuntime)
+            override suspend fun send(frame: WebSocketFrame) = wrapped.send(frame)
+
+            context(server: ServerRuntime)
+            override suspend fun repullState(): T =
+                wrapped.repullState().underlyingData.value(
+                    runtime.internalSerialization.kotlinBytesFormat,
+                    handler.storageSerializer
                 )
+
+            context(server: ServerRuntime)
+            override suspend fun queueStateUpdate(modification: (T) -> T) {
+                wrapped.queueStateUpdate { data ->
+                    val underlying =
+                        data.underlyingData.value(
+                            runtime.internalSerialization.kotlinBytesFormat,
+                            handler.storageSerializer
+                        )
+                    data.copy(
+                        underlyingData = AnonType(
+                            runtime.internalSerialization.kotlinBytesFormat,
+                            modification(underlying),
+                            handler.storageSerializer
+                        )
+                    )
+                }
             }
-            return currentState
-        }
 
-        override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) =
-            wrapped.subscribe(topic)
-
-        override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) = wrapped.unsubscribe(topic)
-
-        suspend fun finalize() {
-            if (request.cache.updated) {
+            context(server: ServerRuntime)
+            override suspend fun updateStateImmediately(modification: (T) -> T): T {
                 wrapped.updateStateImmediately { data ->
-                    data.copy(request = request)
+                    val underlying =
+                        data.underlyingData.value(
+                            runtime.internalSerialization.kotlinBytesFormat,
+                            handler.storageSerializer
+                        )
+                    data.copy(
+                        underlyingData = AnonType(
+                            runtime.internalSerialization.kotlinBytesFormat,
+                            modification(underlying).also { currentState = it },
+                            handler.storageSerializer
+                        )
+                    )
+                }
+                return currentState
+            }
+
+            context(server: ServerRuntime)
+            override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) =
+                wrapped.subscribe(topic)
+
+            context(server: ServerRuntime)
+            override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) = wrapped.unsubscribe(topic)
+
+            suspend fun finalize() {
+                if (request.cache.updated) {
+                    wrapped.updateStateImmediately { data ->
+                        data.copy(request = request)
+                    }
                 }
             }
         }
-    }
 
-    private suspend inline fun <T> WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>.withWrapped(
-        handler: WebSocketHandler<PathSpec, T>,
-        action: suspend (ConnectionWrapped<T>) -> Unit,
-    ): WebSocketConnection<PathSpec, T> {
         val wrapped = ConnectionWrapped(this, handler)
         action(wrapped)
         wrapped.finalize()
@@ -101,14 +120,15 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
     }
 
 
+    @OverrideOnly
     context(serverRuntime: ServerRuntime)
     override suspend fun willConnect(
         request: WebSocketConnectRequest<PathSpec0>,
     ): QueryParamWebSocketHandlerData {
         val rawPath =
-            request.headers["x-path"]?.root?.substringBefore('?') ?: request.queryParameters["path"]?.substringBefore(
-                '?'
-            ) ?: "/"
+            request.headers["x-path"]?.root?.substringBefore('?')
+                ?: request.queryParameters["path"]?.substringBefore('?')
+                ?: "/"
         val match = serverRuntime.server.endpoints.match(
             serverRuntime.externalSerialization.stringArrayFormat,
             rawPath
@@ -125,34 +145,21 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
                 } else it
             } + (request.headers["x-path"]?.root?.substringAfter('?')?.let { QueryParameters.parse(it).entries }
                 ?: listOf()))
-            WebSocketConnectRequest<PathSpec>(
-                path = RawWebSocketPath<PathSpec>(PathSegments.parse(rawPath), match),
+            @Suppress("UNCHECKED_CAST")
+            val routed = match as PathSpecMap.Match<WebSocketHandler<PathSpec, *>>
+            // A child socket, as with multiplexing, so its phases are traced and run through the execution
+            // interceptors under its real route instead of under this shim's. The WebSocket chain already
+            // wrapped this shim, so it does not wrap the child again.
+            request.subConnection(
+                // SAFETY: match came from routing, which only pairs a handler with the spec it was registered under
+                path = @OptIn(Unsafe::class) RawWebSocketPath.fromMatch(routed),
+                socketId = Execution.ID.generate(),
                 queryParameters = fixedQueryParameters,
-                headers = request.headers,
-                domain = request.domain,
-                protocol = request.protocol,
-                sourceIp = request.sourceIp,
-                // Same physical socket, only the path is rewritten, so the identity carries over.
-                requestId = request.requestId,
-                parentRequestId = request.parentRequestId,
-                upstreamRequestId = request.upstreamRequestId,
-                cache = request.cache,
             )
         }
-        val otherHandler = match.value
         @Suppress("UNCHECKED_CAST")
-        otherHandler as WebSocketHandler<PathSpec, *>
-        val startData =
-        // TODO: How do we handle metrics here?
-//            Metrics.handlerPerformance(
-//                WebSockets.HandlerContext(
-//                    request.path,
-//                    WebSockets.WsHandlerType.CONNECTING,
-//                    null /*TODO*/
-//                )
-//            ) {
-            otherHandler.willConnectWithMetrics(match.pathSpec, serverRuntime, request)
-//            }
+        val otherHandler = match.value as WebSocketHandler<PathSpec, Any?>
+        val startData = otherHandler.willConnectWithMetrics(request)
 
         @Suppress("UNCHECKED_CAST")
         return QueryParamWebSocketHandlerData(
@@ -165,60 +172,61 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
         )
     }
 
-    context(connection: WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>)
-    override suspend fun didConnect(
-    ) {
-        val innerRequest = connection.currentState.request
-        val match = with(connection) { innerRequest.path.match }
-        val otherHandler = match.value
-            ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${innerRequest.path}'")
+    /**
+     * Resolves the handler the socket was actually opened against, which is stored on the connection
+     * rather than the path because every AWS socket arrives at "/".
+     */
+    context(serverRuntime: ServerRuntime)
+    private fun WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>.inner(): WebSocketHandler<PathSpec, Any?> {
+        val innerRequest = currentState.request
+        val otherHandler = innerRequest.path.tryResolve()?.value
+            ?: throw NotFoundException("No web socket handler found for '${innerRequest.path}'")
         @Suppress("UNCHECKED_CAST")
-        otherHandler as WebSocketHandler<PathSpec, Any?>
-        connection.withWrapped(otherHandler) { otherHandler.didConnectWithMetrics(match.pathSpec, it) }
+        return otherHandler as WebSocketHandler<PathSpec, Any?>
     }
 
-    context(connection: WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>)
-    override suspend fun messageFromClient(
-        frame: WebSocketFrame,
-    ) {
-        val innerRequest = connection.currentState.request
-        val match = with(connection) { innerRequest.path.match }
-        val otherHandler = match.value
-            ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${innerRequest.path}'")
-        @Suppress("UNCHECKED_CAST")
-        otherHandler as WebSocketHandler<PathSpec, Any?>
-        connection.withWrapped(otherHandler) { otherHandler.messageFromClientWithMetrics(match.pathSpec, it, frame) }
-    }
-
-    context(connection: WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>)
-    override suspend fun messageFromSubscription(
-        topic: WebSocketSubscriptionMessage<*, *>,
-    ) {
-        val innerRequest = connection.currentState.request
-        val match = with(connection) { innerRequest.path.match }
-        val otherHandler = match.value
-            ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${innerRequest.path}'")
-        @Suppress("UNCHECKED_CAST")
-        otherHandler as WebSocketHandler<PathSpec, Any?>
-        connection.withWrapped(otherHandler) {
-            otherHandler.messageFromSubscriptionWithMetrics(
-                match.pathSpec,
-                it,
-                topic
-            )
+    @OverrideOnly
+    context(serverRuntime: ServerRuntime)
+    override suspend fun didConnect(connection: WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>) {
+        val otherHandler = connection.inner()
+        connection.withWrapped(otherHandler, physicalSocketClosing = false) {
+            otherHandler.didConnectWithMetrics(it)
         }
     }
 
-    context(connection: WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>)
+    @OverrideOnly
+    context(serverRuntime: ServerRuntime)
+    override suspend fun messageFromClient(
+        connection: WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>,
+        frame: WebSocketFrame,
+    ) {
+        val otherHandler = connection.inner()
+        connection.withWrapped(otherHandler, physicalSocketClosing = false) {
+            otherHandler.messageFromClientWithMetrics(it, frame)
+        }
+    }
+
+    @OverrideOnly
+    context(serverRuntime: ServerRuntime)
+    override suspend fun messageFromSubscription(
+        connection: WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>,
+        topic: WebSocketSubscriptionMessage<*, *>,
+    ) {
+        val otherHandler = connection.inner()
+        connection.withWrapped(otherHandler, physicalSocketClosing = false) {
+            otherHandler.messageFromSubscriptionWithMetrics(it, topic)
+        }
+    }
+
+    @OverrideOnly
+    context(serverRuntime: ServerRuntime)
     override suspend fun disconnect(
+        connection: WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>,
         reason: WebSocketClose,
     ) {
-        val innerRequest = connection.currentState.request
-        val match = with(connection) { innerRequest.path.match }
-        val otherHandler = match.value
-            ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${innerRequest.path}'")
-        @Suppress("UNCHECKED_CAST")
-        otherHandler as WebSocketHandler<PathSpec, Any?>
-        connection.withWrapped(otherHandler) { otherHandler.disconnectWithMetrics(match.pathSpec, it, reason) }
+        val otherHandler = connection.inner()
+        connection.withWrapped(otherHandler, physicalSocketClosing = true) {
+            otherHandler.disconnectAndClose(it, reason)
+        }
     }
 }

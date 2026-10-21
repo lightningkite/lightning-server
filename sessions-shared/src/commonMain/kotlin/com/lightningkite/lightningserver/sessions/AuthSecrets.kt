@@ -1,8 +1,8 @@
 package com.lightningkite.lightningserver.sessions
 
 import com.lightningkite.lightningserver.sessions.proofs.TotpHashAlgorithm
-import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.data.IndexSet
+import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.Serializable
 import kotlin.time.Duration
@@ -10,34 +10,19 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
- * Represents a Time-based One-Time Password (TOTP) secret for multi-factor authentication.
+ * Represents a time-based one-time password (TOTP) secret bound to a subject, as used by authenticator apps.
  *
- * TOTP secrets are used for generating time-based authentication codes (like Google Authenticator).
- * Each secret is bound to a specific subject (user) and can be configured with different algorithms
- * and code generation parameters.
+ * The [secretBase32] must be stored securely and never exposed to clients after initial setup.
  *
- * Security considerations:
- * - The [secretBase32] should be stored securely and never exposed to clients after initial setup
- * - Secrets should be checked for expiration ([expiresAt]) and disabled status ([disabledAt])
- * - Track [lastUsedAt] to detect inactive or potentially compromised secrets
- * - Consider rotating secrets periodically for enhanced security
- *
- * @property _id Unique identifier for this TOTP secret
- * @property subjectType Type identifier for the subject (e.g., "User", "Admin")
- * @property subjectId Unique identifier of the subject (user) this secret belongs to
- * @property label Human-readable label for this authenticator (shown in authenticator apps)
- * @property secretBase32 The Base32-encoded shared secret used to generate TOTP codes. Must be kept confidential.
- * @property issuer The issuer name displayed in authenticator apps (typically your application/company name)
- * @property period Time window duration for code generation (typically 30 seconds)
- * @property digits Number of digits in the generated code (typically 6 or 8)
- * @property algorithm Hash algorithm used for TOTP generation (SHA1, SHA256, or SHA512)
- * @property establishedAt Timestamp when this TOTP secret was first created
- * @property lastUsedAt Timestamp of the last successful authentication using this secret, or null if never used
- * @property expiresAt Optional expiration timestamp after which this secret is no longer valid
- * @property disabledAt Optional timestamp when this secret was disabled, making it unusable even if not expired
+ * @property subjectType The type of the subject, such as `User`.
+ * @property label The label shown in authenticator apps.
+ * @property issuer The issuer name shown in authenticator apps, typically your application's name.
+ * @property period The time window of each code, typically 30 seconds.
+ * @property digits The number of digits in a code, typically 6 or 8.
+ * @property expiresAt When this secret stops being valid, or `null` if it does not expire.
+ * @property disabledAt When this secret was disabled, which makes it unusable even if not expired.
  */
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 @IndexSet(["subjectId", "subjectType", "expiresAt", "disabledAt"])
 public data class TotpSecret(
     override val _id: Uuid = Uuid.random(),
@@ -58,33 +43,14 @@ public data class TotpSecret(
 ) : HasId<Uuid>
 
 /**
- * Represents a hashed password credential for user authentication.
+ * Represents a hashed password bound to a subject.
  *
- * Password secrets store hashed passwords (never plaintext) for user authentication.
- * Each secret is bound to a specific subject (user) and can optionally include a hint
- * to help users remember their password.
- *
- * Security considerations:
- * - The [hash] should be a cryptographically strong hash (e.g., bcrypt, argon2, scrypt)
- * - Never store plaintext passwords - always hash before storing
- * - Password hints ([hint]) should not reveal the password itself
- * - Implement password expiration policies using [expiresAt]
- * - Track [lastUsedAt] to detect inactive accounts or credential stuffing attempts
- * - Enforce strong password policies before hashing
- * - Consider implementing rate limiting on password verification attempts
- *
- * @property _id Unique identifier for this password secret
- * @property subjectType Type identifier for the subject (e.g., "User", "Admin")
- * @property subjectId Unique identifier of the subject (user) this password belongs to
- * @property hash The cryptographically hashed password. Never store plaintext passwords.
- * @property hint Optional hint to help the user remember their password. Should not reveal the password.
- * @property establishedAt Timestamp when this password was first created or last changed
- * @property lastUsedAt Timestamp of the last successful authentication using this password, or null if never used
- * @property expiresAt Optional expiration timestamp after which the password must be changed
- * @property disabledAt Optional timestamp when this password was disabled, preventing its use
+ * @property hash The password hash, never the plaintext.
+ * @property hint A hint to help the user remember the password, which must not reveal it.
+ * @property expiresAt When the password must be changed, or `null` if it does not expire.
+ * @property disabledAt When this password was disabled, which prevents its use.
  */
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 @IndexSet(["subjectId", "subjectType", "expiresAt", "disabledAt"])
 public data class PasswordSecret(
     override val _id: Uuid = Uuid.random(),
@@ -101,34 +67,14 @@ public data class PasswordSecret(
 ) : HasId<Uuid>
 
 /**
- * Represents a trusted device credential for device-based authentication.
+ * Represents a secret stored on a trusted device, which enables "remember this device" logins.
  *
- * Known device secrets enable "remember this device" functionality, where a device can be
- * authenticated based on a secret stored on that device. This is commonly used to reduce
- * friction in multi-factor authentication by trusting devices that have been previously verified.
- *
- * Security considerations:
- * - The [hash] should be a cryptographically strong hash of the device secret
- * - Device secrets should be unique per device and difficult to predict
- * - Implement device expiration using [expiresAt] (e.g., 30-90 days)
- * - Allow users to revoke device trust by setting [disabledAt]
- * - Store [deviceInfo] for user visibility but don't use it for authentication
- * - Consider IP address and user-agent validation in addition to the device secret
- * - Track [lastUsedAt] to detect compromised device credentials
- * - Limit the number of known devices per user
- *
- * @property _id Unique identifier for this device secret
- * @property subjectType Type identifier for the subject (e.g., "User", "Admin")
- * @property subjectId Unique identifier of the subject (user) this device belongs to
- * @property hash The cryptographically hashed device secret. Verified against the device's presented secret.
- * @property deviceInfo Human-readable device information (e.g., "Chrome on Windows", "iPhone 12")
- * @property establishedAt Timestamp when this device was first trusted
- * @property lastUsedAt Timestamp of the last successful authentication from this device, or null if never used
- * @property expiresAt Optional expiration timestamp after which the device must be re-verified
- * @property disabledAt Optional timestamp when trust for this device was revoked
+ * @property hash The hash of the device secret.
+ * @property deviceInfo A description of the device for the user to see, such as `Chrome on Windows`, which is not used for authentication.
+ * @property expiresAt When the device must be re-verified, or `null` if it does not expire.
+ * @property disabledAt When trust for this device was revoked.
  */
-@Serializable
-@GenerateDataClassPaths
+@Queryable
 @IndexSet(["subjectId", "subjectType", "expiresAt", "disabledAt"])
 public data class KnownDeviceSecret(
     override val _id: Uuid = Uuid.random(),
@@ -145,22 +91,9 @@ public data class KnownDeviceSecret(
 ) : HasId<Uuid>
 
 /**
- * Request data for establishing a new password credential.
+ * Holds the password and optional hint a user sets or changes.
  *
- * This class is used when a user wants to set up or change their password.
- * The password should be validated for strength before being hashed and stored
- * as a [PasswordSecret].
- *
- * Security considerations:
- * - Always validate password strength before accepting (minimum length, complexity, etc.)
- * - Hash the password immediately upon receipt using a strong algorithm
- * - Never log or persist the plaintext password
- * - Consider checking against known compromised password databases
- * - Transmit only over encrypted connections (HTTPS)
- * - Validate that the hint doesn't contain the password or obvious derivatives
- *
- * @property password The plaintext password to be hashed and stored. Should be validated for strength.
- * @property hint Optional hint to help the user remember their password. Should not reveal the password.
+ * The password arrives in plaintext, so validate its strength, hash it immediately, and never log it.
  */
 @Serializable
 public data class EstablishPassword(
@@ -169,22 +102,9 @@ public data class EstablishPassword(
 )
 
 /**
- * Request data for establishing a new TOTP (Time-based One-Time Password) authenticator.
+ * Asks the server to generate a new TOTP secret and return it with a QR code for an authenticator app.
  *
- * This class is used when a user wants to set up TOTP-based multi-factor authentication.
- * The server will generate a new secret and return it (along with a QR code) to the client
- * for scanning with an authenticator app.
- *
- * Typical flow:
- * 1. Client sends EstablishTotp request with optional label
- * 2. Server generates a new TOTP secret and returns it with QR code
- * 3. User scans QR code in their authenticator app
- * 4. User provides a test code to verify setup
- * 5. Server activates the TOTP secret
- *
- * @property label Optional human-readable label for this authenticator entry. If not provided,
- *                 a default label may be used (e.g., user's email or username). This label appears
- *                 in the user's authenticator app to distinguish between multiple accounts.
+ * @property label The label shown in the user's authenticator app, with a default used if `null`.
  */
 @Serializable
 public data class EstablishTotp(

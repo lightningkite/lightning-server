@@ -1,9 +1,13 @@
+@file:OptIn(com.lightningkite.lightningserver.EngineApi::class)
+
 package com.lightningkite.lightningserver.engine.awsserverless
 
+import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
-import com.lightningkite.lightningserver.runtime.handle
+import com.lightningkite.lightningserver.runtime.Execution
+import com.lightningkite.lightningserver.runtime.handleRoot
 import com.lightningkite.services.data.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -35,12 +39,13 @@ internal class AwsAdapterHttp(val root: AwsAdapter) {
             domain = event.requestContext.domainName,
             protocol = "https",
             sourceIp = event.requestContext.identity.sourceIp,
-            // API Gateway mints this itself, so it is authoritative without any trusted-header
-            // configuration, and it matches the ID in the gateway's own access logs.
-            requestId = event.requestContext.requestId,
             upstreamRequestId = headers[HttpHeader.XRequestId]?.root,
+            // API Gateway's ID is not a UUID, so it is kept as the join key to the gateway's own
+            // access logs rather than adopted as ours.
+            engineRequestId = event.requestContext.requestId,
         )
-        val result = root.handle(request)
+        // API Gateway's ID is not a UUID, so we always mint our own execution id.
+        val result = with(root) { root.handleRoot(request, Execution.ID.generate()) }
         return result.toAws()
     }
 }

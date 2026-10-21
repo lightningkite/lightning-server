@@ -399,7 +399,7 @@ services, and exits cleanly.  No explicit shutdown code is needed in `main()`.
 
 - **[Deploying to EC2](deploy-ec2.md)** — automated Terraform-managed EC2 with
   Auto Scaling and an Application Load Balancer.
-- **[Deploying to AWS Lambda](aws-deployment.md)** — the serverless path with
+- **[Deploying to AWS Lambda](../guide/aws-deployment.md)** — the serverless path with
   `TerraformAwsServerlessBuilder`.
-- **[Running Your Server](running.md)** — deeper coverage of engine selection
+- **[Running Your Server](../guide/running.md)** — deeper coverage of engine selection
   and settings loading.

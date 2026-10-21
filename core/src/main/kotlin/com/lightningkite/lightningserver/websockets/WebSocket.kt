@@ -4,10 +4,12 @@ import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.QueryParameters
-import com.lightningkite.lightningserver.http.generateRequestId
 import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.runtime.Engine
+import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.location
+import com.lightningkite.services.data.Unsafe
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 
@@ -39,12 +41,22 @@ public class WebSocketTopic<PATH : PathSpec, T> internal constructor(
  * @property topic The topic to subscribe to
  * @property rawPathArguments The path parameter values for this subscription
  */
-public data class WebSocketSubscriptionRequest<PATH : PathSpec, T>(
+@ConsistentCopyVisibility
+public data class WebSocketSubscriptionRequest<PATH : PathSpec, T> private constructor(
     val topic: WebSocketTopic<PATH, T>,
     val rawPathArguments: List<Any?>,
 ) : HasContextualPath<PATH> {
-    context(server: ServerRuntime)
-    override val pathInContext: ResolvedPath<PATH> get() = ResolvedPath(topic.location, rawPathArguments)
+    @OptIn(Unsafe::class)
+    context(server: Engine)
+    override val pathInContext: ResolvedPath<PATH> get() = ResolvedPath.fromRawPathArguments(topic.location, rawPathArguments)
+
+    public companion object {
+        @Unsafe("Arguments must match the types expected by the topic's PathSpec")
+        public fun <PATH : PathSpec, T> fromRawPathArguments(
+            topic: WebSocketTopic<PATH, T>,
+            rawPathArguments: List<Any?>,
+        ): WebSocketSubscriptionRequest<PATH, T> = WebSocketSubscriptionRequest(topic, rawPathArguments)
+    }
 }
 
 /**
@@ -59,14 +71,38 @@ public data class WebSocketSubscriptionRequest<PATH : PathSpec, T>(
  * @property rawPathArguments The path parameters identifying which subscriptions to notify
  * @property value The actual message payload
  */
-public data class WebSocketSubscriptionMessage<PATH : PathSpec, T>(
+@ConsistentCopyVisibility
+public data class WebSocketSubscriptionMessage<PATH : PathSpec, T> private constructor(
     val topic: WebSocketTopic<PATH, T>,
     val rawPathArguments: List<Any?>,
     val value: T,
 ) : HasContextualPath<PATH> {
-    context(server: ServerRuntime)
-    override val pathInContext: ResolvedPath<PATH> get() = ResolvedPath(topic.location, rawPathArguments)
+    @OptIn(Unsafe::class)
+    context(server: Engine)
+    override val pathInContext: ResolvedPath<PATH> get() = ResolvedPath.fromRawPathArguments(topic.location, rawPathArguments)
+
+    public companion object {
+        @Unsafe("Arguments must match the types expected by the topic's PathSpec")
+        public fun <PATH : PathSpec, T> fromRawPathArguments(
+            topic: WebSocketTopic<PATH, T>,
+            rawPathArguments: List<Any?>,
+            value: T,
+        ): WebSocketSubscriptionMessage<PATH, T> = WebSocketSubscriptionMessage(topic, rawPathArguments, value)
+    }
 }
+
+// Topics never leave the server, so their paths are keyed in the internal format, not the external one
+// [HasContextualPath.path] uses.
+
+/** The key this subscription's topic is published and subscribed under. */
+context(server: Engine)
+public fun WebSocketSubscriptionRequest<*, *>.topicPath(): String =
+    pathInContext.path(server.internalSerialization.stringArrayFormat)
+
+/** The key this message's topic is published and subscribed under. */
+context(server: Engine)
+public fun WebSocketSubscriptionMessage<*, *>.topicPath(): String =
+    pathInContext.path(server.internalSerialization.stringArrayFormat)
 
 
 /**
@@ -85,32 +121,22 @@ public data class WebSocketConnectRequest<PATH : PathSpec>(
     override val domain: String = "",
     override val protocol: String = "",
     override val sourceIp: String = "",
-    /**
-     * Identifies this connection for the lifetime of the socket. Every message and every push on
-     * this connection correlates back to it, since a long-lived socket is one logical session rather
-     * than one request.
-     */
-    override val requestId: String,
-    override val parentRequestId: String? = null,
     override val upstreamRequestId: String? = null,
-    override val cache: SerializableCache = SerializableCache(),
+    override val cache: SerializableCache<WebSocketConnectRequest<*>> = SerializableCache(),
     /**
      * Engine-specific socket identifier for direct message sending.
      * For AWS API Gateway, this is the connection ID.
      * Used by CoroutineWebSocketHandler to bypass pub/sub for direct sends.
      */
     val engineSocketId: String? = null,
+    /** The identity of the logical socket this request opens, constant across every phase of its lifetime. */
+    val socketId: Execution.ID,
 ) : Request<PATH>() {
-    /**
-     * Derives a logical sub-connection of this one, as multiplexing carries several logical sockets
-     * over a single physical connection.
-     *
-     * The sub-connection gets its own [requestId] with [parentRequestId] pointing back here, so each
-     * logical socket is independently attributable while remaining joinable to the physical
-     * connection carrying it. Use this only for a genuinely distinct logical connection — a shim that
-     * merely rewrites the path of the same socket should keep the existing [requestId].
-     */
-    public fun <PATH2 : PathSpec> subConnection(
+    /** The gateway's identifier for a socket is the socket itself, so there is nothing else to hold. */
+    override val engineRequestId: String? get() = engineSocketId
+
+    /** The same socket at a different path, keeping its [socketId]. */
+    public fun <PATH2 : PathSpec> withPath(
         path: RawWebSocketPath<PATH2>,
         queryParameters: QueryParameters = this.queryParameters,
     ): WebSocketConnectRequest<PATH2> = WebSocketConnectRequest(
@@ -120,19 +146,31 @@ public data class WebSocketConnectRequest<PATH : PathSpec>(
         domain = domain,
         protocol = protocol,
         sourceIp = sourceIp,
-        requestId = generateRequestId(),
-        parentRequestId = requestId,
         upstreamRequestId = upstreamRequestId,
         cache = cache,
         engineSocketId = engineSocketId,
+        socketId = socketId,
     )
+
+    /**
+     * Derives a logical sub-connection of this one, as multiplexing carries several logical sockets
+     * over a single physical connection.
+     *
+     * Use this only for a genuinely distinct logical socket, which needs its own [socketId]. A shim that
+     * merely re-targets the same socket is not opening one, and should use [withPath] instead.
+     */
+    public fun <PATH2 : PathSpec> subConnection(
+        path: RawWebSocketPath<PATH2>,
+        socketId: Execution.ID,
+        queryParameters: QueryParameters = this.queryParameters,
+    ): WebSocketConnectRequest<PATH2> = withPath(path, queryParameters).copy(socketId = socketId)
 }
 
 /**
  * Represents an active WebSocket connection with stateful lifecycle management.
  *
- * This interface extends [ServerRuntime] to provide access to server services and adds
- * WebSocket-specific functionality for managing connection state, subscriptions, and messaging.
+ * This is the socket alone: connection state, subscriptions, and messaging. The server it runs on is
+ * a separate concern, supplied to every [WebSocketHandler] method as a [ServerRuntime] context.
  *
  * **State Management:**
  * Each connection maintains a STORAGE object that can be updated in two ways:
@@ -149,9 +187,12 @@ public data class WebSocketConnectRequest<PATH : PathSpec>(
  * @param PATH The PathSpec type for this WebSocket endpoint
  * @param STORAGE The type of state object maintained for this connection
  */
-public interface WebSocketConnection<PATH : PathSpec, STORAGE> : ServerRuntime {
+public interface WebSocketConnection<PATH : PathSpec, STORAGE> {
     /** The original connection request */
     public val request: WebSocketConnectRequest<PATH>
+
+    /** The identity of this logical socket, constant across every phase of its lifetime. */
+    public val socketId: Execution.ID get() = request.socketId
 
     /** The current state for this connection */
     public val currentState: STORAGE
@@ -160,6 +201,7 @@ public interface WebSocketConnection<PATH : PathSpec, STORAGE> : ServerRuntime {
      * Reloads the state from persistent storage.
      * Useful if the state might have been modified externally.
      */
+    context(server: ServerRuntime)
     public suspend fun repullState(): STORAGE
 
     /**
@@ -167,6 +209,7 @@ public interface WebSocketConnection<PATH : PathSpec, STORAGE> : ServerRuntime {
      *
      * Use this for high-frequency updates where immediate consistency isn't required.
      */
+    context(server: ServerRuntime)
     public suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE)
 
     /**
@@ -175,26 +218,34 @@ public interface WebSocketConnection<PATH : PathSpec, STORAGE> : ServerRuntime {
      * This operation is atomic - the modification function is applied to the current
      * state and the result becomes the new state.
      */
+    context(server: ServerRuntime)
     public suspend fun updateStateImmediately(modification: (STORAGE) -> STORAGE): STORAGE
 
     /**
      * Subscribes this connection to a topic to receive future messages.
      */
+    context(server: ServerRuntime)
     public suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>)
 
     /**
      * Unsubscribes this connection from a topic.
      */
+    context(server: ServerRuntime)
     public suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>)
 
     /**
      * Sends a frame to the connected client.
      */
+    context(server: ServerRuntime)
     public suspend fun send(frame: WebSocketFrame)
 
     /**
-     * Closes the WebSocket connection with a reason code.
+     * Tears down the underlying transport with a reason code, and nothing else.
+     *
+     * This does not run [WebSocketHandler.disconnect]; the disconnect phase calls this itself once the
+     * handler has finished, so an implementation that ran the handler again would recurse.
      */
+    context(server: ServerRuntime)
     public suspend fun close(reason: WebSocketClose)
 }
 
@@ -210,16 +261,13 @@ public interface WebSocketConnection<PATH : PathSpec, STORAGE> : ServerRuntime {
  * 3. No way to query current subscriptions for a connection. Adding a `val subscriptions: Set<WebSocketSubscriptionRequest<*, *>>`
  *    would be useful for debugging and state inspection.
  *
- * 4. WebSocketConnection extends ServerRuntime which means every connection has its own runtime context.
- *    Document how this relates to the parent server runtime and if there are any scoping implications.
- *
- * 5. The subscribe/unsubscribe operations don't return success/failure. If a topic doesn't exist or
+ * 4. The subscribe/unsubscribe operations don't return success/failure. If a topic doesn't exist or
  *    subscription fails, how does the caller know? Consider returning Boolean or throwing exceptions.
  *
- * 6. No ping/pong support exposed in the API. WebSocket implementations typically need this for
+ * 5. No ping/pong support exposed in the API. WebSocket implementations typically need this for
  *    connection keepalive. Consider adding automatic ping or exposing manual ping control.
  *
- * 7. The currentState property could be stale if queueStateUpdate is used. Document the
+ * 6. The currentState property could be stale if queueStateUpdate is used. Document the
  *    consistency model (eventual consistency? last-write-wins?).
  */
 

@@ -1,6 +1,13 @@
 package com.lightningkite.lightningserver.websockets
 
+import com.lightningkite.lightningserver.EngineApi
 import com.lightningkite.lightningserver.NotFoundException
+import com.lightningkite.lightningserver.pathing.PathSpec0
+import com.lightningkite.lightningserver.runtime.Execution
+import com.lightningkite.lightningserver.runtime.ExecutionInterceptor
+import com.lightningkite.lightningserver.runtime.Invocation
+import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.disconnectAndCloseAsRoot
 import com.lightningkite.lightningserver.data.set
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.HttpHeaders
@@ -51,7 +58,7 @@ class QueryParamWebSocketHandlerTest {
 
         val qp = path.path("qp") bind QueryParamWebSocketHandler()
 
-        object CacheKey : com.lightningkite.lightningserver.data.SerializableCache.Key<String> {
+        object CacheKey : com.lightningkite.lightningserver.data.SerializableCache.Key<com.lightningkite.lightningserver.data.Request<*>, String> {
             override val id: String = "qp-test-cache"
             override val serializer = String.serializer()
         }
@@ -128,6 +135,67 @@ class QueryParamWebSocketHandlerTest {
             val value = with(ws.server) { outer.request.cache[TestServer.CacheKey] }
             assertEquals("yes", value)
             ws.close()
+        }
+    }
+
+    // The inner socket used to reuse the outer socket's id, so its Connect execution duplicated the
+    // outer one's id, and its close closed the physical socket a second time.
+    @OptIn(EngineApi::class)
+    @Test
+    fun inner_handler_runs_as_a_child_socket_under_its_own_route(): Unit = runBlocking {
+        val executions = ArrayList<Execution>()
+        val server = object : ServerBuilder() {
+            init {
+                install(object : ExecutionInterceptor {
+                    context(runtime: ServerRuntime)
+                    override suspend fun <T> intercept(invocation: Invocation, cont: suspend context(ServerRuntime) () -> T): T {
+                        executions.add(runtime.execution)
+                        return cont()
+                    }
+                })
+            }
+
+            val inner = path.path("inner") bind WebSocketHandler<PathSpec0, Unit>(
+                willConnect = {},
+                messageFromClient = { send(it) },
+            )
+            val qp = path.path("qp") bind QueryParamWebSocketHandler()
+        }
+        server.test(settings = { }) {
+            val ws = server.qp.test(queryParameters = QueryParameters(listOf("path" to "/inner")))
+            ws.send(WebSocketFrame.Text("ping"))
+
+            var closes = 0
+            val physical = object : WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData> by ws.server {
+                context(server: ServerRuntime)
+                override suspend fun close(reason: WebSocketClose) {
+                    closes++
+                    ws.server.close(reason)
+                }
+            }
+            server.qp.disconnectAndCloseAsRoot(physical, WebSocketClose.NORMAL)
+            assertEquals(1, closes)
+        }
+
+        val sockets = executions.map { it as Execution.WebSocket }
+        assertEquals(sockets.map { it.id }.distinct(), sockets.map { it.id })
+
+        val inner = sockets.filter { it.path.toString() == "/inner" }
+        assertEquals(
+            listOf(
+                Execution.WebSocket.Phase.Connect,
+                Execution.WebSocket.Phase.Connected,
+                Execution.WebSocket.Phase.ClientMessage,
+                Execution.WebSocket.Phase.Disconnect,
+            ),
+            inner.map { it.phase },
+        )
+        val byId = sockets.associateBy { it.id }
+        for (child in inner) {
+            val parent = byId.getValue(child.parent!!)
+            assertEquals("/qp", parent.path.toString())
+            assertEquals(child.phase, parent.phase)
+            assertNotEquals(parent.socketId, child.socketId)
         }
     }
 }

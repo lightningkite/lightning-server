@@ -5,7 +5,7 @@ import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.http.post
-import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.engine
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
@@ -85,15 +85,15 @@ class UploadEarlyEndpointTest {
             val file = files().root.then("test.txt")
             file.put(TypedData.text("Hello world!", MediaType.Text.Plain))
             println(file.signedUrl)
-            val serialized = contextOf<ServerRuntime>().externalSerialization.stringArrayFormat.encodeToString(
+            val serialized = engine.externalSerialization.stringArrayFormat.encodeToString(
                 uploadEarly.serializer(),
                 file.serverFile
             )
             println(serialized)
             files().parseExternalUrl(serialized)!!
             run {
-                val match = contextOf<ServerRuntime>().server.endpoints.match(
-                    contextOf<ServerRuntime>().externalSerialization.stringArrayFormat,
+                val match = engine.server.endpoints.match(
+                    engine.externalSerialization.stringArrayFormat,
                     serialized.substringBefore('?').substringAfter("://").substringAfter("/")
                 ) { it.http[HttpMethod.GET] } ?: throw Exception(
                     "Endpoint for '${
@@ -119,8 +119,8 @@ class UploadEarlyEndpointTest {
             val prepare = Server.uploadEarly.endpoint.test(null, Unit)
 
             run {
-                val match = contextOf<ServerRuntime>().server.endpoints.match(
-                    contextOf<ServerRuntime>().externalSerialization.stringArrayFormat,
+                val match = engine.server.endpoints.match(
+                    engine.externalSerialization.stringArrayFormat,
                     prepare.uploadUrl.substringBefore('?').substringAfter("://").substringAfter("/")
                 ) { it.http[HttpMethod.PUT] }!!
                 Server.served.upload.test(
@@ -143,8 +143,8 @@ class UploadEarlyEndpointTest {
                 .let { Json.decodeFromString<ServerFile>(it) }
 
             run {
-                val match = contextOf<ServerRuntime>().server.endpoints.match(
-                    contextOf<ServerRuntime>().externalSerialization.stringArrayFormat,
+                val match = engine.server.endpoints.match(
+                    engine.externalSerialization.stringArrayFormat,
                     clientSideServerFile.location.substringBefore('?').substringAfter("://").substringAfter("/")
                 ) { it.http[HttpMethod.GET] }!!
                 Server.served.fetch.test(

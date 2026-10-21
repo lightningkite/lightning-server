@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.http
 
+import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 
 /**
@@ -25,7 +26,7 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
  */
 public class SecurityHeadersInterceptor(
     private val hstsMaxAgeSeconds: Long = DEFAULT_HSTS_MAX_AGE_SECONDS,
-) : HttpConnectionInterceptor {
+) : HttpInterceptor {
     override val name: String = "SecurityHeaders"
 
     public companion object {
@@ -40,9 +41,9 @@ public class SecurityHeadersInterceptor(
     }
 
     context(runtime: ServerRuntime)
-    override suspend fun intercept(
-        request: HttpRequest<*>,
-        cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
+    override suspend fun <PATH : PathSpec> intercept(
+        request: HttpRequest<PATH>,
+        cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
     ): HttpResponse {
         val response = cont(request)
         val secure = request.protocol.equals("https", ignoreCase = true)

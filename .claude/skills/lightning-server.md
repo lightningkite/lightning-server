@@ -89,9 +89,8 @@ val createPost = path.path("posts").post bind ApiHttpHandler(
 For standard CRUD operations, use the pre-built `ModelRestEndpoints` rather than manually creating database endpoints:
 
 ```kotlin
-// Define your model with @GenerateDataClassPaths
-@Serializable
-@GenerateDataClassPaths
+// Define your model with @Queryable
+@Queryable
 data class Post(
     override val _id: Uuid = Uuid.random(),
     val title: String,
@@ -274,7 +273,7 @@ val auth = path.path("auth") module object: AuthEndpoints<User, Uuid>(
 ### 6. File Handling
 
 ```kotlin
-val files = setting("files", PublicFileSystem.Settings())
+val files = setting("files", ExternalFileSystem.Settings())
 
 // Upload (early binding)
 val uploadEarly = path.path("upload") module
@@ -369,34 +368,23 @@ suspend fun getExpensiveData(id: String): Data {
 
 ### 10. Testing
 
-**⚠️ CRITICAL: Use Modern Server.test() Pattern**
+**⚠️ CRITICAL: Use the Server.testBlocking() Pattern**
 
-When writing tests, use the `Server.test()` extension function which handles server building and settings configuration
-automatically:
+When writing tests, use the `Server.testBlocking()` extension function, which builds the server on a `TestRunner`,
+configures settings, and runs a suspending test body:
 
 ```kotlin
-// TestHelper.kt - shared across all test files
-object TestHelper {
-    init {
-        JsonFileDatabase  // Ensure mock implementations are loaded
-    }
-
-    inline fun testServer(action: context(TestRunner<Server>) Server.() -> Unit) {
-        Server.test(settings = { database set Database.Settings("ram") }, action)
-    }
-}
-
-// In your test file
 class ServerTest {
     @Test
-    fun testEndpoint() = runBlocking {
-        TestHelper.testServer {
-            val response = Server.someEndpoint.test()
-            assertEquals("expected", response.body!!.text())
-        }
+    fun testEndpoint() = Server.testBlocking(settings = { database set Database.Settings("ram") }) {
+        val response = Server.someEndpoint.test()
+        assertEquals("expected", response.body!!.text())
     }
 }
 ```
+
+The `TestRunner` is an `Engine`, not a `ServerRuntime`. Handler `.test()` helpers need nothing more, but anything the
+test does itself that needs a runtime (database access, launching tasks) goes inside `execute { }`.
 
 **Test Method Signatures**
 
@@ -422,7 +410,7 @@ For `ApiHttpHandler` endpoints:
 ```kotlin
 // Create test authentication using PrincipalType.testAuth()
 val user = User(email = "test@example.com", ...)
-userInfo.table().insertOne(user)
+execute { userInfo.table().insertOne(user) }
 val auth = UserAuth.testAuth(user)
 
 // No path args - authenticated
@@ -559,7 +547,7 @@ Projects typically have paired modules:
 
 Lightning Server supports multiple engines:
 
-- `engine-local` - For unit testing
+- `engine-local` - Base engine for single-process deployments (unit tests use `TestRunner` from `core`)
 - `engine-ktor` - Ktor HTTP server (dev/prod)
 - `engine-netty` - Netty HTTP server
 - `engine-jdk-server` - Pure JDK HTTP server
@@ -567,16 +555,18 @@ Lightning Server supports multiple engines:
 
 ### AWS Deployment
 
-The AWS engine auto-generates Terraform:
+The Lambda handler is a subclass of `AwsAdapter`, and a `TerraformAwsServerlessBuilder` subclass generates the
+Terraform and deploys it:
 
 ```kotlin
-fun main() {
-    val built = Server.build()
-    AwsHandler(built).apply {
-        settings.loadFromFile(KFile("settings.json"))
-        // Generates terraform/ directory
-    }
+class AwsHandler : AwsAdapter(Server)
+
+object ProductionDeploy : TerraformAwsServerlessDomainBuilder<Server>(Server) {
+    override val handler = AwsHandler::class
+    // ... region, domain, storage bucket, and Server.settings() choosing infrastructure
 }
+
+fun main() = ProductionDeploy.deploy()  // writes .tf.json, then terraform init and apply
 ```
 
 ### Settings Management
@@ -599,21 +589,21 @@ First run generates `settings.json`:
 1. **Use ModelRestEndpoints for CRUD** - Don't manually create database CRUD endpoints; use ModelRestEndpoints
 2. **Settings File Works Out-of-Box** - Generated settings should allow immediate running
 3. **Use Service Abstractions** - Don't depend on specific implementations
-4. **Test with Mocks** - Use JsonFileDatabase, RAM cache for tests
+4. **Test with Mocks** - Use the in-memory `ram` database and cache for tests
 5. **Store Endpoint References** - Keep constants for all endpoints
 6. **Group Endpoints Logically** - Use ServerBuilder objects
-7. **Type Safety** - Use @GenerateDataClassPaths on all database models
+7. **Type Safety** - Use @Queryable on all database models
 8. **Document Typed Endpoints** - Add summaries and descriptions
 
 ## Anti-Patterns
 
 ❌ **Don't manually create CRUD endpoints** - Use ModelRestEndpoints instead
 ❌ **Don't create multiple UploadEarlyEndpoint instances** - Causes ServerFile serialization conflicts
-❌ **Don't use deprecated TestRunner pattern** - Use modern `Server.test(settings = {...}) { ... }` approach
+❌ **Don't construct a TestRunner by hand** - Use `Server.testBlocking(settings = {...}) { ... }`
 ❌ Don't access database implementations directly
 ❌ Don't hardcode configuration
 ❌ Don't skip endpoint reference storage
-❌ Don't forget @GenerateDataClassPaths
+❌ Don't forget @Queryable
 ❌ Don't use plain HttpHandler for APIs (use `bind ApiHttpHandler(...)` for typed endpoints)
 ❌ Don't test against real services
 ❌ Don't write manual list/get/create/update/delete endpoints when ModelRestEndpoints can do it

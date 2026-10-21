@@ -6,12 +6,10 @@ import kotlin.time.Instant
 
 
 /**
- * Completes a multi-step authentication proof by providing the final password/PIN.
- * Used when a proof method (like email or SMS) delivers a temporary code that must be submitted.
+ * Completes a proof whose method delivered a temporary code, such as email or SMS.
  *
- * @property key The unique identifier for this proof attempt, typically returned when initiating the proof.
- * @property password The verification code or password received via the proof method (e.g., PIN from email/SMS).
- *           **Security Note**: This field contains sensitive authentication data and should be transmitted over secure channels only.
+ * @property key The identifier of the proof attempt, returned when it was begun.
+ * @property password The code received, which is sensitive and must only be sent over secure channels.
  */
 @Serializable
 public data class FinishProof(
@@ -20,14 +18,12 @@ public data class FinishProof(
 )
 
 /**
- * Combines user identification with a password for authentication.
- * Used for traditional username/password login flows.
+ * Holds the identification and password of a username and password login.
  *
- * @property type The type of identification being used (e.g., "User", "Account").
- * @property property The specific property being used to identify the user (e.g., "email", "username", "phoneNumber").
- * @property value The actual identification value (e.g., "user@example.com", "john_doe").
- * @property password The user's password for authentication.
- *           **Security Note**: This field contains sensitive credentials and must be transmitted over HTTPS only.
+ * @property type The type of entity being identified, such as `User`.
+ * @property property The property that identifies the user, such as `email` or `username`.
+ * @property value The identifying value, such as `user@example.com`.
+ * @property password The user's password, which must only be sent over HTTPS.
  */
 @Serializable
 public data class IdentificationAndPassword(
@@ -39,14 +35,11 @@ public data class IdentificationAndPassword(
 
 
 /**
- * Identifies a user or entity without providing authentication credentials.
- * Used to specify which user is attempting to authenticate before proof methods are selected.
+ * Identifies who is attempting to authenticate, before any proof method is chosen.
  *
- * @property type The type of entity being identified (e.g., "User", "Account", "Session").
- * @property property The specific property being used to identify the entity (e.g., "email", "username", "id").
- *           Null when only the type is needed for identification.
- * @property value The actual identification value (e.g., "user@example.com", "12345").
- *           Null when only the type and property are needed.
+ * @property type The type of entity being identified, such as `User`.
+ * @property property The property that identifies the entity, such as `email`, or `null` if only the type is needed.
+ * @property value The identifying value, or `null` if only the type and property are needed.
  */
 @Serializable
 public data class Identification(
@@ -56,14 +49,11 @@ public data class Identification(
 )
 
 /**
- * Describes an available authentication proof method and its security characteristics.
- * Used to communicate which authentication methods are available to the user.
+ * Describes an available proof method and its strength.
  *
- * @property via The mechanism used for proof delivery (e.g., "email", "sms", "password", "oauth", "device").
- * @property property The specific property associated with this proof method (e.g., "email", "phoneNumber").
- *           Null for methods that don't require a specific property (e.g., "password").
- * @property strength The security strength of this proof method. Higher values indicate stronger authentication.
- *           Default is 1. Multi-factor authentication may require combining methods to reach a minimum strength threshold.
+ * @property via The mechanism of the proof, such as `email`, `sms`, `password`, `oauth` or `device`.
+ * @property property The property the proof verifies, such as `email`, or `null` if it verifies none, as with a password.
+ * @property strength How strong the proof is, with proofs combined to reach a required total. The default is 1.
  */
 @Serializable
 public data class ProofMethodInfo(
@@ -73,12 +63,9 @@ public data class ProofMethodInfo(
 )
 
 /**
- * Represents a specific authentication option available to a user, combining the proof method with the target value.
- * Part of presenting authentication choices to the user during login.
+ * Represents a proof method together with where its proof will be sent, as one of the choices presented during login.
  *
- * @property method The authentication method information including delivery mechanism and strength.
- * @property value The specific value where the proof will be sent (e.g., "user@example.com", "+1234567890").
- *           Null if the value should not be disclosed to the user (e.g., for privacy reasons) or not applicable.
+ * @property value Where the proof will be sent, such as `user@example.com`, or `null` if it is not applicable or must not be disclosed.
  */
 @Serializable
 public data class ProofOption(
@@ -87,13 +74,10 @@ public data class ProofOption(
 )
 
 /**
- * Defines the authentication requirements and available proof options for accessing a resource or completing an action.
- * Used in multi-factor authentication scenarios where users must provide sufficient proof strength.
+ * Describes the proof options available to a user and the total strength they must reach.
  *
- * @property options The list of available authentication methods the user can choose from.
- *           Multiple proofs may need to be combined to meet the strength requirement.
- * @property strengthRequired The minimum total strength value required for successful authentication.
- *           The sum of all proof strengths provided must meet or exceed this value.
+ * @property options The proof methods the user can choose from, which may need to be combined.
+ * @property strengthRequired The minimum sum of the strengths of the proofs provided.
  */
 @Serializable
 public data class AuthRequirements(
@@ -102,18 +86,14 @@ public data class AuthRequirements(
 )
 
 /**
- * Represents a completed authentication proof with cryptographic verification.
- * This is the server-generated evidence that authentication was successfully completed.
+ * Represents a server-issued proof that a property was verified.
  *
- * @property via The mechanism used for this proof (e.g., "email", "sms", "password", "oauth").
- * @property strength The security strength value of this proof method.
- * @property property The property that was verified (e.g., "email", "phoneNumber", "password").
- * @property value The actual value that was verified (e.g., "user@example.com").
- * @property at The timestamp when this proof was completed.
- * @property expiresAt The timestamp when this proof is no longer valid.
- *           Nullable for now for backwards compatibility with mobile apps
- * @property signature A cryptographic signature that validates this proof's authenticity.
- *           **Security Note**: This prevents tampering and ensures the proof was issued by the server.
+ * @property via The mechanism of the proof, such as `email`, `sms`, `password` or `oauth`.
+ * @property property The property that was verified, such as `email`.
+ * @property value The value that was verified, such as `user@example.com`.
+ * @property at When the proof was completed.
+ * @property expiresAt When the proof stops being valid, which is nullable for backwards compatibility with mobile apps.
+ * @property signature The signature that shows the proof was issued by the server and not tampered with.
  */
 @Serializable
 public data class Proof(
@@ -127,12 +107,10 @@ public data class Proof(
 )
 
 /**
- * Configuration for "remember this device" functionality in authentication flows.
- * Allows reduced authentication requirements for known/trusted devices.
+ * Configures "remember this device", which reduces the authentication required on a known device.
  *
- * @property duration How long the device should be considered "known" before requiring full re-authentication.
- * @property strength The authentication strength value granted by device recognition.
- *           This strength can reduce the total proof strength needed on subsequent logins.
+ * @property duration How long a device stays known before full re-authentication is required.
+ * @property strength The proof strength granted by recognizing the device.
  */
 @Serializable
 public data class KnownDeviceOptions(
@@ -141,13 +119,10 @@ public data class KnownDeviceOptions(
 )
 
 /**
- * Contains the device recognition credentials issued to a trusted device.
- * Stored client-side to enable reduced authentication requirements on return visits.
+ * Holds the secret issued to a trusted device, which the client stores to reduce the authentication required on return visits.
  *
- * @property secret A cryptographic secret that identifies this specific device to the server.
- *           **Security Note**: This value must be kept secure on the client device. If compromised,
- *           an attacker could impersonate this device and bypass authentication requirements.
- * @property expiresAt The timestamp when this device secret expires and full authentication is required again.
+ * @property secret The secret identifying the device, which must be kept secure since anyone holding it can impersonate the device.
+ * @property expiresAt When the secret expires and full authentication is required again.
  */
 @Serializable
 public data class KnownDeviceSecretAndExpiration(

@@ -282,6 +282,6 @@ class RateLimitTest {
   preflight requests are not counted against the caller's budget.
 - **Authentication** — key the limiter by user ID instead of IP for authenticated endpoints;
   this prevents IP sharing (NAT, corporate proxies) from causing false positives.
-- **Bulk requests** — the `/meta/bulk` endpoint fans out to multiple sub-handlers.  Each
-  sub-request is metered by the inner handler, not by the bulk wrapper, so the budget
-  cost is proportional to actual work done.
+- **Bulk requests** — the `/meta/bulk` endpoint fans out to multiple sub-handlers.  The
+  limiter sees only the outer request, so the whole bulk call is charged once for its
+  wall-clock duration.

@@ -1,7 +1,5 @@
 # Serialization
 
-Last updated October 29, 2025 (`version-5`)
-
 Lightning Server provides a comprehensive serialization system for handling multiple data formats in HTTP requests and
 responses. The serialization package enables automatic encoding/decoding of data using KotlinX Serialization with
 support for JSON, form data, and binary formats.
@@ -23,7 +21,7 @@ The framework automatically registers basic media type coders during server setu
 ```kotlin
 object Server : ServerBuilder() {
     init {
-        // Basic coders are registered automatically
+        // Registers the JSON, form data, and Kotlin bytes coders. Nothing is registered unless you call this.
         registerBasicMediaTypeCoders()
     }
 }
@@ -122,10 +120,9 @@ Lightning Server provides a convenient extension for parsing query parameters:
 data class PageParams(val page: Int = 1, val size: Int = 20)
 
 val endpoint = path.path("users").get bind HttpHandler { request ->
-    with(serverRuntime) {
-        val params = request.queryParameters(PageParams.serializer())
-        // Use params.page and params.size
-    }
+    val params = request.queryParameters(PageParams.serializer())
+    // Use params.page and params.size
+    HttpResponse.plainText("Page ${params.page}")
 }
 ```
 
@@ -236,6 +233,25 @@ val myModule = SerializersModule {
 
 val serialization = Serialization(myModule)
 // All formats now use myModule
+```
+
+### Observing Encoded Values
+
+An `EncodingInterceptor` sees every value the server encodes, with its serializer, just before it is encoded: HTTP
+responses from any handler, WebSocket frames, and error bodies. It must not alter the value, but may throw to stop the
+send. The audit module's disclosure log uses this to record which audited records reached a client.
+
+```kotlin
+object Server : ServerBuilder() {
+    init {
+        install(object : EncodingInterceptor {
+            context(runtime: ServerRuntime)
+            override suspend fun <T> beforeEncode(serializer: SerializationStrategy<T>, value: T) {
+                runtime.logger.debug { "Encoding ${serializer.descriptor.serialName}" }
+            }
+        })
+    }
+}
 ```
 
 ## Best Practices

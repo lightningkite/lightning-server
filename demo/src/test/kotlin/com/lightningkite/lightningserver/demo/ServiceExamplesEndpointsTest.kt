@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.demo
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.demo.endpoints.ServiceExamplesEndpoints
 import com.lightningkite.lightningserver.runtime.test.TestRunner
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.testBlocking
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.typed.test
@@ -44,7 +45,7 @@ class ServiceExamplesEndpointsTest {
 
     @Test
     fun sendEmailUsesTheConfiguredEmailService() = serviceTest {
-        val user = Server.userInfo.table().insertOne(User(email = "caller@example.com"))!!
+        val user = execute { Server.userInfo.table().insertOne(User(email = "caller@example.com"))!! }
         val auth = Authentication(Server.UserAuth, id = user._id, sessionId = null)
 
         ServiceExamplesEndpoints.sendEmail.test(auth, "recipient@example.com".toEmailAddress())
@@ -55,7 +56,7 @@ class ServiceExamplesEndpointsTest {
 
     @Test
     fun sendSmsUsesTheConfiguredSmsService() = serviceTest {
-        val user = Server.userInfo.table().insertOne(User(email = "caller@example.com"))!!
+        val user = execute { Server.userInfo.table().insertOne(User(email = "caller@example.com"))!! }
         val auth = Authentication(Server.UserAuth, id = user._id, sessionId = null)
 
         ServiceExamplesEndpoints.sendSms.test(auth, "+15555550123".toPhoneNumber())
@@ -66,7 +67,7 @@ class ServiceExamplesEndpointsTest {
 
     @Test
     fun placeCallStartsSpeaksAndHangsUp() = serviceTest {
-        val user = Server.userInfo.table().insertOne(User(email = "caller@example.com"))!!
+        val user = execute { Server.userInfo.table().insertOne(User(email = "caller@example.com"))!! }
         val auth = Authentication(Server.UserAuth, id = user._id, sessionId = null)
 
         ServiceExamplesEndpoints.placeCall.test(auth, "+15555550123".toPhoneNumber())
@@ -80,7 +81,7 @@ class ServiceExamplesEndpointsTest {
 
     @Test
     fun pushNotificationSendsToTheGivenToken() = serviceTest {
-        val user = Server.userInfo.table().insertOne(User(email = "caller@example.com"))!!
+        val user = execute { Server.userInfo.table().insertOne(User(email = "caller@example.com"))!! }
         val auth = Authentication(Server.UserAuth, id = user._id, sessionId = null)
 
         ServiceExamplesEndpoints.pushNotification.test(auth, "device-token-123")
@@ -91,7 +92,7 @@ class ServiceExamplesEndpointsTest {
 
     @Test
     fun readSecretReturnsTheConfiguredValue() = serviceTest {
-        val user = Server.userInfo.table().insertOne(User(email = "caller@example.com"))!!
+        val user = execute { Server.userInfo.table().insertOne(User(email = "caller@example.com"))!! }
         val auth = Authentication(Server.UserAuth, id = user._id, sessionId = null)
 
         val result = ServiceExamplesEndpoints.readSecret.test(auth, Unit)

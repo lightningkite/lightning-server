@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.notifications.events.event
 import com.lightningkite.lightningserver.notifications.subscriptions.NonCustomizableSubscriptions
 import com.lightningkite.lightningserver.notifications.subscriptions.subscribed
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.settings.setStatic
 import com.lightningkite.lightningserver.typed.sdk.module
@@ -159,15 +160,17 @@ class NotificationBatchingTest {
         }) {
             runBlocking {
                 val user = TestUser(name = "AllImmediateUser", email = "test@example.com", phone = "1234567890")
-                Server.userInfo.table().insertOne(user)
+                execute {
+                    Server.userInfo.table().insertOne(user)
 
-                val model = TestModel(name = "Test", ownerId = user._id)
-                Notifications.allImmediate(model)
+                    val model = TestModel(name = "Test", ownerId = user._id)
+                    Notifications.allImmediate(model)
+                }
 
                 assertTrue(testEmail!!.sentEmails.isNotEmpty())
                 assertTrue(testSms!!.messageHistory.isNotEmpty())
 
-                val notifications = Notifications.Dispatcher.info.table().all().toList()
+                val notifications = execute { Notifications.Dispatcher.info.table().all().toList() }
                 val userNotif = notifications.find { it.user == user._id }
                 assertNotNull(userNotif)
                 assertTrue(userNotif.email?.sent ?: false)
@@ -194,17 +197,19 @@ class NotificationBatchingTest {
         ) {
             runBlocking {
                 val user = TestUser(name = "AllDelayedUser")
-                Server.userInfo.table().insertOne(user)
+                execute {
+                    Server.userInfo.table().insertOne(user)
 
-                val model = TestModel(name = "Test", ownerId = user._id)
-                Notifications.allDelayed(model)
+                    val model = TestModel(name = "Test", ownerId = user._id)
+                    Notifications.allDelayed(model)
+                }
 
                 // Nothing should be sent immediately
                 assertTrue(testEmail!!.sentEmails.isEmpty())
                 assertTrue(testSms!!.messageHistory.isEmpty())
 
                 // All channels should exist but not be sent
-                val notifications = Notifications.Dispatcher.info.table().all().toList()
+                val notifications = execute { Notifications.Dispatcher.info.table().all().toList() }
                 val userNotif = notifications.find { it.user == user._id }
                 assertNotNull(userNotif)
                 assertNotNull(userNotif.email)
@@ -232,10 +237,12 @@ class NotificationBatchingTest {
         ) {
             runBlocking {
                 val user = TestUser(name = "DelayedRefreshUser", email = "delayed@example.com", phone = "1234567890")
-                Server.userInfo.table().insertOne(user)
+                execute {
+                    Server.userInfo.table().insertOne(user)
 
-                Notifications.allDelayed(TestModel(name = "M1", ownerId = user._id))
-                Notifications.allDelayed(TestModel(name = "M2", ownerId = user._id))
+                    Notifications.allDelayed(TestModel(name = "M1", ownerId = user._id))
+                    Notifications.allDelayed(TestModel(name = "M2", ownerId = user._id))
+                }
 
                 // Nothing sent yet
                 assertTrue(testEmail!!.sentEmails.isEmpty())
@@ -245,7 +252,7 @@ class NotificationBatchingTest {
                 clock.measuredFrom = clock.measuredFrom + 2.hours
 
                 // Refresh to send delayed notifications
-                Notifications.Dispatcher.refreshNotifications()
+                execute { Notifications.Dispatcher.refreshNotifications() }
 
                 // Everything should now be sent
                 assertTrue(testEmail.sentEmails.isNotEmpty(), "Emails should be sent after refresh")
@@ -271,10 +278,12 @@ class NotificationBatchingTest {
         ) {
             runBlocking {
                 val user = TestUser(name = "MixedFreqUser", email = "test@example.com", phone = "1234567890")
-                Server.userInfo.table().insertOne(user)
+                execute {
+                    Server.userInfo.table().insertOne(user)
 
-                val model = TestModel(name = "Test", ownerId = user._id)
-                Notifications.emailDelayed(model)
+                    val model = TestModel(name = "Test", ownerId = user._id)
+                    Notifications.emailDelayed(model)
+                }
 
                 // SMS should be sent immediately
                 assertTrue(testSms!!.messageHistory.isNotEmpty())
@@ -282,7 +291,7 @@ class NotificationBatchingTest {
                 // Email should NOT be sent (delayed)
                 assertTrue(testEmail!!.sentEmails.isEmpty())
 
-                val notifications = Notifications.Dispatcher.info.table().all().toList()
+                val notifications = execute { Notifications.Dispatcher.info.table().all().toList() }
                 val userNotif = notifications.find { it.user == user._id }
                 assertNotNull(userNotif)
 
@@ -307,13 +316,15 @@ class NotificationBatchingTest {
         }) {
             runBlocking {
                 val user = TestUser(name = "NoEmailUser")
-                Server.userInfo.table().insertOne(user)
+                execute {
+                    Server.userInfo.table().insertOne(user)
 
-                Notifications.smsOnly(TestModel(name = "Test", ownerId = user._id))
+                    Notifications.smsOnly(TestModel(name = "Test", ownerId = user._id))
+                }
 
                 assertTrue(testEmail!!.sentEmails.isEmpty())
 
-                val notifications = Notifications.Dispatcher.info.table().all().toList()
+                val notifications = execute { Notifications.Dispatcher.info.table().all().toList() }
                 val userNotif = notifications.find { it.user == user._id }
                 assertNotNull(userNotif)
                 assertNull(userNotif.email)
@@ -331,13 +342,15 @@ class NotificationBatchingTest {
         }) {
             runBlocking {
                 val user = TestUser(name = "NoSmsUser")
-                Server.userInfo.table().insertOne(user)
+                execute {
+                    Server.userInfo.table().insertOne(user)
 
-                Notifications.emailOnly(TestModel(name = "Test", ownerId = user._id))
+                    Notifications.emailOnly(TestModel(name = "Test", ownerId = user._id))
+                }
 
                 assertTrue(testSms!!.messageHistory.isEmpty())
 
-                val notifications = Notifications.Dispatcher.info.table().all().toList()
+                val notifications = execute { Notifications.Dispatcher.info.table().all().toList() }
                 val userNotif = notifications.find { it.user == user._id }
                 assertNotNull(userNotif)
                 assertNull(userNotif.sms)
@@ -358,16 +371,18 @@ class NotificationBatchingTest {
         }) {
             runBlocking {
                 val user = TestUser(name = "InAppOnlyUser")
-                Server.userInfo.table().insertOne(user)
+                execute {
+                    Server.userInfo.table().insertOne(user)
 
-                Notifications.inAppOnly(TestModel(name = "Test", ownerId = user._id))
+                    Notifications.inAppOnly(TestModel(name = "Test", ownerId = user._id))
+                }
 
                 // No email or SMS
                 assertTrue(testEmail!!.sentEmails.isEmpty())
                 assertTrue(testSms!!.messageHistory.isEmpty())
 
                 // Notification with inApp sent
-                val notifications = Notifications.Dispatcher.info.table().all().toList()
+                val notifications = execute { Notifications.Dispatcher.info.table().all().toList() }
                 val userNotif = notifications.find { it.user == user._id }
                 assertNotNull(userNotif)
                 assertNotNull(userNotif.inApp)
@@ -390,13 +405,15 @@ class NotificationBatchingTest {
         }) {
             runBlocking {
                 val user = TestUser(name = "BatchUser", email = "batch@example.com")
-                Server.userInfo.table().insertOne(user)
+                val notifications = execute {
+                    Server.userInfo.table().insertOne(user)
 
-                Notifications.allImmediate(TestModel(name = "Model1", ownerId = user._id))
-                Notifications.allImmediate(TestModel(name = "Model2", ownerId = user._id))
-                Notifications.allImmediate(TestModel(name = "Model3", ownerId = user._id))
+                    Notifications.allImmediate(TestModel(name = "Model1", ownerId = user._id))
+                    Notifications.allImmediate(TestModel(name = "Model2", ownerId = user._id))
+                    Notifications.allImmediate(TestModel(name = "Model3", ownerId = user._id))
 
-                val notifications = Notifications.Dispatcher.info.table().all().toList()
+                    Notifications.Dispatcher.info.table().all().toList()
+                }
                 val userNotifs = notifications.filter { it.user == user._id }
                 assertTrue(userNotifs.size >= 3)
 
@@ -413,12 +430,14 @@ class NotificationBatchingTest {
         }) {
             runBlocking {
                 val user = TestUser(name = "MultiEventUser", email = "multi@example.com")
-                Server.userInfo.table().insertOne(user)
+                val notifications = execute {
+                    Server.userInfo.table().insertOne(user)
 
-                Notifications.allImmediate(TestModel(name = "Model1", ownerId = user._id))
-                Notifications.emailOnly(TestModel(name = "Model2", ownerId = user._id))
+                    Notifications.allImmediate(TestModel(name = "Model1", ownerId = user._id))
+                    Notifications.emailOnly(TestModel(name = "Model2", ownerId = user._id))
 
-                val notifications = Notifications.Dispatcher.info.table().all().toList()
+                    Notifications.Dispatcher.info.table().all().toList()
+                }
                 val userNotifs = notifications.filter { it.user == user._id }
                 assertTrue(userNotifs.size >= 2)
             }

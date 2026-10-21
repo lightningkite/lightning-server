@@ -10,7 +10,7 @@ deleted.  The server enforces the same `ModelInfo` permissions as the REST
 endpoints — only items the caller can read are ever sent.
 
 This page assumes you have already read
-[Model REST Endpoints](model-rest.md) and are familiar with `ModelInfo`,
+[Model REST Endpoints](../guide/model-rest.md) and are familiar with `ModelInfo`,
 `ModelPermissions`, and the `condition { }` DSL.
 
 ## Imports
@@ -247,7 +247,7 @@ This produces the WebSocket at `ws:///blog/rest`.
 ## What's Next
 
 - **Model REST Endpoints** — the HTTP side of auto-CRUD:
-  [Model REST Endpoints](model-rest.md).
+  [Model REST Endpoints](../guide/model-rest.md).
 - **WebSockets** — lower-level WebSocket primitives, topics, and connection
   state: [WebSockets](../guide/websockets.md).
 - **Typed Endpoints & SDK Generation** — how both REST and WebSocket endpoints

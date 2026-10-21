@@ -5,163 +5,163 @@ supports multiple delivery channels (email, SMS, push, in-app) with flexible sch
 
 ## Overview
 
-The notification system consists of three main components:
+The notification system consists of four parts:
 
-1. **Events**: Things that happen in your application that might trigger notifications
-2. **Subscriptions**: Rules that determine which users get notified about which events
-3. **Dispatcher**: Handles queuing, bulking, formatting, and sending notifications
+1. **Events**: Things that happen in your application that might trigger notifications, defined as `EventDefinition`s
+2. **Subscriptions**: A provider that decides which users get notified about each event, and how often per channel
+3. **Content**: A generator per event that produces each user's notification content
+4. **Dispatcher**: Stores, bulks, formats, and sends notifications
+
+`NotificationEndpoints` ties them together: it receives each event, asks the subscription provider who is interested,
+generates their content, and hands the notifications to the dispatcher.
 
 ## Quick Start
 
-### 1. Define Your Notification System
+### 1. Define a Dispatcher
+
+`NotificationBulkDispatcher` is the built-in dispatcher. Extend it to say how to reach a user and how to format their
+notifications:
 
 ```kotlin
-object NotificationHandler : NotificationEventHandler<User, Uuid, NotificationContent>(
-    users = userInfo,
-    dispatcher = notificationDispatcher,
-    subscriptions = NonCustomizableSubscriptions()
-)
+@Serializable
+data class NotificationContent(val title: String, val body: String)
+
+object Dispatcher : NotificationBulkDispatcher<User, Uuid, NotificationContent>(
+    info = Server.database.modelInfo(auth = User.require(), tableName = "Notification", permissions = { /* ... */ }),
+    cache = Server.cache,
+    database = Server.database,
+    users = Server.userInfo,
+    contentSerializer = NotificationContent.serializer(),
+    email = Server.email,
+    sms = Server.sms,
+) {
+    context(server: ServerRuntime)
+    override suspend fun email(user: User): EmailAddress? = user.email.toEmailAddress()
+    context(server: ServerRuntime)
+    override suspend fun phone(user: User): PhoneNumber? = user.phone?.toPhoneNumber()
+    context(server: ServerRuntime)
+    override suspend fun fcmTokens(user: User): Set<String> = emptySet()
+    context(server: ServerRuntime)
+    override suspend fun onFcmTokensDead(user: User, deadTokens: Set<String>) {}
+
+    context(runtime: ServerRuntime)
+    override suspend fun makeEmailNotifications(user: User, notifications: List<Notification<Uuid, NotificationContent>>) =
+        notifications.map { Email(subject = it.content.title, to = listOf(EmailAddressWithName(user.email)), plainText = it.content.body) }
+
+    context(runtime: ServerRuntime)
+    override suspend fun makeSmsNotifications(user: User, notifications: List<Notification<Uuid, NotificationContent>>) =
+        notifications.map { it.content.body }
+
+    context(runtime: ServerRuntime)
+    override suspend fun makePushNotifications(user: User, notifications: List<Notification<Uuid, NotificationContent>>) =
+        emptyList<NotificationData>()
+}
 ```
 
-### 2. Define Event Types
+### 2. Create the Notification System
 
 ```kotlin
-val postCreated = NotificationHandler.event(
-    name = "post-created",
-    info = postInfo
-) {
-    // Configure content for this event type
-    it.content { post ->
-        { user ->
-            NotificationContent(
-                title = "New Post",
-                body = "${post.author} created a new post: ${post.title}"
-            )
+object Notifications : ServerBuilder() {
+    val handler = path include NotificationEndpoints(
+        users = Server.userInfo,
+        dispatcher = Dispatcher,
+        subscriptions = FrequencyCustomizableSubscriptions(
+            info = Server.database.modelInfo(auth = User.require(), tableName = "NotificationSendMethods", permissions = { /* ... */ })
+        ),
+    )
+}
+```
+
+### 3. Define Events
+
+`event` defines an event type and returns an `EventLauncher`. Its setup block says who is subscribed and what they
+receive:
+
+```kotlin
+object PostEndpoints : ServerBuilder() {
+    val info = Server.database.modelInfo(
+        auth = User.require(),
+        tableName = "Post",
+        permissions = { /* ... */ },
+        signals = { table -> table.postCreate { postCreated(it) } },  // Launch the event whenever a post is created
+    )
+
+    val postCreated = Notifications.handler.event("Post Created", info) { event ->
+        event.subscribed { occurrence ->
+            followersOf(occurrence.subject.authorId)  // The set of user IDs to notify
+        }
+        event.content { occurrence ->
+            { user -> NotificationContent("New post", "${occurrence.subject.title} was just posted") }
         }
     }
 }
 ```
 
-### 3. Subscribe Users to Events
-
-```kotlin
-// Subscribe all users to new post notifications
-NotificationHandler.subscriptions.addEventListener(
-    type = postCreated.type,
-    email = Frequency.daily(hour = 9, minute = 0),  // Daily digest at 9 AM
-    push = Frequency.immediately(),                  // Immediate push notifications
-    interested = { event ->
-        // Return set of user IDs who should be notified
-        userTable.find(Condition.Always).toList().map { it._id }.toSet()
-    }
-)
-```
+Every event must have content; a startup task fails the server if one does not.
 
 ### 4. Trigger Events
 
+Invoke the launcher with the subject. This queues the event's task, which runs as a child of the current execution:
+
 ```kotlin
-// When a post is created
-postCreated(newPost)
+postCreated(post)
 ```
 
-## Subscription Models
+`postCreated.handleInline(post)` handles it immediately instead, which is useful in tests.
 
-The notifications module provides three subscription strategies:
+## Subscription Providers
 
 ### NonCustomizableSubscriptions
 
-All subscription logic is defined in code. Users cannot customize their notification preferences.
-
-**Use when:**
-
-- Notifications are mandatory (e.g., security alerts)
-- You want complete control over notification delivery
-- You don't want to manage subscription state in the database
+Subscriptions are defined entirely in code, with no database storage. Use `subscribedDirect` to return each interested
+user with their frequencies:
 
 ```kotlin
-val subscriptions = NonCustomizableSubscriptions<User, Uuid>()
-
-subscriptions.addEventListener(
-    type = securityAlert,
-    email = Frequency.immediately(),
-    sms = Frequency.immediately(),
-    push = Frequency.immediately(),
-    interested = { event ->
-        setOf(event.subject.userId) // Only notify the affected user
+event.subscribedDirect { occurrence ->
+    adminIds().map { id ->
+        ScheduledSendMethods.Data(user = id, email = Frequency.immediately(), sms = null, push = null, inApp = Frequency.immediately())
     }
-)
+}
 ```
+
+When several definitions target the same user, the earliest scheduled time for each channel wins. Best for mandatory
+notifications.
 
 ### FrequencyCustomizableSubscriptions
 
-Users can customize delivery frequencies but not which events they receive. The logic for determining interested users
-is defined in code.
-
-**Use when:**
-
-- Event logic is complex or security-sensitive
-- You want users to control *how* but not *what* they're notified about
-- You want programmatic control over subscription logic
+Your code decides who is interested, and users choose how often they are told on each channel. Preferences are stored
+in a `NotificationSendMethods` table with REST endpoints. Use `subscribed`, optionally overriding the default
+frequencies:
 
 ```kotlin
-val subscriptions = FrequencyCustomizableSubscriptions<User, Uuid>(
-    info = notificationSendMethodsInfo
-)
-
-subscriptions.addEventListener(
-    type = commentOnMyPost,
-    defaultEmail = Frequency.batch(60),  // Hourly by default
-    defaultPush = Frequency.immediately(),
-    interested = { event ->
-        // Find users who should be notified based on the event
-        setOf(event.subject.postAuthorId)
-    }
-)
-```
-
-Users can then customize their preferences via REST endpoints:
-
-```kotlin
-val rest = notificationDispatcher.rest  // Auto-generated REST endpoints
+event.subscribed(defaultEmail = Frequency.daily(hour = 9, minute = 0)) { occurrence ->
+    setOf(occurrence.subject.ownerId)
+}
 ```
 
 ### FullyCustomizableSubscriptions
 
-Users have complete control over both filtering conditions and delivery frequencies.
-
-**Use when:**
-
-- Users need maximum flexibility
-- You trust users to create their own subscription filters
-- Your application has complex filtering requirements
+Users choose what they hear about, with filter conditions, as well as how often. Subscriptions are stored in a
+`NotificationEventSubscription` table with REST endpoints. Use `defaultSubscription` to give each user their starting
+subscription:
 
 ```kotlin
-val subscriptions = FullyCustomizableSubscriptions<User, Uuid>(
-    info = notificationEventSubscriptionInfo,
-    users = userInfo,
-    principal = userPrincipal,
-    events = NotificationHandler.registry
-)
-
-// Define default subscriptions for new users
-subscriptions.setDefaultSubscription(
-    type = postCreated,
-    subscription = { user ->
-        Subscription(
-            filter = condition { it.author eq "favorite-author" },
-            email = Frequency.daily(hour = 9, minute = 0),
-            push = Frequency.immediately(),
-            sms = null  // Disable SMS
-        )
-    }
-)
+event.defaultSubscription { user ->
+    FullEventSubscription(
+        filter = Condition.Always,
+        email = Frequency.immediately(),
+        push = Frequency.immediately(),
+        sms = null,  // Disabled
+    )
+}
 ```
 
-**Important:** FullyCustomizableSubscriptions automatically manages default subscriptions:
+FullyCustomizableSubscriptions manages default subscriptions automatically:
 
 - New users get all default subscriptions
-- When defaults change, existing subscriptions are updated based on `DefaultSubscriptionUpdateBehavior`
-- Read permissions are automatically enforced (users only see events they have permission to view)
+- When defaults change, existing subscriptions are updated according to `DefaultSubscriptionUpdateBehavior`
+  (`UpdateReadPermissions`, `ReplaceExistingWithDefault`, or `UpdateRetainingUserChanges`)
+- Read permissions are enforced, so users only hear about events they are allowed to see
 
 ## Notification Frequencies
 
@@ -181,278 +181,86 @@ Frequency.batch(15)  // Every 15 minutes
 Frequency.daily(hour = 9, minute = 0, timeZone = TimeZone.of("America/New_York"))
 
 // Weekly on specific day
-Frequency.weekly(weekDay = DayOfWeek.MONDAY, hour = 9, minute = 0)
+Frequency.weekly(TimeZone.of("America/New_York"), DayOfWeek.MONDAY, LocalTime(9, 0))
 
 // Combined: daily with delay
 Frequency.daily(hour = 9, minute = 0).delayed(30.minutes)
-
-// Disable a channel
-email = null  // No email notifications
 ```
 
-## Notification Dispatcher
+A `null` frequency disables that channel.
 
-The dispatcher handles queuing, formatting, and sending notifications. You must implement:
+## Notification Bulking
 
-```kotlin
-abstract class NotificationBulkDispatcher<USER, UID, CONTENT>(
-    // ... configuration ...
-) {
-    // Contact information
-    context(ServerRuntime)
-    abstract suspend fun email(user: USER): EmailAddress?
-
-    context(ServerRuntime)
-    abstract suspend fun phone(user: USER): PhoneNumber?
-
-    context(ServerRuntime)
-    abstract suspend fun fcmTokens(user: USER): Set<String>
-
-    // Formatting (with bulking support)
-    context(ServerRuntime)
-    abstract suspend fun makeEmailNotifications(
-        user: USER,
-        notifications: List<Notification<UID, CONTENT>>
-    ): List<Email>
-
-    context(ServerRuntime)
-    abstract suspend fun makeSmsNotifications(
-        user: USER,
-        notifications: List<Notification<UID, CONTENT>>
-    ): List<String>
-
-    context(ServerRuntime)
-    abstract suspend fun makePushNotifications(
-        user: USER,
-        notifications: List<Notification<UID, CONTENT>>
-    ): List<NotificationData>
-}
-```
-
-### Notification Bulking
-
-When multiple notifications for the same user are scheduled at the same time, they're grouped together. You control how
-they're formatted:
+When multiple notifications for the same user are due at the same time on the same channel, they are passed to your
+`make…Notifications` function together. You decide how to format them:
 
 ```kotlin
+context(runtime: ServerRuntime)
 override suspend fun makeEmailNotifications(
-    user: USER,
-    notifications: List<Notification<UID, CONTENT>>
-): List<Email> {
-    // Option 1: Send one email with all notifications
-    return listOf(
-        Email(
-            to = email(user)!!,
-            subject = "${notifications.size} new notifications",
-            body = notifications.joinToString("\n") { it.content.body }
-        )
+    user: User,
+    notifications: List<Notification<Uuid, NotificationContent>>
+): List<Email> = listOf(
+    // One email covering every notification
+    Email(
+        subject = "${notifications.size} new notifications",
+        to = listOf(EmailAddressWithName(user.email)),
+        plainText = notifications.joinToString("\n") { it.content.body },
     )
-
-    // Option 2: Send separate emails for important ones
-    return notifications.map { notif ->
-        Email(
-            to = email(user)!!,
-            subject = notif.content.title,
-            body = notif.content.body
-        )
-    }
-}
+)
 ```
 
 ## Scheduling
 
-The dispatcher includes an automatic scheduler that checks for pending notifications every minute:
-
-```kotlin
-// Automatically included
-val autoRefreshNotifications: ScheduledTask
-
-// Manual refresh if needed
-context(ServerRuntime)
-suspend fun refreshNotifications()
-```
+The dispatcher includes a scheduled task, `autoRefreshNotifications`, that finds and sends pending notifications. It
+runs every minute by default; pass `refreshSchedule` to the dispatcher to change that. Sending is locked so that only one
+instance processes a notification.
 
 ## REST Endpoints
 
-For customizable subscription models, REST endpoints are automatically generated:
+The customizable subscription providers and the dispatcher each expose REST endpoints:
 
-```kotlin
-// FullyCustomizableSubscriptions
-val rest: ModelRestEndpoints<NotificationEventSubscription<UID>>
+- `FrequencyCustomizableSubscriptions.rest` - the user's send-method preferences
+- `FullyCustomizableSubscriptions.rest` - the user's event subscriptions
+- `NotificationBulkDispatcher.rest` - stored notifications, with a WebSocket for in-app notifications as they arrive
 
-// FrequencyCustomizableSubscriptions
-val rest: ModelRestEndpoints<NotificationSendMethods<UID>>
-
-// NotificationBulkDispatcher
-val rest: ModelRestEndpointsAndUpdatesWebsocket<Notification<UID, CONTENT>>
-```
-
-These provide standard CRUD operations for managing subscriptions and querying notifications.
+`NotificationEndpoints` also mounts the registered event types at `/events`.
 
 ## Event Tags
 
 Organize events with tags for easier management:
 
 ```kotlin
-val postCreated = NotificationHandler.event(
-    name = "post-created",
+val postCreated = Notifications.handler.event(
+    name = "Post Created",
     info = postInfo,
-    tags = setOf("posts", "social", "user-generated-content")
-)
-
-// Query event types by tags
-eventEndpoints.queryEventTypes(
-    Query(condition { it.tags contains "posts" })
-)
+    tags = setOf("posts", "social"),
+) { event -> /* ... */ }
 ```
 
 ## Best Practices
 
-### 1. Content Generation
-
-Keep content generation logic simple and fast. It runs for every interested user:
-
-```kotlin
-it.content { post ->
-    { user ->
-        // Fast: direct field access
-        NotificationContent(
-            title = "New Post",
-            body = post.title
-        )
-
-        // Avoid: additional database queries per user
-        // val author = authorTable.get(post.authorId)  // DON'T DO THIS
-    }
-}
-```
-
-### 2. Subscription Logic
-
-For `NonCustomizableSubscriptions` and `FrequencyCustomizableSubscriptions`, optimize the `interested` function:
-
-```kotlin
-// Good: single query
-interested = { event ->
-    followTable
-        .find(condition { it.following eq event.subject.authorId })
-        .toList()
-        .map { it.follower }
-        .toSet()
-}
-
-// Avoid: querying per user
-interested = { event ->
-    users.filter { user ->
-        // followTable.find(...) per user
-    }
-}
-```
-
-### 3. Default Frequencies
-
-Choose sensible defaults based on notification importance:
-
-```kotlin
-// High importance: immediate
-Frequency.immediately()
-
-// Medium importance: batched
-Frequency.batch(60)  // Hourly
-
-// Low importance: daily digest
-Frequency.daily(hour = 9, minute = 0)
-```
-
-### 4. Testing
-
-Use the inline handler for testing:
-
-```kotlin
-@Test
-fun testPostCreatedNotification() = runBlocking {
-    val engine = LocalEngine(Server.build())
-
-    // Trigger event inline (doesn't use task system)
-    postCreated.handleInline(testPost)
-
-    // Verify notifications were created
-    val notifications = notificationTable.find(Condition.Always).toList()
-    assertEquals(1, notifications.size)
-}
-```
-
-## Common Patterns
-
-### Role-Based Notifications
-
-```kotlin
-subscriptions.addEventListener(
-    type = adminAlert,
-    interested = { event ->
-        userTable
-            .find(condition { it.role eq UserRole.ADMIN })
-            .toList()
-            .map { it._id }
-            .toSet()
-    }
-)
-```
-
-### Relationship-Based Notifications
-
-```kotlin
-subscriptions.addEventListener(
-    type = commentOnMyPost,
-    interested = { event ->
-        // Notify post author
-        setOf(event.subject.post.authorId)
-    }
-)
-```
-
-### Proximity-Based Notifications
-
-```kotlin
-subscriptions.addEventListener(
-    type = nearbyEvent,
-    interested = { event ->
-        userLocationTable
-            .find(condition {
-                it.location.within(event.subject.location, radius = 10.miles)
-            })
-            .toList()
-            .map { it.userId }
-            .toSet()
-    }
-)
-```
+1. **Fetch shared data once**: The content generator runs once per event and returns a function run once per user, so
+   load anything common to every user in the outer function.
+2. **Keep subscriber logic cheap**: It runs for every event occurrence; query by indexed fields.
+3. **Choose conservative defaults**: Prefer batched or daily email for frequent events, and let users opt in to more.
+4. **Test with test services**: Set the email and SMS settings to `TestEmailService` and `TestSMS` with `setStatic`, then
+   inspect what was sent.
 
 ## Troubleshooting
 
 ### Notifications Not Sending
 
-1. Check that `autoRefreshNotifications` is enabled
-2. Verify the scheduler has cache access for locking
-3. Check logs for errors in the dispatcher
-4. Ensure contact information (email, phone, FCM tokens) is available
+- Check that the dispatcher's scheduled task is running (it is a `ScheduledTask` on the dispatcher)
+- Check the user has an email, phone, or FCM token for the channel
+- Check the frequency for that channel is not `null`
 
 ### Users Not Receiving Notifications
 
-1. Verify subscription logic returns the user ID
-2. Check that content generator runs without errors
-3. Verify read permissions (for FullyCustomizableSubscriptions)
-4. Check that the user hasn't disabled the notification channel
-
-### Performance Issues
-
-1. Optimize `interested` functions to use single queries
-2. Consider batching for high-volume events
-3. Monitor notification content generation time
-4. Use appropriate database indexes on notification table (`user`, `sendAt`)
+- Check the subscription provider returns the user for that event
+- With FullyCustomizableSubscriptions, check the user's filter matches and they can read the subject
 
 ## See Also
 
-- [Events](./notifications-events.md) - Detailed event system documentation
-- [Database](./database.md) - Query DSL for subscription filtering
-- [Authentication](./authentication.md) - Permission integration
+- [Tasks](tasks.md) - How event tasks are queued
+- [Email](email.md) - Email service configuration
+- [Database](database.md) - `modelInfo` and `signals`

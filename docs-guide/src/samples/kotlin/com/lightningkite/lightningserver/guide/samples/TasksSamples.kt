@@ -49,10 +49,10 @@ object TaskServer : ServerBuilder() {
 
 // region task-test
 fun taskTest() = TaskServer.testBlocking(settings = {}) {
-    // Launch the task directly. In TestRunner, Task.invoke calls executeInline —
-    // the task body completes before launch() returns. The effect is immediately
+    // Launch the task as the test's own work. TestRunner runs dispatched tasks inline, so
+    // the task body completes before launch() returns and the effect is immediately
     // visible in the next line.
-    TaskServer.sendWelcomeEmail.launch(WelcomeEmailInput("alice@example.com", "Alice"))
+    execute { TaskServer.sendWelcomeEmail.launch(WelcomeEmailInput("alice@example.com", "Alice")) }
 
     val logged = TaskServer.cache().get<String>("last-welcome-email")
     assertEquals("alice@example.com", logged)

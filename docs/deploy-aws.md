@@ -1,7 +1,5 @@
 # Deploy to AWS Serverless
 
-Last updated January 2025 (`version-5`)
-
 Lightning Server can automatically generate and deploy serverless infrastructure to AWS using Terraform. This allows you
 to deploy your application to AWS Lambda with API Gateway, complete with database, cache, file storage, and other
 services.
@@ -22,11 +20,11 @@ Add the AWS serverless engine to your project:
 dependencies {
     implementation("com.lightningkite.lightningserver:engine-aws-serverless:$lightningServerVersion")
 
-    // Add service implementations you'll use
-    implementation("com.lightningkite.services:database-mongodb:$lightningServerVersion")
-    implementation("com.lightningkite.services:cache-dynamodb:$lightningServerVersion")
-    implementation("com.lightningkite.services:files-s3:$lightningServerVersion")
-    implementation("com.lightningkite.services:email-ses:$lightningServerVersion")
+    // Add service implementations you'll use; these are versioned with service-abstractions
+    implementation("com.lightningkite.services:database-mongodb:$serviceAbstractionsVersion")
+    implementation("com.lightningkite.services:cache-dynamodb:$serviceAbstractionsVersion")
+    implementation("com.lightningkite.services:files-s3:$serviceAbstractionsVersion")
+    implementation("com.lightningkite.services:email-javasmtp:$serviceAbstractionsVersion")
 }
 ```
 
@@ -52,10 +50,11 @@ import com.lightningkite.lightningserver.terraform.generated
 import com.lightningkite.services.database.mongodb.mongodbAtlasFree
 import com.lightningkite.services.cache.dynamodb.awsDynamoDb
 import com.lightningkite.services.files.s3.awsS3Bucket
+import com.lightningkite.services.email.javasmtp.awsSesDomainConfiguration
 import com.lightningkite.services.email.javasmtp.awsSesSmtp
 import com.lightningkite.services.sms.SMS
 import com.lightningkite.services.terraform.*
-import com.lightningkite.toEmailAddress
+import com.lightningkite.services.data.toEmailAddress
 import software.amazon.awssdk.regions.Region
 import java.io.File
 import kotlin.reflect.KClass
@@ -96,8 +95,8 @@ object ProductionDeploy : TerraformAwsServerlessDomainBuilder<Server>(Server) {
         // File storage: S3
         files.awsS3Bucket(signedUrlDuration = 1.days)
 
-        // Email: SES via SMTP
-        email.awsSesSmtp("noreply@yourapp.com".toEmailAddress())
+        // Email: SES via SMTP, sending from the deployment's domain
+        email.awsSesSmtp(awsSesDomainConfiguration("email", "admin@yourapp.com".toEmailAddress()))
 
         // SMS: Configure if needed
         sms.direct(SMS.Settings())
@@ -125,40 +124,18 @@ object ProductionEditVars {
 
 ## Step 4: Generate Terraform Configuration
 
-Run the deployment main function to generate Terraform files:
+Run the deployment main function:
 
 ```bash
 ./gradlew run --args="ProductionDeployMain"
 ```
 
-This will:
+`deploy()` writes the Terraform configuration as `.tf.json` files in the `terraformRoot` directory, runs `terraform init`,
+then runs `terraform apply`, which shows you the plan and waits for you to type `yes`. Credentials come from the
+deployment's secret source, and you are prompted for any that are missing. Run `ProductionEditVars` first to set them up
+ahead of time.
 
-1. Generate Terraform configuration in the `terraformRoot` directory
-2. Create a `.env` file with required variables
-3. Set up the AWS infrastructure definition
-
-## Step 5: Review Generated Terraform
-
-Review the generated Terraform files in your `terraformRoot` directory:
-
-```
-terraform/production/
-├── main.tf          # Main infrastructure definition
-├── variables.tf     # Variable declarations
-├── outputs.tf       # Output values
-└── .env            # Environment variables
-```
-
-## Step 6: Deploy to AWS
-
-Initialize and apply Terraform:
-
-```bash
-cd terraform/production
-terraform init
-terraform plan
-terraform apply
-```
+## Step 5: Review What Gets Created
 
 Terraform will create:
 
@@ -209,7 +186,6 @@ cache.awsDynamoDb()
 ```kotlin
 files.awsS3Bucket(
     signedUrlDuration = 1.days,
-    publicRead = false
 )
 ```
 
@@ -218,10 +194,12 @@ files.awsS3Bucket(
 #### SES via SMTP
 
 ```kotlin
-email.awsSesSmtp("noreply@yourapp.com".toEmailAddress())
+email.awsSesSmtp(awsSesDomainConfiguration("email", "admin@yourapp.com".toEmailAddress()))
 ```
 
-**Note**: You must verify your email address or domain in AWS SES before sending emails.
+This needs a domain deployment (`TerraformAwsServerlessDomainBuilder`): the configuration sets up the domain's SES
+identity and DNS records, and the address receives DMARC reports. Reference `JavaSmtpEmailService` in your server so
+the `smtp` scheme is registered.
 
 ### Monitoring and Telemetry
 
@@ -271,13 +249,12 @@ To update your deployed application:
 
 1. Make changes to your code
 2. Build the project: `./gradlew build`
-3. Regenerate Terraform: `./gradlew run --args="ProductionDeployMain"`
-4. Apply changes: `cd terraform/production && terraform apply`
+3. Deploy: `./gradlew run --args="ProductionDeployMain"`, then review the plan and type `yes`
 
 ## Managing Secrets
 
-Sensitive values are stored in the `.env` file in your Terraform directory. **Never commit this file to version control.
-**
+Sensitive values are kept in the deployment's secret source, by default an encrypted file outside your project, and are
+passed to Terraform as environment variables. The plan is never saved to disk, since it would hold them in plain text.
 
 To edit secrets:
 
@@ -299,7 +276,7 @@ To minimize AWS costs:
 
 1. **Use Free Tiers**: MongoDB Atlas free tier, DynamoDB on-demand
 2. **Optimize Lambda**: Adjust memory based on actual usage
-3. **Enable Compression**: For API responses
+3. **Enable Compression**: Install `GzipInterceptor` for API responses
 4. **Use Reserved Capacity**: For predictable workloads
 
 ## Troubleshooting
@@ -309,7 +286,7 @@ To minimize AWS costs:
 Increase timeout in deployment configuration:
 
 ```kotlin
-override val lambdaTimeout: Duration = 30.seconds
+override val timeout: Duration = 60.seconds
 ```
 
 ### Memory Issues
@@ -317,12 +294,13 @@ override val lambdaTimeout: Duration = 30.seconds
 Increase Lambda memory:
 
 ```kotlin
-override val lambdaMemoryMb: Int = 512
+override val memory: DataSize = 2.gibibytes
 ```
 
 ### Cold Starts
 
-For critical endpoints, consider:
+SnapStart is on by default (`snapStart`), which restores Lambdas from a snapshot taken after initialization. For critical
+endpoints, also consider:
 
 - Provisioned concurrency
 - Keeping Lambdas warm with scheduled pings

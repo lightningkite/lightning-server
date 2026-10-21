@@ -10,14 +10,12 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
- * Request to create a sub-session with reduced privileges derived from an existing session.
- * Useful for creating temporary, scope-limited sessions for specific operations.
+ * Asks for a sub-session with reduced privileges derived from the current session.
  *
- * @property label Human-readable label describing the purpose of this sub-session
- * @property scopes Scopes to grant to this sub-session. The default, root, means "the parent session's scopes";
- *   anything else must be within the parent's scopes.
- * @property oauthClient Optional OAuth client ID if this sub-session is for OAuth purposes
- * @property expires Optional expiration time for the sub-session. If not provided, inherits from parent session
+ * @property scopes The scopes to grant. The default, root, grants the parent session's scopes; anything else must be
+ *   within them.
+ * @property oauthClient The OAuth client ID, if the sub-session is for OAuth.
+ * @property expires When the sub-session expires, inheriting the parent's expiration if `null`.
  */
 @Serializable
 public data class SubSessionRequest(
@@ -29,31 +27,23 @@ public data class SubSessionRequest(
 }
 
 /**
- * Represents an active authentication session for a subject (user).
- * Sessions are created after successful authentication and used to maintain stateful access.
+ * Represents an authentication session of a subject, created after a successful login.
  *
- * @param SUBJECT The type of entity this session represents (e.g., User)
- * @param ID The ID type of the subject
- * @property _id Unique session identifier
- * @property secretHash Hash of the session secret token (never store the raw secret)
- * @property derivedFrom ID of parent session if this is a sub-session; terminating the parent terminates this session
- * @property label Human-readable description of the session (e.g., "Web Browser", "Mobile App")
- * @property subjectId ID of the authenticated subject
- * @property createdAt When the session was created
- * @property authenticatedAt When the subject last proved their identity for this session's lineage. Sub-sessions
- *   inherit it from their parent, so `maxAge` requirements measure time since real authentication, not since minting.
- *   Null (sessions stored before this field existed) means [createdAt]. Nullable so that SQL databases can add
- *   the column to a populated table.
- * @property lastUsed When the session was last used (updated on each request)
- * @property expires Optional hard expiration time for the session
- * @property stale Optional time when session should be considered stale and require re-authentication
- * @property terminated If set, the session has been explicitly terminated
- * @property ips Set of IP addresses that have used this session (for security auditing)
- * @property userAgents Set of user agent strings that have used this session (for security auditing)
- * @property scopes Authorization scopes granted to this session
+ * @param SUBJECT The type of the subject.
+ * @param ID The type of the subject's ID.
+ * @property secretHash The hash of the session secret, never the raw secret.
+ * @property derivedFrom The parent session, if this is a sub-session. Terminating the parent terminates this session.
+ * @property authenticatedAt When the subject last proved their identity in this session's lineage, which sub-sessions
+ *   inherit, so `maxAge` measures time since real authentication. `null`, for sessions stored before this field
+ *   existed, means [createdAt].
+ * @property lastUsed When the session was last used.
+ * @property expires The hard expiration time, or `null` if there is none.
+ * @property stale When the session goes stale and requires re-authentication, or `null` if never.
+ * @property terminated When the session was explicitly terminated, or `null` if it was not.
+ * @property ips The IP addresses that have used this session, for auditing.
+ * @property userAgents The user agents that have used this session, for auditing.
  */
-@GenerateDataClassPaths
-@Serializable
+@Queryable
 @AdminTableColumns(["label", "subjectId", "scopes"])
 @IndexSet(["subjectId", "terminated", "expires", "stale"])
 public data class Session<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
@@ -75,12 +65,11 @@ public data class Session<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 ) : HasId<Uuid>
 
 /**
- * Request to log in and create a new session.
+ * Asks to log in with [proofs] and create a session.
  *
- * @property proofs List of authentication proofs to verify (e.g., password, OTP, email verification)
- * @property label Descriptive label for the session being created
- * @property scopes Authorization scopes to grant to the new session
- * @property expires Optional expiration time for the session
+ * @property label A description of the session being created.
+ * @property scopes The scopes to grant the session.
+ * @property expires When the session expires, or `null` to use the default.
  */
 @Serializable
 public data class LogInRequest(
@@ -91,12 +80,11 @@ public data class LogInRequest(
 )
 
 /**
- * Response after checking proofs during login, containing the user ID and available authentication methods.
+ * Describes the outcome of a login attempt.
  *
- * @property id The authenticated subject's ID
- * @property options Available authentication methods/proofs that can be used
- * @property strengthRequired Minimum authentication strength required (sum of proof strengths)
- * @property refreshToken Token to use for refreshing or completing the login process
+ * @property options The proof options still available.
+ * @property strengthRequired The total proof strength required.
+ * @property refreshToken The refresh token if the proofs were sufficient, and `null` otherwise.
  */
 @Serializable
 public data class IdAndAuthMethods<ID>(
@@ -115,13 +103,12 @@ public data class IdAndAuthMethods<ID>(
 }
 
 /**
- * Result of checking authentication proofs before completing login.
+ * Describes whether a set of proofs is enough to log in, without having created a session.
  *
- * @property id The identified subject's ID
- * @property options Additional authentication options available
- * @property strengthRequired Minimum authentication strength still needed
- * @property readyToLogIn Whether provided proofs are sufficient to complete login
- * @property maxExpiration Maximum allowed expiration time based on the proofs provided
+ * @property options The additional proof options available.
+ * @property strengthRequired The proof strength still needed.
+ * @property readyToLogIn Whether the proofs are sufficient to log in.
+ * @property maxExpiration The latest expiration the session may have, based on the proofs.
  */
 @Serializable
 public data class ProofsCheckResult<ID>(

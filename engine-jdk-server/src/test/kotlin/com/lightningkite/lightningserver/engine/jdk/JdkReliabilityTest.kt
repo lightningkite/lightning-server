@@ -42,7 +42,7 @@ import kotlin.time.Duration.Companion.seconds
 class JdkReliabilityTest {
 
     object TestServer : ServerBuilder() {
-        // Required so the central 408 timeout error body can be serialized by DefaultExceptionHttpHandler.
+        // Required so the central 408 timeout error body can be serialized by ExceptionHttpHandler.Default.
         init { registerBasicMediaTypeCoders() }
 
         val slow = path.path("slow").get bind HttpHandler<PathSpec0>(timeout = 500.milliseconds) {
@@ -126,6 +126,18 @@ class JdkReliabilityTest {
                 assertEquals(200, resp.code)
                 assertEquals("received $maxBody", resp.body.string())
             }
+    }
+
+    @Test
+    fun websocket_upgrade_is_refused() {
+        startServer()
+        val request = Request.Builder().url("http://127.0.0.1:$port/echo")
+            .header("Connection", "Upgrade")
+            .header("Upgrade", "websocket")
+            .build()
+        client().newCall(request).execute().use { resp ->
+            assertEquals(HttpStatus.NotImplemented.code, resp.code)
+        }
     }
 
     @Test

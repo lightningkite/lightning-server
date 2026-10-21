@@ -1,7 +1,8 @@
+@file:OptIn(com.lightningkite.lightningserver.EngineApi::class)
+
 package com.lightningkite.lightningserver.engine.jdk
 
 import com.lightningkite.lightningserver.HttpMethod
-import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.engine.local.BodyTooLargeException
@@ -12,7 +13,8 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
-import com.lightningkite.lightningserver.runtime.handle
+import com.lightningkite.lightningserver.runtime.Execution
+import com.lightningkite.lightningserver.runtime.handleRoot
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.services.data.*
 import com.sun.net.httpserver.HttpExchange
@@ -34,8 +36,8 @@ import kotlin.time.Clock
  * @property realIpHeader Optional header name to extract the real client IP from (useful behind proxies)
  * @property requestIdHeader Optional header name carrying a request ID stamped by a **trusted**
  *   reverse proxy, adopted as the authoritative request ID. Leave null (the default) to always
- *   generate one; a client-supplied ID is never trusted. Set to "X-Request-ID" behind Envoy so the
- *   proxy's capture and the server's logs share an identifier.
+ *   generate one; a client-supplied ID is never trusted. The proxy must stamp version 7 UUIDs
+ *   (Envoy's built-in X-Request-ID is version 4); see [requestIdentity].
  * @property reliability Shared engine reliability settings (request timeout, max body size, graceful
  *   shutdown drain, worker-thread pool size). See [EngineReliabilitySettings].
  */
@@ -60,7 +62,8 @@ public val jdkRunConfig: ServerSetting.Direct<JdkRuntimeSettings> = ServerSettin
 /**
  * A Lightning Server engine implementation using the JDK's built-in HTTP server.
  *
- * **IMPORTANT: This engine does NOT support WebSockets.**
+ * **IMPORTANT: This engine does NOT support WebSockets.** Upgrade requests are refused with
+ * 501 Not Implemented.
  *
  * This engine is useful for:
  * - Minimal dependencies (no external server library required)
@@ -132,10 +135,15 @@ public class JdkEngine(
                     exchange.respondPlain(HttpStatus.PayloadTooLarge.code, "Payload Too Large")
                     return@createContext
                 }
-                val request = exchange.requestToLightningServer(cfg.realIpHeader, cfg.requestIdHeader, this@JdkEngine, maxBody)
+                if (exchange.requestHeaders.getFirst("Upgrade").equals("websocket", ignoreCase = true)) {
+                    exchange.respondPlain(HttpStatus.NotImplemented.code, "WebSockets are not supported by this server")
+                    return@createContext
+                }
+                val (request, executionId) =
+                    exchange.requestToLightningServer(cfg.realIpHeader, cfg.requestIdHeader, this@JdkEngine, maxBody)
                 // Request timeout is enforced centrally in ServerRuntime.handle (per-handler HttpHandler.timeout).
                 runBlocking {
-                    val result: HttpResponse = this@JdkEngine.handle(request)
+                    val result: HttpResponse = this@JdkEngine.handleRoot(request, executionId)
                     exchange.write(result)
                 }
             } catch (e: BodyTooLargeException) {
@@ -271,7 +279,7 @@ private fun HttpExchange.requestToLightningServer(
     requestIdHeader: String?,
     engine: JdkEngine,
     maxBody: Long,
-): HttpRequest<PathSpec> {
+): Pair<HttpRequest<PathSpec>, Execution.ID> {
     val method = this.requestMethod
     val uri = this.requestURI
     val queryParams = QueryParameters.parse(uri.rawQuery ?: "")
@@ -296,21 +304,23 @@ private fun HttpExchange.requestToLightningServer(
         }
     } else null
 
-    val identity = headers.requestIdentity(requestIdHeader) {
-        engine.logger.warn { "Request ID header for proxy '$requestIdHeader' was missing from the request." }
+    val identity = with(engine) {
+        headers.requestIdentity(requestIdHeader) {
+            engine.logger.warn { "Request ID header for proxy '$requestIdHeader' was missing from the request." }
+        }
     }
 
-    return HttpRequest(
+    val adapted = HttpRequest(
         path = RawHttpEndpoint(uri.path ?: "/", HttpMethod(method)),
         queryParameters = queryParams,
         headers = headers,
         domain = domain,
         protocol = protocol,
         sourceIp = sourceIp,
-        requestId = identity.requestId,
         upstreamRequestId = identity.upstreamRequestId,
         body = body
     )
+    return adapted to identity.requestId
 }
 
 /**
@@ -334,6 +344,6 @@ private fun com.sun.net.httpserver.Headers.adapt(): HttpHeaders = HttpHeaders(
  *    more specific error responses based on exception type
  * 4. The adapt() function splits comma-separated headers, but some headers (like Set-Cookie)
  *    shouldn't be split. Consider header-specific handling.
- * 5. Document the WebSocket limitation more prominently (e.g., throw exception if WebSocket
- *    endpoints are registered)
+ * 5. WebSocket upgrade requests are refused with 501. Consider also warning at startup if WebSocket
+ *    endpoints are registered.
  */

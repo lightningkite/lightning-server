@@ -12,6 +12,7 @@ import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.lightningserver.serialization.approximateJsonSize
+import com.lightningkite.services.data.Unsafe
 import com.lightningkite.services.database.*
 import kotlinx.serialization.KSerializer
 import kotlinx.coroutines.CancellationException
@@ -70,8 +71,7 @@ public class ModelRestUpdatesWebSocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
         )
     }
 
-    private inner class WebSocket :
-        ApiWebSocketHandler<PathSpec0, ModelRestUpdatesWebSocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>> {
+    private inner class WebSocket : ApiWebSocketHandler<PathSpec0, ModelRestUpdatesWebSocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>> {
         override val auth: AuthRequirement<USER> = info.auth
         override val inputType: KSerializer<Condition<T>> = Condition.serializer(info.serializer)
         override val outputType: KSerializer<CollectionUpdates<T, ID>> =
@@ -92,18 +92,28 @@ public class ModelRestUpdatesWebSocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
             )
         }
 
-        context(connection: ApiWebSocketHandler.Connection<PathSpec0, ModelRestUpdatesWebSocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>>)
-        override suspend fun didConnectTyped() {
+        context(serverRuntime: ServerRuntime)
+        override suspend fun didConnectTyped(
+            connection: ApiWebSocketHandler.Connection<PathSpec0, ModelRestUpdatesWebSocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>>,
+        ) {
         }
 
-        context(connection: ApiWebSocketHandler.Connection<PathSpec0, ModelRestUpdatesWebSocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>>)
-        override suspend fun messageFromClientTyped(frame: Condition<T>) {
+        context(serverRuntime: ServerRuntime)
+        override suspend fun messageFromClientTyped(
+            connection: ApiWebSocketHandler.Connection<PathSpec0, ModelRestUpdatesWebSocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>>,
+            frame: Condition<T>,
+        ) {
             val p = info.table(connection.auth())
             val c = p.fullCondition(frame).simplify()
             val oldTopics: Set<WebSocketSubscriptionRequest<out PathSpec, *>> =
                 connection.currentState.topics.mapTo(HashSet()) {
-                    connection.server.webSocketTopics.match(connection.internalSerialization.stringArrayFormat, it)
-                        ?.let { match -> WebSocketSubscriptionRequest(match.value, match.path.rawPathArguments) }
+                    serverRuntime.server.webSocketTopics.match(serverRuntime.internalSerialization.stringArrayFormat, it)
+                        ?.let { match ->
+                            // SAFETY: webSocketTopics is keyed by each topic's own location, so the match
+                            // arguments were decoded by that topic's PathSpec serializers
+                            @OptIn(Unsafe::class)
+                            WebSocketSubscriptionRequest.fromRawPathArguments(match.value, match.path.rawPathArguments)
+                        }
                         ?: throw IllegalArgumentException(
                             "WebSocket topic $it does not exist.  " +
                                     "Topics must be registered with the server before they can be used."
@@ -122,21 +132,24 @@ public class ModelRestUpdatesWebSocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
                     condition = c,
                     mask = refreshedMask,
                     permissionsCheckedAt = now(),
-                    topics = newTopics.mapTo(HashSet()) { it.pathInContext.path(connection.internalSerialization.stringArrayFormat) })
+                    topics = newTopics.mapTo(HashSet()) { it.pathInContext.path(serverRuntime.internalSerialization.stringArrayFormat) })
             }
             (oldTopics - newTopics.toHashSet()).forEach { connection.unsubscribe(it) }
             newTopics.filter { it !in oldTopics }.forEach { connection.subscribe(it) }
             connection.send(CollectionUpdates(condition = frame))
         }
 
-        context(connection: ApiWebSocketHandler.Connection<PathSpec0, ModelRestUpdatesWebSocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>>)
-        override suspend fun messageFromSubscriptionTyped(topic: WebSocketSubscriptionMessage<*, *>) {
+        context(serverRuntime: ServerRuntime)
+        override suspend fun messageFromSubscriptionTyped(
+            connection: ApiWebSocketHandler.Connection<PathSpec0, ModelRestUpdatesWebSocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>>,
+            topic: WebSocketSubscriptionMessage<*, *>,
+        ) {
             val state = connection.currentState
             val now = now()
 
             state.user?.expiration?.let { expiration ->
                 if (expiration <= now) {
-                    connection.close(WebSocketClose.VIOLATED_POLICY)
+                    connection.close(WebSocketClose(WebSocketClose.Code.VIOLATED_POLICY, "Expired"))
                     return
                 }
             }
@@ -146,9 +159,9 @@ public class ModelRestUpdatesWebSocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
                     info.table(connection.auth())
                 } catch (e: CancellationException) {
                     throw e
-                } catch (_: Exception) {
+                } catch (e: Exception) {
                     // Auth no longer resolves — the session was terminated or the credential revoked.
-                    connection.close(WebSocketClose.VIOLATED_POLICY)
+                    connection.close(WebSocketClose(WebSocketClose.Code.VIOLATED_POLICY, "Auth Revoked", e))
                     return
                 }
                 // Resolved outside updateStateImmediately: its modification lambda is not suspending.
@@ -182,7 +195,7 @@ public class ModelRestUpdatesWebSocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
             )
             // Measured on the unmasked payload: masking only ever removes content, so this errs toward
             // declaring an overload, which costs the client an HTTP refetch rather than a huge frame.
-            val approxSize = connection.externalSerialization.approximateJsonSize(
+            val approxSize = serverRuntime.externalSerialization.approximateJsonSize(
                 CollectionUpdates.serializer(info.serializer, info.idSerializer),
                 unmaskedUpdates,
                 limit = OVERLOAD_THRESHOLD_BYTES,
@@ -197,8 +210,11 @@ public class ModelRestUpdatesWebSocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
             }
         }
 
-        context(connection: ApiWebSocketHandler.Connection<PathSpec0, ModelRestUpdatesWebSocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>>)
-        override suspend fun disconnectTyped(reason: WebSocketClose) {
+        context(serverRuntime: ServerRuntime)
+        override suspend fun disconnectTyped(
+            connection: ApiWebSocketHandler.Connection<PathSpec0, ModelRestUpdatesWebSocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>>,
+            reason: WebSocketClose,
+        ) {
         }
     }
 

@@ -12,7 +12,7 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.*
 
 /**
- * Tests for DefaultExceptionHttpHandler behavior.
+ * Tests for ExceptionHttpHandler.Default behavior.
  */
 class DefaultExceptionHttpHandlerTest {
 

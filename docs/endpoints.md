@@ -1,7 +1,5 @@
 # Endpoints
 
-Last updated January 2025 (`version-5`)
-
 This guide covers everything you need to know about defining HTTP endpoints in Lightning Server, from basic routing to
 advanced request/response handling.
 
@@ -127,7 +125,7 @@ val endpoint = path.path("users").arg<String>("id").get bind HttpHandler { reque
     val isSecure = request.protocol == "https"
     val hostname = request.domain
 
-    HttpResponse.json(mapOf("userId" to userId))
+    HttpResponse.plainText("User $userId")
 }
 ```
 
@@ -140,7 +138,7 @@ val endpoint = path.path("users").arg<String>("id").get bind HttpHandler { reque
 - **domain**: Domain name from the request (e.g., "example.com")
 - **protocol**: "http" or "https"
 - **sourceIp**: Originating client IP address
-- **cache**: Request-scoped cache for storing data across interceptors
+- **cache**: Request-scoped cache, keyed by `Request.CacheKey`s such as `Authentication.CacheKey`
 
 ### Common Request Patterns
 
@@ -153,7 +151,7 @@ val listItems = path.path("items").get bind HttpHandler { request ->
         data.filter { it % 2 == 1 }
     else
         data
-    HttpResponse.json(dataToRender)
+    HttpResponse.plainText(dataToRender.joinToString())
 }
 ```
 
@@ -199,7 +197,7 @@ val listUsers = path.path("users").get bind HttpHandler { request ->
         .find(condition { /* ... */ }, skip = (page - 1) * limit, limit = limit)
         .toList()
 
-    HttpResponse.json(users)
+    HttpResponse(body = users.toTypedData(request.headers.accept))
 }
 ```
 
@@ -207,24 +205,23 @@ val listUsers = path.path("users").get bind HttpHandler { request ->
 
 ```kotlin
 val createUser = path.path("users").post bind HttpHandler { request ->
-    // TypedData.parse<T>() automatically uses the appropriate MediaTypeCoder
-    // based on the request's Content-Type header (JSON, CSV, XML, etc.)
-    val user = request.body?.parse<User>() ?: throw BadRequestException("Missing body")
+    // parse() picks the registered decoder for the body's Content-Type (JSON, form data, etc.)
+    val user = request.body?.parse(User.serializer()) ?: throw BadRequestException("Missing body")
 
     // Process user...
-    HttpResponse.json(user)  // HttpResponse.json() serializes using Serialization.json
+
+    // toTypedData() picks the registered encoder for the request's Accept header
+    HttpResponse(body = user.toTypedData(request.headers.accept))
 }
 ```
 
-The `parse<T>()` extension function on `TypedData` automatically selects the correct deserializer based on the body's
-media type. Similarly, `HttpResponse.json()` uses `Serialization.json` to serialize your object.
-
 **Key Points:**
 
-- `TypedData.parse<T>()` - Deserializes based on Content-Type (JSON, CSV, XML, etc.)
-- `HttpResponse.json(obj)` - Serializes using `Serialization.json`
-- Both use `kotlinx.serialization` under the hood
-- Custom media types can be registered via `Serialization.handler()`
+- `TypedData.parse(serializer)` - Deserializes based on Content-Type
+- `value.toTypedData(accepts)` - Serializes for the best media type the client accepts
+- Both use the media type coders registered on the server, so call `registerBasicMediaTypeCoders()` in your
+  `ServerBuilder`'s `init`
+- For JSON APIs, [typed endpoints](typed-endpoints.md) do all of this for you, and generate documentation and SDKs
 
 See [Serialization Documentation](serialization.md) for more details on customizing serialization, adding custom media
 types, and working with different formats.
@@ -238,7 +235,7 @@ An `HttpResponse` is made of a body, status code, and set of headers.
 ```kotlin
 // Manual construction
 HttpResponse(
-    body = TypedData.text("Hello"),
+    body = TypedData.text("Hello", MediaType.Text.Plain),
     status = HttpStatus.OK,
     headers = HttpHeaders {
         add("X-Custom-Header", "value")
@@ -246,7 +243,7 @@ HttpResponse(
 )
 
 // Default status behavior
-HttpResponse(body = TypedData.json(data))  // 200 OK (has body)
+HttpResponse(body = TypedData.text("Hello", MediaType.Text.Plain))  // 200 OK (has body)
 HttpResponse()  // 204 No Content (no body)
 ```
 
@@ -259,7 +256,6 @@ Extension functions provide convenient shortcuts:
 
 ```kotlin
 HttpResponse.plainText("Some Text")
-HttpResponse.json(dataObject)
 HttpResponse.redirectToGet("https://example.com")
 HttpResponse.pathMoved("/new-location")
 HttpResponse.pathMovedPermanently("/new-permanent-location")
@@ -282,9 +278,9 @@ The content is represented as `TypedData`, which includes both the data and its 
 ```kotlin
 import com.lightningkite.services.data.TypedData
 
-TypedData.text("Some text", "text/plain")
-TypedData.json("{\"json\": true}")
-HttpResponse(body = TypedData.bytes(byteArray, "application/octet-stream"))
+TypedData.text("Some text", MediaType.Text.Plain)
+TypedData.text("{\"json\": true}", MediaType.Application.Json)
+HttpResponse(body = TypedData.bytes(byteArray, MediaType.Application.OctetStream))
 ```
 
 ### HttpStatus Codes
@@ -459,19 +455,6 @@ val segments = PathSegments.parse("/users/john%20doe")
 println(segments.segments)  // ["users", "john doe"]
 ```
 
-### PathAndParams
-
-Combines path and query parameters:
-
-```kotlin
-val parsed = PathAndParams.parse("/api/users?filter=active&sort=name")
-println(parsed.pathSegments.segments)    // ["api", "users"]
-println(parsed.queryParameters["filter"]) // "active"
-
-// Convert back to string
-println(parsed.toString())  // "api/users?filter=active&sort=name"
-```
-
 ## Grouping Endpoints
 
 Organize related endpoints into separate objects:
@@ -489,7 +472,7 @@ object ApiEndpoints : ServerBuilder() {
 
     // GET /api/users
     val listUsers = path.path("users").get bind HttpHandler {
-        HttpResponse.json(listOf("user1", "user2"))
+        HttpResponse.plainText("user1, user2")
     }
 }
 ```
@@ -505,44 +488,50 @@ limiting, etc.
 ### Creating Interceptors
 
 ```kotlin
-// Logging interceptor
-val loggingInterceptor = HttpInterceptor { request, cont ->
-    val start = Clock.System.now()
-    println("→ ${request.path}")
-    val response = cont(request)
-    val duration = Clock.System.now() - start
-    println("← ${response.status} (${duration.inWholeMilliseconds}ms)")
-    response
+object LoggingInterceptor : HttpInterceptor {
+    context(runtime: ServerRuntime)
+    override suspend fun <PATH : PathSpec> intercept(
+        request: HttpRequest<PATH>,
+        cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
+    ): HttpResponse {
+        val start = TimeSource.Monotonic.markNow()
+        println("→ ${request.path}")
+        val response = cont(request)
+        println("← ${response.status} (${start.elapsedNow().inWholeMilliseconds}ms)")
+        return response
+    }
 }
 
-// Authentication interceptor
-val authInterceptor = HttpInterceptor { request, cont ->
-    val token = request.headers[HttpHeader.Authorization]?.root
-        ?: throw UnauthorizedException("Missing auth token")
-
-    // Validate token
-    val user = validateToken(token)
-
-    // Store user in request cache for downstream handlers
-    val requestWithUser = request.copy(
-        cache = request.cache.apply { put("user", user) }
-    )
-
-    cont(requestWithUser)
+object RequireApiKey : HttpInterceptor {
+    context(runtime: ServerRuntime)
+    override suspend fun <PATH : PathSpec> intercept(
+        request: HttpRequest<PATH>,
+        cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
+    ): HttpResponse {
+        if (request.headers["X-Api-Key"] != apiKeySetting()) throw UnauthorizedException("Missing or invalid API key")
+        return cont(request)
+    }
 }
 ```
+
+For authentication, prefer registering an `Authentication.Reader` (see [Authentication](authentication.md)) over an
+interceptor: auth is resolved on demand and cached on the request.
 
 ### Installing Interceptors
 
 ```kotlin
 object Server : ServerBuilder() {
     init {
-        install(loggingInterceptor)
-        install(authInterceptor)
+        install(LoggingInterceptor)
+        install(RequireApiKey)
         install(CorsInterceptor(corsSettings))
     }
 }
 ```
+
+Interceptors run once for each request the engine receives, not for the sub-requests inside `/meta/bulk` or internal
+endpoint calls. To wrap every execution, including those, tasks and schedules, install an `ExecutionInterceptor`
+instead (see [Runtime](runtime.md)).
 
 ### Interceptor Capabilities
 
@@ -551,18 +540,20 @@ Interceptors can:
 - **Modify requests** before passing to next handler
 - **Short-circuit** and return responses without calling next handler
 - **Modify responses** after calling next handler
-- **Handle exceptions** from downstream handlers
 - **Add timing/logging** around request processing
 - **Enforce authentication/authorization**
 - **Add CORS headers**
 - **Rate limit requests**
 
-**Order matters:** Interceptors execute in the order they are installed. Put cheaper checks (like CORS) before expensive
-ones (like authentication).
+**Order matters:** Interceptors execute in the order they are installed; the first installed is the outermost. Put
+cheaper checks (like CORS) before expensive ones.
+
+Exceptions thrown by a handler are turned into responses before they reach the interceptors, so an interceptor sees an
+error response rather than an exception, and can still post-process it (CORS headers, for example).
 
 ## Exception Handling
 
-Lightning Server automatically converts exceptions to HTTP responses using `ExceptionHttpHandler`.
+Lightning Server automatically converts exceptions to HTTP responses using `HttpExceptionHandler`.
 
 ### Default Behavior
 
@@ -570,29 +561,17 @@ Lightning Server automatically converts exceptions to HTTP responses using `Exce
 - **Other exceptions in debug mode** → 500 with exception details and stack trace
 - **Other exceptions in production** → 500 with generic error message
 
-### Custom Exception Handler
+### Custom Error Responses
+
+Throw an `HttpStatusException` subclass to choose the status, and give it a `detail` and `message` to shape the body:
 
 ```kotlin
-object CustomExceptionHandler : ExceptionHttpHandler {
-    context(server: ServerRuntime)
-    override suspend fun handle(
-        request: HttpRequest<PathSpec>,
-        exception: Exception
-    ): HttpResponse {
-        return when (exception) {
-            is ValidationException -> HttpResponse(
-                status = HttpStatus.BadRequest,
-                body = TypedData.json(mapOf("errors" to exception.errors))
-            )
-            is NotFoundException -> HttpResponse(
-                status = HttpStatus.NotFound,
-                body = TypedData.json(mapOf("message" to exception.message))
-            )
-            else -> DefaultExceptionHttpHandler.handle(request, exception)
-        }
-    }
-}
+throw BadRequestException(detail = "invalid-email", message = "That email address is not valid")
+throw NotFoundException("No such user")
 ```
+
+There is currently no registration API for a custom `HttpExceptionHandler`; every server uses
+`HttpExceptionHandler.Default`.
 
 ## Advanced Patterns
 
@@ -600,24 +579,17 @@ object CustomExceptionHandler : ExceptionHttpHandler {
 
 Handle different Accept headers to return appropriate formats:
 
+`toTypedData` does this for you: it picks a registered encoder for the media types in the Accept header, falling back
+to the server's default (JSON with the basic coders):
+
 ```kotlin
 val getData = path.path("data").get bind HttpHandler { request ->
     val data = fetchData()
-
-    when {
-        request.headers.accept.any { it.subtype == "json" } ->
-            HttpResponse.json(data)
-        request.headers.accept.any { it.subtype == "xml" } ->
-            HttpResponse(
-                body = TypedData.xml(data),
-                status = HttpStatus.OK,
-                headers = HttpHeaders("Content-Type" to "application/xml")
-            )
-        else ->
-            HttpResponse.json(data)  // Default to JSON
-    }
+    HttpResponse(body = data.toTypedData(request.headers.accept))
 }
 ```
+
+To support another format, register a `MediaTypeCoder` for it (see [Serialization](serialization.md)).
 
 ### Conditional Requests
 
@@ -625,8 +597,8 @@ Support ETags for caching:
 
 ```kotlin
 val getResource = path.path("resource").arg<String>("id").get bind HttpHandler { request ->
-    val resource = resourceTable().get(request.path.arg1)
-    val etag = resource.hash()
+    val resource = resourceTable().get(request.path.arg1) ?: throw NotFoundException()
+    val etag = resource.hashCode().toString()
 
     val clientETag = request.headers[HttpHeader.IfNoneMatch]?.root
     if (clientETag == etag) {
@@ -634,7 +606,7 @@ val getResource = path.path("resource").arg<String>("id").get bind HttpHandler {
     }
 
     HttpResponse(
-        body = TypedData.json(resource),
+        body = resource.toTypedData(request.headers.accept),
         headers = HttpHeaders {
             add(HttpHeader.ETag, etag)
             add(HttpHeader.CacheControl, "max-age=3600")
@@ -648,13 +620,14 @@ val getResource = path.path("resource").arg<String>("id").get bind HttpHandler {
 For large files or streaming data:
 
 ```kotlin
-val downloadFile = path.path("download").arg<String>("fileId").get bind HttpHandler { request ->
-    val file = files().get(request.path.arg1)
+val downloadFile = path.path("download").arg<String>("fileName").get bind HttpHandler { request ->
+    val path = Path("exports", request.path.arg1)
 
     HttpResponse(
-        body = TypedData.stream(file.inputStream(), file.contentType),
+        // TypedData.source streams from a kotlinx-io Source instead of loading everything into memory
+        body = TypedData.source(SystemFileSystem.source(path).buffered(), MediaType.Application.OctetStream),
         headers = HttpHeaders {
-            add(HttpHeader.ContentDisposition, "attachment; filename=\"${file.name}\"")
+            add(HttpHeader.ContentDisposition, "attachment; filename=\"${request.path.arg1}\"")
         }
     )
 }
@@ -694,15 +667,16 @@ For serving static files, use the file system abstraction (see [Files documentat
 ### Response Construction
 
 1. **Use appropriate status codes**: 201 Created, 204 No Content, 404 Not Found, etc.
-2. **Set Content-Type explicitly** when not using convenience methods
+2. **Choose the media type deliberately**: use `toTypedData` for content negotiation, or a `MediaType` constant
 3. **Include Location header** for 201 Created responses
-4. **Use typed response helpers**: `HttpResponse.json()` over manual construction
+4. **Prefer typed endpoints** for JSON APIs over hand-built responses
 5. **Be explicit about status codes** when they differ from defaults
 
 ### Headers
 
 1. **Use HttpHeader constants** instead of string literals to avoid typos
-2. **Set security headers**: Strict-Transport-Security, X-Content-Type-Options, X-Frame-Options
+2. **Set security headers**: install `SecurityHeadersInterceptor` for Strict-Transport-Security and
+   X-Content-Type-Options
 3. **Include CORS headers** when serving cross-origin requests (see [CORS documentation](cors.md))
 4. **Use httpOnly and secure flags** on sensitive cookies
 5. **Headers are case-insensitive** but constants use standard casing
@@ -728,21 +702,23 @@ For serving static files, use the file system abstraction (see [Files documentat
 Store endpoint references for easy testing:
 
 ```kotlin
-val getUser = path.path("users").arg<String>("id").get bind HttpHandler { request ->
-    val user = userTable().get(request.path.arg1)
-    HttpResponse.json(user)
+val getUser = path.path("users").arg<User.ID>("id").get bind HttpHandler { request ->
+    val user = userTable().get(request.path.arg1) ?: throw NotFoundException()
+    HttpResponse(body = user.toTypedData(request.headers.accept))
 }
 
 // In tests:
 @Test
-fun testGetUser() = runBlocking {
-    val engine = LocalEngine(Server.build())
-    val response = Server.getUser.test(engine, pathArgs = listOf("user123"))
+fun testGetUser() = Server.testBlocking(settings = { database set Database.Settings("ram") }) {
+    val user = User(email = "test@example.com")
+    execute { userTable().insertOne(user) }  // Direct database access needs a ServerRuntime
+
+    val response = Server.getUser.test(user._id)  // Path arguments are passed positionally
     assertEquals(HttpStatus.OK, response.status)
 }
 ```
 
-See your test files for more examples of endpoint testing patterns.
+See the [Testing Guide](../docs-guide/guide/testing.md) for more endpoint testing patterns.
 
 ## See Also
 

@@ -1,9 +1,13 @@
+@file:OptIn(InternalLightningServerApi::class, EngineApi::class)
+
 package com.lightningkite.lightningserver.engine.local
 
+import com.lightningkite.lightningserver.EngineApi
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.path
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.messageFromSubscriptionAsRoot
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.pubsub.PubSubChannel
 import kotlinx.coroutines.CoroutineScope
@@ -23,16 +27,19 @@ public abstract class LocalWebSocketConnection<PATH : PathSpec, STORAGE>(
     override val request: WebSocketConnectRequest<PATH>,
     private val handler: WebSocketHandler<PATH, STORAGE>,
     private val scope: CoroutineScope,
-    server: ServerRuntime,
     private val pubSub: (request: WebSocketSubscriptionRequest<*, Any?>) -> PubSubChannel<Any?>,
-) : WebSocketConnection<PATH, STORAGE>, ServerRuntime by server {
-
+) : WebSocketConnection<PATH, STORAGE> {
     override var currentState: STORAGE = startingState
+
+    context(server: ServerRuntime)
     override suspend fun repullState(): STORAGE = currentState
+
+    context(server: ServerRuntime)
     override suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE) {
         currentState = modification(currentState)
     }
 
+    context(server: ServerRuntime)
     override suspend fun updateStateImmediately(modification: (STORAGE) -> STORAGE): STORAGE {
         currentState = modification(currentState)
         return currentState
@@ -43,20 +50,25 @@ public abstract class LocalWebSocketConnection<PATH : PathSpec, STORAGE>(
     /** The topic subscriptions this connection currently holds. */
     public val activeSubscriptions: Set<WebSocketSubscriptionRequest<*, *>> get() = subscriptions.keys.toSet()
 
+    context(server: ServerRuntime)
     override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) {
         @Suppress("UNCHECKED_CAST")
         topic as WebSocketSubscriptionRequest<*, Any?>
         subscriptions.remove(topic)?.cancel()
         subscriptions[topic] = scope.launch {
             pubSub(topic).collect { value ->
-                handler.messageFromSubscription(
-                    WebSocketSubscriptionMessage(topic.topic, topic.pathInContext.rawPathArguments, value),
+                // Each delivery is caused by the published message, not by whatever called subscribe(), so it
+                // runs as a root.
+                handler.messageFromSubscriptionAsRoot(
+                    this@LocalWebSocketConnection,
+                    WebSocketSubscriptionMessage(topic, value),
                 )
             }
             yield()
         }
     }
 
+    context(server: ServerRuntime)
     override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) {
         subscriptions.remove(topic)?.cancel()
     }
