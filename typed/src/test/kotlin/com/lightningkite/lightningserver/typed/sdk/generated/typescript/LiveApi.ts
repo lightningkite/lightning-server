@@ -1,5 +1,5 @@
 import type { Query, MassModification, EntryChange, ListChange, Modification, Condition, GroupCountQuery, AggregateQuery, GroupAggregateQuery, Aggregate, SortPart, DataClassPath, DataClassPathPartial, QueryPartial, DeepPartial, Fetcher, Brand } from '@lightningkite/lightning-server-simplified'
-import type { CollectionUpdates, TestModel, Mask, UpdateRestrictions, ModelPermissions, Pair, TestInput, Uuid } from './models.ts'
+import type { CollectionUpdates, TestModel, Mask, UpdateRestrictions, ModelPermissions, Pair, ScoredResult, TestInput, TextIndexQuery, Uuid } from './models.ts'
 import type { Api } from './Api.ts'
 
 export class LiveApi implements Api {
@@ -26,6 +26,7 @@ export class LiveApi implements Api {
 		groupAggregate2: (input) => this.fetcher(`/m1/rest/group-aggregate-2`, "POST", input),
 		groupAggregate: (input) => this.fetcher(`/m1/rest/group-aggregate`, "POST", input),
 		query: (input) => this.fetcher(`/m1/rest/query`, "POST", input),
+		textQuery: (input) => this.fetcher(`/m1/rest/text-query`, "POST", input),
 		count: (input) => this.fetcher(`/m1/rest/count`, "POST", input),
 		groupCount: (input) => this.fetcher(`/m1/rest/group-count`, "POST", input),
 		insertBulk: (input) => this.fetcher(`/m1/rest/bulk`, "POST", input),
@@ -51,6 +52,7 @@ export class LiveApi implements Api {
 			groupAggregate2: (input) => this.fetcher(`/m1/second/rest/group-aggregate-2`, "POST", input),
 			groupAggregate: (input) => this.fetcher(`/m1/second/rest/group-aggregate`, "POST", input),
 			query: (input) => this.fetcher(`/m1/second/rest/query`, "POST", input),
+			textQuery: (input) => this.fetcher(`/m1/second/rest/text-query`, "POST", input),
 			count: (input) => this.fetcher(`/m1/second/rest/count`, "POST", input),
 			groupCount: (input) => this.fetcher(`/m1/second/rest/group-count`, "POST", input),
 			insertBulk: (input) => this.fetcher(`/m1/second/rest/bulk`, "POST", input),
@@ -80,6 +82,7 @@ export class LiveApi implements Api {
 			groupAggregate2: (input) => this.fetcher(`/m1/duplicate/rest/group-aggregate-2`, "POST", input),
 			groupAggregate: (input) => this.fetcher(`/m1/duplicate/rest/group-aggregate`, "POST", input),
 			query: (input) => this.fetcher(`/m1/duplicate/rest/query`, "POST", input),
+			textQuery: (input) => this.fetcher(`/m1/duplicate/rest/text-query`, "POST", input),
 			count: (input) => this.fetcher(`/m1/duplicate/rest/count`, "POST", input),
 			groupCount: (input) => this.fetcher(`/m1/duplicate/rest/group-count`, "POST", input),
 			insertBulk: (input) => this.fetcher(`/m1/duplicate/rest/bulk`, "POST", input),
@@ -110,6 +113,7 @@ export class LiveApi implements Api {
 		groupAggregate2: (input) => this.fetcher(`/m2/rest/group-aggregate-2`, "POST", input),
 		groupAggregate: (input) => this.fetcher(`/m2/rest/group-aggregate`, "POST", input),
 		query: (input) => this.fetcher(`/m2/rest/query`, "POST", input),
+		textQuery: (input) => this.fetcher(`/m2/rest/text-query`, "POST", input),
 		count: (input) => this.fetcher(`/m2/rest/count`, "POST", input),
 		groupCount: (input) => this.fetcher(`/m2/rest/group-count`, "POST", input),
 		insertBulk: (input) => this.fetcher(`/m2/rest/bulk`, "POST", input),
@@ -142,6 +146,7 @@ export class LiveApi implements Api {
 			groupAggregate2: (input) => this.fetcher(`/third/rest/group-aggregate-2`, "POST", input),
 			groupAggregate: (input) => this.fetcher(`/third/rest/group-aggregate`, "POST", input),
 			query: (input) => this.fetcher(`/third/rest/query`, "POST", input),
+			textQuery: (input) => this.fetcher(`/third/rest/text-query`, "POST", input),
 			count: (input) => this.fetcher(`/third/rest/count`, "POST", input),
 			groupCount: (input) => this.fetcher(`/third/rest/group-count`, "POST", input),
 			insertBulk: (input) => this.fetcher(`/third/rest/bulk`, "POST", input),
@@ -166,6 +171,7 @@ export class LiveApi implements Api {
 			groupAggregate2: (input) => this.fetcher(`/third/rest2/group-aggregate-2`, "POST", input),
 			groupAggregate: (input) => this.fetcher(`/third/rest2/group-aggregate`, "POST", input),
 			query: (input) => this.fetcher(`/third/rest2/query`, "POST", input),
+			textQuery: (input) => this.fetcher(`/third/rest2/text-query`, "POST", input),
 			count: (input) => this.fetcher(`/third/rest2/count`, "POST", input),
 			groupCount: (input) => this.fetcher(`/third/rest2/group-count`, "POST", input),
 			insertBulk: (input) => this.fetcher(`/third/rest2/bulk`, "POST", input),

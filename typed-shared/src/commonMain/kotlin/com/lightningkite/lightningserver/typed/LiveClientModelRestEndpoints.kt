@@ -79,6 +79,14 @@ public open class LiveClientModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID
         ListSerializer(PartialSerializer(serializer))
     )
 
+    override suspend fun textQuery(input: TextIndexQuery<T>): List<ScoredResult<T>> = fetcher(
+        "$subpath/text-query",
+        HttpMethod.POST,
+        TextIndexQuery.serializer(serializer),
+        input,
+        ListSerializer(ScoredResult.serializer(serializer))
+    )
+
     override suspend fun detail(id: ID): T = fetcher(
         "$subpath/${id.url()}",
         HttpMethod.GET,

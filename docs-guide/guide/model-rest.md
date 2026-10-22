@@ -122,6 +122,7 @@ Key points:
 | `list` | GET | `/` | `Query<T>` (query param) | `List<T>` |
 | `query` | POST | `/query` | `Query<T>` | `List<T>` |
 | `queryPartial` | POST | `/query-partial` | `QueryPartial<T>` | `List<Partial<T>>` |
+| `textQuery` | POST | `/text-query` | `TextIndexQuery<T>` | `List<ScoredResult<T>>` |
 | `detail` | GET | `/{id}` | — | `T` |
 | `insert` | POST | `/` | `T` | `T` |
 | `insertBulk` | POST | `/bulk` | `List<T>` | `List<T>` |
@@ -364,7 +365,7 @@ tokens to be restricted to a subset of operations:
 
 | Scope | Endpoints |
 |---|---|
-| `ModelInfo.Scopes.read` | `list`, `query`, `queryPartial`, `detail`, `count`, `groupCount`, `groupCount2`, `aggregate`, `groupAggregate`, `groupAggregate2`, `permissions` |
+| `ModelInfo.Scopes.read` | `list`, `query`, `queryPartial`, `textQuery`, `detail`, `count`, `groupCount`, `groupCount2`, `aggregate`, `groupAggregate`, `groupAggregate2`, `permissions` |
 | `ModelInfo.Scopes.create` | `insert`, `insertBulk` |
 | `ModelInfo.Scopes.create` + `update` | `upsert` |
 | `ModelInfo.Scopes.update` | `replace`, `bulkReplace`, `modify`, `modifyWithDiff`, `modifySimple`, `bulkModify` |

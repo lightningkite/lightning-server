@@ -1,5 +1,5 @@
 import type { Query, MassModification, EntryChange, ListChange, Modification, Condition, GroupCountQuery, AggregateQuery, GroupAggregateQuery, Aggregate, SortPart, DataClassPath, DataClassPathPartial, QueryPartial, DeepPartial, Fetcher, Brand } from '@lightningkite/lightning-server-simplified'
-import type { CollectionUpdates, TestModel, Mask, UpdateRestrictions, ModelPermissions, Pair, TestInput, Uuid } from './models.ts'
+import type { CollectionUpdates, TestModel, Mask, UpdateRestrictions, ModelPermissions, Pair, ScoredResult, TestInput, TextIndexQuery, Uuid } from './models.ts'
 
 export interface Api {
 	index(): Promise<number>
@@ -20,6 +20,7 @@ export interface Api {
 		groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 		groupAggregate(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 		query(input: Query<TestModel>): Promise<Array<TestModel>>
+		textQuery(input: TextIndexQuery<TestModel>): Promise<Array<ScoredResult<TestModel>>>
 		count(input: Condition<TestModel>): Promise<number>
 		groupCount(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
 		insertBulk(input: Array<TestModel>): Promise<Array<TestModel>>
@@ -45,6 +46,7 @@ export interface Api {
 			groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 			groupAggregate(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 			query(input: Query<TestModel>): Promise<Array<TestModel>>
+			textQuery(input: TextIndexQuery<TestModel>): Promise<Array<ScoredResult<TestModel>>>
 			count(input: Condition<TestModel>): Promise<number>
 			groupCount(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
 			insertBulk(input: Array<TestModel>): Promise<Array<TestModel>>
@@ -74,6 +76,7 @@ export interface Api {
 			groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 			groupAggregate(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 			query(input: Query<TestModel>): Promise<Array<TestModel>>
+			textQuery(input: TextIndexQuery<TestModel>): Promise<Array<ScoredResult<TestModel>>>
 			count(input: Condition<TestModel>): Promise<number>
 			groupCount(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
 			insertBulk(input: Array<TestModel>): Promise<Array<TestModel>>
@@ -104,6 +107,7 @@ export interface Api {
 		groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 		groupAggregate(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 		query(input: Query<TestModel>): Promise<Array<TestModel>>
+		textQuery(input: TextIndexQuery<TestModel>): Promise<Array<ScoredResult<TestModel>>>
 		count(input: Condition<TestModel>): Promise<number>
 		groupCount(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
 		insertBulk(input: Array<TestModel>): Promise<Array<TestModel>>
@@ -136,6 +140,7 @@ export interface Api {
 			groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 			groupAggregate(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 			query(input: Query<TestModel>): Promise<Array<TestModel>>
+			textQuery(input: TextIndexQuery<TestModel>): Promise<Array<ScoredResult<TestModel>>>
 			count(input: Condition<TestModel>): Promise<number>
 			groupCount(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
 			insertBulk(input: Array<TestModel>): Promise<Array<TestModel>>
@@ -160,6 +165,7 @@ export interface Api {
 			groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 			groupAggregate(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 			query(input: Query<TestModel>): Promise<Array<TestModel>>
+			textQuery(input: TextIndexQuery<TestModel>): Promise<Array<ScoredResult<TestModel>>>
 			count(input: Condition<TestModel>): Promise<number>
 			groupCount(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
 			insertBulk(input: Array<TestModel>): Promise<Array<TestModel>>

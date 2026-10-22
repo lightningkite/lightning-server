@@ -87,6 +87,7 @@ When you create `ModelRestEndpoints`, the following endpoints are automatically 
 - `DELETE /posts/rest/{id}` - Delete a specific post (respecting delete permissions)
 - `POST /posts/rest/query` - Advanced query endpoint
 - `POST /posts/rest/query-partial` - Query returning only selected fields
+- `POST /posts/rest/text-query` - Search the model's `@TextIndex` fields, most relevant first (400 `no-text-index` if it has none)
 - `POST /posts/rest/count`, `/group-count`, `/aggregate`, `/group-aggregate` - Counting and aggregation
 - `POST`/`PUT`/`PATCH /posts/rest/bulk` - Insert, replace, or modify many posts
 - `POST /posts/rest/bulk-delete` - Delete multiple posts

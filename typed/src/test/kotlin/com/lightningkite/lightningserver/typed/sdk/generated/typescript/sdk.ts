@@ -26,6 +26,11 @@ export interface Pair<T, T1> {
 	second: T1
 }
 
+export interface ScoredResult<T> {
+	model: T
+	score: number
+}
+
 export interface TestInput {
 	id: number
 	name: string
@@ -50,6 +55,13 @@ export namespace TestModel {
 		status: TestModel.Status
 		updatedAt: number
 	}
+}
+
+export interface TextIndexQuery<T> {
+	query: string
+	condition: Condition<T>
+	skip: number
+	limit: number
 }
 
 export interface UpdateRestrictions<T> {
@@ -190,6 +202,14 @@ export interface Api {
 		 * **Auth Requirements:** No Requirements
 		 * */
 		query(input: Query<TestModel>): Promise<Array<TestModel>>
+		/**
+		 * Text Query
+		 * 
+		 * Searches the text-indexed fields of TestModels, most relevant first.
+		 * 
+		 * **Auth Requirements:** No Requirements
+		 * */
+		textQuery(input: TextIndexQuery<TestModel>): Promise<Array<ScoredResult<TestModel>>>
 		/**
 		 * Count
 		 * 
@@ -376,6 +396,14 @@ export interface Api {
 			 * **Auth Requirements:** Authenticated
 			 * */
 			query(input: Query<TestModel>): Promise<Array<TestModel>>
+			/**
+			 * Text Query
+			 * 
+			 * Searches the text-indexed fields of TestModels, most relevant first.
+			 * 
+			 * **Auth Requirements:** Authenticated
+			 * */
+			textQuery(input: TextIndexQuery<TestModel>): Promise<Array<ScoredResult<TestModel>>>
 			/**
 			 * Count
 			 * 
@@ -574,6 +602,14 @@ export interface Api {
 			 * */
 			query(input: Query<TestModel>): Promise<Array<TestModel>>
 			/**
+			 * Text Query
+			 * 
+			 * Searches the text-indexed fields of TestModels, most relevant first.
+			 * 
+			 * **Auth Requirements:** Authenticated
+			 * */
+			textQuery(input: TextIndexQuery<TestModel>): Promise<Array<ScoredResult<TestModel>>>
+			/**
 			 * Count
 			 * 
 			 * Gets the total number of TestModels matching the given condition.
@@ -771,6 +807,14 @@ export interface Api {
 		 * **Auth Requirements:** Authenticated
 		 * */
 		query(input: Query<TestModel>): Promise<Array<TestModel>>
+		/**
+		 * Text Query
+		 * 
+		 * Searches the text-indexed fields of TestModels, most relevant first.
+		 * 
+		 * **Auth Requirements:** Authenticated
+		 * */
+		textQuery(input: TextIndexQuery<TestModel>): Promise<Array<ScoredResult<TestModel>>>
 		/**
 		 * Count
 		 * 
@@ -979,6 +1023,14 @@ export interface Api {
 			 * */
 			query(input: Query<TestModel>): Promise<Array<TestModel>>
 			/**
+			 * Text Query
+			 * 
+			 * Searches the text-indexed fields of TestModels, most relevant first.
+			 * 
+			 * **Auth Requirements:** No Requirements
+			 * */
+			textQuery(input: TextIndexQuery<TestModel>): Promise<Array<ScoredResult<TestModel>>>
+			/**
 			 * Count
 			 * 
 			 * Gets the total number of TestModels matching the given condition.
@@ -1157,6 +1209,14 @@ export interface Api {
 			 * */
 			query(input: Query<TestModel>): Promise<Array<TestModel>>
 			/**
+			 * Text Query
+			 * 
+			 * Searches the text-indexed fields of TestModels, most relevant first.
+			 * 
+			 * **Auth Requirements:** No Requirements
+			 * */
+			textQuery(input: TextIndexQuery<TestModel>): Promise<Array<ScoredResult<TestModel>>>
+			/**
 			 * Count
 			 * 
 			 * Gets the total number of TestModels matching the given condition.
@@ -1306,6 +1366,7 @@ export class LiveApi implements Api {
 		groupAggregate2: (input) => this.fetcher(`/m1/rest/group-aggregate-2`, "POST", input),
 		groupAggregate: (input) => this.fetcher(`/m1/rest/group-aggregate`, "POST", input),
 		query: (input) => this.fetcher(`/m1/rest/query`, "POST", input),
+		textQuery: (input) => this.fetcher(`/m1/rest/text-query`, "POST", input),
 		count: (input) => this.fetcher(`/m1/rest/count`, "POST", input),
 		groupCount: (input) => this.fetcher(`/m1/rest/group-count`, "POST", input),
 		insertBulk: (input) => this.fetcher(`/m1/rest/bulk`, "POST", input),
@@ -1331,6 +1392,7 @@ export class LiveApi implements Api {
 			groupAggregate2: (input) => this.fetcher(`/m1/second/rest/group-aggregate-2`, "POST", input),
 			groupAggregate: (input) => this.fetcher(`/m1/second/rest/group-aggregate`, "POST", input),
 			query: (input) => this.fetcher(`/m1/second/rest/query`, "POST", input),
+			textQuery: (input) => this.fetcher(`/m1/second/rest/text-query`, "POST", input),
 			count: (input) => this.fetcher(`/m1/second/rest/count`, "POST", input),
 			groupCount: (input) => this.fetcher(`/m1/second/rest/group-count`, "POST", input),
 			insertBulk: (input) => this.fetcher(`/m1/second/rest/bulk`, "POST", input),
@@ -1360,6 +1422,7 @@ export class LiveApi implements Api {
 			groupAggregate2: (input) => this.fetcher(`/m1/duplicate/rest/group-aggregate-2`, "POST", input),
 			groupAggregate: (input) => this.fetcher(`/m1/duplicate/rest/group-aggregate`, "POST", input),
 			query: (input) => this.fetcher(`/m1/duplicate/rest/query`, "POST", input),
+			textQuery: (input) => this.fetcher(`/m1/duplicate/rest/text-query`, "POST", input),
 			count: (input) => this.fetcher(`/m1/duplicate/rest/count`, "POST", input),
 			groupCount: (input) => this.fetcher(`/m1/duplicate/rest/group-count`, "POST", input),
 			insertBulk: (input) => this.fetcher(`/m1/duplicate/rest/bulk`, "POST", input),
@@ -1390,6 +1453,7 @@ export class LiveApi implements Api {
 		groupAggregate2: (input) => this.fetcher(`/m2/rest/group-aggregate-2`, "POST", input),
 		groupAggregate: (input) => this.fetcher(`/m2/rest/group-aggregate`, "POST", input),
 		query: (input) => this.fetcher(`/m2/rest/query`, "POST", input),
+		textQuery: (input) => this.fetcher(`/m2/rest/text-query`, "POST", input),
 		count: (input) => this.fetcher(`/m2/rest/count`, "POST", input),
 		groupCount: (input) => this.fetcher(`/m2/rest/group-count`, "POST", input),
 		insertBulk: (input) => this.fetcher(`/m2/rest/bulk`, "POST", input),
@@ -1422,6 +1486,7 @@ export class LiveApi implements Api {
 			groupAggregate2: (input) => this.fetcher(`/third/rest/group-aggregate-2`, "POST", input),
 			groupAggregate: (input) => this.fetcher(`/third/rest/group-aggregate`, "POST", input),
 			query: (input) => this.fetcher(`/third/rest/query`, "POST", input),
+			textQuery: (input) => this.fetcher(`/third/rest/text-query`, "POST", input),
 			count: (input) => this.fetcher(`/third/rest/count`, "POST", input),
 			groupCount: (input) => this.fetcher(`/third/rest/group-count`, "POST", input),
 			insertBulk: (input) => this.fetcher(`/third/rest/bulk`, "POST", input),
@@ -1446,6 +1511,7 @@ export class LiveApi implements Api {
 			groupAggregate2: (input) => this.fetcher(`/third/rest2/group-aggregate-2`, "POST", input),
 			groupAggregate: (input) => this.fetcher(`/third/rest2/group-aggregate`, "POST", input),
 			query: (input) => this.fetcher(`/third/rest2/query`, "POST", input),
+			textQuery: (input) => this.fetcher(`/third/rest2/text-query`, "POST", input),
 			count: (input) => this.fetcher(`/third/rest2/count`, "POST", input),
 			groupCount: (input) => this.fetcher(`/third/rest2/group-count`, "POST", input),
 			insertBulk: (input) => this.fetcher(`/third/rest2/bulk`, "POST", input),

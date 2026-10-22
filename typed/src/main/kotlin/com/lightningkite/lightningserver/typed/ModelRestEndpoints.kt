@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec.Segment
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
+import com.lightningkite.services.data.TextIndex
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.KSerializer
@@ -41,6 +42,12 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
         detail = "unique",
         message = "A unique constraint was violated.",
     )
+    private val noTextIndexError = LSError(
+        http = HttpStatus.BadRequest.code,
+        detail = "no-text-index",
+        message = "This model has no text index to search.",
+    )
+    private val hasTextIndex = info.serializer.descriptor.annotations.any { it is TextIndex }
 
     public val permissions: ApiHttpHandler<PathSpec0, USER, Unit, ModelPermissions<T>> =
         path.path("_permissions_").get bind explicitApiHttpHandler(
@@ -103,6 +110,24 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             implementation = { input: QueryPartial<T> ->
                 info.table(this)
                     .queryPartial(input.withId())
+                    .toList()
+            }
+        )
+
+
+    public val textQuery: ApiHttpHandler<PathSpec0, USER, TextIndexQuery<T>, List<ScoredResult<T>>> =
+        path.path("text-query").post bind explicitApiHttpHandler(
+            summary = "Text Query",
+            description = "Searches the text-indexed fields of ${info.tableName}s, most relevant first.",
+            inputType = TextIndexQuery.serializer(info.serializer),
+            outputType = ListSerializer(ScoredResult.serializer(info.serializer)),
+            auth = info.auth.subscope(ModelInfo.Scopes.read),
+            errorCases = listOf(noTextIndexError),
+            examples = emptyList(),
+            implementation = { input: TextIndexQuery<T> ->
+                if (!hasTextIndex) throw BadRequestException(detail = noTextIndexError.detail, message = noTextIndexError.message)
+                info.table(this)
+                    .findByTextIndex(input.query, input.condition, input.skip, input.limit)
                     .toList()
             }
         )

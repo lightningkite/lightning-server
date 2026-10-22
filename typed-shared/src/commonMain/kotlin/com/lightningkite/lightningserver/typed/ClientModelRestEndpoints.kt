@@ -40,6 +40,18 @@ public interface ClientModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>> {
     public suspend fun queryPartial(input: QueryPartial<T>): List<Partial<T>>
 
     /**
+     * Searches the models' text-indexed fields for [TextIndexQuery.query], most relevant first.
+     *
+     * The default implementation throws [UnsupportedOperationException]; [LiveClientModelRestEndpoints] calls the server.
+     *
+     * @param input Search text, an optional condition, and paging
+     * @return Matching models with their relevance scores, comparable only within this result
+     * @throws BadRequestException if the model has no text index
+     */
+    public suspend fun textQuery(input: TextIndexQuery<T>): List<ScoredResult<T>> =
+        throw UnsupportedOperationException("textQuery is not implemented by ${this::class.simpleName}")
+
+    /**
      * Gets a single model by ID.
      *
      * @param id The model's ID

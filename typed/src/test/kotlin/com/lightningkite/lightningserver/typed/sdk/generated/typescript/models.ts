@@ -26,6 +26,11 @@ export interface Pair<T, T1> {
 	second: T1
 }
 
+export interface ScoredResult<T> {
+	model: T
+	score: number
+}
+
 export interface TestInput {
 	id: number
 	name: string
@@ -50,6 +55,13 @@ export namespace TestModel {
 		status: TestModel.Status
 		updatedAt: number
 	}
+}
+
+export interface TextIndexQuery<T> {
+	query: string
+	condition: Condition<T>
+	skip: number
+	limit: number
 }
 
 export interface UpdateRestrictions<T> {

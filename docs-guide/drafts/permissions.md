@@ -366,6 +366,7 @@ all of which respect the permissions declared in `modelInfo`:
 | List | GET | `/posts` | `read` |
 | Query | POST | `/posts/query` | `read` |
 | Query Partial | POST | `/posts/query-partial` | `read` |
+| Text Query | POST | `/posts/text-query` | `read` |
 | Get | GET | `/posts/{id}` | `read` |
 | Insert | POST | `/posts` | `create` |
 | Insert Bulk | POST | `/posts/bulk` | `create` |

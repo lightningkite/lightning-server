@@ -1,6 +1,7 @@
 // by Claude
 package com.lightningkite.lightningserver.typed
 
+import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.GeneralServerSettings
@@ -11,6 +12,7 @@ import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.services.data.Queryable
+import com.lightningkite.services.data.TextIndex
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.runBlocking
 import kotlin.test.*
@@ -31,6 +33,43 @@ class ModelRestEndpointsTest {
             permissions = { ModelPermissions.allowAll() }
         )
         val rest = path.path("items") include ModelRestEndpoints(info)
+
+        val noteInfo = database.modelInfo<HasId<*>?, SearchableNote, Uuid>(
+            tableName = "SearchableNote",
+            auth = noAuth,
+            permissions = { ModelPermissions.allowAll() }
+        )
+        val notes = path.path("notes") include ModelRestEndpoints(noteInfo)
+    }
+
+    @Test
+    fun text_query_returns_matching_items_with_scores() = runBlocking {
+        CrudTestServer.test(settings = {
+            generalSettings set GeneralServerSettings()
+            database set Database.Settings()
+        }) {
+            val kotlin = SearchableNote(title = "Kotlin tips", body = "Type safe builders in Kotlin")
+            val other = SearchableNote(title = "Gardening", body = "Tomatoes need sun")
+            CrudTestServer.notes.insertBulk.test(null, listOf(kotlin, other))
+
+            val results = CrudTestServer.notes.textQuery.test(null, TextIndexQuery("kotlin"))
+
+            assertEquals(listOf(kotlin._id), results.map { it.model._id })
+            assertTrue(results.single().score > 0f)
+        }
+    }
+
+    @Test
+    fun text_query_is_rejected_for_a_model_without_a_text_index() = runBlocking {
+        CrudTestServer.test(settings = {
+            generalSettings set GeneralServerSettings()
+            database set Database.Settings()
+        }) {
+            val error = assertFailsWith<BadRequestException> {
+                CrudTestServer.rest.textQuery.test(null, TextIndexQuery("anything"))
+            }
+            assertEquals("no-text-index", error.detail)
+        }
     }
 
     @Test
@@ -646,4 +685,12 @@ data class CrudItem(
     val category: String = "",
     val price: Double = 0.0,
     val quantity: Int = 0,
+) : HasId<Uuid>
+
+@Queryable
+@TextIndex(["title", "body"])
+data class SearchableNote(
+    override val _id: Uuid = Uuid.random(),
+    val title: String = "",
+    val body: String = "",
 ) : HasId<Uuid>
