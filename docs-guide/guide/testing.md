@@ -229,9 +229,10 @@ fun authTypedTest() = TestingServer.testBlocking(settings = { cache set Cache.Se
 
 ## Asserting an Error Path
 
-`ApiHttpHandler.test()` calls the handler directly — it does **not** go
-through the HTTP serialization layer.  Errors thrown inside the implementation
-are propagated as Kotlin exceptions.
+`ApiHttpHandler.test()` validates the input like a real request, then calls the
+handler directly — it does **not** go through the HTTP serialization layer.
+Validation failures and errors thrown inside the implementation are propagated
+as Kotlin exceptions.
 
 Catch `HttpStatusException` and check `.status.code` and `.detail` to verify
 the right error fired:

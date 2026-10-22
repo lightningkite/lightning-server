@@ -59,6 +59,19 @@ object ValidationServer : ServerBuilder() {
 }
 // endregion validation-server
 
+// region validation-reject-typed-test
+fun validationRejectTypedTest() = ValidationServer.testBlocking(settings = {}) {
+    // name exceeds @MaxLength(50).
+    val input = CreateUserRequest(name = "A".repeat(51), email = "user@example.com", age = 25, tags = emptyList())
+    try {
+        ValidationServer.createUser.test(null, input)
+        error("Expected validation to fail")
+    } catch (e: BadRequestException) {
+        check(e.detail == "validation-failed")
+    }
+}
+// endregion validation-reject-typed-test
+
 // region validation-reject-test
 fun validationRejectTest() = ValidationServer.testBlocking(settings = {}) {
     // Encode a CreateUserRequest whose name exceeds @MaxLength(50).
@@ -69,10 +82,8 @@ fun validationRejectTest() = ValidationServer.testBlocking(settings = {}) {
         ),
         MediaType.Application.Json
     )
-    // HttpHandler.test(body = ...) drives the full HTTP pipeline, including the validation
-    // step that runs before the implementation lambda.
-    // The typed ApiHttpHandler.test(auth, input) helper bypasses validation — always use
-    // HttpHandler.test() when testing constraint enforcement.
+    // HttpHandler.test(body = ...) drives the full HTTP pipeline, so the failure arrives
+    // as a 400 response rather than an exception.
     val response = ValidationServer.createUser.test(body = body)
     check(response.status.code == 400)
 }

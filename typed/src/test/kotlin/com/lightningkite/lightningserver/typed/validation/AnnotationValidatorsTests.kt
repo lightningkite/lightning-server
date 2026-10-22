@@ -13,6 +13,7 @@ import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.serialization.validators
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
+import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.services.data.*
 import com.lightningkite.services.database.validation.AnnotationValidators
 import kotlinx.coroutines.runBlocking
@@ -126,6 +127,16 @@ class AnnotationValidatorsTests {
                 assertFails(TestModel(string = "123456"))
                 assertFails(TestModel(list = List(4) { "" }))
                 assertFails(TestModel(list = List(3) { "123456" }))
+            }
+        }
+    }
+
+    @Test
+    fun testHelperValidatesLikeHttp() {
+        TestServer.test({}) {
+            runBlocking {
+                endpoint.test(null, TestModel())
+                assertBadRequest { endpoint.test(null, TestModel(string = "123456")) }
             }
         }
     }

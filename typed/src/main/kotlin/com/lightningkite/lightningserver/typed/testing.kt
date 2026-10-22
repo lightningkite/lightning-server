@@ -6,6 +6,8 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.lightningserver.runtime.test.TestRunner
+import com.lightningkite.lightningserver.serialization.assertValidOrBadRequest
+import com.lightningkite.lightningserver.serialization.validators
 import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.database.HasId
@@ -103,25 +105,7 @@ public suspend fun <USER : HasId<*>, INPUT, OUTPUT> ApiHttpHandler<PathSpec0, US
     auth: Authentication<USER>,
     input: INPUT,
 ): OUTPUT {
-    return handle(
-        access = HttpAccess(
-            HttpRequest(
-                RawHttpEndpoint(location.path, method = location.method),
-                queryParameters = QueryParameters.EMPTY,
-                headers = HttpHeaders(),
-                domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
-                protocol = generalSettings().publicUrl.substringBefore("://"),
-                sourceIp = "localhost",
-                requestId = generateRequestId(),
-                body = TypedData.text(
-                    test.externalSerialization.json.encodeToString(inputType, input),
-                    MediaType.Application.Json
-                ),
-            ),
-            auth,
-        ),
-        input
-    )
+    return handleAsTest(RawHttpEndpoint(location.path, method = location.method), auth, input)
 }
 
 context(test: TestRunner<*>)
@@ -130,25 +114,7 @@ public suspend fun <USER : HasId<*>, INPUT, OUTPUT, A> ApiHttpHandler<PathSpec1<
     auth: Authentication<USER>,
     input: INPUT,
 ): OUTPUT {
-    return handle(
-        access = HttpAccess(
-            HttpRequest(
-                RawHttpEndpoint(location.path, path1, method = location.method),
-                queryParameters = QueryParameters.EMPTY,
-                headers = HttpHeaders(),
-                domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
-                protocol = generalSettings().publicUrl.substringBefore("://"),
-                sourceIp = "localhost",
-                requestId = generateRequestId(),
-                body = TypedData.text(
-                    test.externalSerialization.json.encodeToString(inputType, input),
-                    MediaType.Application.Json
-                ),
-            ),
-            auth,
-        ),
-        input
-    )
+    return handleAsTest(RawHttpEndpoint(location.path, path1, method = location.method), auth, input)
 }
 
 context(test: TestRunner<*>)
@@ -158,25 +124,7 @@ public suspend fun <USER : HasId<*>, INPUT, OUTPUT, A, B> ApiHttpHandler<PathSpe
     auth: Authentication<USER>,
     input: INPUT,
 ): OUTPUT {
-    return handle(
-        access = HttpAccess(
-            HttpRequest(
-                RawHttpEndpoint(location.path, path1, path2, method = location.method),
-                queryParameters = QueryParameters.EMPTY,
-                headers = HttpHeaders(),
-                domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
-                protocol = generalSettings().publicUrl.substringBefore("://"),
-                sourceIp = "localhost",
-                requestId = generateRequestId(),
-                body = TypedData.text(
-                    test.externalSerialization.json.encodeToString(inputType, input),
-                    MediaType.Application.Json
-                ),
-            ),
-            auth,
-        ),
-        input
-    )
+    return handleAsTest(RawHttpEndpoint(location.path, path1, path2, method = location.method), auth, input)
 }
 
 context(test: TestRunner<*>)
@@ -187,25 +135,7 @@ public suspend fun <USER : HasId<*>, INPUT, OUTPUT, A, B, C> ApiHttpHandler<Path
     auth: Authentication<USER>,
     input: INPUT,
 ): OUTPUT {
-    return handle(
-        access = HttpAccess(
-            HttpRequest(
-                RawHttpEndpoint(location.path, path1, path2, path3, method = location.method),
-                queryParameters = QueryParameters.EMPTY,
-                headers = HttpHeaders(),
-                domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
-                protocol = generalSettings().publicUrl.substringBefore("://"),
-                sourceIp = "localhost",
-                requestId = generateRequestId(),
-                body = TypedData.text(
-                    test.externalSerialization.json.encodeToString(inputType, input),
-                    MediaType.Application.Json
-                ),
-            ),
-            auth,
-        ),
-        input
-    )
+    return handleAsTest(RawHttpEndpoint(location.path, path1, path2, path3, method = location.method), auth, input)
 }
 
 @JvmName("testNullableAuth")
@@ -213,25 +143,7 @@ context(test: TestRunner<*>) public suspend fun <USER : HasId<*>, INPUT, OUTPUT>
     auth: Authentication<USER>?,
     input: INPUT,
 ): OUTPUT {
-    return handle(
-        access = HttpAccess(
-            HttpRequest(
-                RawHttpEndpoint(location.path, method = location.method),
-                queryParameters = QueryParameters.EMPTY,
-                headers = HttpHeaders(),
-                domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
-                protocol = generalSettings().publicUrl.substringBefore("://"),
-                sourceIp = "localhost",
-                requestId = generateRequestId(),
-                body = TypedData.text(
-                    test.externalSerialization.json.encodeToString(inputType, input),
-                    MediaType.Application.Json
-                ),
-            ),
-            auth,
-        ),
-        input
-    )
+    return handleAsTest(RawHttpEndpoint(location.path, method = location.method), auth, input)
 }
 
 @JvmName("testNullableAuth")
@@ -240,25 +152,7 @@ context(test: TestRunner<*>) public suspend fun <USER : HasId<*>, INPUT, OUTPUT,
     auth: Authentication<USER>?,
     input: INPUT,
 ): OUTPUT {
-    return handle(
-        access = HttpAccess(
-            HttpRequest(
-                RawHttpEndpoint(location.path, path1, method = location.method),
-                queryParameters = QueryParameters.EMPTY,
-                headers = HttpHeaders(),
-                domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
-                protocol = generalSettings().publicUrl.substringBefore("://"),
-                sourceIp = "localhost",
-                requestId = generateRequestId(),
-                body = TypedData.text(
-                    test.externalSerialization.json.encodeToString(inputType, input),
-                    MediaType.Application.Json
-                ),
-            ),
-            auth,
-        ),
-        input
-    )
+    return handleAsTest(RawHttpEndpoint(location.path, path1, method = location.method), auth, input)
 }
 
 @JvmName("testNullableAuth")
@@ -268,25 +162,7 @@ context(test: TestRunner<*>) public suspend fun <USER : HasId<*>, INPUT, OUTPUT,
     auth: Authentication<USER>?,
     input: INPUT,
 ): OUTPUT {
-    return handle(
-        access = HttpAccess(
-            HttpRequest(
-                RawHttpEndpoint(location.path, path1, path2, method = location.method),
-                queryParameters = QueryParameters.EMPTY,
-                headers = HttpHeaders(),
-                domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
-                protocol = generalSettings().publicUrl.substringBefore("://"),
-                sourceIp = "localhost",
-                requestId = generateRequestId(),
-                body = TypedData.text(
-                    test.externalSerialization.json.encodeToString(inputType, input),
-                    MediaType.Application.Json
-                ),
-            ),
-            auth,
-        ),
-        input
-    )
+    return handleAsTest(RawHttpEndpoint(location.path, path1, path2, method = location.method), auth, input)
 }
 
 @JvmName("testNullableAuth")
@@ -297,10 +173,20 @@ context(test: TestRunner<*>) public suspend fun <USER : HasId<*>, INPUT, OUTPUT,
     auth: Authentication<USER>?,
     input: INPUT,
 ): OUTPUT {
+    return handleAsTest(RawHttpEndpoint(location.path, path1, path2, path3, method = location.method), auth, input)
+}
+
+context(test: TestRunner<*>)
+private suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PATH, USER, INPUT, OUTPUT>.handleAsTest(
+    endpoint: RawHttpEndpoint<PATH>,
+    auth: Authentication<USER & Any>?,
+    input: INPUT,
+): OUTPUT {
+    test.validators.assertValidOrBadRequest(inputType, input)
     return handle(
         access = HttpAccess(
             HttpRequest(
-                RawHttpEndpoint(location.path, path1, path2, path3, method = location.method),
+                endpoint,
                 queryParameters = QueryParameters.EMPTY,
                 headers = HttpHeaders(),
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),

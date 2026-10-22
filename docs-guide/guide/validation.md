@@ -173,10 +173,30 @@ back to individual fields.
 
 > To wrap these examples in a test class, annotate your test methods with `@Test` — see [Testing Your Server](testing.md) for the complete `@Test` + `testBlocking` pattern.
 
-The typed `ApiHttpHandler.test(auth, input)` helper calls the typed `handle`
-method directly and **bypasses the validation step**. To test constraint
-enforcement, use `HttpHandler.test(body = ...)` — it routes through the full
-HTTP pipeline, including the validation middleware:
+The typed `ApiHttpHandler.test(auth, input)` helper validates `input` exactly
+as a real request body is validated, so a constraint violation throws
+`BadRequestException` with `detail = "validation-failed"`:
+
+<!-- sample: com/lightningkite/lightningserver/guide/samples/ValidationSamples.kt#validation-reject-typed-test -->
+```kotlin
+fun validationRejectTypedTest() = ValidationServer.testBlocking(settings = {}) {
+    // name exceeds @MaxLength(50).
+    val input = CreateUserRequest(name = "A".repeat(51), email = "user@example.com", age = 25, tags = emptyList())
+    try {
+        ValidationServer.createUser.test(null, input)
+        error("Expected validation to fail")
+    } catch (e: BadRequestException) {
+        check(e.detail == "validation-failed")
+    }
+}
+```
+
+Validation covers endpoint input only.  Writing to a table directly (for
+example `table.insertOne(...)` in server code or test setup) is trusted and not
+validated.
+
+To check the 400 response a client actually receives, use
+`HttpHandler.test(body = ...)`, which routes through the full HTTP pipeline:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/ValidationSamples.kt#validation-reject-test -->
 ```kotlin
@@ -189,10 +209,8 @@ fun validationRejectTest() = ValidationServer.testBlocking(settings = {}) {
         ),
         MediaType.Application.Json
     )
-    // HttpHandler.test(body = ...) drives the full HTTP pipeline, including the validation
-    // step that runs before the implementation lambda.
-    // The typed ApiHttpHandler.test(auth, input) helper bypasses validation — always use
-    // HttpHandler.test() when testing constraint enforcement.
+    // HttpHandler.test(body = ...) drives the full HTTP pipeline, so the failure arrives
+    // as a 400 response rather than an exception.
     val response = ValidationServer.createUser.test(body = body)
     check(response.status.code == 400)
 }
