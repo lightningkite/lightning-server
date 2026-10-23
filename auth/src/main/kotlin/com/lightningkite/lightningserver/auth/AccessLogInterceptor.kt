@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.data.get
+import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.HttpLogicalInterceptor
@@ -122,7 +123,7 @@ public class AccessLogInterceptor : HttpLogicalInterceptor, WebSocketLogicalInte
  */
 context(runtime: ServerRuntime)
 private suspend fun com.lightningkite.lightningserver.data.Request<*>.principalName(): String = try {
-    this[Authentication.CacheKey]?.toString() ?: "anonymous"
+    this[Authentication.CacheKey]?.let{if(generalSettings().debug) it.toDebugString() else it.toString()} ?: "anonymous"
 } catch (e: CancellationException) {
     throw e // never swallow cancellation — it would break structured concurrency
 } catch (_: Exception) {

@@ -18,6 +18,7 @@ import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.*
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.uuid.Uuid
 
 private val logger = KotlinLogging.logger("CoroutineWebSocketHandler")
@@ -88,7 +89,6 @@ public abstract class CoroutineWebSocketHandler : ServerBuilder() {
         path.path("ws-out").arg<Uuid>("connectionId").topic(SerializableWebSocketFrame.serializer())
 
     public val task: Task<Storage> = path.path("ws-controller") bind Task(Storage.serializer()) { storage ->
-        logger.info { "Task STARTING for connection ${storage.id}" }
         // Capture direct send capability from context before creating lambdas
         val directSender = getDirectSender()
         val socketId = storage.request.engineSocketId
@@ -97,9 +97,7 @@ public abstract class CoroutineWebSocketHandler : ServerBuilder() {
                 request = storage.request,
                 waitForFullConnect = {
                     // Send empty frame to indicate connection is ready
-                    logger.info { "Task ${storage.id}: emitting ready signal to inbound channel" }
                     storage.inbound().emit(SerializableWebSocketFrame())
-                    logger.info { "Task ${storage.id}: ready signal emitted" }
                 },
                 incoming = storage.inbound().mapNotNull {
                     if (it.close) throw CancellationException("Client closed connection.")
@@ -120,15 +118,11 @@ public abstract class CoroutineWebSocketHandler : ServerBuilder() {
                     }
                 }
             )
-            logger.info { "Task COMPLETED normally for connection ${storage.id}" }
         } catch (e: CancellationException) {
-            logger.info { "Task COMPLETED via cancellation for connection ${storage.id}" }
             storage.inbound().emit(SerializableWebSocketFrame(close = true, failure = null))
         } catch (e: HttpStatusException) {
-            logger.info { "Task COMPLETED via HttpStatusException for connection ${storage.id}: ${e.message}" }
             storage.inbound().emit(SerializableWebSocketFrame(close = true, failure = e.message, status = e.status))
         } catch (e: Exception) {
-            logger.info { "Task COMPLETED via Exception for connection ${storage.id}: ${e.message}" }
             storage.inbound().emit(SerializableWebSocketFrame(close = true, failure = e.message ?: e::class.simpleName))
         }
     }
@@ -148,7 +142,6 @@ public abstract class CoroutineWebSocketHandler : ServerBuilder() {
                 send: suspend (WebSocketFrame) -> Unit,
                 close: suspend (WebSocketClose) -> Unit,
             ) {
-                logger.info { "handleDirect: starting direct execution (bypassing pub/sub)" }
                 try {
                     with(serverRuntime) {
                         handle(
@@ -160,13 +153,10 @@ public abstract class CoroutineWebSocketHandler : ServerBuilder() {
                             send = send
                         )
                     }
-                    logger.info { "handleDirect: handler completed normally" }
                     close(WebSocketClose.NORMAL)
                 } catch (e: CancellationException) {
-                    logger.info { "handleDirect: cancelled" }
                     close(WebSocketClose.GOING_AWAY)
                 } catch (e: HttpStatusException) {
-                    logger.warn(e) { "handleDirect: HTTP exception" }
                     close(e.status.bestWebSocketCloseCode)
                 } catch (e: Exception) {
                     logger.error(e) { "handleDirect: unexpected exception" }
@@ -189,25 +179,21 @@ public abstract class CoroutineWebSocketHandler : ServerBuilder() {
             context(serverRuntime: ServerRuntime)
             override suspend fun willConnect(request: WebSocketConnectRequest<PathSpec0>): Storage = coroutineScope {
                 val s = Storage(request = request)
-                logger.info { "willConnect ${s.id}: starting, subscribing to inbound channel" }
 
                 // Start collecting from inbound BEFORE starting the task
                 val startupMessageDeferred = async {
-                    logger.info { "willConnect ${s.id}: waiting for first message with 25s timeout" }
                     // Increased timeout to handle Lambda cold starts + DynamoDB Task scheduling + PubSub latency
-                    withTimeout(25_000) {
+                    withTimeout(25_000.milliseconds) {
                         s.inbound().first()
                     }
                 }
 
                 // Give the async block a moment to start collecting
                 // Increased for DynamoDB-based PubSub which may have subscription latency
-                logger.info { "willConnect ${s.id}: delaying 100ms for subscription setup" }
-                delay(100)
+                delay(100.milliseconds)
 
                 // Launch the background task in a separate coroutine so it doesn't block
                 // This allows the task to run `incoming.collect {}` without blocking willConnect
-                logger.info { "willConnect ${s.id}: invoking task" }
                 taskScope.launch {
                     with(serverRuntime) {
                         task(s)
@@ -215,7 +201,6 @@ public abstract class CoroutineWebSocketHandler : ServerBuilder() {
                 }
 
                 // Wait for the startup message
-                logger.info { "willConnect ${s.id}: waiting for startup message" }
                 val startupMessage = try {
                     startupMessageDeferred.await()
                 } catch (e: Exception) {
@@ -223,7 +208,6 @@ public abstract class CoroutineWebSocketHandler : ServerBuilder() {
                     throw Exception("Background task failed to start: ${e.message}", e)
                 }
 
-                logger.info { "willConnect ${s.id}: received startup message, close=${startupMessage.close}" }
                 if (startupMessage.close) {
                     throw Exception(startupMessage.failure ?: "Background task failed to start")
                 }

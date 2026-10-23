@@ -64,7 +64,8 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
         // catch only fires when there are no interceptors installed (the compiled chain is
         // HttpInterceptor.NoOp, which bypasses interceptInstrumented) or some other exception
         // escapes the chain machinery itself — headers from would-be interceptors are absent here.
-        this.logger.error(e) { "Exception in HTTP interceptor chain" }
+        if (e is HttpStatusException) this.logger.debug(e) { "HttpStatusException in HTTP interceptor chain" }
+        else this.logger.error(e) { "Exception in HTTP interceptor chain" }
         errorType = "unhandled_exception"
         try {
             instrument("exceptionHandler") { server.exceptionHandler.handle(request, e) }
@@ -195,7 +196,9 @@ private suspend fun ServerRuntime.dispatchLogicalRequest(request: HttpRequest<Pa
                 label = "timeout",
             )
         } catch (e: Exception) {
-            this.logger.error(e) { "Exception in HTTP" }
+            // HttpStatusExceptions are expected client-facing outcomes (400, 401, 404, ...), not server faults.
+            if (e is HttpStatusException) this.logger.debug(e) { "HttpStatusException in HTTP" }
+            else this.logger.error(e) { "Exception in HTTP" }
             handleError(e)
         }
     }

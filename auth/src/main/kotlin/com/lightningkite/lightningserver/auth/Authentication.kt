@@ -209,6 +209,12 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
         fromMasquerade?.let { "$it masquerading as" },
         principalName,
         rawId,
+    ).joinToString(" ")
+
+    public fun toDebugString(): String = listOfNotNull(
+        fromMasquerade?.let { "$it masquerading as" },
+        principalName,
+        rawId,
         cache.let { "cached: $it" },
     ).joinToString(" ")
 
