@@ -4,7 +4,9 @@ import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.serialization.assertValidOrBadRequest
 import com.lightningkite.lightningserver.serialization.parse
+import com.lightningkite.lightningserver.serialization.validators
 import com.lightningkite.lightningserver.typed.access
 import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
@@ -92,13 +94,15 @@ public class JsonRpcHandler<PATH : PathSpec>(
             // Parse parameters; treat null/missing params as empty object for compatibility
             // by Claude - MCP notifications like notifications/initialized send no params
             val params = try {
-                when (rpcRequest.params) {
+                val decoded = when (rpcRequest.params) {
                     null, is JsonNull -> if (typedMethod.inputType.descriptor.isNullable) null else typedMethod.inputType.default()
                     else -> server.externalSerialization.jsonWithoutExplicitNulls.decodeFromJsonElement(
                         typedMethod.inputType,
                         rpcRequest.params
                     )
                 }
+                server.validators.assertValidOrBadRequest(typedMethod.inputType, decoded)
+                decoded
             } catch (e: Exception) {
                 return if (isNotification) HttpResponse(status = HttpStatus.Accepted)
                 else errorResponse(

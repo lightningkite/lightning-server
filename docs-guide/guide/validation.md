@@ -169,6 +169,11 @@ is a JSON-encoded `Map<String, String>` whose keys are dotted paths
 (`"tags.2"`, `"address.street"`, etc.) so client-side form code can map errors
 back to individual fields.
 
+`JsonRpcHandler` validates decoded params the same way.  A violation becomes a
+JSON-RPC `invalidParams` error (code `-32602`) carrying the same `message`; the
+per-field `data` map is not included.  Notifications (no `id`) still get a bare
+`202 Accepted`.
+
 ## Testing: the Rejection Path
 
 > To wrap these examples in a test class, annotate your test methods with `@Test` — see [Testing Your Server](testing.md) for the complete `@Test` + `testBlocking` pattern.
