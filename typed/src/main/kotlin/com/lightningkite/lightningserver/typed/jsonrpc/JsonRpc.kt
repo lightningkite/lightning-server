@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.typed.jsonrpc
 
+import com.lightningkite.lightningserver.http.HttpStatus
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
@@ -50,49 +51,71 @@ public data class JsonRpcErrorResponse(
 /**
  * JSON-RPC 2.0 error object.
  *
- * @property code Error code (integer)
+ * @property code Error code
  * @property message Human-readable error message
  * @property data Additional error information (optional)
  */
 @Serializable
 public data class JsonRpcError(
-    val code: Int,
+    val code: JsonRpcErrorCode,
     val message: String,
     val data: JsonElement? = null,
 ) {
     public companion object {
-        /** Invalid JSON was received by the server */
-        public const val PARSE_ERROR: Int = -32700
-
-        /** The JSON sent is not a valid Request object */
-        public const val INVALID_REQUEST: Int = -32600
-
-        /** The method does not exist / is not available */
-        public const val METHOD_NOT_FOUND: Int = -32601
-
-        /** Invalid method parameter(s) */
-        public const val INVALID_PARAMS: Int = -32602
-
-        /** Internal JSON-RPC error */
-        public const val INTERNAL_ERROR: Int = -32603
-
-        /** Reserved for implementation-defined server-errors (range: -32000 to -32099) */
-        public const val SERVER_ERROR_MIN: Int = -32099
-        public const val SERVER_ERROR_MAX: Int = -32000
-
         public fun parseError(message: String = "Parse error", data: JsonElement? = null): JsonRpcError =
-            JsonRpcError(PARSE_ERROR, message, data)
+            JsonRpcError(JsonRpcErrorCode.ParseError, message, data)
 
         public fun invalidRequest(message: String = "Invalid Request", data: JsonElement? = null): JsonRpcError =
-            JsonRpcError(INVALID_REQUEST, message, data)
+            JsonRpcError(JsonRpcErrorCode.InvalidRequest, message, data)
 
         public fun methodNotFound(method: String): JsonRpcError =
-            JsonRpcError(METHOD_NOT_FOUND, "Method not found: $method")
+            JsonRpcError(JsonRpcErrorCode.MethodNotFound, "Method not found: $method")
 
         public fun invalidParams(message: String = "Invalid params", data: JsonElement? = null): JsonRpcError =
-            JsonRpcError(INVALID_PARAMS, message, data)
+            JsonRpcError(JsonRpcErrorCode.InvalidParams, message, data)
 
         public fun internalError(message: String = "Internal error", data: JsonElement? = null): JsonRpcError =
-            JsonRpcError(INTERNAL_ERROR, message, data)
+            JsonRpcError(JsonRpcErrorCode.InternalError, message, data)
     }
 }
+
+/**
+ * A JSON-RPC 2.0 error code, serialized as the bare integer.
+ *
+ * Use the companion object constants for the codes JSON-RPC defines, or construct one for a code a protocol built on
+ * JSON-RPC defines (MCP's `-32002` resource not found, for one).
+ *
+ * @property code The numeric error code
+ */
+@Serializable
+@JvmInline
+public value class JsonRpcErrorCode(public val code: Int) {
+    /** Whether this is in -32099 to -32000, the range JSON-RPC reserves for implementation-defined server errors. */
+    public val isServerError: Boolean get() = code in -32099..-32000
+
+    override fun toString(): String = "$code"
+
+    public companion object {
+        /** Invalid JSON was received by the server. */
+        public val ParseError: JsonRpcErrorCode = JsonRpcErrorCode(-32700)
+        /** The JSON sent is not a valid Request object. */
+        public val InvalidRequest: JsonRpcErrorCode = JsonRpcErrorCode(-32600)
+        /** The method does not exist or is not available. */
+        public val MethodNotFound: JsonRpcErrorCode = JsonRpcErrorCode(-32601)
+        /** Invalid method parameters. */
+        public val InvalidParams: JsonRpcErrorCode = JsonRpcErrorCode(-32602)
+        /** Internal JSON-RPC error. */
+        public val InternalError: JsonRpcErrorCode = JsonRpcErrorCode(-32603)
+    }
+}
+
+/**
+ * Thrown from a [JsonRpcMethod] or a [JsonRpcHandler] check to answer with exactly [error], at HTTP [status].
+ *
+ * Protocols built on JSON-RPC define their own error codes, and some (MCP, for one) their own HTTP statuses, so a method
+ * that needs one throws this instead of an exception the handler would report as an internal error.
+ */
+public class JsonRpcException(
+    public val error: JsonRpcError,
+    public val status: HttpStatus = HttpStatus.OK,
+) : Exception(error.message)

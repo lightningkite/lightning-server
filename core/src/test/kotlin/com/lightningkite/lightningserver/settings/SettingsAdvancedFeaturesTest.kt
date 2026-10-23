@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.settings
 
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.services.kfile.KFile
 import com.lightningkite.services.kfile.workingDirectory
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -490,5 +491,49 @@ class SettingsAdvancedFeaturesTest {
         // Base values are used for others
         assertEquals("base-2", serializable[TestServer.setting2])
         assertEquals(Config("base-host", 1111), serializable[TestServer.config])
+    }
+
+    /**
+     * Regression test: a settings file given as a bare filename (no directory part) has no
+     * `parentFile`, which previously disabled defaults and failed with "Defaults file usage is disabled."
+     */
+    @Test
+    fun testDefaultsChainWithBareFilename() {
+        // A bare filename resolves against the working directory, so these can't live under testRoot.
+        val baseFile = KFile("test-advanced-bare-base.json")
+        val mainFile = KFile("test-advanced-bare-main.json")
+        try {
+            baseFile.writeString(
+                """
+                {
+                  "setting1": "from-base",
+                  "setting2": "base-2",
+                  "config": {
+                    "host": "base-host",
+                    "port": 1111
+                  }
+                }
+                """.trimIndent()
+            )
+            mainFile.writeString(
+                """
+                {
+                  "defaults": "test-advanced-bare-base.json",
+                  "setting1": "main-1"
+                }
+                """.trimIndent()
+            )
+
+            val settings = ServerSettings(TestServer.build().settings.toSet())
+            settings.loadFromFile(mainFile, EmptySerializersModule())
+
+            val serializable = settings.allSerializable()
+            assertEquals("main-1", serializable[TestServer.setting1])
+            assertEquals("base-2", serializable[TestServer.setting2])
+            assertEquals(Config("base-host", 1111), serializable[TestServer.config])
+        } finally {
+            baseFile.delete()
+            mainFile.delete()
+        }
     }
 }

@@ -1074,7 +1074,7 @@ require { it.fetch().emailVerified }
   better UX.
 - [ ] **`EmailProofEndpoints.kt:105`** Consider adding email normalization beyond lowercase (e.g., Gmail dot/plus
   address handling).
-- [ ] **`EmailProofEndpoints.kt:106`** The verifyEmail function could be enhanced to return an error message that can be
+- [x] **`EmailProofEndpoints.kt:106`** The verifyEmail function could be enhanced to return an error message that can be
   displayed to the user (e.g., "Please use your work email address").
 - [ ] **`EmailProofEndpoints.kt:108`** Consider adding support for HTML email templates in addition to the current plain
   text support.

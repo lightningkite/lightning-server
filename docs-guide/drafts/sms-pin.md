@@ -171,7 +171,7 @@ where `<projectName>` is resolved from `generalSettings().projectName` at runtim
 | `smsTemplate` | `suspend context(ServerRuntime) (pin: String) -> String` | `"Your $projectName code is $pin. Don't share this with anyone."` | Lambda that returns the SMS body; receives the raw PIN |
 | `proofSigner` | `RuntimeDeferred<Signer>` | `secretBasis.signer("proof")` | Signs the proof; share across all proof methods if you use several |
 | `proofExpiration` | `Duration` | `1.hours` | How long a produced `Proof` stays valid |
-| `verifyPhone` | `suspend context(ServerRuntime) (String) -> Boolean` | `{ true }` | Optional gate; return `false` to silently skip sending |
+| `screenPhone` | `suspend context(ServerRuntime) (PhoneNumber) -> ScreeningResult` | `{ ScreeningResult.Allow }` | Optional gate deciding whether to send, silently skip, or reject with an error; see below |
 
 ### Customizing the SMS template
 
@@ -188,23 +188,37 @@ SmsProofEndpoints(
 
 Keep messages under 160 characters to avoid multi-segment billing.
 
-### Optional: blocking phone numbers
+### Optional: screening phone numbers
 
-Use `verifyPhone` to reject numbers before sending.  The `start` endpoint returns a key but no
-SMS is dispatched when `verifyPhone` returns `false` — this avoids leaking information about
-whether a number is blocked:
+Use `screenPhone` to decide what happens for each number before a PIN is sent. It receives the
+normalized `PhoneNumber` and returns a `PinBasedProofEndpoints.ScreeningResult`:
+
+| Result | Response to the client | SMS sent |
+|---|---|---|
+| `ScreeningResult.Allow` (default) | `200` with the lookup key | Yes |
+| `ScreeningResult.Suppress` | `200` with a lookup key, as if successful | No |
+| `ScreeningResult.Reject(message, detail = "target-rejected")` | `400` with your `message` and `detail` | No |
+
+`Suppress` avoids leaking whether a number is blocked or has an account; `Reject` gives the user
+a message they can act on. Rejections count toward the `start` endpoint's attempt rate limit.
 
 ```kotlin
 // Illustrative — require US numbers for this application.
+import com.lightningkite.lightningserver.sessions.proofs.PinBasedProofEndpoints.ScreeningResult
+
 SmsProofEndpoints(
     pin  = pins,
     sms  = sms,
-    verifyPhone = { phone ->
+    screenPhone = { phone ->
         // phone is already normalized to E.164 at this point
-        phone.startsWith("+1") && phone.length == 12
+        if (phone.raw.startsWith("+1") && phone.raw.length == 12) ScreeningResult.Allow
+        else ScreeningResult.Reject("Only US phone numbers are supported", detail = "unsupported-country")
     },
 )
 ```
+
+> The former `verifyPhone: (String) -> Boolean` parameter is deprecated. It still compiles, with
+> `true` mapping to `Allow` and `false` to `Suppress`.
 
 ### Phone number normalization
 

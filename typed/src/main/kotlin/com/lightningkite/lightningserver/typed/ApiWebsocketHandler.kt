@@ -95,6 +95,12 @@ public interface ApiWebSocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
         connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>,
         frame: WebSocketFrame,
     ) {
+        // Clients keep idle sockets alive with a blank text frame and expect one back, as
+        // MultiplexWebSocketHandler does. Parsing it as INPUT would fail and close the socket.
+        if ((frame as? WebSocketFrame.Text)?.content?.isBlank() == true) {
+            connection.send(" ")
+            return
+        }
         val parsed = try {
             connection.currentState.mediaType.decoder!!.decode(frame, inputType)
         } catch (e: SerializationException) {

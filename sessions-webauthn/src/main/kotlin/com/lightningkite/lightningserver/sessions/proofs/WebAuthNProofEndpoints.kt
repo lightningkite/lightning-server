@@ -46,7 +46,7 @@ import kotlin.uuid.Uuid
  *
  * @param rpId The relying party id the credentials are scoped to, typically your registrable domain.
  * @param allowedOrigins The exact origins permitted to create and use these credentials, such as `https://app.example.com`. This must be an explicit allowlist, since browsers produce assertions for [rpId] from any subdomain. Native apps need their own form: `https://<rpId>` on iOS, and `android:apk-key-hash:<base64url SHA-256 of the signing certificate>` on Android, which differs per signing key. Each also requires its platform's association file to be served from the [rpId] domain.
- * @param expiration How long an issued challenge stays usable, both as the `timeout` sent to the client and as its cache lifetime.
+ * @param challengeExpiration How long an issued challenge stays usable, both as the `timeout` sent to the client and as its cache lifetime.
  * @param registrationForUser Supplies the creation options for [registerStart]. The client's resident-key preference is only a hint, so return it in [WebAuthN.AuthenticatorSelectionOptions.residentKey] to honor it.
  * @param proveOptions Supplies the assertion options for [start], given the subject id resolved from the request, or `null` for the discoverable flow.
  * @param webAuthnManager The verifier for registration and authentication. The default performs no attestation verification, so requesting [WebAuthN.Attestation.Direct] or [WebAuthN.Attestation.Enterprise] has no effect. Supply a strict [WebAuthnManager] to enforce an authenticator allowlist.
@@ -57,7 +57,7 @@ public class WebAuthNProofEndpoints(
     override val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
     override val proofExpiration: Duration = 1.hours,
     private val challengeLength: Int = 64,
-    private val expiration: Duration = 5.minutes,
+    private val challengeExpiration: Duration = 5.minutes,
     private val rpId: context(ServerRuntime) () -> String,
     private val allowedOrigins: context(ServerRuntime) () -> Set<String>,
     private val registrationForUser: context(ServerRuntime) (HasId<*>, WebAuthN.GeneralPreference) -> WebAuthN.Registration.RegistrationOptions,
@@ -194,7 +194,7 @@ public class WebAuthNProofEndpoints(
     /**
      * Issues a challenge for creating a passkey on the calling subject's account, requiring [proofMethodAuth].
      *
-     * The request is the client's resident-key preference, which is only a hint passed to [registrationForUser]. The response holds a `challengeId` for [registerFinish], valid for [expiration], and the options for `navigator.credentials.create()`, with `excludeCredentials` listing the subject's existing credentials.
+     * The request is the client's resident-key preference, which is only a hint passed to [registrationForUser]. The response holds a `challengeId` for [registerFinish], valid for [challengeExpiration], and the options for `navigator.credentials.create()`, with `excludeCredentials` listing the subject's existing credentials.
      */
     @OptIn(ExperimentalEncodingApi::class)
     public val registerStart: ApiHttpHandler<PathSpec0, HasId<*>, WebAuthN.GeneralPreference, WebAuthN.Registration.RegistrationResponse> =
@@ -219,7 +219,7 @@ public class WebAuthNProofEndpoints(
                         allowedAlgorithms = options.pubKeyCredParams,
                         userVerification = options.authenticatorSelection.userVerification == WebAuthN.GeneralPreference.Required
                     ),
-                    timeToLive = expiration
+                    timeToLive = challengeExpiration
                 )
 
                 WebAuthN.Registration.RegistrationResponse(
@@ -243,7 +243,7 @@ public class WebAuthNProofEndpoints(
                             id = rpId(),
                             name = generalSettings().projectName
                         ),
-                        timeout = expiration.inWholeMilliseconds.toInt(),
+                        timeout = challengeExpiration.inWholeMilliseconds.toInt(),
                         user = options.user,
                     )
                 )
@@ -418,7 +418,7 @@ public class WebAuthNProofEndpoints(
                         subjectType = subjectType,
                         allowCredentials = existingCreds.map { it.id },
                     ),
-                    timeToLive = expiration
+                    timeToLive = challengeExpiration
                 )
 
                 WebAuthN.Authentication.StartResponse(
@@ -429,7 +429,7 @@ public class WebAuthNProofEndpoints(
                         extensions = options.extensions,
                         hints = options.hints,
                         rpId = rpId(),
-                        timeout = expiration.inWholeMilliseconds.toInt(),
+                        timeout = challengeExpiration.inWholeMilliseconds.toInt(),
                         userVerification = options.userVerification,
                     )
                 )
@@ -575,3 +575,33 @@ public class WebAuthNProofEndpoints(
             }
         )
 }
+
+
+@Deprecated("Use the \"challengeExpiration\" parameter instead of \"expiration\".")
+public fun WebAuthNProofEndpoints(
+    database: Runtime<Database>,
+    cache: Runtime<Cache>,
+    proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
+    proofExpiration: Duration = 1.hours,
+    challengeLength: Int = 64,
+    rpId: context(ServerRuntime) () -> String,
+    allowedOrigins: context(ServerRuntime) () -> Set<String>,
+    registrationForUser: context(ServerRuntime) (HasId<*>, WebAuthN.GeneralPreference) -> WebAuthN.Registration.RegistrationOptions,
+    proveOptions: context(ServerRuntime) (String?) -> WebAuthN.Authentication.ProveOptions = { WebAuthN.Authentication.ProveOptions() },
+    webAuthnManager: WebAuthnManager = WebAuthnManager.createNonStrictWebAuthnManager(),
+    signals: (context(ServerRuntime) (Table<WebAuthNCredential>) -> Table<WebAuthNCredential>)? = null,
+    expiration: Duration,
+): WebAuthNProofEndpoints = WebAuthNProofEndpoints(
+    database = database,
+    cache = cache,
+    proofSigner = proofSigner,
+    proofExpiration = proofExpiration,
+    challengeLength = challengeLength,
+    challengeExpiration = expiration,
+    rpId = rpId,
+    allowedOrigins = allowedOrigins,
+    registrationForUser = registrationForUser,
+    proveOptions = proveOptions,
+    webAuthnManager = webAuthnManager,
+    signals = signals,
+)

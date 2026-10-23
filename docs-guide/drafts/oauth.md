@@ -134,9 +134,9 @@ object Server : ServerBuilder() {
     val googleOAuth = setting("googleOAuth", OauthProviderCredentials("", ""))
 
     val pins       = PinHandler(cache, "pins")
-    val proofEmail = path.path("proof").path("email") module EmailProofEndpoints(pins, email) { to, pin ->
+    val proofEmail = path.path("proof").path("email") module EmailProofEndpoints(pins, email, emailTemplate = { to, pin ->
         Email(subject = "Your PIN", to = listOf(EmailAddressWithName(to)), plainText = "PIN: $pin")
-    }
+    })
 
     // Mount the Google OAuth proof method at /proof/google
     val proofGoogle = path.path("proof").path("google") module OauthProofEndpoints(

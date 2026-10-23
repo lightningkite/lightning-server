@@ -122,13 +122,14 @@ public suspend fun <PATH : PathSpec, T> HttpHandler<PATH>.executeWithMetrics(
 
 // INTERNAL IMPLEMENTATION STUFF
 
+// Claude: the operation name becomes a metric label, and an unmatched request's method and path are whatever the client sent.
 context(engine: Engine)
-internal fun HttpRequest<*>.operationName() = "${path.method} ${path.route()}"
+internal fun HttpRequest<*>.operationName() = if (path.tryResolve() == null) "unmatched" else "${path.method} ${path.route()}"
 
 context(engine: Engine)
 internal fun HttpRequest<*>.telemetryAttributes() = TelemetryAttributes {
     put(TelemetryKeys.Http.method, path.method.toString())
-    put(TelemetryKeys.Http.route, path.route())
+    if (path.tryResolve() != null) put(TelemetryKeys.Http.route, path.route())
     put(TelemetryKeys.Http.target, "/" + path.pathSegments.toString())
     put(TelemetryKeys.Http.scheme, protocol)
     put(TelemetryKeys.Http.host, domain)
