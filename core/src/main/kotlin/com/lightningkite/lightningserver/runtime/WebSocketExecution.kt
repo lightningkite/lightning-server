@@ -12,6 +12,7 @@ import com.lightningkite.services.telemetry.TelemetryAttributes
 import com.lightningkite.services.telemetry.TelemetryKey
 import com.lightningkite.services.telemetry.TelemetryKeys
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.withContext
 
 // Pre-allocated TelemetryKey instances (backend caches by equality).
 private val wsRoute = TelemetryKey.OfString("ws.route")
@@ -37,12 +38,14 @@ public suspend fun <PATH : PathSpec, STORAGE> DirectExecutableWebSocketHandler<P
     incoming: ReceiveChannel<WebSocketFrame>,
     send: suspend (WebSocketFrame) -> Unit,
     close: suspend (WebSocketClose) -> Unit,
-): Unit = engine.processEngine.execute(
-    "handleDirect",
-    request.connectPhase(null),
-    connectAttributes(request)
-) {
-    handleDirect(request, incoming, send, close)
+): Unit = withContext(request.traceParent()) {
+    engine.processEngine.execute(
+        "handleDirect",
+        request.connectPhase(null),
+        connectAttributes(request)
+    ) {
+        reportingServerErrors { handleDirect(request, incoming, send, close) }
+    }
 }
 
 /**
@@ -61,7 +64,7 @@ public suspend fun <PATH : PathSpec, STORAGE> DirectExecutableWebSocketHandler<P
     request.connectPhase(runtime.execution),
     connectAttributes(request)
 ) {
-    handleDirect(request, incoming, send, close)
+    reportingServerErrors { handleDirect(request, incoming, send, close) }
 }
 
 /** Runs [WebSocketHandler.willConnect] as the socket's Connect execution, as a root. */
@@ -70,12 +73,14 @@ public suspend fun <PATH : PathSpec, STORAGE> DirectExecutableWebSocketHandler<P
 context(engine: Engine)
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.willConnectAsRoot(
     request: WebSocketConnectRequest<PATH>,
-): STORAGE = engine.processEngine.execute(
-    "willConnect",
-    request.connectPhase(null),
-    connectAttributes(request)
-) {
-    willConnect(request)
+): STORAGE = withContext(request.traceParent()) {
+    engine.processEngine.execute(
+        "willConnect",
+        request.connectPhase(null),
+        connectAttributes(request)
+    ) {
+        reportingServerErrors { willConnect(request) }
+    }
 }
 
 /** Runs [WebSocketHandler.willConnect] as the socket's Connect execution, caused by the current one. */
@@ -88,7 +93,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.wi
     request.connectPhase(runtime.execution),
     connectAttributes(request)
 ) {
-    willConnect(request)
+    reportingServerErrors { willConnect(request) }
 }
 
 /** Runs [WebSocketHandler.didConnect] as a new root execution. */
@@ -102,7 +107,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
     connection.phase(Execution.WebSocket.Phase.Connected, null),
     connectionAttributes(connection)
 ) {
-    didConnect(connection)
+    reportingServerErrors { didConnect(connection) }
 }
 
 /** Runs [WebSocketHandler.didConnect] as a new execution caused by the current one. */
@@ -115,7 +120,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
     connection.phase(Execution.WebSocket.Phase.Connected, runtime.execution),
     connectionAttributes(connection)
 ) {
-    didConnect(connection)
+    reportingServerErrors { didConnect(connection) }
 }
 
 /** Runs [WebSocketHandler.messageFromClient] as a new root execution. */
@@ -130,7 +135,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
     connection.phase(Execution.WebSocket.Phase.ClientMessage, null),
     clientMessageAttributes(connection, frame)
 ) {
-    messageFromClient(connection, frame)
+    reportingServerErrors { messageFromClient(connection, frame) }
 }
 
 /** Runs [WebSocketHandler.messageFromClient] as a new execution caused by the current one. */
@@ -144,7 +149,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
     connection.phase(Execution.WebSocket.Phase.ClientMessage, runtime.execution),
     clientMessageAttributes(connection, frame)
 ) {
-    messageFromClient(connection, frame)
+    reportingServerErrors { messageFromClient(connection, frame) }
 }
 
 /** Runs [WebSocketHandler.messageFromSubscription] as a new root execution. */
@@ -159,7 +164,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
     connection.phase(Execution.WebSocket.Phase.SubscriptionMessage, null),
     subscriptionMessageAttributes(connection, topic)
 ) {
-    messageFromSubscription(connection, topic)
+    reportingServerErrors { messageFromSubscription(connection, topic) }
 }
 
 /** Runs [WebSocketHandler.messageFromSubscription] as a new execution caused by the current one. */
@@ -173,7 +178,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
     connection.phase(Execution.WebSocket.Phase.SubscriptionMessage, runtime.execution),
     subscriptionMessageAttributes(connection, topic)
 ) {
-    messageFromSubscription(connection, topic)
+    reportingServerErrors { messageFromSubscription(connection, topic) }
 }
 
 /**
@@ -192,7 +197,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
     disconnectAttributes(connection, reason)
 ) {
     try {
-        disconnect(connection, reason)
+        reportingServerErrors { disconnect(connection, reason) }
     } finally {
         connection.close(reason)
     }
@@ -213,7 +218,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
     disconnectAttributes(connection, reason)
 ) {
     try {
-        disconnect(connection, reason)
+        reportingServerErrors { disconnect(connection, reason) }
     } finally {
         connection.close(reason)
     }

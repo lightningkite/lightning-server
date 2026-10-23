@@ -115,12 +115,14 @@ public suspend inline fun <PATH : PathSpec> HttpInterceptor.interceptInstrumente
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
-        try {
+        val response = try {
             @Suppress("UNCHECKED_CAST")
             server.server.exceptionHandler.handle(request as HttpRequest<PathSpec>, e)
         } catch (_: Exception) {
             HttpResponse(status = HttpStatus.InternalServerError)
         }
+        if (response.status.serverError) server.reportException(e)
+        response
     }
 }
 

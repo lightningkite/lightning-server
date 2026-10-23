@@ -59,7 +59,7 @@ private suspend fun Engine.executeTaskLike(
         put(taskType, kind.telemetryType)
         put(taskRoute, location.toString())
     }) {
-        body()
+        reportingServerErrors { body() }
     }
 }
 

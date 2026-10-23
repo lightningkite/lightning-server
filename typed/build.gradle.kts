@@ -14,6 +14,7 @@ dependencies {
     api(project(":core"))
     api(project(":auth"))
     api(project(":typed-shared"))
+    implementation(project(":ratelimit"))
     api(libs.services.database)
     api(libs.services.cache)
     api(libs.services.http.client)

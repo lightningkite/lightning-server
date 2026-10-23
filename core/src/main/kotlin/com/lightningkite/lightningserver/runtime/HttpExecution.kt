@@ -8,8 +8,10 @@ import com.lightningkite.lightningserver.pathing.route
 import com.lightningkite.services.telemetry.TelemetryAttributes
 import com.lightningkite.services.telemetry.TelemetryKey
 import com.lightningkite.services.telemetry.TelemetryKeys
+import com.lightningkite.services.telemetry.Untraced
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlin.time.Duration
 
@@ -160,45 +162,48 @@ private suspend fun <PATH : PathSpec> Engine.executeHttp(
     interceptors: HttpInterceptor,
     dispatch: suspend ServerRuntime.(HttpRequest<PATH>) -> HttpResponse,
 ): HttpResponse = try {
-    execute(request.operationName(), Invocation.Http(execution, request), request.telemetryAttributes()) { trace ->
-        var handledError: String? = null
-        suspend fun handleError(e: Exception): HttpResponse {
-            handledError = e::class.simpleName
-            return try {
-                instrument("exceptionHandler") { serverRuntime.server.exceptionHandler.handle(request, e) }
-            } catch (_: Exception) {
-                handledError = "unhandled_exception"
-                HttpResponse(status = HttpStatus.InternalServerError)
-            }
-        }
-
-        val response = try {
-            interceptors.intercept(request) { req ->
-                // Map handler and routing exceptions to responses in-place so the surrounding
-                // interceptors (CORS, etc.) still post-process error responses.
-                try {
-                    dispatch(req)
-                } catch (e: Exception) {
-                    serverRuntime.logger.error(e) { "Exception in HTTP" }
-                    handleError(e)
+    val telemetryContext = if (request.path.tryResolve()?.value?.traced == false) Untraced else request.traceParent()
+    withContext(telemetryContext) {
+        execute(request.operationName(), Invocation.Http(execution, request), request.telemetryAttributes()) { trace ->
+            var handledError: String? = null
+            suspend fun handleError(e: Exception): HttpResponse {
+                handledError = e::class.simpleName
+                val response = try {
+                    instrument("exceptionHandler") { serverRuntime.server.exceptionHandler.handle(request, e) }
+                } catch (_: Exception) {
+                    handledError = "unhandled_exception"
+                    HttpResponse(status = HttpStatus.InternalServerError)
                 }
+                if (response.status.serverError) reportException(e)
+                return response
             }
-        } catch (e: Exception) {
-            logger.error(e) { "Exception in HTTP interceptor chain" }
-            handleError(e)
-        }
 
-        trace.enrich(TelemetryAttributes {
-            put(TelemetryKeys.Http.statusCode, response.status.code.toLong())
-            handledError?.let { put(errorType, it) }
-        })
-        response
+            val response = try {
+                interceptors.intercept(request) { req ->
+                    // Map handler and routing exceptions to responses in-place so the surrounding
+                    // interceptors (CORS, etc.) still post-process error responses.
+                    try {
+                        dispatch(req)
+                    } catch (e: Exception) {
+                        handleError(e)
+                    }
+                }
+            } catch (e: Exception) {
+                handleError(e)
+            }
+
+            trace.enrich(TelemetryAttributes {
+                put(TelemetryKeys.Http.statusCode, response.status.code.toLong())
+                handledError?.let { put(errorType, it) }
+            })
+            response
+        }
     }
 } catch (e: CancellationException) {
     throw e
 } catch (e: Exception) {
     // Claude: the execution interceptors wrap the error handling above, so their own failures land here.
-    logger.error(e) { "Exception in execution interceptor chain" }
+    reportException(e)
     HttpResponse(status = HttpStatus.InternalServerError)
 }
 

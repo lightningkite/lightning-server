@@ -11,19 +11,24 @@ import com.lightningkite.lightningserver.encryption.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.currentRequestTrace
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.sessions.token.*
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.services.database.optics.*
 import com.lightningkite.services.database.*
+import com.lightningkite.services.telemetry.TelemetryAttributes
+import com.lightningkite.services.telemetry.TelemetryKey
+import com.lightningkite.services.telemetry.TelemetryKeys
 import dev.whyoleg.cryptography.random.CryptographyRandom
-import io.opentelemetry.api.trace.Span
 import kotlinx.serialization.builtins.serializer
 import kotlin.io.encoding.Base64
 import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
+
+private val authorizationMethod = TelemetryKey.OfString("authorization.method")
 
 /**
  * Manages sessions of [SUBJECT] with short-lived access tokens backed by long-lived refresh tokens stored in the database.
@@ -177,17 +182,19 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         try {
             return tokenFormat().read(principal, token)
                 ?.also { auth ->
-                    val span = Span.current()
-                    auth.sessionId?.let { span.setAttribute("session.id", it) }
-                    span.setAttribute("user.id", auth.id.toString())
-                    span.setAttribute("authorization.method", "access token")
+                    currentRequestTrace()?.enrich(TelemetryAttributes {
+                        putIfNotNull(TelemetryKeys.Session.id, auth.sessionId)
+                        put(TelemetryKeys.User.id, auth.id.toString())
+                        put(authorizationMethod, "access token")
+                    })
                 }
                 ?: RefreshToken(token).session(request)?.toAuth()
                     ?.also { auth ->
-                        val span = Span.current()
-                        auth.sessionId?.let { span.setAttribute("session.id", it) }
-                        span.setAttribute("user.id", auth.id.toString())
-                        span.setAttribute("authorization.method", "refresh token")
+                        currentRequestTrace()?.enrich(TelemetryAttributes {
+                            putIfNotNull(TelemetryKeys.Session.id, auth.sessionId)
+                            put(TelemetryKeys.User.id, auth.id.toString())
+                            put(authorizationMethod, "refresh token")
+                        })
                     }
         } catch (e: TokenException) {
             throw UnauthorizedException(e.message ?: "JWT issue")
