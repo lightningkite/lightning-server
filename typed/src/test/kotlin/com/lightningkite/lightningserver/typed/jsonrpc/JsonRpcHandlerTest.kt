@@ -11,11 +11,15 @@ import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
+import com.lightningkite.services.data.MaxLength
 import com.lightningkite.services.data.MediaType
+import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.services.data.TypedData
+import com.lightningkite.services.database.validation.AnnotationValidators
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
+import kotlinx.serialization.modules.SerializersModule
 import org.junit.Test
 import kotlin.test.*
 
@@ -33,6 +37,11 @@ class JsonRpcHandlerTest {
     )
 
     @Serializable
+    data class ShortNameParams(
+        @MaxLength(5) val name: String,
+    )
+
+    @Serializable
     data class GreetResult(
         val message: String,
     )
@@ -45,6 +54,10 @@ class JsonRpcHandlerTest {
     )
 
     object TestServer : ServerBuilder() {
+        override val annotationValidators: Runtime<AnnotationValidators> = Runtime {
+            AnnotationValidators(SerializersModule { })
+        }
+
         init {
             registerBasicMediaTypeCoders()
         }
@@ -68,7 +81,14 @@ class JsonRpcHandlerTest {
             }
         )
 
-        val complexMethod = JsonRpcMethod<PathSpec0, Nothing?, ComplexData, ComplexData>(
+        val shortNameMethod = JsonRpcMethod<PathSpec0, Nothing?, ShortNameParams, String>(
+            name = "shortName",
+            description = "Accepts only short names",
+            auth = noAuth,
+            implementation = { it.name }
+        )
+
+        val complexMethod =JsonRpcMethod<PathSpec0, Nothing?, ComplexData, ComplexData>(
             name = "processComplex",
             description = "Processes complex data",
             auth = noAuth,
@@ -115,6 +135,7 @@ class JsonRpcHandlerTest {
             methods = listOf(
                 addMethod,
                 greetMethod,
+                shortNameMethod,
                 complexMethod,
                 nullableMethod,
                 missingMethod,
@@ -348,6 +369,23 @@ class JsonRpcHandlerTest {
             assertEquals(HttpStatus.OK, response.status)
             val errorResponse = Json.decodeFromString<JsonRpcErrorResponse>(response.body!!.text())
             assertEquals(JsonRpcErrorCode.InvalidParams, errorResponse.error.code)
+        }
+    }
+
+    @Test
+    fun paramsFailingAnnotationValidationAreInvalidParams() = runBlocking {
+        TestServer.test({}) {
+            val response = TestServer.rpcEndpoint.test(
+                body = TypedData.text(
+                    """{"jsonrpc": "2.0", "method": "shortName", "params": {"name": "too long"}, "id": 1}""",
+                    MediaType.Application.Json
+                )
+            )
+
+            assertEquals(HttpStatus.OK, response.status)
+            val error = Json.decodeFromString<JsonRpcErrorResponse>(response.body!!.text()).error
+            assertEquals(JsonRpcErrorCode.InvalidParams, error.code)
+            assertEquals("name: Too long; maximum 5 characters allowed", error.message)
         }
     }
 
