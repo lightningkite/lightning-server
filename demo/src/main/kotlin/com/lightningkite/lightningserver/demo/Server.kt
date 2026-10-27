@@ -16,7 +16,6 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.fullUrl
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.serialization.StandardWithExternalModule
-import com.lightningkite.lightningserver.serialization.queryParameters
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.sessions.*
 import com.lightningkite.lightningserver.sessions.proofs.*
@@ -40,7 +39,6 @@ import com.lightningkite.services.email.javasmtp.JavaSmtpEmailService
 import com.lightningkite.services.email.ses.SesEmailInboundService
 import com.lightningkite.services.files.*
 import com.lightningkite.services.files.s3.*
-import com.lightningkite.services.http.*
 import com.lightningkite.services.notifications.NotificationService
 import com.lightningkite.services.otel.OtelTelemetryBackend
 import com.lightningkite.services.phonecall.PhoneCallService
@@ -53,15 +51,11 @@ import com.lightningkite.services.sms.twilio.TwilioSMS
 import com.lightningkite.services.sms.twilio.TwilioSmsInboundService
 import com.lightningkite.services.voiceagent.VoiceAgentService
 import com.lightningkite.services.voiceagent.openai.OpenAIVoiceAgentService
-import io.ktor.client.request.*
 import io.ktor.http.decodeURLQueryComponent
 import io.ktor.http.encodeURLQueryComponent
-import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
-import kotlinx.html.*
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.*
-import kotlin.random.*
 import kotlin.time.*
 import kotlin.uuid.*
 
@@ -141,7 +135,7 @@ object Server : ServerBuilder() {
         context(server: ServerRuntime)
         override suspend fun fetchByProperty(property: String, value: String): User? {
             return when (property) {
-                "email" -> return userInfo.table().findOne(Condition { it.email eq value }) ?: userInfo.table()
+                "email" -> userInfo.table().findOne(Condition { it.email eq value }) ?: userInfo.table()
                     .insertOne(User(email = value))
 
                 else -> super.fetchByProperty(property, value)

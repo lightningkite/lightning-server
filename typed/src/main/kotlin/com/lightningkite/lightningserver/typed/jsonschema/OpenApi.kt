@@ -146,105 +146,97 @@ private fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PA
     builder: JsonSchemaBuilder,
     method: HttpMethod,
     docGroup: String?,
-) = OpenApiOperation(
-    summary = summary,
-    description = description,
-    tags = listOfNotNull(docGroup),
-    operationId = if (docGroup == null) functionName.functionCase() else (docGroup + "_" + functionName.functionCase()),
-    parameters = listOf(),
-    requestBody = if (method == HttpMethod.GET) null else if (this.inputType.isUnit()) null else OpenApiRequestBody(
-        content = mapOf(
-            MediaType.Application.Json.toString() to OpenApiMediaType(
-                schema = builder[this.inputType],
-                example = (examples.firstOrNull() ?: ApiHttpHandler.Example(
-                    inputType.default(),
-                    outputType.default()
-                ))
-                    .let { example ->
-                        @Suppress("UNCHECKED_CAST")
-                        runtime.externalSerialization.json.encodeToJsonElement(
-                            inputType as KSerializer<Any?>,
-                            example.input
-                        )
-                    },
-                examples = examples.groupBy { it.name }.flatMap {
-                    if (it.value.size == 1) it.value else it.value.mapIndexed { index, it ->
-                        it.copy(
-                            name = it.name + " " + index.plus(1)
-                        )
-                    }
-                }.associate { example ->
-                    example.name to OpenApiExample(
-                        example.name,
-                        value = runtime.externalSerialization.json.encodeToJsonElement(inputType, example.input)
-                    )
-                }
-            )
-        ),
-        required = true
-    ),
-    responses = run {
-        val response =
-            if (this.outputType.isUnit()) OpenApiResponse("Success", emptyMap())
-            else OpenApiResponse(
-                description = "Success",
-                content = mapOf(
-                    MediaType.Application.Json.toString() to OpenApiMediaType(
-                        schema = builder[this.outputType],
-                        example = (examples.firstOrNull() ?: ApiHttpHandler.Example(
-                            inputType.default(),
-                            outputType.default()
-                        ))
-                            .let { example ->
-                                @Suppress("UNCHECKED_CAST")
-                                runtime.externalSerialization.json.encodeToJsonElement(
-                                    outputType as KSerializer<Any?>,
-                                    example.output
-                                )
-                            },
-                        examples = examples.groupBy { it.name }.flatMap {
-                            if (it.value.size == 1) it.value else it.value.mapIndexed { index, it ->
-                                it.copy(name = it.name + " " + index.plus(1))
-                            }
-                        }.associate { example ->
-                            example.name to OpenApiExample(
-                                example.name,
-                                value = runtime.externalSerialization.json.encodeToJsonElement(
-                                    outputType,
-                                    example.output
-                                )
+): OpenApiOperation? {
+    // Claude: an endpoint with no explicit example and no constructible default (e.g. an aggregate over a model with no
+    // aggregatable field) has no valid request, so it is left out of the docs.
+    val example = examples.firstOrNull() ?: try {
+        ApiHttpHandler.Example(inputType.default(), outputType.default())
+    } catch (_: Exception) {
+        return null
+    }
+    return OpenApiOperation(
+        summary = summary,
+        description = description,
+        tags = listOfNotNull(docGroup),
+        operationId = if (docGroup == null) functionName.functionCase() else (docGroup + "_" + functionName.functionCase()),
+        parameters = listOf(),
+        requestBody = if (method == HttpMethod.GET) null else if (this.inputType.isUnit()) null else OpenApiRequestBody(
+            content = mapOf(
+                MediaType.Application.Json.toString() to OpenApiMediaType(
+                    schema = builder[this.inputType],
+                    example = runtime.externalSerialization.json.encodeToJsonElement(inputType, example.input),
+                    examples = examples.groupBy { it.name }.flatMap {
+                        if (it.value.size == 1) it.value else it.value.mapIndexed { index, it ->
+                            it.copy(
+                                name = it.name + " " + index.plus(1)
                             )
                         }
-                    )
+                    }.associate { example ->
+                        example.name to OpenApiExample(
+                            example.name,
+                            value = runtime.externalSerialization.json.encodeToJsonElement(inputType, example.input)
+                        )
+                    }
                 )
-            )
-
-        // Declared error cases become documented responses keyed by status code. Cases sharing a status
-        // code are grouped into one response with a combined description and the LSError schema/example.
-        val errorResponses = errorCases
-            .groupBy { it.http }
-            .mapKeys { it.key.toString() }
-            .mapValues { (_, cases) ->
-                OpenApiResponse(
-                    description = cases.joinToString("\n") { case ->
-                        val prefix = if (case.detail.isNotBlank()) "[${case.detail}] " else ""
-                        prefix + case.message.ifBlank { "Error" }
-                    },
+            ),
+            required = true
+        ),
+        responses = run {
+            val response =
+                if (this.outputType.isUnit()) OpenApiResponse("Success", emptyMap())
+                else OpenApiResponse(
+                    description = "Success",
                     content = mapOf(
                         MediaType.Application.Json.toString() to OpenApiMediaType(
-                            schema = builder[LSError.serializer()],
+                            schema = builder[this.outputType],
                             example = runtime.externalSerialization.json.encodeToJsonElement(
-                                LSError.serializer(),
-                                cases.first()
-                            )
+                                outputType as KSerializer<Any?>,
+                                example.output
+                            ),
+                            examples = examples.groupBy { it.name }.flatMap {
+                                if (it.value.size == 1) it.value else it.value.mapIndexed { index, it ->
+                                    it.copy(name = it.name + " " + index.plus(1))
+                                }
+                            }.associate { example ->
+                                example.name to OpenApiExample(
+                                    example.name,
+                                    value = runtime.externalSerialization.json.encodeToJsonElement(
+                                        outputType,
+                                        example.output
+                                    )
+                                )
+                            }
                         )
                     )
                 )
-            }
 
-        mapOf(successCode.code.toString() to response) + errorResponses
-    }
-)
+            // Declared error cases become documented responses keyed by status code. Cases sharing a status
+            // code are grouped into one response with a combined description and the LSError schema/example.
+            val errorResponses = errorCases
+                .groupBy { it.http }
+                .mapKeys { it.key.toString() }
+                .mapValues { (_, cases) ->
+                    OpenApiResponse(
+                        description = cases.joinToString("\n") { case ->
+                            val prefix = if (case.detail.isNotBlank()) "[${case.detail}] " else ""
+                            prefix + case.message.ifBlank { "Error" }
+                        },
+                        content = mapOf(
+                            MediaType.Application.Json.toString() to OpenApiMediaType(
+                                schema = builder[LSError.serializer()],
+                                example = runtime.externalSerialization.json.encodeToJsonElement(
+                                    LSError.serializer(),
+                                    cases.first()
+                                )
+                            )
+                        )
+                    )
+                }
+
+            mapOf(successCode.code.toString() to response) + errorResponses
+        }
+    )
+}
 
 context(runtime: ServerRuntime)
 public val openApiDescription: OpenApiRoot
