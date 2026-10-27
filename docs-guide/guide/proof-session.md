@@ -79,13 +79,13 @@ object Server : ServerBuilder() {
     val pins = PinHandler(cache, "pins")
 
     // Mount one proof method per path segment you choose.
-    val proofEmail    = path.path("proof").path("email")    module EmailProofEndpoints(pins, email) { to, pin ->
+    val proofEmail    = path.path("proof").path("email")    module EmailProofEndpoints(pins, email, emailTemplate = { to, pin ->
         Email(
             subject = "Log In Code",
             to = listOf(EmailAddressWithName(to)),
             plainText = "Your PIN is $pin.",
         )
-    }
+    })
     val proofPhone    = path.path("proof").path("phone")    module SmsProofEndpoints(pins, sms)
     val proofPassword = path.path("proof").path("password") module PasswordProofEndpoints(database, cache)
     val proofOtp      = path.path("proof").path("otp")      module TimeBasedOTPProofEndpoints(database, cache)

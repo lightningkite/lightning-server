@@ -1,7 +1,10 @@
 package com.lightningkite.lightningserver.terraform
 
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger as LogbackLogger
 import com.lightningkite.services.terraform.TerraformNeed
 import kotlinx.serialization.json.Json
+import org.slf4j.LoggerFactory
 import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient
@@ -49,6 +52,16 @@ public class AwsSecretException(message: String?, cause: Throwable?) : Exception
  */
 public class AwsSecretSource(public val profile: String, private val idPrefix: String, region: Region) :
     PopulatableSecretSource {
+
+    private companion object {
+        init {
+            var sdkLogger = LoggerFactory.getLogger("org.apache.hc.client5") as? LogbackLogger
+            if(sdkLogger != null && sdkLogger.level == null) sdkLogger.level = Level.WARN
+
+            sdkLogger = LoggerFactory.getLogger("software.amazon.awssdk") as? LogbackLogger
+            if(sdkLogger != null && sdkLogger.level == null) sdkLogger.level = Level.WARN
+        }
+    }
 
     private val json = Json
     private val client = SecretsManagerClient.builder()

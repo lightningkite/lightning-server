@@ -1,6 +1,7 @@
 // by Claude
 package com.lightningkite.lightningserver.sessions.proofs
 
+import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.register
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
@@ -10,6 +11,7 @@ import com.lightningkite.lightningserver.encryption.SecretBasis
 import com.lightningkite.lightningserver.encryption.signer
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.lightningserver.sessions.proofs.PinBasedProofEndpoints.ScreeningResult
 import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.database.HasId
@@ -268,6 +270,188 @@ class EmailProofEndpointsTest {
 
                 assertTrue(key1 != key2, "Different start calls should generate different keys")
                 assertEquals(2, emailService.sentEmails.size, "Each start should send an email")
+            }
+        }
+    }
+
+    @Test
+    fun `suppressed email returns key without sending`() = runBlocking {
+        object : ServerBuilder() {
+            val cache = setting("cache", Cache.Settings("ram"))
+            val email = setting("email", EmailService.Settings("test"))
+
+            init {
+                register(TestUser)
+            }
+
+            val emailProof = path.path("auth").path("email") include EmailProofEndpoints(
+                pin = PinHandler(
+                    cache = cache,
+                    keyPrefix = "email-test-suppress",
+                    expiration = 15.minutes,
+                    maxAttempts = 5
+                ),
+                email = email,
+                emailTemplate = { recipient, pin ->
+                    Email(
+                        subject = "Your verification code",
+                        to = listOf(EmailAddressWithName(recipient)),
+                        plainText = "Your code is: $pin"
+                    )
+                },
+                proofSigner = RuntimeDeferred.Cached { testBasis.signer("proof") },
+                proofExpiration = 1.hours,
+                screenEmail = { address ->
+                    if (address.raw == "known@example.com") ScreeningResult.Allow else ScreeningResult.Suppress
+                }
+            )
+        }.let { server ->
+            server.test({}) {
+                val emailService = server.email() as TestEmailService
+                emailService.clear()
+
+                val key = server.emailProof.start.test(null, "unknown@example.com")
+                assertNotNull(key)
+                assertEquals(0, emailService.sentEmails.size, "Suppressed address should not receive an email")
+
+                server.emailProof.start.test(null, "known@example.com")
+                assertEquals(1, emailService.sentEmails.size, "Allowed address should receive an email")
+            }
+        }
+    }
+
+    @Test
+    fun `rejected email returns error with custom message`() = runBlocking {
+        object : ServerBuilder() {
+            val cache = setting("cache", Cache.Settings("ram"))
+            val email = setting("email", EmailService.Settings("test"))
+
+            init {
+                register(TestUser)
+            }
+
+            val emailProof = path.path("auth").path("email") include EmailProofEndpoints(
+                pin = PinHandler(
+                    cache = cache,
+                    keyPrefix = "email-test-reject",
+                    expiration = 15.minutes,
+                    maxAttempts = 5
+                ),
+                email = email,
+                emailTemplate = { recipient, pin ->
+                    Email(
+                        subject = "Your verification code",
+                        to = listOf(EmailAddressWithName(recipient)),
+                        plainText = "Your code is: $pin"
+                    )
+                },
+                proofSigner = RuntimeDeferred.Cached { testBasis.signer("proof") },
+                proofExpiration = 1.hours,
+                screenEmail = { address ->
+                    if (address.raw.endsWith("@work.com")) ScreeningResult.Allow
+                    else ScreeningResult.Reject("Please use your work email address")
+                }
+            )
+        }.let { server ->
+            server.test({}) {
+                val emailService = server.email() as TestEmailService
+                emailService.clear()
+
+                val error = assertFailsWith<BadRequestException> {
+                    server.emailProof.start.test(null, "user@personal.com")
+                }
+                assertEquals(ScreeningResult.Reject.DEFAULT_DETAIL, error.detail)
+                assertEquals("Please use your work email address", error.message)
+                assertEquals(0, emailService.sentEmails.size)
+
+                server.emailProof.start.test(null, "user@work.com")
+                assertEquals(1, emailService.sentEmails.size)
+            }
+        }
+    }
+
+    @Test
+    fun `invalid email address is rejected`() = runBlocking {
+        object : ServerBuilder() {
+            val cache = setting("cache", Cache.Settings("ram"))
+            val email = setting("email", EmailService.Settings("test"))
+
+            init {
+                register(TestUser)
+            }
+
+            val emailProof = path.path("auth").path("email") include EmailProofEndpoints(
+                pin = PinHandler(
+                    cache = cache,
+                    keyPrefix = "email-test-invalid",
+                    expiration = 15.minutes,
+                    maxAttempts = 5
+                ),
+                email = email,
+                emailTemplate = { recipient, pin ->
+                    Email(
+                        subject = "Your verification code",
+                        to = listOf(EmailAddressWithName(recipient)),
+                        plainText = "Your code is: $pin"
+                    )
+                },
+                proofSigner = RuntimeDeferred.Cached { testBasis.signer("proof") },
+                proofExpiration = 1.hours,
+                screenEmail = { ScreeningResult.Allow }
+            )
+        }.let { server ->
+            server.test({}) {
+                val emailService = server.email() as TestEmailService
+                emailService.clear()
+
+                assertFailsWith<BadRequestException> {
+                    server.emailProof.start.test(null, "not-an-email")
+                }
+                assertEquals(0, emailService.sentEmails.size)
+            }
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    @Test
+    fun `deprecated verifyEmail returning false suppresses the email`() = runBlocking {
+        object : ServerBuilder() {
+            val cache = setting("cache", Cache.Settings("ram"))
+            val email = setting("email", EmailService.Settings("test"))
+
+            init {
+                register(TestUser)
+            }
+
+            val emailProof = path.path("auth").path("email") include EmailProofEndpoints(
+                pin = PinHandler(
+                    cache = cache,
+                    keyPrefix = "email-test-deprecated",
+                    expiration = 15.minutes,
+                    maxAttempts = 5
+                ),
+                email = email,
+                emailTemplate = { recipient, pin ->
+                    Email(
+                        subject = "Your verification code",
+                        to = listOf(EmailAddressWithName(recipient)),
+                        plainText = "Your code is: $pin"
+                    )
+                },
+                proofSigner = RuntimeDeferred.Cached { testBasis.signer("proof") },
+                proofExpiration = 1.hours,
+                verifyEmail = { address -> address == "known@example.com" }
+            )
+        }.let { server ->
+            server.test({}) {
+                val emailService = server.email() as TestEmailService
+                emailService.clear()
+
+                assertNotNull(server.emailProof.start.test(null, "unknown@example.com"))
+                assertEquals(0, emailService.sentEmails.size)
+
+                server.emailProof.start.test(null, "known@example.com")
+                assertEquals(1, emailService.sentEmails.size)
             }
         }
     }

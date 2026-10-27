@@ -47,6 +47,38 @@ class ApiWebSocketHandlerTest {
     }
 
     @Test
+    fun blankFrameIsAnsweredAsPing() {
+        val TestServer = object : ServerBuilder() {
+            val ws = path.path("testws") bind ApiWebSocketHandler<PathSpec0, Int, Nothing?, Int, Int>(
+                summary = "running sum",
+                auth = noAuth,
+                willConnectType = { 0 },
+                messageFromClientType = {
+                    send(updateStateImmediately { v -> it + v })
+                },
+            )
+
+            init {
+                registerBasicMediaTypeCoders()
+            }
+        }
+        TestServer.test(settings = {}) {
+            runBlocking {
+                val socket = ws.test()
+                val received = ArrayList<String>()
+                socket.onMessageSent = {
+                    received.add(it.text)
+                }
+                socket.send(WebSocketFrame(" "))
+                assertEquals(listOf(" "), received)
+                // The socket is still usable afterward, and the ping did not reach the handler.
+                socket.send(WebSocketFrame("1"))
+                assertEquals(listOf(" ", "1"), received)
+            }
+        }
+    }
+
+    @Test
     fun queueStateUpdatesWorks() {
         val TestServer = object : ServerBuilder() {
             val ws = path.path("testws") bind ApiWebSocketHandler<PathSpec0, Int, Nothing?, Int, Int>(

@@ -14,7 +14,10 @@ import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.default
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.*
+
+private val logger = KotlinLogging.logger("com.lightningkite.lightningserver.typed.jsonrpc.JsonRpcHandler")
 
 /**
  * HTTP handler that processes JSON-RPC 2.0 requests and routes them to the appropriate method.
@@ -33,11 +36,18 @@ import kotlinx.serialization.json.*
  * )
  * ```
  *
+ * A method that needs a specific error code or HTTP status throws [JsonRpcException]. Any other exception is an
+ * internal error, logged and reported without its message. A failed authentication is an HTTP 401 or 403, not a
+ * JSON-RPC error, so clients can start their authentication flow.
+ *
  * @param PATH The path specification type
  * @param methods List of available RPC methods
+ * @param check Runs on every parsed request before its method is looked up, e.g. to enforce headers a protocol built on
+ *   JSON-RPC requires; throw [JsonRpcException] to refuse the request.
  */
 public class JsonRpcHandler<PATH : PathSpec>(
     private val methods: List<JsonRpcMethod<PATH, *, *, *>>,
+    private val check: suspend context(ServerRuntime) (request: HttpRequest<PATH>, rpc: JsonRpcRequest) -> Unit = { _, _ -> },
 ) : HttpHandler<PATH> {
 
     private val methodMap: Map<String, JsonRpcMethod<PATH, *, *, *>> = methods.associateBy { it.name }
@@ -64,15 +74,25 @@ public class JsonRpcHandler<PATH : PathSpec>(
         // by Claude - JSON-RPC notifications have no id; per MCP spec they get 202 Accepted
         val isNotification = rpcRequest.id == null || rpcRequest.id is JsonNull
 
+        try {
+            check(request, rpcRequest)
+        } catch (e: JsonRpcException) {
+            return errorResponse(rpcRequest.id, e.error, e.status)
+        }
+
         // Find the method
         val method = methodMap[rpcRequest.method]
             ?: return if (isNotification) HttpResponse(status = HttpStatus.Accepted)
             else errorResponse(rpcRequest.id, JsonRpcError.methodNotFound(rpcRequest.method))
 
+        @Suppress("UNCHECKED_CAST")
+        val typedMethod = method as JsonRpcMethod<PATH, HasId<*>?, Any?, Any?>
+
+        // Outside the try below, so a failed authentication is an HTTP 401 or 403.
+        val access = request.access(typedMethod.auth)
+
         // Process the method invocation
         return try {
-            @Suppress("UNCHECKED_CAST")
-            val typedMethod = method as JsonRpcMethod<PATH, HasId<*>?, Any?, Any?>
 
             // Parse parameters; treat null/missing params as empty object for compatibility
             // by Claude - MCP notifications like notifications/initialized send no params
@@ -92,9 +112,6 @@ public class JsonRpcHandler<PATH : PathSpec>(
                 )
             }
 
-            // Get authenticated access
-            val access = request.access(typedMethod.auth)
-
             // Execute the method
             val (result, customHeaders) = typedMethod.handleWithCustomHeaders(access, params)
             // Claude: encoded below without the server's encoders, so it notifies the observers itself.
@@ -112,24 +129,25 @@ public class JsonRpcHandler<PATH : PathSpec>(
             // Return success response
             successResponse(rpcRequest.id, resultJson, customHeaders)
 
+        } catch (e: JsonRpcException) {
+            if (isNotification) return HttpResponse(status = HttpStatus.Accepted)
+            errorResponse(rpcRequest.id, e.error, e.status)
         } catch (e: HttpStatusException) {
             if (isNotification) return HttpResponse(status = HttpStatus.Accepted)
             // Map HTTP exceptions to JSON-RPC errors
             errorResponse(
                 rpcRequest.id,
                 JsonRpcError(
-                    code = -32000 - e.status.code, // Map to server error range
+                    code = JsonRpcErrorCode(-32000 - e.status.code), // Map to server error range
                     message = e.message,
                     data = JsonPrimitive(e.message)
                 )
             )
         } catch (e: Exception) {
             if (isNotification) return HttpResponse(status = HttpStatus.Accepted)
-            // Generic internal error
-            errorResponse(
-                rpcRequest.id,
-                JsonRpcError.internalError(e.message ?: "Unknown error")
-            )
+            // The message can carry internals, so it's logged rather than sent.
+            logger.error(e) { "JSON-RPC method " + rpcRequest.method + " failed" }
+            errorResponse(rpcRequest.id, JsonRpcError.internalError())
         }
     }
 
@@ -155,14 +173,14 @@ public class JsonRpcHandler<PATH : PathSpec>(
     }
 
     context(server: ServerRuntime)
-    private fun errorResponse(id: JsonElement?, error: JsonRpcError): HttpResponse {
+    private fun errorResponse(id: JsonElement?, error: JsonRpcError, status: HttpStatus = HttpStatus.OK): HttpResponse {
         val response = JsonRpcErrorResponse(
             jsonrpc = "2.0",
             error = error,
             id = id
         )
         return HttpResponse(
-            status = HttpStatus.OK, // JSON-RPC errors are still HTTP 200
+            status = status, // JSON-RPC errors are HTTP 200 unless a JsonRpcException says otherwise
             body = TypedData.text(
                 server.externalSerialization.jsonWithoutExplicitNulls.encodeToString(response),
                 MediaType.Application.Json

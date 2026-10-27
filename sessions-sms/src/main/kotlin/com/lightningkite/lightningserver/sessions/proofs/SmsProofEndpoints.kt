@@ -20,7 +20,7 @@ import kotlin.time.Duration.Companion.hours
  *
  * @param pin Generates and validates the PIN codes.
  * @param smsTemplate Builds the SMS text from the PIN.
- * @param verifyPhone Returns whether a number is allowed for PINs, such as to block premium rate or international numbers.
+ * @param screenPhone Decides whether to send to a number, such as to block premium rate or international numbers: [ScreeningResult.Allow] sends, [ScreeningResult.Suppress] silently sends nothing, and [ScreeningResult.Reject] returns an error to the client. Prefer [ScreeningResult.Suppress] when rejecting would reveal whether an account exists.
  */
 public class SmsProofEndpoints(
     pin: PinHandler,
@@ -28,7 +28,7 @@ public class SmsProofEndpoints(
     private val smsTemplate: suspend context(ServerRuntime) (pin: String) -> String = { code -> "Your ${generalSettings().projectName} code is ${code}. Don't share this with anyone." },
     proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
     proofExpiration: Duration = 1.hours,
-    private val verifyPhone: suspend context(ServerRuntime) (String) -> Boolean = { true },
+    private val screenPhone: suspend context(ServerRuntime) (PhoneNumber) -> ScreeningResult = { ScreeningResult.Allow },
 ) : PinBasedProofEndpoints(
     name = "sms",
     property = "phone",
@@ -62,23 +62,46 @@ public class SmsProofEndpoints(
             }
         }
 
-    /** Sends [pin] by SMS to the phone number [to] using [smsTemplate], or sends nothing if [verifyPhone] rejects it. */
+    /** Applies [screenPhone] to the normalized phone number. */
+    context(_: ServerRuntime)
+    public override suspend fun screen(to: String): ScreeningResult = screenPhone(to.toPhoneNumber())
+
+    /** Sends [pin] by SMS to the phone number [to] using [smsTemplate]. Only called when [screen] allowed the number. */
     context(_: ServerRuntime)
     override suspend fun send(to: String, pin: String) {
-        if (verifyPhone(to))
-            sms().send(to.toPhoneNumber(), smsTemplate(pin))
+        sms().send(to.toPhoneNumber(), smsTemplate(pin))
     }
 
     /**
      * Sends the SMS that [content] builds from a newly issued [Proof] for [destination], such as a login link.
      *
-     * The proof is issued without anyone presenting a credential, so whoever receives it can authenticate. Pass the [request] that asked for it, if any, so its origin can be audited if needed. Unlike the PIN overload, this does not apply [verifyPhone] or normalize [destination].
+     * The proof is issued without anyone presenting a credential, so whoever receives it can authenticate. Pass the [request] that asked for it, if any, so its origin can be audited if needed. Unlike the PIN overload, this does not apply [screenPhone] or normalize [destination].
      */
     context(_: ServerRuntime)
     public suspend fun send(destination: PhoneNumber, request: Request<*>?, content: (Proof) -> String) {
         sms().send(destination, content(issueProof(destination.raw, request)))
     }
 }
+
+@Deprecated("Use the \"screenPhone\" parameter instead of \"verifyPhone\".")
+public fun SmsProofEndpoints(
+    pin: PinHandler,
+    sms: Runtime<SMS>,
+    smsTemplate: suspend context(ServerRuntime) (pin: String) -> String = { code -> "Your ${generalSettings().projectName} code is ${code}. Don't share this with anyone." },
+    proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
+    proofExpiration: Duration = 1.hours,
+    verifyPhone: suspend context(ServerRuntime) (String) -> Boolean,
+): SmsProofEndpoints = SmsProofEndpoints(
+    pin = pin,
+    sms = sms,
+    smsTemplate = smsTemplate,
+    proofSigner = proofSigner,
+    proofExpiration = proofExpiration,
+    screenPhone = { phone: PhoneNumber ->
+        if (verifyPhone(phone.raw)) PinBasedProofEndpoints.ScreeningResult.Allow
+        else PinBasedProofEndpoints.ScreeningResult.Suppress
+    }
+)
 
 /*
  * TODO API Recommendations:

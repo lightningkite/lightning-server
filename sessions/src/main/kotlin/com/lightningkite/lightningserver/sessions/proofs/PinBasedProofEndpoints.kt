@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.sessions.reportAuthEvent
 import com.lightningkite.lightningserver.sessions.AuthEvent
 import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.BadRequestException
+import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.noAuth
@@ -42,6 +43,31 @@ public abstract class PinBasedProofEndpoints(
     context(_: ServerRuntime)
     protected abstract suspend fun send(to: String, pin: String)
 
+    /**
+     * The outcome of [screen], deciding how a request to start a proof is handled.
+     */
+    public sealed interface ScreeningResult {
+        /** Send the PIN as normal. */
+        public data object Allow : ScreeningResult
+
+        /** Respond as if successful, but send nothing (prevents account enumeration). */
+        public data object Suppress : ScreeningResult
+
+        /** Reject the request with a 400 error that can be displayed to the user. */
+        public data class Reject(val message: String, val detail: String = DEFAULT_DETAIL) : ScreeningResult {
+            public companion object {
+                public const val DEFAULT_DETAIL: String = "target-rejected"
+            }
+        }
+    }
+
+    /**
+     * Decides whether a PIN should be sent to the given (already normalized) destination.
+     * Called before a PIN is established, within the attempt rate limit.
+     */
+    context(_: ServerRuntime)
+    public open suspend fun screen(to: String): ScreeningResult = ScreeningResult.Allow
+
     final override val info: ProofMethodInfo = ProofMethodInfo(
         via = name,
         property = property,
@@ -53,7 +79,13 @@ public abstract class PinBasedProofEndpoints(
             auth = noAuth,
             summary = "Begin $name Ownership Proof",
             description = "Sends a login code to the given ${name.lowercase()}. The message will contain both a PIN that can be combined with the returned key to log in.",
-            errorCases = emptyList(),
+            errorCases = listOf(
+                LSError(
+                    http = HttpStatus.BadRequest.code,
+                    detail = ScreeningResult.Reject.DEFAULT_DETAIL,
+                    message = "The given ${name.lowercase()} is not permitted."
+                )
+            ),
             successCode = HttpStatus.OK,
             implementation = { valueUnsafe: String ->
                 val value = normalize(valueUnsafe)
@@ -61,9 +93,15 @@ public abstract class PinBasedProofEndpoints(
                 pin.cache().constrainAttemptRate(
                     cacheKey = "$name-pin-count-${value}"
                 ) {
-                    val p = pin.establish(value)
-                    send(value, p.pin)
-                    p.key
+                    when (val screening = screen(value)) {
+                        ScreeningResult.Allow -> pin.establish(value).also { send(value, it.pin) }.key
+                        // Still establish a PIN so the key behaves identically to a real one.
+                        ScreeningResult.Suppress -> pin.establish(value).key
+                        is ScreeningResult.Reject -> throw BadRequestException(
+                            detail = screening.detail,
+                            message = screening.message
+                        )
+                    }
                 }
             }
         )
