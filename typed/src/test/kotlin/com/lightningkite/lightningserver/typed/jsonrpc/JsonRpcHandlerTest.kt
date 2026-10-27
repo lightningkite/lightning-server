@@ -1,8 +1,12 @@
 package com.lightningkite.lightningserver.typed.jsonrpc
 
+import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.auth.noAuth
+import com.lightningkite.lightningserver.auth.require
 import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.definition.Runtime
+import com.lightningkite.lightningserver.http.HttpHeaders
+import com.lightningkite.lightningserver.typed.sdk.User
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
@@ -122,6 +126,27 @@ class JsonRpcHandlerTest {
             implementation = { params -> params.name }
         )
 
+        val missingMethod = JsonRpcMethod<PathSpec0, Nothing?, GreetParams, String>(
+            name = "missing",
+            description = "Fails with a protocol-defined error",
+            auth = noAuth,
+            implementation = { throw JsonRpcException(JsonRpcError(JsonRpcErrorCode(-32002), "Resource not found"), HttpStatus.NotFound) }
+        )
+
+        val explodingMethod = JsonRpcMethod<PathSpec0, Nothing?, GreetParams, String>(
+            name = "explode",
+            description = "Fails unexpectedly",
+            auth = noAuth,
+            implementation = { throw IllegalStateException("database password is hunter2") }
+        )
+
+        val signedInMethod = JsonRpcMethod<PathSpec0, User, GreetParams, String>(
+            name = "signedIn",
+            description = "Needs a signed-in user",
+            auth = User.require(),
+            implementation = { "ok" }
+        )
+
         // Create the JSON-RPC endpoint
         val rpcEndpoint = path.path("rpc").post bind JsonRpcHandler(
             methods = listOf(
@@ -130,8 +155,70 @@ class JsonRpcHandlerTest {
                 complexMethod,
                 nullableMethod,
                 shortEchoMethod,
+                missingMethod,
+                explodingMethod,
+                signedInMethod,
             )
         )
+
+        val checkedEndpoint = path.path("checked").post bind JsonRpcHandler(
+            methods = listOf(addMethod),
+            check = { request, rpc ->
+                if (request.headers["X-Method"]?.root != rpc.method)
+                    throw JsonRpcException(JsonRpcError(JsonRpcErrorCode(-32020), "X-Method header doesn't match"), HttpStatus.BadRequest)
+            },
+        )
+    }
+
+    private fun call(method: String) = TypedData.text(
+        """{"jsonrpc": "2.0", "method": "$method", "params": {"a": 1, "b": 2, "name": "x"}, "id": 1}""",
+        MediaType.Application.Json,
+    )
+
+    @Test
+    fun aMethodCanAnswerWithItsOwnErrorCodeAndStatus() = runBlocking {
+        TestServer.test({}) {
+            val response = TestServer.rpcEndpoint.test(body = call("missing"))
+            assertEquals(HttpStatus.NotFound, response.status)
+            val error = Json.decodeFromString<JsonRpcErrorResponse>(response.body!!.text()).error
+            assertEquals(JsonRpcErrorCode(-32002), error.code)
+            assertEquals("Resource not found", error.message)
+        }
+    }
+
+    @Test
+    fun aCheckCanRefuseARequestBeforeItsMethodRuns() = runBlocking {
+        TestServer.test({}) {
+            val refused = TestServer.checkedEndpoint.test(body = call("add"))
+            assertEquals(HttpStatus.BadRequest, refused.status)
+            assertEquals(JsonRpcErrorCode(-32020), Json.decodeFromString<JsonRpcErrorResponse>(refused.body!!.text()).error.code)
+
+            val accepted = TestServer.checkedEndpoint.test(body = call("add"), headers = HttpHeaders("X-Method" to "add"))
+            assertEquals(JsonPrimitive(3), Json.decodeFromString<JsonRpcResponse>(accepted.body!!.text()).result)
+        }
+    }
+
+    @Test
+    fun anUnexpectedFailureIsAnInternalErrorWithoutItsMessage() = runBlocking {
+        TestServer.test({}) {
+            val response = TestServer.rpcEndpoint.test(body = call("explode"))
+            assertEquals(HttpStatus.OK, response.status)
+            val body = response.body!!.text()
+            assertEquals(JsonRpcErrorCode.InternalError, Json.decodeFromString<JsonRpcErrorResponse>(body).error.code)
+            assertFalse("hunter2" in body)
+        }
+    }
+
+    @Test
+    fun aFailedAuthenticationIsAnHttpError() = runBlocking {
+        TestServer.test({}) {
+            val status = try {
+                TestServer.rpcEndpoint.test(body = call("signedIn")).status
+            } catch (e: HttpStatusException) {
+                e.status
+            }
+            assertTrue(status == HttpStatus.Unauthorized || status == HttpStatus.Forbidden, "got $status")
+        }
     }
 
     private fun rpcBody(method: String, params: String) = TypedData.text(
@@ -145,7 +232,7 @@ class JsonRpcHandlerTest {
             val response = TestServer.rpcEndpoint.test(body = rpcBody("shortEcho", """{"name": "much too long"}"""))
 
             val errorResponse = Json.decodeFromString<JsonRpcErrorResponse>(response.body!!.text())
-            assertEquals(JsonRpcError.INVALID_PARAMS, errorResponse.error.code)
+            assertEquals(JsonRpcErrorCode.InvalidParams, errorResponse.error.code)
         }
     }
 
@@ -300,7 +387,7 @@ class JsonRpcHandlerTest {
             assertEquals(HttpStatus.OK, response.status)
             val errorResponse = Json.decodeFromString<JsonRpcErrorResponse>(response.body!!.text())
             assertEquals("2.0", errorResponse.jsonrpc)
-            assertEquals(JsonRpcError.METHOD_NOT_FOUND, errorResponse.error.code)
+            assertEquals(JsonRpcErrorCode.MethodNotFound, errorResponse.error.code)
             assertTrue(errorResponse.error.message.contains("nonexistent"))
         }
     }
@@ -323,7 +410,7 @@ class JsonRpcHandlerTest {
 
             assertEquals(HttpStatus.OK, response.status)
             val errorResponse = Json.decodeFromString<JsonRpcErrorResponse>(response.body!!.text())
-            assertEquals(JsonRpcError.INVALID_PARAMS, errorResponse.error.code)
+            assertEquals(JsonRpcErrorCode.InvalidParams, errorResponse.error.code)
         }
     }
 
@@ -345,7 +432,7 @@ class JsonRpcHandlerTest {
 
             assertEquals(HttpStatus.OK, response.status)
             val errorResponse = Json.decodeFromString<JsonRpcErrorResponse>(response.body!!.text())
-            assertEquals(JsonRpcError.INVALID_REQUEST, errorResponse.error.code)
+            assertEquals(JsonRpcErrorCode.InvalidRequest, errorResponse.error.code)
             assertTrue(errorResponse.error.message.contains("Invalid jsonrpc version"))
         }
     }
@@ -363,7 +450,7 @@ class JsonRpcHandlerTest {
 
             assertEquals(HttpStatus.OK, response.status)
             val errorResponse = Json.decodeFromString<JsonRpcErrorResponse>(response.body!!.text())
-            assertEquals(JsonRpcError.PARSE_ERROR, errorResponse.error.code)
+            assertEquals(JsonRpcErrorCode.ParseError, errorResponse.error.code)
         }
     }
 
@@ -376,7 +463,7 @@ class JsonRpcHandlerTest {
 
             assertEquals(HttpStatus.OK, response.status)
             val errorResponse = Json.decodeFromString<JsonRpcErrorResponse>(response.body!!.text())
-            assertEquals(JsonRpcError.INVALID_REQUEST, errorResponse.error.code)
+            assertEquals(JsonRpcErrorCode.InvalidRequest, errorResponse.error.code)
         }
     }
 

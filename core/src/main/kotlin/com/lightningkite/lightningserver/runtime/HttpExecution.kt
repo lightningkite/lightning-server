@@ -4,7 +4,6 @@ import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
-import com.lightningkite.lightningserver.pathing.route
 import com.lightningkite.services.telemetry.TelemetryAttributes
 import com.lightningkite.services.telemetry.TelemetryKey
 import com.lightningkite.services.telemetry.TelemetryKeys
@@ -123,12 +122,17 @@ public suspend fun <PATH : PathSpec, T> HttpHandler<PATH>.executeWithMetrics(
 // INTERNAL IMPLEMENTATION STUFF
 
 context(engine: Engine)
-internal fun HttpRequest<*>.operationName() = "${path.method} ${path.route()}"
+internal fun HttpRequest<*>.operationName(): String {
+    // The operation name becomes a metric label.  An unmatched request's path and method are whatever
+    // the client sent (scanners send thousands), so they must not appear in it.
+    val route = path.tryResolve()?.pathSpec ?: return "unmatched"
+    return "${path.method} $route"
+}
 
 context(engine: Engine)
 internal fun HttpRequest<*>.telemetryAttributes() = TelemetryAttributes {
     put(TelemetryKeys.Http.method, path.method.toString())
-    put(TelemetryKeys.Http.route, path.route())
+    path.tryResolve()?.let { put(TelemetryKeys.Http.route, it.pathSpec.toString()) }
     put(TelemetryKeys.Http.target, "/" + path.pathSegments.toString())
     put(TelemetryKeys.Http.scheme, protocol)
     put(TelemetryKeys.Http.host, domain)
