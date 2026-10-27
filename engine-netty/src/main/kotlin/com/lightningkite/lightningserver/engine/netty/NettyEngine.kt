@@ -576,7 +576,7 @@ public class NettyEngine(
                 val startingState = try {
                     socketHandler.willConnectAsRoot(wsRequest)
                 } catch (e: HttpStatusException) {
-                    logger.error(e) { "" }
+                    logger.debug(e) { "WebSocket willConnect rejected" }
                     val res = DefaultFullHttpResponse(req.protocolVersion(), HttpResponseStatus.valueOf(e.status.code))
                     ctx.writeAndFlush(res).addListener(ChannelFutureListener.CLOSE)
                     return

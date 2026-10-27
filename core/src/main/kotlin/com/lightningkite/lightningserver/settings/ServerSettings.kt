@@ -216,6 +216,7 @@ public class ServerSettings private constructor(
     public fun ready() {
         val missing = settings.minus(serializable.keys + goal.keys + overrides.keys)
         if (missing.isNotEmpty()) throw IllegalStateException("Settings ${missing.joinToString { it.name }} are missing.")
+        if(ready) return
         ready = true
 
         val errors = mutableMapOf<ServerSetting<*, *>, Exception>()

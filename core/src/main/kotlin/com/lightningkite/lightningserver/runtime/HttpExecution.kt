@@ -183,12 +183,15 @@ private suspend fun <PATH : PathSpec> Engine.executeHttp(
                 try {
                     dispatch(req)
                 } catch (e: Exception) {
-                    serverRuntime.logger.error(e) { "Exception in HTTP" }
+                    // HttpStatusExceptions are expected client-facing outcomes (400, 401, 404, ...), not server faults.
+                    if (e is HttpStatusException) serverRuntime.logger.debug(e) { "HttpStatusException in HTTP" }
+                    else serverRuntime.logger.error(e) { "Exception in HTTP" }
                     handleError(e)
                 }
             }
         } catch (e: Exception) {
-            logger.error(e) { "Exception in HTTP interceptor chain" }
+            if (e is HttpStatusException) logger.debug(e) { "HttpStatusException in HTTP interceptor chain" }
+            else logger.error(e) { "Exception in HTTP interceptor chain" }
             handleError(e)
         }
 
