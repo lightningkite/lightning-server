@@ -136,6 +136,8 @@ module:
 - **Audit modules** (`audit`, `audit-shared`): Audit logging of request origins, disclosures, queries, mutations, and
   auth events
 - **Rate limiting** (`ratelimit`): Request rate limiting
+- **Fixtures** (`fixtures`): Deterministic, scalable seed data for debug databases (`FixtureRegistry`, `seed`,
+  `LazyList`, `Faker`), and `deleteSeedData` to reset it
 - **Engine modules**: Different deployment targets
     - `engine-local`: The base engine for single-process deployments; the Ktor, Netty, and JDK engines extend it (unit
       tests use `TestRunner` from `core`)

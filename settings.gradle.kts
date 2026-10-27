@@ -51,6 +51,7 @@ include(":engine-jdk-server")
 include(":deploy-aws-ec2")
 
 include(":ratelimit")
+include(":fixtures")
 
 include(":secret-source-aws")
 
