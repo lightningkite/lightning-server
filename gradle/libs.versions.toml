@@ -28,7 +28,7 @@ oneTimePass = "3.0.0"
 orgCrac = "0.1.3"
 proguard = "7.10.0"
 scrimage = "4.6.8"
-serviceAbstractions = "1.4.0-prerelease-93-82898bcd"
+serviceAbstractions = "1.4.0-prerelease-99-2c6d4329"
 vanniktechMavenPublish = "0.37.0"
 webauthn4jCore = "0.31.10.RELEASE"
 
