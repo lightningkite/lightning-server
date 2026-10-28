@@ -49,7 +49,7 @@ internal suspend fun ApplicationCall.adapt(maxBody: Long): HttpRequest<PathSpec>
         protocol = request.origin.scheme,
         sourceIp = ktorRunConfig().realIpHeader?.let {
             request.header(it)
-                ?: run { server.logger.warn { "Real IP address header for proxy '$it' was missing from the request." }; null }
+                ?: run { server.logger.warn { "Real IP address header for proxy '$it' was missing from request [${identity.requestId}}]." }; null }
         } ?: request.origin.remoteAddress,
         body = run {
             // TODO: Add MultiPart support

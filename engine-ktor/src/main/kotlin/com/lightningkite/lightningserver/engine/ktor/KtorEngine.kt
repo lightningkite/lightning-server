@@ -228,7 +228,7 @@ public class KtorEngine(
                     protocol = call.request.origin.scheme,
                     sourceIp = runConfig.realIpHeader?.let {
                         call.request.header(it)
-                            ?: run { logger.warn { "Real IP address header for proxy '$it' was missing from the request." }; null }
+                            ?: run { logger.warn { "Real IP address header for proxy '$it' was missing from request [${identity.requestId}}]." }; null }
                     } ?: call.request.origin.remoteAddress,
                 )
 
