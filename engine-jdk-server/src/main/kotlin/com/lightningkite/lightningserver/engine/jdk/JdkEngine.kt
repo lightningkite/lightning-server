@@ -5,10 +5,7 @@ package com.lightningkite.lightningserver.engine.jdk
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerSetting
-import com.lightningkite.lightningserver.engine.local.BodyTooLargeException
-import com.lightningkite.lightningserver.engine.local.EngineReliabilitySettings
-import com.lightningkite.lightningserver.engine.local.LocalEngine
-import com.lightningkite.lightningserver.engine.local.copyLimited
+import com.lightningkite.lightningserver.engine.local.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
@@ -20,12 +17,11 @@ import com.lightningkite.services.data.*
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
 import kotlinx.coroutines.runBlocking
-import kotlinx.io.*
+import kotlinx.io.asSink
+import kotlinx.io.buffered
 import kotlinx.serialization.Serializable
 import java.net.InetSocketAddress
-import java.util.concurrent.ArrayBlockingQueue
-import java.util.concurrent.ThreadPoolExecutor
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.*
 import kotlin.time.Clock
 
 /**
@@ -287,9 +283,16 @@ private fun HttpExchange.requestToLightningServer(
     val hostHeader = this.requestHeaders.getFirst("Host") ?: ""
     val domain = hostHeader.substringBefore(":").ifEmpty { this.localAddress.hostString }
     val protocol = if (this.httpContext.server is com.sun.net.httpserver.HttpsServer) "https" else "http"
-    val sourceIp = realIpHeader?.let { h ->
-        this.requestHeaders.getFirst(h)
-            ?: run { engine.logger.warn { "Real IP address header for proxy '$h' was missing from the request." }; null }
+    val identity = with(engine) {
+        headers.requestIdentity(requestIdHeader) {
+            engine.logger.warn { "Request ID header for proxy '$requestIdHeader' was missing from the request." }
+        }
+    }
+    val sourceIp = realIpHeader?.let { header ->
+        this.requestHeaders.getFirst(header).also { realIp ->
+            if (realIp == null)
+                engine.logger.warn { "Real IP address header for proxy '$header' was missing from request [${identity.requestId}}]." }
+        }
     } ?: this.remoteAddress?.address?.hostAddress ?: ""
 
     val contentTypeHeader = headers.contentType
@@ -303,12 +306,6 @@ private fun HttpExchange.requestToLightningServer(
             copyLimited(src, maxBody) { b, off, len -> out.write(b, off, len) }
         }
     } else null
-
-    val identity = with(engine) {
-        headers.requestIdentity(requestIdHeader) {
-            engine.logger.warn { "Request ID header for proxy '$requestIdHeader' was missing from the request." }
-        }
-    }
 
     val adapted = HttpRequest(
         path = RawHttpEndpoint(uri.path ?: "/", HttpMethod(method)),

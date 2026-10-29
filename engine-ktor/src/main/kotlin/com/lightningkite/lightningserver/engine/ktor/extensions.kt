@@ -4,12 +4,8 @@ import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.logger
-import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
-import com.lightningkite.lightningserver.pathing.RawWebSocketPath
-import com.lightningkite.lightningserver.runtime.Engine
-import com.lightningkite.lightningserver.runtime.EngineBase
-import com.lightningkite.lightningserver.runtime.Execution
+import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.services.data.MediaType
@@ -19,7 +15,7 @@ import io.ktor.server.application.*
 import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.util.*
-import io.ktor.websocket.CloseReason
+import io.ktor.websocket.*
 
 /**
  * Converts a Ktor ContentType to a Lightning Server MediaType.
@@ -51,9 +47,10 @@ internal suspend fun ApplicationCall.adaptHttpRequest(maxBody: Long): Pair<HttpR
         upstreamRequestId = identity.upstreamRequestId,
         domain = request.origin.serverHost,
         protocol = request.origin.scheme,
-        sourceIp = ktorRunConfig().realIpHeader?.let { realIp ->
-            request.header(realIp).also {
-                if (it == null) server.logger.warn { "Real IP address header for proxy '$realIp' was missing from the request." }
+        sourceIp = ktorRunConfig().realIpHeader?.let { header ->
+            request.header(header).also { realIp ->
+                if (realIp == null)
+                    server.logger.warn { "Real IP address header for proxy '$header' was missing from request [${identity.requestId}}]." }
             }
         } ?: request.origin.remoteAddress,
         body = run {
@@ -103,9 +100,11 @@ internal fun ApplicationCall.adaptWebSocketConnectRequest(): WebSocketConnectReq
         upstreamRequestId = identity.upstreamRequestId,
         domain = request.origin.serverHost,
         protocol = request.origin.scheme,
-        sourceIp = runConfig.realIpHeader?.let {
-            request.header(it)
-                ?: run { engine.logger.warn { "Real IP address header for proxy '$it' was missing from the request." }; null }
+        sourceIp = runConfig.realIpHeader?.let { header ->
+            request.header(header).also { realIp ->
+                if (realIp == null)
+                    engine.logger.warn { "Real IP address header for proxy '$header' was missing from request [${identity.requestId}}]." }
+            }
         } ?: request.origin.remoteAddress,
     )
 }

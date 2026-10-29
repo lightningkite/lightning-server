@@ -2,17 +2,16 @@
 
 package com.lightningkite.lightningserver.engine.netty
 
+import com.lightningkite.lightningserver.EngineApi
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.HttpStatusException
+import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.engine.local.LocalEngine
+import com.lightningkite.lightningserver.engine.local.LocalWebSocketConnection
 import com.lightningkite.lightningserver.engine.local.WsOversizePolicy
 import com.lightningkite.lightningserver.engine.local.forceWebSocketPubSub
-import com.lightningkite.lightningserver.EngineApi
-import com.lightningkite.lightningserver.InternalLightningServerApi
-import com.lightningkite.lightningserver.engine.local.LocalWebSocketConnection
-import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpRequest
@@ -28,10 +27,9 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.netty.bootstrap.ServerBootstrap
 import io.netty.buffer.*
 import io.netty.channel.*
+import io.netty.channel.epoll.*
 import io.netty.channel.group.ChannelGroup
 import io.netty.channel.group.DefaultChannelGroup
-import io.netty.util.concurrent.GlobalEventExecutor
-import io.netty.channel.epoll.*
 import io.netty.channel.kqueue.*
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
@@ -44,12 +42,13 @@ import io.netty.handler.stream.ChunkedWriteHandler
 import io.netty.handler.timeout.IdleStateEvent
 import io.netty.handler.timeout.IdleStateHandler
 import io.netty.util.AttributeKey
+import io.netty.util.concurrent.GlobalEventExecutor
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.SendChannel
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.serialization.KSerializer
 import java.net.InetSocketAddress
 import java.net.URI
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Clock
 import com.lightningkite.lightningserver.http.HttpHeaders as LsHttpHeaders
 import com.lightningkite.lightningserver.websockets.WebSocketFrame as LkWebSocketFrame
@@ -686,19 +685,19 @@ public class NettyEngine(
                     mediaType = contentTypeHeader ?: MediaType.Application.OctetStream,
                 )
             } else null
-
-            val hostHeader = this.headers()[HOST] ?: ""
-            val domain = hostHeader.substringBefore(":")
-            val sourceIp = cfg.realIpHeader?.let { h ->
-                this.headers()[h] ?: run {
-                    logger.warn { "Real IP address header for proxy '$h' was missing from the request." }
-                    null
-                }
-            } ?: ((ctx.channel().remoteAddress() as? InetSocketAddress)?.address?.hostAddress ?: "")
-
             val identity = headers.requestIdentity(cfg.requestIdHeader) {
                 logger.warn { "Request ID header for proxy '${cfg.requestIdHeader}' was missing from the request." }
             }
+
+            val hostHeader = this.headers()[HOST] ?: ""
+            val domain = hostHeader.substringBefore(":")
+            val sourceIp = cfg.realIpHeader?.let { header ->
+                this.headers()[header].also { realIp ->
+                    if (realIp == null)
+                        logger.warn { "Real IP address header for proxy '$header' was missing from request [${identity.requestId}}]." }
+                }
+            } ?: ((ctx.channel().remoteAddress() as? InetSocketAddress)?.address?.hostAddress ?: "")
+
 
             val adapted = HttpRequest(
                 path = RawHttpEndpoint(parts.path(), HttpMethod(this.method().name())),
@@ -722,16 +721,15 @@ public class NettyEngine(
             val headers = (this.headers() as NettyHttpHeaders).toLightningHeaders()
             val hostHeader = this.headers()[HOST] ?: ""
             val domain = hostHeader.substringBefore(":")
-            val sourceIp = cfg.realIpHeader?.let { h ->
-                this.headers()[h] ?: run {
-                    logger.warn { "Real IP address header for proxy '$h' was missing from the request." }
-                    null
-                }
-            } ?: ((ctx.channel().remoteAddress() as? InetSocketAddress)?.address?.hostAddress ?: "")
-
             val identity = headers.requestIdentity(cfg.requestIdHeader) {
                 logger.warn { "Request ID header for proxy '${cfg.requestIdHeader}' was missing from the request." }
             }
+            val sourceIp = cfg.realIpHeader?.let { header ->
+                this.headers()[header].also { realIp ->
+                    if (realIp == null)
+                        logger.warn { "Real IP address header for proxy '$header' was missing from request [${identity.requestId}}]" }
+                }
+            } ?: ((ctx.channel().remoteAddress() as? InetSocketAddress)?.address?.hostAddress ?: "")
 
             return WebSocketConnectRequest(
                 path = RawWebSocketPath(parts.path()),

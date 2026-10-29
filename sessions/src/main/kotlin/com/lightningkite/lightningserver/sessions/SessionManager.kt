@@ -1,9 +1,9 @@
 package com.lightningkite.lightningserver.sessions
 
-import kotlinx.coroutines.flow.toList
 import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.data.Request
+import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
@@ -19,6 +19,7 @@ import com.lightningkite.services.database.optics.*
 import com.lightningkite.services.database.*
 import dev.whyoleg.cryptography.random.CryptographyRandom
 import io.opentelemetry.api.trace.Span
+import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.builtins.serializer
 import kotlin.io.encoding.Base64
 import kotlin.time.Duration
@@ -83,6 +84,22 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     public open suspend fun permitAuthentication(subject: SUBJECT): Boolean = true
 
     /**
+     * Determines the most a subject is currently allowed to access.
+     *
+     * Applied whenever a session becomes an [Authentication] (in [toAuth]), not when the session is created: the
+     * session keeps the scopes it was created with, and the effective scopes are the intersection of those and
+     * this result. A change here takes effect on the subject's next access token without re-authenticating,
+     * e.g. limiting a subject to MFA setup until it's established, then returning root.
+     *
+     * A root scope allows access to everything.
+     *
+     * @param subject The subject whose scopes are being limited
+     * @return The scopes that subject can access.
+     */
+    context(server: ServerRuntime)
+    public open suspend fun permitScopes(subject: SUBJECT): Set<GrantedScope> = setOf(GrantedScope.root)
+
+    /**
      * Returns the latest instant at which a login for [subject] may expire, or `null` for no limit.
      *
      * This is reported as `maxExpiration` by [AuthEndpoints.proofsCheck] and caps the expiration of sessions created by [AuthEndpoints.login2]. It is not applied by [newSession], which uses the `expires` it is given. See [sessionStaleAfter] for inactivity-based expiration.
@@ -109,7 +126,10 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             // Covers every way a session ends, including a superuser's REST update or delete.
             signals = { table ->
                 sessionSignals(table)
-                    .postChange { old, new -> if (old.terminated == null && new.terminated != null) terminateDerivedFrom(new._id) }
+                    .postChange { old, new ->
+                        if (old.terminated == null && new.terminated != null)
+                            terminateDerivedFrom(new._id)
+                    }
                     .postDelete { terminateDerivedFrom(it._id) }
             },
             log = { table ->
@@ -182,7 +202,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                     span.setAttribute("user.id", auth.id.toString())
                     span.setAttribute("authorization.method", "access token")
                 }
-                ?: RefreshToken(token).session(request)?.toAuth()
+                ?: RefreshToken(token).session(request)?.let { (session, subject) -> session.toAuth(subject) }
                     ?.also { auth ->
                         val span = Span.current()
                         auth.sessionId?.let { span.setAttribute("session.id", it) }
@@ -199,6 +219,9 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
      *
      * The refresh token holds the only plaintext copy of the session's secret, which cannot be recovered from the database.
      *
+     * @param subjectId The ID of the subject (user/entity) this session belongs to
+     * @param label Optional human-readable label for the session (e.g., "Mobile App", "Web Browser")
+     * @param expires Hard expiration time (overrides [sessionExpiration] if provided)
      * @param expires When the session expires, or `null` for never.
      * @param stale The initial stale time, which [sessionStaleAfter] then updates on each use.
      * @param scopes The scopes granted to the session, with full access by default.
@@ -206,6 +229,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
      * @param derivedFrom The parent session if this is a sub-session.
      * @param authenticatedAt See [Session.authenticatedAt].
      * @throws ForbiddenException if the subject is not permitted to authenticate.
+     * @return Pair of the created Session and its RefreshToken (containing plaintext secret)
      */
     context(_: ServerRuntime)
     public suspend fun newSession(
@@ -217,17 +241,46 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         oauthClient: String? = null,
         derivedFrom: Uuid? = null,
         authenticatedAt: Instant = now(),
+    ): Pair<Session<SUBJECT, ID>, RefreshToken> = newSession(
+        subject = principal.fetch(subjectId),
+        label = label,
+        expires = expires,
+        stale = stale,
+        scopes = scopes,
+        oauthClient = oauthClient,
+        derivedFrom = derivedFrom,
+        authenticatedAt = authenticatedAt,
+    )
+
+    /**
+     * Creates a new session for an already-loaded subject, saving the load [newSession] by ID would do.
+     *
+     * Otherwise identical to the [newSession] overload that takes a subject ID; see it for details.
+     *
+     * @param subject The subject (user/entity) this session belongs to
+     * @return Pair of the created Session and its RefreshToken (containing plaintext secret)
+     */
+    context(_: ServerRuntime)
+    public suspend fun newSession(
+        subject: SUBJECT,
+        label: String? = null,
+        expires: Instant? = null,
+        stale: Instant? = null,
+        scopes: Set<GrantedScope> = setOf(GrantedScope.root),
+        oauthClient: String? = null,
+        derivedFrom: Uuid? = null,
+        authenticatedAt: Instant = now(),
     ): Pair<Session<SUBJECT, ID>, RefreshToken> {
         // Generate a cryptographically secure 24-byte random secret
         val secret = Base64.encode(CryptographyRandom.nextBytes(24))
 
-        if(!permitAuthentication(principal.fetch(subjectId))){
+        if(!permitAuthentication(subject)){
             throw ForbiddenException()
         }
 
         return Session<SUBJECT, ID>(
             secretHash = secret.fastHash(),  // SECURITY: Only the hash is stored, never the plaintext. Using fast hash since session tokens are high-entropy.
-            subjectId = subjectId,
+            subjectId = subject._id,
             label = label,
             expires = expires,
             stale = stale,
@@ -244,21 +297,39 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     /** Returns the [Authentication] that represents this session's authorization state. */
     context(server: ServerRuntime)
-    public fun Session<SUBJECT, ID>.toAuth(): Authentication<SUBJECT> = Authentication(
-        principalType = principal,
-        id = subjectId,
-        sessionId = _id,
-        issuedAt = authenticatedAt ?: createdAt,
-        scopes = scopes,
-    )
+    public suspend fun Session<SUBJECT, ID>.toAuth(): Authentication<SUBJECT> = toAuth(principal.fetch(subjectId))
 
+    /** Returns the [Authentication] that represents this session's authorization state. */
+    context(server: ServerRuntime)
+    public suspend fun Session<SUBJECT, ID>.toAuth(subject: SUBJECT): Authentication<SUBJECT> {
+        require(subject._id == subjectId) { "Subject ${subject._id} does not own session $_id" }
+        val allowedScopes = permitScopes(subject)
+        val effectiveScopes = when {
+            GrantedScope.root in scopes -> allowedScopes
+            GrantedScope.root in allowedScopes -> scopes
+            else -> scopes.filterTo(HashSet()) { granted ->
+                allowedScopes.any { it.meetsRequirements(RequiredScope(granted.asString)) }
+            } + allowedScopes.filterTo(HashSet()) { allowed ->
+                scopes.any { it.meetsRequirements(RequiredScope(allowed.asString)) }
+            }
+        }
+        return Authentication(
+            principalType = principal,
+            id = subjectId,
+            sessionId = _id,
+            issuedAt = authenticatedAt ?: createdAt,
+            scopes = effectiveScopes,
+            cache = SerializableCache<Authentication<SUBJECT>>().apply { set(principal.subjectCacheKey, subject) },
+        )
+    }
+
+    // Ownership is part of the update's condition, so checking it costs no separate read.
     context(server: ServerRuntime)
     private suspend fun terminateSessionById(id: Uuid, requireOwnershipOf: ID?) {
-        if (requireOwnershipOf != null) {
-            val owner = sessionInfo.table().get(id)?.subjectId ?: throw ForbiddenException()
-            if (owner != requireOwnershipOf) throw ForbiddenException()
-        }
-        sessionInfo.table().updateOneById(id, Modification(spath) { it.terminated assign now() })
+        val condition = if (requireOwnershipOf == null) spath._id eq id
+        else spath._id.eq(id) and spath.subjectId.eq(requireOwnershipOf)
+        val updated = sessionInfo.table().updateOne(condition, modification(spath) { it.terminated assign now() })
+        if (requireOwnershipOf != null && updated.new == null) throw ForbiddenException()
     }
 
     context(server: ServerRuntime)
@@ -276,6 +347,8 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     // Collected breadth-first, then terminated in one update. Recursing level by level through the postChange hook
     // overflows the stack on a long chain of sub-sessions when the database never suspends (RAM, JSON files).
     // `seen` stops a derivedFrom cycle, which a superuser could create through the REST endpoints.
+    // The root is already terminated or deleted, so with no descendants there's nothing to update. That's also the
+    // case for each descendant when this update's postChange hook runs again for it.
     context(server: ServerRuntime)
     private suspend fun terminateDerivedFrom(root: Uuid) {
         val seen = hashSetOf(root)
@@ -288,6 +361,8 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 .filter { it !in seen }
             seen += parents
         }
+        seen -= root
+        if (seen.isEmpty()) return
         sessionInfo.table().updateMany(
             (spath._id inside seen) and (spath.terminated eq null),
             Modification(spath) { it.terminated assign now() },
@@ -302,7 +377,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
      * @throws UnauthorizedException if the token is well-formed but invalid.
      */
     context(server: ServerRuntime)
-    private suspend fun RefreshToken.session(request: Request<*>): Session<SUBJECT, ID>? {
+    private suspend fun RefreshToken.session(request: Request<*>): Pair<Session<SUBJECT, ID>, SUBJECT>? {
         if (!valid) {
             tokenRejected(AuthEvent.TokenRejected.Reason.Malformed, request)
             return null
@@ -315,11 +390,6 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         val session = sessionInfo.table().get(_id) ?: run {
             tokenRejected(AuthEvent.TokenRejected.Reason.NoSuchSession, request)
             throw UnauthorizedException("No such session")
-        }
-        val subject = principal.fetch(session.subjectId)
-        if(!permitAuthentication(subject)){
-            session.rejected(AuthEvent.SessionRejected.Reason.AuthenticationNotPermitted, request)
-            throw ForbiddenException()
         }
         // SECURITY: Constant-time hash comparison to prevent timing attacks
         if (!plainTextSecret.checkAgainstHash(session.secretHash)) {
@@ -337,6 +407,13 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         if (session.terminated != null) {
             session.rejected(AuthEvent.SessionRejected.Reason.Terminated, request)
             throw UnauthorizedException("Session has been terminated.")
+        }
+
+        // Loaded only once the token itself checks out, so a bad token never costs a subject load
+        val subject = principal.fetch(session.subjectId)
+        if (!permitAuthentication(subject)) {
+            session.rejected(AuthEvent.SessionRejected.Reason.AuthenticationNotPermitted, request)
+            throw ForbiddenException()
         }
 
         // Lazy migration: if using old slow PBKDF2 hash, upgrade to fast SHA-256 hash
@@ -362,7 +439,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 it.secretHash assign plainTextSecret.fastHash()
             }
         })
-        return session
+        return session to subject
     }
 
     /**
@@ -376,10 +453,10 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             auth = noAuth,
             summary = "Get Token Simple",
             implementation = { refresh: String ->
-                val session = RefreshToken(refresh).session(request)
+                val (session, subject) = RefreshToken(refresh).session(request)
                     ?: throw BadRequestException("Refresh token not recognized")
 
-                tokenFormat().create(principal, session.toAuth().apply { precache(principal.precache) })
+                tokenFormat().create(principal, session.toAuth(subject).apply { precache(principal.precache) })
             }
         )
 
@@ -410,7 +487,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
                 newSession(
                     label = request.label,
-                    subjectId = auth.id,
+                    subject = auth.fetch(),
                     derivedFrom = sessionUuid,
                     scopes = scopes,
                     // Sub-session expires can't exceed parent session expiration
