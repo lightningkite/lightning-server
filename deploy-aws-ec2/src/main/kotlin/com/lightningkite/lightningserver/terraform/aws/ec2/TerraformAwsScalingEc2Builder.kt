@@ -161,7 +161,9 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
     /**
      * Salt folded into the golden-AMI version. Bump this to force a re-bake even when the install
      * script itself has not changed — which is how you pick up OS security patches: a re-bake
-     * starts from the latest Ubuntu base and re-runs `apt-get upgrade`. To rebuild on a schedule
+     * re-runs the full system upgrade. This is also the only thing that moves the base AMI: a bump
+     * re-resolves it to the latest release, whereas a newly published release on its own, or a
+     * re-bake from an install script change, stays on the current base. To rebuild on a schedule
      * (e.g. monthly), drive this from a date, for example `get() = "2026-06"`; changing it on
      * each apply produces a fresh, fully-patched AMI and a rolling instance refresh onto it.
      */
@@ -339,28 +341,30 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
      * while leaving its version alone, which is the same rejection one resource over.
      */
     private val imageVersion: String
-        get() = "1.${expression("regex(\"[0-9]{8}\", data.aws_ami.ubuntu.name)")}.${expression("local.image_data_version")}"
+        get() = "1.${expression("regex(\"[0-9]{8}\", terraform_data.base_ami.output.name)")}.${expression("local.image_data_version")}"
 
     private fun emitImageBuilder() {
         emit("image") {
-            // Base Ubuntu 24.04 AMI used as the Image Builder parent image.
-            "data.aws_ami.ubuntu" {
-                "most_recent" - true
-                "owners" - listOf("099720109477")
-                "filter" - listOf(
-                    terraformJsonObject {
-                        "name" - "name"
-                        "values" - listOf("ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-${if (instanceArchitecture == CPUArchitecture.Arm) "arm64" else "amd64"}-server-*")
-                    },
-                    terraformJsonObject {
-                        "name" - "architecture"
-                        "values" - listOf(if (instanceArchitecture == CPUArchitecture.Arm) "arm64" else "x86_64")
-                    },
-                    terraformJsonObject {
-                        "name" - "virtualization-type"
-                        "values" - listOf("hvm")
-                    },
-                )
+            // Latest base AMI for the distro. Only read through terraform_data.base_ami below.
+            baseAmiData()
+
+            // The Image Builder parent image, pinned so a new base AMI release can't force a re-bake and
+            // instance refresh during an unrelated apply. Bumping [baseImageSalt] or changing [distro]
+            // replaces this resource, which re-resolves it to the latest AMI: ignore_changes does not
+            // apply on replacement. The distro must be a trigger too, or a distro change would bake the
+            // new install script on top of the old distro's pinned image.
+            "resource.terraform_data.base_ami" {
+                "input" {
+                    "id" - expression("data.aws_ami.base.id")
+                    "name" - expression("data.aws_ami.base.name")
+                }
+                "triggers_replace" {
+                    "salt" - expression("local.image_salt")
+                    "distro" - distro.name
+                }
+                "lifecycle" {
+                    "ignore_changes" - listOf("input")
+                }
             }
 
             // IAM role/instance-profile for the transient Image Builder build instance.
@@ -418,7 +422,7 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
             "resource.aws_imagebuilder_image_recipe.this" {
                 "name" - "$projectPrefix-recipe"
                 "version" - imageVersion
-                "parent_image" - expression("data.aws_ami.ubuntu.id")
+                "parent_image" - expression("terraform_data.base_ami.output.id")
                 // Ordered: required + additional installs first, then our custom component, then hardening
                 // last so it locks down the fully-built image.
                 "component" - buildList<JsonElement> {
@@ -427,7 +431,7 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
                     hardeningComponents.forEach { add(it.toRecipeComponent()) }
                 }
                 "block_device_mapping" {
-                    "device_name" - "/dev/sda1"
+                    "device_name" - rootDeviceName
                     "ebs" {
                         "volume_size" - volumeSizeGiB
                         "volume_type" - "gp3"
@@ -444,7 +448,7 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
                 "name" - "$projectPrefix-infra"
                 "instance_profile_name" - expression("aws_iam_instance_profile.imagebuilder.name")
                 "instance_types" - listOf(instanceType)
-                // Build in a private subnet (no public IP); egress for apt/curl/SSM goes through
+                // Build in a private subnet (no public IP); egress for packages/curl/SSM goes through
                 // NAT, and S3 through the gateway endpoint. No reason to expose the build host.
                 "subnet_id" - expression("${applicationVpc.privateSubnets.trimExpression()}[0]")
                 "security_group_ids" - listOf(expression("aws_security_group.instance.id"))
@@ -492,10 +496,14 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
                 // The recipe's own inputs, which are versioned by [imageVersion] just like the
                 // component document is. `parent_image` is not covered by the date in the minor
                 // node: two AMIs published on one day (a same-day republish, or the arm64 and
-                // amd64 builds of the same release) share that date, so only the id separates
-                // them -- and the id moving is exactly what a re-bake exists for.
+                // amd64 builds of the same release) share that date, so only the id separates them.
+                //
+                // Named base_ami rather than parent_image so the hash differs from deployments made
+                // before the pin existed. A brand-new terraform_data's output is unknown at plan time,
+                // which plans a replacement of the component and recipe; if they came back at their
+                // old version, AWS would reject them.
                 "image_recipe_inputs" {
-                    "parent_image" - expression("data.aws_ami.ubuntu.id")
+                    "base_ami" - expression("terraform_data.base_ami.output.id")
                     "volume_size" - volumeSizeGiB
                 }
                 "image_data_version" - expression(
@@ -801,7 +809,7 @@ $indentedScript
                     "http_put_response_hop_limit" - 1
                 }
                 "block_device_mappings" {
-                    "device_name" - "/dev/sda1"
+                    "device_name" - rootDeviceName
                     "ebs" {
                         "volume_size" - volumeSizeGiB
                         "volume_type" - "gp3"
@@ -1292,7 +1300,7 @@ run_update() {
 needs_reboot() {
     local id="$1" out
     out=$(ssm_run "$id" 60 24 "reboot check" \
-        "test -f /var/run/reboot-required && echo REBOOT_REQUIRED=yes || echo REBOOT_REQUIRED=no") || return 2
+        "$$rebootCheckCommand") || return 2
     case "$out" in
         *REBOOT_REQUIRED=yes*) return 0 ;;
         *REBOOT_REQUIRED=no*)  return 1 ;;

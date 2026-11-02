@@ -290,6 +290,7 @@ public fun TerraformNeed<TelemetryBackend.Settings>.otelXRay(
     emitter.provisioningFragments += adotProvisioningFragment(
         adotVersion = adotVersion,
         arch = if (emitter.instanceArchitecture == TerraformAwsEc2BuilderBase.CPUArchitecture.Arm) "arm64" else "amd64",
+        distro = emitter.distro,
         region = emitter.applicationRegion,
         namespace = emitter.projectPrefix,
         enableMetrics = enableMetrics,
@@ -300,12 +301,13 @@ public fun TerraformNeed<TelemetryBackend.Settings>.otelXRay(
 }
 
 /**
- * Builds the shell fragment that installs the ADOT collector `.deb`, writes its config to the
- * package's default config path, and `enable`s the packaged systemd service.
+ * Builds the shell fragment that installs the ADOT collector package (`.deb` or `.rpm` per [distro]),
+ * writes its config to the package's default config path, and `enable`s the packaged systemd service.
  */
 private fun adotProvisioningFragment(
     adotVersion: String,
     arch: String,
+    distro: TerraformAwsEc2BuilderBase.Distro,
     region: String,
     namespace: String,
     enableMetrics: Boolean,
@@ -351,9 +353,19 @@ exporters:
     return buildString {
         appendLine("# === AWS Distro for OpenTelemetry collector ===")
         appendLine("echo \"[INFO] Installing ADOT collector $adotVersion at \$(date)\"")
-        appendLine("curl -fsSL -o /tmp/aws-otel-collector.deb https://aws-otel-collector.s3.amazonaws.com/ubuntu/$arch/$adotVersion/aws-otel-collector.deb")
-        appendLine("dpkg -i /tmp/aws-otel-collector.deb")
-        appendLine("rm -f /tmp/aws-otel-collector.deb")
+        when (distro) {
+            TerraformAwsEc2BuilderBase.Distro.Ubuntu2404, TerraformAwsEc2BuilderBase.Distro.Ubuntu2604 -> {
+                appendLine("curl -fsSL -o /tmp/aws-otel-collector.deb https://aws-otel-collector.s3.amazonaws.com/ubuntu/$arch/$adotVersion/aws-otel-collector.deb")
+                appendLine("dpkg -i /tmp/aws-otel-collector.deb")
+                appendLine("rm -f /tmp/aws-otel-collector.deb")
+            }
+
+            TerraformAwsEc2BuilderBase.Distro.AmazonLinux2023 -> {
+                appendLine("curl -fsSL -o /tmp/aws-otel-collector.rpm https://aws-otel-collector.s3.amazonaws.com/amazon_linux/$arch/$adotVersion/aws-otel-collector.rpm")
+                appendLine("dnf install -y /tmp/aws-otel-collector.rpm")
+                appendLine("rm -f /tmp/aws-otel-collector.rpm")
+            }
+        }
         appendLine()
         appendLine("cat > /opt/aws/aws-otel-collector/etc/config.yaml << 'ADOT_CONFIG_EOF'")
         appendLine(config)
