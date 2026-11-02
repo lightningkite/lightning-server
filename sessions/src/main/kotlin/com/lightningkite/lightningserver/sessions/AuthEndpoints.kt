@@ -132,7 +132,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
         val subject = principal.fetch(result.id)
         return newSession(
-            subjectId = result.id,
+            subject = subject,
             label = request.label,
             expires = run {
                 val a = result.maxExpiration

@@ -9,6 +9,11 @@ import com.lightningkite.services.data.DataSize
 import com.lightningkite.services.data.DataSize.Companion.gibibytes
 import com.lightningkite.services.data.EmailAddress
 import com.lightningkite.services.terraform.*
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.*
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.lambda.model.Architecture
@@ -958,7 +963,12 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                 "resource.aws_cloudwatch_event_rule.scheduled_task_$name" {
                     "name" - "${emitter.projectPrefix}_$name"
                     "schedule_expression" - when (val s = schedule.schedule) {
-                        is Schedule.Daily -> "cron(${s.time.minute} ${s.time.hour} * * ? *)"
+                        is Schedule.Daily ->{
+                            val utcTime =
+                                LocalDateTime(LocalDate(2001, 1, 1), s.time).toInstant(s.zone).toLocalDateTime(TimeZone.UTC)
+
+                            "cron(${utcTime.time.minute} ${utcTime.time.hour} * * ? *)"
+                        }
                         is Schedule.Frequency -> "rate(${s.gap.inWholeMinutes} minute${if (s.gap.inWholeMinutes > 1) "s" else ""})"
                         is Schedule.Cron -> "cron(${s.cron} *)"
                     }

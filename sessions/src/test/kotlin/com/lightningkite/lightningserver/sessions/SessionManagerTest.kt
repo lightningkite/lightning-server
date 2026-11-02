@@ -63,9 +63,13 @@ class SessionManagerTest {
             override val subjectSerializer: KSerializer<SessionTestUser> = serializer()
 
             val users = mutableMapOf<Uuid, SessionTestUser>()
+            var fetchCount = 0
 
             context(server: ServerRuntime)
-            override suspend fun fetch(id: Uuid): SessionTestUser = users[id] ?: SessionTestUser(id)
+            override suspend fun fetch(id: Uuid): SessionTestUser {
+                fetchCount++
+                return users[id] ?: SessionTestUser(id)
+            }
         }
     }
 
@@ -73,6 +77,7 @@ class SessionManagerTest {
         database: Runtime<Database>,
         private val expirationDuration: Duration? = 30.days,
         private val staleDuration: Duration? = 7.days,
+        private val allowedScopes: (SessionTestUser) -> Set<GrantedScope> = { setOf(GrantedScope.root) },
         sessionSignals: context(ServerRuntime) (Table<Session<SessionTestUser, Uuid>>) -> Table<Session<SessionTestUser, Uuid>> = { it },
     ) : SessionManager<SessionTestUser, Uuid>(
         principal = SessionTestUser,
@@ -89,6 +94,9 @@ class SessionManagerTest {
 
         context(server: ServerRuntime)
         override suspend fun sessionStaleAfter(subject: SessionTestUser): Duration? = staleDuration
+
+        context(server: ServerRuntime)
+        override suspend fun permitScopes(subject: SessionTestUser): Set<GrantedScope> = allowedScopes(subject)
     }
 
     @Test
@@ -853,6 +861,221 @@ class SessionManagerTest {
                 )
                 val narrowerSession = execute { server.sessions.sessionInfo.table().get(RefreshToken(narrower)._id) }!!
                 assertEquals(setOf(GrantedScope("auth:sessions:create")), narrowerSession.scopes)
+            }
+        }
+    }
+
+    @Test
+    fun `permitScopes limits access tokens and lifts without re-authenticating`() = runBlocking {
+        SessionTestUser.users.clear()
+        val userId = Uuid.random()
+        SessionTestUser.users[userId] = SessionTestUser(userId, "test@example.com")
+        val setupOnly = setOf(GrantedScope("auth:proofs:totp"))
+        var mfaEstablished = false
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+
+            val sessions = path.path("auth") include TestSessionManager(
+                database = database,
+                allowedScopes = { if (mfaEstablished) setOf(GrantedScope.root) else setupOnly },
+            )
+        }.let { server ->
+            server.test({}) {
+                val (session, refreshToken) = execute { server.sessions.newSession(subjectId = userId) }
+                // The session keeps what was requested; the limit is applied on use.
+                assertEquals(setOf(GrantedScope.root), session.scopes)
+
+                val restricted = server.sessions.tokenSimple.test(null, refreshToken.string)
+                assertEquals(setupOnly, execute { server.sessions.tokenFormat().read(SessionTestUser, restricted)!!.scopes })
+
+                mfaEstablished = true
+                val full = server.sessions.tokenSimple.test(null, refreshToken.string)
+                assertEquals(setOf(GrantedScope.root), execute { server.sessions.tokenFormat().read(SessionTestUser, full)!!.scopes })
+            }
+        }
+    }
+
+    @Test
+    fun `permitScopes also limits a refresh token used as a bearer token`() = runBlocking {
+        SessionTestUser.users.clear()
+        val userId = Uuid.random()
+        SessionTestUser.users[userId] = SessionTestUser(userId, "test@example.com")
+        val setupOnly = setOf(GrantedScope("auth:proofs:totp"))
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+
+            val sessions = path.path("auth") include TestSessionManager(
+                database = database,
+                allowedScopes = { setupOnly },
+            )
+        }.let { server ->
+            server.test({}) {
+                val (_, refreshToken) = execute { server.sessions.newSession(userId) }
+                val auth = execute { server.sessions.read(
+                    HttpRequest<PathSpec>(
+                        path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
+                        queryParameters = QueryParameters.EMPTY,
+                        headers = HttpHeaders { add(HttpHeader.Authorization, "Bearer ${refreshToken.string}") },
+                        domain = "example.com",
+                        protocol = "https",
+                        sourceIp = "local",
+                    )
+                ) }
+                assertEquals(setupOnly, auth!!.scopes)
+            }
+        }
+    }
+
+    @Test
+    fun `permitScopes intersects hierarchically with session scopes`() = runBlocking {
+        SessionTestUser.users.clear()
+        val userId = Uuid.random()
+        SessionTestUser.users[userId] = SessionTestUser(userId, "test@example.com")
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+
+            val sessions = path.path("auth") include TestSessionManager(
+                database = database,
+                allowedScopes = { setOf(GrantedScope("api"), GrantedScope("admin:read")) },
+            )
+        }.let { server ->
+            server.test({}) {
+                suspend fun effective(vararg stored: String) = with(server.sessions) {
+                    execute { newSession(userId, scopes = stored.mapTo(HashSet()) { GrantedScope(it) }).first.toAuth().scopes }
+                }
+
+                // Narrower session scope within an allowed one is kept
+                assertEquals(setOf(GrantedScope("api:read")), effective("api:read"))
+                // Broader session scope is narrowed to what's allowed
+                assertEquals(setOf(GrantedScope("admin:read")), effective("admin"))
+                // Root session scope becomes exactly the allowed set
+                assertEquals(setOf(GrantedScope("api"), GrantedScope("admin:read")), effective("*"))
+                // Unrelated scopes are dropped
+                assertEquals(emptySet(), effective("other"))
+            }
+        }
+    }
+
+    @Test
+    fun `refreshing loads the subject once and caches it on the authentication`() = runBlocking {
+        SessionTestUser.users.clear()
+        val userId = Uuid.random()
+        SessionTestUser.users[userId] = SessionTestUser(userId, "test@example.com")
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+
+            val sessions = path.path("auth") include TestSessionManager(database = database)
+        }.let { server ->
+            server.test({}) {
+                val (_, refreshToken) = execute { server.sessions.newSession(userId) }
+
+                SessionTestUser.fetchCount = 0
+                server.sessions.tokenSimple.test(null, refreshToken.string)
+                assertEquals(1, SessionTestUser.fetchCount)
+
+                // Refresh token used as a bearer token: the handler's fetch() hits the cache
+                SessionTestUser.fetchCount = 0
+                val auth = execute { server.sessions.read(
+                    HttpRequest<PathSpec>(
+                        path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
+                        queryParameters = QueryParameters.EMPTY,
+                        headers = HttpHeaders { add(HttpHeader.Authorization, "Bearer ${refreshToken.string}") },
+                        domain = "example.com",
+                        protocol = "https",
+                        sourceIp = "local",
+                    )
+                )!! }
+                assertEquals(userId, execute { auth.fetch()._id })
+                assertEquals(1, SessionTestUser.fetchCount)
+            }
+        }
+    }
+
+    @Test
+    fun `a refresh token with the wrong secret does not load the subject`() = runBlocking {
+        SessionTestUser.users.clear()
+        val userId = Uuid.random()
+        SessionTestUser.users[userId] = SessionTestUser(userId, "test@example.com")
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+
+            val sessions = path.path("auth") include TestSessionManager(database = database)
+        }.let { server ->
+            server.test({}) {
+                val (_, refreshToken) = execute { server.sessions.newSession(userId) }
+                val forged = RefreshToken(refreshToken.type, refreshToken._id, "not-the-secret")
+
+                SessionTestUser.fetchCount = 0
+                assertFailsWith<UnauthorizedException> { server.sessions.tokenSimple.test(null, forged.string) }
+                assertEquals(0, SessionTestUser.fetchCount)
+            }
+        }
+    }
+
+    @Test
+    fun `terminating another subject's session is forbidden and leaves it active`() = runBlocking {
+        SessionTestUser.users.clear()
+        val ownerId = Uuid.random()
+        val otherId = Uuid.random()
+        SessionTestUser.users[ownerId] = SessionTestUser(ownerId, "owner@example.com")
+        SessionTestUser.users[otherId] = SessionTestUser(otherId, "other@example.com")
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+
+            val sessions = path.path("auth") include TestSessionManager(database = database)
+        }.let { server ->
+            server.test({}) {
+                val (target, targetRefresh) = execute { server.sessions.newSession(ownerId) }
+                val (otherSession, _) = execute { server.sessions.newSession(otherId) }
+                val otherAuth = execute { with(server.sessions) { otherSession.toAuth() } }
+
+                assertFailsWith<ForbiddenException> {
+                    server.sessions.otherSessionTerminate.test(target._id, otherAuth, Unit)
+                }
+                assertFailsWith<ForbiddenException> {
+                    server.sessions.otherSessionTerminate.test(Uuid.random(), otherAuth, Unit)
+                }
+                assertNull(execute { server.sessions.sessionInfo.table().get(target._id)!!.terminated })
+                server.sessions.tokenSimple.test(null, targetRefresh.string)
+
+                val ownerAuth =execute {  with(server.sessions) { server.sessions.newSession(ownerId).first.toAuth() } }
+                server.sessions.otherSessionTerminate.test(target._id, ownerAuth, Unit)
+                assertNotNull(execute { server.sessions.sessionInfo.table().get(target._id)!!.terminated })
+            }
+        }
+    }
+
+    @Test
+    fun `creating a session from a loaded subject does not reload it`() = runBlocking {
+        SessionTestUser.users.clear()
+        val userId = Uuid.random()
+        val user = SessionTestUser(userId, "test@example.com")
+        SessionTestUser.users[userId] = user
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+
+            val sessions = path.path("auth") include TestSessionManager(database = database)
+        }.let { server ->
+            server.test({}) {
+                SessionTestUser.fetchCount = 0
+                val (parent, _) = execute { server.sessions.newSession(user) }
+                assertEquals(userId, parent.subjectId)
+                assertEquals(0, SessionTestUser.fetchCount)
+
+                // The parent auth already carries the subject, so the sub-session reuses it
+                val parentAuth = execute { with(server.sessions) { parent.toAuth(user) } }
+                server.sessions.createSubSession.test(parentAuth, SubSessionRequest(label = "child"))
+                assertEquals(0, SessionTestUser.fetchCount)
+
+                SessionTestUser.users[userId] = user.copy(active = false)
+                assertFailsWith<ForbiddenException> { execute { server.sessions.newSession(user.copy(active = false)) }}
             }
         }
     }
