@@ -186,7 +186,7 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
             ?: throw UnauthorizedException("Principal type $principalName is unrecognized")
 
     @Transient
-    public var cachedId: Comparable<*>? = null
+    private var cachedId: Comparable<*>? = null
 
     /**
      * Retrieves the deserialized ID for this authentication's subject.
@@ -381,7 +381,7 @@ public val <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication<SUBJECT>.pr
 
 @Suppress("UNCHECKED_CAST")
 context(server: Engine)
-public val <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication<SUBJECT>.id: ID
+public val <ID : Comparable<*>> Authentication<out HasId<out ID>>.id: ID
     get() = untypedId as ID
 
 @Suppress("UNCHECKED_CAST", "UPPER_BOUND_VIOLATED_IN_TYPE_OPERATOR_OR_PARAMETER_BOUNDS_WARNING")

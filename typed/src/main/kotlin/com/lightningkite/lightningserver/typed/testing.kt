@@ -127,7 +127,7 @@ private suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHa
 
 context(test: TestRunner<*>)
 public suspend fun <USER : HasId<*>, INPUT, OUTPUT> ApiHttpHandler<PathSpec0, USER, INPUT, OUTPUT>.test(
-    auth: Authentication<USER>,
+    auth: Authentication<out USER>,
     input: INPUT,
 ): OUTPUT {
     return testWith(
@@ -140,7 +140,7 @@ public suspend fun <USER : HasId<*>, INPUT, OUTPUT> ApiHttpHandler<PathSpec0, US
 context(test: TestRunner<*>)
 public suspend fun <USER : HasId<*>, INPUT, OUTPUT, A> ApiHttpHandler<PathSpec1<A>, USER, INPUT, OUTPUT>.test(
     path1: A,
-    auth: Authentication<USER>,
+    auth: Authentication<out USER>,
     input: INPUT,
 ): OUTPUT {
     return testWith(
@@ -154,7 +154,7 @@ context(test: TestRunner<*>)
 public suspend fun <USER : HasId<*>, INPUT, OUTPUT, A, B> ApiHttpHandler<PathSpec2<A, B>, USER, INPUT, OUTPUT>.test(
     path1: A,
     path2: B,
-    auth: Authentication<USER>,
+    auth: Authentication<out USER>,
     input: INPUT,
 ): OUTPUT {
     return testWith(
@@ -169,7 +169,7 @@ public suspend fun <USER : HasId<*>, INPUT, OUTPUT, A, B, C> ApiHttpHandler<Path
     path1: A,
     path2: B,
     path3: C,
-    auth: Authentication<USER>,
+    auth: Authentication<out USER>,
     input: INPUT,
 ): OUTPUT {
     return testWith(
@@ -181,7 +181,7 @@ public suspend fun <USER : HasId<*>, INPUT, OUTPUT, A, B, C> ApiHttpHandler<Path
 
 @JvmName("testNullableAuth")
 context(test: TestRunner<*>) public suspend fun <USER : HasId<*>, INPUT, OUTPUT> ApiHttpHandler<PathSpec0, USER?, INPUT, OUTPUT>.test(
-    auth: Authentication<USER>?,
+    auth: Authentication<out USER>?,
     input: INPUT,
 ): OUTPUT {
     return testWith(
@@ -194,7 +194,7 @@ context(test: TestRunner<*>) public suspend fun <USER : HasId<*>, INPUT, OUTPUT>
 @JvmName("testNullableAuth")
 context(test: TestRunner<*>) public suspend fun <USER : HasId<*>, INPUT, OUTPUT, A> ApiHttpHandler<PathSpec1<A>, USER?, INPUT, OUTPUT>.test(
     path1: A,
-    auth: Authentication<USER>?,
+    auth: Authentication<out USER>?,
     input: INPUT,
 ): OUTPUT {
     return testWith(
@@ -208,7 +208,7 @@ context(test: TestRunner<*>) public suspend fun <USER : HasId<*>, INPUT, OUTPUT,
 context(test: TestRunner<*>) public suspend fun <USER : HasId<*>, INPUT, OUTPUT, A, B> ApiHttpHandler<PathSpec2<A, B>, USER?, INPUT, OUTPUT>.test(
     path1: A,
     path2: B,
-    auth: Authentication<USER>?,
+    auth: Authentication<out USER>?,
     input: INPUT,
 ): OUTPUT {
     return testWith(
@@ -223,7 +223,7 @@ context(test: TestRunner<*>) public suspend fun <USER : HasId<*>, INPUT, OUTPUT,
     path1: A,
     path2: B,
     path3: C,
-    auth: Authentication<USER>?,
+    auth: Authentication<out USER>?,
     input: INPUT,
 ): OUTPUT {
     return testWith(
