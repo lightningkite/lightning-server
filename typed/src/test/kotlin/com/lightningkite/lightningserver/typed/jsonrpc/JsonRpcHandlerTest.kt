@@ -2,9 +2,9 @@ package com.lightningkite.lightningserver.typed.jsonrpc
 
 import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.auth.noAuth
+import com.lightningkite.lightningserver.auth.require
 import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.definition.Runtime
-import com.lightningkite.lightningserver.auth.require
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.typed.sdk.User
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder

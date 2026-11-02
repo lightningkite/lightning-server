@@ -4,7 +4,6 @@ import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
-import com.lightningkite.lightningserver.pathing.route
 import com.lightningkite.services.telemetry.TelemetryAttributes
 import com.lightningkite.services.telemetry.TelemetryKey
 import com.lightningkite.services.telemetry.TelemetryKeys
@@ -124,14 +123,18 @@ public suspend fun <PATH : PathSpec, T> HttpHandler<PATH>.executeWithMetrics(
 
 // INTERNAL IMPLEMENTATION STUFF
 
-// Claude: the operation name becomes a metric label, and an unmatched request's method and path are whatever the client sent.
 context(engine: Engine)
-internal fun HttpRequest<*>.operationName() = if (path.tryResolve() == null) "unmatched" else "${path.method} ${path.route()}"
+internal fun HttpRequest<*>.operationName(): String {
+    // The operation name becomes a metric label.  An unmatched request's path and method are whatever
+    // the client sent (scanners send thousands), so they must not appear in it.
+    val route = path.tryResolve()?.pathSpec ?: return "unmatched"
+    return "${path.method} $route"
+}
 
 context(engine: Engine)
 internal fun HttpRequest<*>.telemetryAttributes() = TelemetryAttributes {
     put(TelemetryKeys.Http.method, path.method.toString())
-    if (path.tryResolve() != null) put(TelemetryKeys.Http.route, path.route())
+    path.tryResolve()?.let { put(TelemetryKeys.Http.route, it.pathSpec.toString()) }
     put(TelemetryKeys.Http.target, "/" + path.pathSegments.toString())
     put(TelemetryKeys.Http.scheme, protocol)
     put(TelemetryKeys.Http.host, domain)
@@ -179,19 +182,24 @@ private suspend fun <PATH : PathSpec> Engine.executeHttp(
                 return response
             }
 
-            val response = try {
-                interceptors.intercept(request) { req ->
-                    // Map handler and routing exceptions to responses in-place so the surrounding
-                    // interceptors (CORS, etc.) still post-process error responses.
-                    try {
-                        dispatch(req)
-                    } catch (e: Exception) {
-                        handleError(e)
-                    }
+        val response = try {
+            interceptors.intercept(request) { req ->
+                // Map handler and routing exceptions to responses in-place so the surrounding
+                // interceptors (CORS, etc.) still post-process error responses.
+                try {
+                    dispatch(req)
+                } catch (e: Exception) {
+                    // HttpStatusExceptions are expected client-facing outcomes (400, 401, 404, ...), not server faults.
+                    if (e is HttpStatusException) serverRuntime.logger.debug(e) { "HttpStatusException in HTTP" }
+                    else serverRuntime.logger.error(e) { "Exception in HTTP" }
+                    handleError(e)
                 }
-            } catch (e: Exception) {
-                handleError(e)
             }
+        } catch (e: Exception) {
+            if (e is HttpStatusException) logger.debug(e) { "HttpStatusException in HTTP interceptor chain" }
+            else logger.error(e) { "Exception in HTTP interceptor chain" }
+            handleError(e)
+        }
 
             trace.enrich(TelemetryAttributes {
                 put(TelemetryKeys.Http.statusCode, response.status.code.toLong())
