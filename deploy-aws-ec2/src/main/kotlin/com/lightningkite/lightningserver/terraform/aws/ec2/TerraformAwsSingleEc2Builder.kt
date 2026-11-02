@@ -9,8 +9,9 @@ import com.lightningkite.services.terraform.*
  * Terraform builder for deploying Lightning Server to a single AWS EC2 instance.
  *
  * This is the simplest, cheapest deployment: one instance with an Elastic IP, running the
- * application behind an on-box Angie (nginx fork) reverse proxy that terminates TLS via the
- * Let's Encrypt ACME client. Route53 A/AAAA records point straight at the instance, and
+ * application behind an on-box nginx reverse proxy that terminates TLS with a Let's Encrypt
+ * certificate it obtains and renews itself through `nginx-module-acme`. Route53 A/AAAA records
+ * point straight at the instance, and
  * code/settings updates are pushed in-place to that one instance via SSM Run Command.
  *
  * For a horizontally-scaled, load-balanced deployment see [TerraformAwsScalingEc2Builder].
@@ -97,7 +98,7 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
         emptyList() // Example: ::/0, would allow everyone in the world to attempt to ssh in
 
 
-    /** Direct application only accessible internally; we force using Angie. */
+    /** Direct application only accessible internally; we force using nginx. */
     override val appBindsAllNetworkInterfaces: Boolean get() = false
 
     override fun registerProviders() {
@@ -153,7 +154,7 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
                 "depends_on" - listOfNotNull(
                     "null_resource.upload_jar",
                     "null_resource.upload_settings",
-                    "aws_instance.ubuntu",
+                    "aws_instance.main",
                     "aws_iam_role_policy_attachment.ssm",
                     "aws_iam_role_policy_attachment.servicesAccess",
                     if (enableIPv4) "aws_eip_association.main" else null,
@@ -161,37 +162,19 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
                 )
                 "provisioner" {
                     "local-exec" {
-                        "command" - $$"bash ${path.module}/redeploy.sh ${aws_instance.ubuntu.id} $$applicationRegion"
+                        "command" - $$"bash ${path.module}/redeploy.sh ${aws_instance.main.id} $$applicationRegion"
                     }
                 }
             }
         }
 
         emit("ec2") {
-            // Get latest Ubuntu 24.04 AMI
-            "data.aws_ami.ubuntu" {
-                "most_recent" - true
-                "owners" - listOf("099720109477")
-
-                "filter" - listOf(
-                    terraformJsonObject {
-                        "name" - "name"
-                        "values" - listOf("ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-${if (instanceArchitecture == CPUArchitecture.Arm) "arm64" else "amd64"}-server-*")
-                    },
-                    terraformJsonObject {
-                        "name" - "architecture"
-                        "values" - listOf(if (instanceArchitecture == CPUArchitecture.Arm) "arm64" else "x86_64")
-                    },
-                    terraformJsonObject {
-                        "name" - "virtualization-type"
-                        "values" - listOf("hvm")
-                    }
-                )
-            }
+            // Get latest base AMI for the distro
+            baseAmiData()
 
             // EC2 Instance
-            "resource.aws_instance.ubuntu" {
-                "ami" - expression("data.aws_ami.ubuntu.id")
+            "resource.aws_instance.main" {
+                "ami" - expression("data.aws_ami.base.id")
                 "instance_type" - instanceType
                 "iam_instance_profile" - expression("aws_iam_instance_profile.ec2.name")
 
@@ -241,6 +224,13 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
 
                 "tags" {
                     "Name" - deploymentTag
+                }
+
+                // A new base AMI release must not replace the only instance during an unrelated apply.
+                // ignore_changes does not apply on replacement, so any replacement (an init script
+                // change, or `terraform apply -replace`) still moves to the latest AMI.
+                "lifecycle" {
+                    "ignore_changes" - listOf("ami")
                 }
 
                 "depends_on" - (listOf(
@@ -311,7 +301,7 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
                     "name" - domain
                     "type" - "AAAA"
                     "ttl" - 300
-                    "records" - listOf(expression("aws_instance.ubuntu.ipv6_addresses[0]"))
+                    "records" - listOf(expression("aws_instance.main.ipv6_addresses[0]"))
                 }
 
 
@@ -331,7 +321,7 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
                         "name" - wsDomain
                         "type" - "AAAA"
                         "ttl" - 300
-                        "records" - listOf(expression("aws_instance.ubuntu.ipv6_addresses[0]"))
+                        "records" - listOf(expression("aws_instance.main.ipv6_addresses[0]"))
                     }
             }
         }
@@ -369,7 +359,7 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
                 "treat_missing_data" - "breaching"
 
                 "dimensions" {
-                    "InstanceId" - expression("aws_instance.ubuntu.id")
+                    "InstanceId" - expression("aws_instance.main.id")
                 }
 
                 "alarm_actions" - listOf(expression("aws_sns_topic.emergency.arn"))
@@ -388,7 +378,7 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
                 "alarm_description" - "High CPU utilization"
 
                 "dimensions" {
-                    "InstanceId" - expression("aws_instance.ubuntu.id")
+                    "InstanceId" - expression("aws_instance.main.id")
                 }
 
                 "alarm_actions" - listOf(expression("aws_sns_topic.emergency.arn"))
@@ -406,7 +396,7 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
                 "comparison_operator" - "GreaterThanThreshold"
 
                 "dimensions" {
-                    "InstanceId" - expression("aws_instance.ubuntu.id")
+                    "InstanceId" - expression("aws_instance.main.id")
                 }
 
                 "alarm_actions" - listOf(expression("aws_sns_topic.emergency.arn"))
@@ -424,7 +414,7 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
                 "comparison_operator" - "GreaterThanThreshold"
 
                 "dimensions" {
-                    "InstanceId" - expression("aws_instance.ubuntu.id")
+                    "InstanceId" - expression("aws_instance.main.id")
                 }
 
                 "alarm_actions" - listOf(expression("aws_sns_topic.emergency.arn"))
@@ -450,7 +440,7 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
             }
 
             "resource.aws_eip_association.main" {
-                "instance_id" - expression("aws_instance.ubuntu.id")
+                "instance_id" - expression("aws_instance.main.id")
                 "allocation_id" - expression("aws_eip.main.id")
             }
         }
@@ -586,8 +576,16 @@ exec > >(tee /var/log/$$projectPrefix/ec2_init.log | logger -t ec2_init -s) 2>&1
 # === Bootstrap packages ===
 # Just enough to fetch ec2_init.sh; the full system update and package install happen there.
 echo "[INFO] Installing bootstrap packages..."
-apt-get -o DPkg::Lock::Timeout=$$aptLockTimeoutSeconds update -y
-apt-get -o DPkg::Lock::Timeout=$$aptLockTimeoutSeconds install -y curl ca-certificates unzip
+$${
+                    when (distro) {
+                        Distro.Ubuntu2404, Distro.Ubuntu2604 -> """
+apt-get -o DPkg::Lock::Timeout=$aptLockTimeoutSeconds update -y
+apt-get -o DPkg::Lock::Timeout=$aptLockTimeoutSeconds install -y curl ca-certificates unzip
+""".trim()
+                        // curl (as curl-minimal) and ca-certificates ship in the AMI.
+                        Distro.AmazonLinux2023 -> "dnf install -y unzip"
+                    }
+                }
 """
             )
 
@@ -633,7 +631,7 @@ rm ec2_init.sh
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
-echo "[INFO] EC2 Init script started at $(date)"
+echo "[INFO] EC2 Init script started on ${distro.name} at $(date)"
 """
             )
 
@@ -648,7 +646,7 @@ echo "[INFO] EC2 Init script started at $(date)"
 
             cloudwatchAgent(emitter.applicationRegion)
 
-            angieInstall()
+            nginxInstall()
 
             ssm()
 
@@ -659,7 +657,7 @@ echo "[INFO] EC2 Init script started at $(date)"
             val localHealthUrl = "http://localhost:8080${healthCheckPath}"
 
             // The single instance fills the bucket name via terraform templatefile() and the
-            // region is a compile-time constant. The app listens on appPort behind Angie.
+            // region is a compile-time constant. The app listens on appPort behind nginx.
             instanceRedeployScript(
                 $$"""BUCKET="${deployment_bucket}"
 REGION="$$applicationRegion"""",
@@ -689,8 +687,8 @@ echo "[INFO] Running first-time application deploy..."
 
 # === Start Services ===
 echo "[INFO] Starting services..."
-systemctl enable angie
-systemctl restart angie
+systemctl enable nginx
+systemctl restart nginx
 """
             )
 
@@ -722,10 +720,21 @@ echo "[INFO] EC2 Init script completed in $BOOT_DURATION seconds"
     }
 
     /**
-     * Download + install the CloudWatch agent .deb. The scaling builder installs the agent via the
+     * Install the CloudWatch agent (a downloaded .deb on Ubuntu, dnf on Amazon Linux). The scaling builder installs the agent via the
      * AWS-managed `amazon-cloudwatch-agent-linux` component instead, so it only needs [cloudwatchAgentConfig].
      */
     private fun StringBuilder.cloudwatchAgentInstall(applicationRegion: String) {
+        if (distro == Distro.AmazonLinux2023) {
+            // Packaged in the AL2023 repositories.
+            appendLine(
+                """
+# === Install CloudWatch Agent ===
+echo "[INFO] Installing CloudWatch Agent at $(date)"
+dnf install -y amazon-cloudwatch-agent
+"""
+            )
+            return
+        }
         appendLine(
             $$"""
 # === Install CloudWatch Agent ===
@@ -765,9 +774,11 @@ rm -rf aws/ awscliv2.zip
         )
     }
 
-    private fun StringBuilder.angieInstall() {
-
-        fun outputServer(domain: String, includeUpgrade: Boolean): String = $$"""
+    /**
+     * The `server` blocks for [domain]: a catch-all that drops unknown hosts, an HTTP-to-HTTPS redirect,
+     * and the TLS proxy to the app.
+     */
+    private fun nginxServers(domain: String, includeUpgrade: Boolean): String = $$"""
 # Drop requests for any other host name or a bare IP
 server {
     listen 80 default_server;
@@ -778,7 +789,7 @@ server {
     return 444;
 }
 
-# HTTP: redirect to HTTPS (Angie answers ACME challenges before this)
+# HTTP: redirect to HTTPS (nginx-module-acme answers ACME challenges before this)
 server {
     listen 80;
     listen [::]:80;
@@ -792,9 +803,11 @@ server {
     listen [::]:443 ssl;
     http2 on;
 
-    acme letsencrypt;
-    ssl_certificate     $acme_cert_letsencrypt;
-    ssl_certificate_key $acme_cert_key_letsencrypt;
+    acme_certificate letsencrypt;
+    ssl_certificate     $acme_certificate;
+    ssl_certificate_key $acme_certificate_key;
+    # Variable certificate paths are otherwise re-read on every handshake.
+    ssl_certificate_cache max=2;
 
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305;
@@ -831,22 +844,47 @@ $${
 }
 """
 
+    /** Installs nginx and nginx-module-acme from nginx.org's repository, then writes the proxy config. */
+    private fun StringBuilder.nginxInstall() {
+        val repository = when (distro) {
+            // nginx.org's packages over Ubuntu's own nginx, which nginx-module-acme is not built against.
+            Distro.Ubuntu2404, Distro.Ubuntu2604 -> $$"""
+install -d -m 0755 /etc/apt/keyrings
+curl -fsSL -o /etc/apt/keyrings/nginx.asc https://nginx.org/keys/nginx_signing.key
+echo "deb [signed-by=/etc/apt/keyrings/nginx.asc] https://nginx.org/packages/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") nginx" \
+    > /etc/apt/sources.list.d/nginx.list
+printf 'Package: *\nPin: origin nginx.org\nPin: release o=nginx\nPin-Priority: 900\n' > /etc/apt/preferences.d/99nginx
+apt-get -o DPkg::Lock::Timeout=$$aptLockTimeoutSeconds update -y
+apt-get -o DPkg::Lock::Timeout=$$aptLockTimeoutSeconds install -y nginx nginx-module-acme"""
+
+            // priority=9 prefers nginx.org's packages over AL2023's own nginx, which ships no ACME module.
+            Distro.AmazonLinux2023 -> """
+cat > /etc/yum.repos.d/nginx.repo << 'NGINX_REPO_EOF'
+[nginx-stable]
+name=nginx stable repo
+baseurl=https://nginx.org/packages/amzn/2023/${'$'}basearch/
+gpgcheck=1
+enabled=1
+gpgkey=https://nginx.org/keys/nginx_signing.key
+module_hotfixes=true
+priority=9
+NGINX_REPO_EOF
+dnf install -y nginx nginx-module-acme"""
+        }
+
         // language="Shell Script"
         appendLine(
             $$"""
-# === Install Angie + ACME module ===
-echo "[INFO] Installing Angie $(date)"
-curl -o /etc/apt/trusted.gpg.d/angie-signing.gpg \
-            https://angie.software/keys/angie-signing.gpg
-echo "deb https://download.angie.software/angie/$(. /etc/os-release && echo "$ID/$VERSION_ID $VERSION_CODENAME") main" \
-    | tee /etc/apt/sources.list.d/angie.list > /dev/null
-apt-get -o DPkg::Lock::Timeout=$$aptLockTimeoutSeconds update -y
-apt-get -o DPkg::Lock::Timeout=$$aptLockTimeoutSeconds install -y angie
+# === Install nginx + ACME module ===
+echo "[INFO] Installing nginx $(date)"$$repository
 
-# === Angie config (built-in ACME client handles cert issuance + renewal) ===
-echo "[INFO] Creating server.conf for Angie $(date)"
-rm -f /etc/angie/http.d/default.conf
-cat > /etc/angie/http.d/server.conf << 'NGX_EOF'
+# === nginx config (nginx-module-acme handles cert issuance + renewal) ===
+echo "[INFO] Creating server.conf for nginx $(date)"
+# The ACME module is dynamic, and load_module is only valid at the top level of nginx.conf.
+grep -q 'ngx_http_acme_module' /etc/nginx/nginx.conf \
+    || sed -i '1i load_module modules/ngx_http_acme_module.so;' /etc/nginx/nginx.conf
+rm -f /etc/nginx/conf.d/default.conf
+cat > /etc/nginx/conf.d/server.conf << 'NGX_EOF'
 resolver 8.8.8.8 1.1.1.1 ipv6=off;
 resolver_timeout 5s;
 
@@ -862,9 +900,13 @@ upstream app {
     keepalive_requests 1000;
 }
 
-acme_client letsencrypt https://acme-v02.api.letsencrypt.org/directory;
-$${outputServer(domain, wsDomain == domain)}
-$${if (wsDomain != domain) outputServer(wsDomain, true) else ""}
+acme_issuer letsencrypt {
+    uri https://acme-v02.api.letsencrypt.org/directory;
+    state_path /var/cache/nginx/acme-letsencrypt;
+    accept_terms_of_service;
+}
+$${nginxServers(domain, wsDomain == domain)}
+$${if (wsDomain != domain) nginxServers(wsDomain, true) else ""}
 NGX_EOF
 """
         )

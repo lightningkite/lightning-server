@@ -7,26 +7,54 @@ Two deployment styles are provided:
 
 | Builder | Shape | Use it when |
 |---------|-------|-------------|
-| `TerraformAwsSingleEc2Builder` | One EC2 instance with an Elastic IP; on-box Angie terminates TLS via Let's Encrypt and reverse-proxies to the app. | Cheapest option; low/predictable traffic; no horizontal scaling needed. |
+| `TerraformAwsSingleEc2Builder` | One EC2 instance with an Elastic IP; on-box nginx terminates TLS via Let's Encrypt and reverse-proxies to the app. | Cheapest option; low/predictable traffic; no horizontal scaling needed. |
 | `TerraformAwsScalingEc2Builder` | Application Load Balancer (ACM TLS) in front of an Auto Scaling Group of instances in private subnets, booting from a golden AMI. | You need horizontal scaling, zero-downtime rolling deploys, and load balancing. |
 
 Both share a common base (`TerraformAwsEc2BuilderBase`) for the artifact bucket, IAM, encrypted
 settings pipeline, the on-instance deploy script, and the user-data fragments.
+
+## Operating system
+
+Instances run Ubuntu 24.04 by default. Set `distro` to choose another OS:
+
+| `distro` | OS |
+|----------|----|
+| `Distro.Ubuntu2404` (default) | Ubuntu 24.04 LTS |
+| `Distro.Ubuntu2604` | Ubuntu 26.04 LTS |
+| `Distro.AmazonLinux2023` | Amazon Linux 2023 |
+
+```kotlin
+override val distro = Distro.AmazonLinux2023
+```
+
+The install scripts, `os-update`, and the scaling builder's reboot check all follow the distro.
+`additionalPackages` and custom install scripts are passed through unchanged, so they must use the
+distro's own package names and tools.
+
+Amazon Linux 2023's package repositories are locked to the release of the AMI an instance started
+from. Every system upgrade here, at install time and in `os-update`, passes `--releasever=latest` so
+it picks up fixes published since. On Amazon Linux, `os-update` takes package names only, not
+versions.
+
+Changing `distro` on an existing deployment, including between Ubuntu releases, replaces the single
+instance. On the scaling builder it re-bakes the image from the new distro's latest AMI and rolls the
+fleet onto it.
 
 ## Module structure
 
 ```
 deploy-aws-ec2/src/main/kotlin/com/lightningkite/lightningserver/terraform/awsec2/
 ├── TerraformAwsEc2BuilderBase.kt      # Shared config, deployment resources, user-data fragments
-├── TerraformAwsSingleEc2Builder.kt    # Single instance + Angie/Let's Encrypt + Elastic IP
+├── TerraformAwsSingleEc2Builder.kt    # Single instance + nginx/Let's Encrypt + Elastic IP
 ├── TerraformAwsScalingEc2Builder.kt   # ALB + ACM + Auto Scaling Group + golden AMI
 └── extensions.kt                      # IAM path helper
 ```
 
 ## Single-instance builder
 
-One instance behind on-box Angie (nginx fork) which terminates TLS with the built-in Let's
-Encrypt ACME client and proxies to the app on `:8080`. Route53 A/AAAA records point straight at
+One instance behind on-box nginx, installed from nginx.org's repository with the
+`nginx-module-acme` dynamic module. nginx obtains and renews its own Let's Encrypt certificate,
+terminates TLS, and proxies to the app on `:8080`. Route53 A/AAAA records point straight at
 the instance's Elastic IP. Code/settings updates are pushed in-place to that one instance via
 SSM Run Command (`redeploy.sh` → on-instance `lightning-server-redeploy`).
 
@@ -50,6 +78,13 @@ object MyDeployment : TerraformAwsSingleEc2Builder<Server>(Server) {
     }
 }
 ```
+
+### Base AMI updates
+
+The instance ignores changes to its base AMI, so a new release never replaces it on its own. Any
+replacement moves to the latest release, including one caused by an install script change. To move
+on purpose, run `terraform apply -replace=aws_instance.main`. `os-update` patches the running
+instance in place.
 
 ## Scaling (ALB + Auto Scaling Group) builder
 
@@ -89,7 +124,8 @@ object MyDeployment : TerraformAwsSingleEc2Builder<Server>(Server) {
   minute. The application JAR and encrypted settings are **not** baked — they are fetched from S3
   at boot — so ordinary app deploys never re-bake the AMI. The AMI re-bakes only when the install
   script changes (its content hash drives the Image Builder component version) or when
-  `baseImageSalt` is bumped.
+  `baseImageSalt` is bumped. The base AMI is pinned, so a new release never forces a re-bake on its
+  own; only a `baseImageSalt` bump (or a `distro` change) moves the base to the latest release.
 - **Health check = liveness, autodetected:** the ALB target health check defaults to the server's
   `/meta/online` liveness endpoint, not the deep `/meta/health`, so a slow downstream service can't 
    make the ALB drain the whole fleet. Override `healthCheckPath` if needed.
@@ -110,9 +146,10 @@ object MyDeployment : TerraformAwsSingleEc2Builder<Server>(Server) {
   (the ASG scales out on the max of the two, in only when both agree), which catches I/O-bound
   concurrency saturation that CPU misses. Memory is intentionally an alarm, not a scaling signal
   (the JVM heap is fixed via `-Xmx`, so RAM is near-constant under load).
-- **OS patching:** the bake runs `apt-get upgrade` from the latest Ubuntu base, so re-baking ships
-  a fully patched image. Drive `baseImageSalt` from a date (e.g. `get() = "2026-06"`) to rebuild on
-  a schedule, and set `maxInstanceLifetimeSeconds` to force the fleet to rotate onto new AMIs.
+- **OS patching:** the bake runs a full system upgrade, so re-baking ships a fully patched image, and a
+  `baseImageSalt` bump also moves it onto the latest base AMI. Drive `baseImageSalt` from a date
+  (e.g. `get() = "2026-06"`) to rebuild on a schedule, and set `maxInstanceLifetimeSeconds` to force
+  the fleet to rotate onto new AMIs.
 - **Scheduled tasks need no extra infrastructure:** Lightning Server's long-running engines
   coordinate scheduled tasks across the fleet through the **shared cache** (a distributed lock per
   schedule). Therefore the scaling builder **requires a distributed cache** (Redis / Memcached /

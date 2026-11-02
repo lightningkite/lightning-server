@@ -244,7 +244,7 @@ class Ec2BuilderGenerationTest {
         assertContains(types, "aws_instance")
         assertContains(types, "aws_eip")
         // IMDSv2 must be enforced on the instance.
-        val httpTokens = d.terraformRoot.findResource("aws_instance", "ubuntu")!!
+        val httpTokens = d.terraformRoot.findResource("aws_instance", "main")!!
             .let { it["metadata_options"]!!.jsonObject["http_tokens"]!!.jsonPrimitive.content }
         assertEquals("required", httpTokens)
     }
@@ -283,6 +283,38 @@ class Ec2BuilderGenerationTest {
         assertContains(ignore, "desired_capacity")
         // CPU-only by default: no request-count policy.
         assertNull(d.terraformRoot.findResource("aws_autoscaling_policy", "requests"))
+    }
+
+    @Test
+    fun scalingPinsBaseAmiToSalt() {
+        val d = ScalingDeployment()
+        d.write()
+        val pin = d.terraformRoot.findResource("terraform_data", "base_ami")!!
+        val triggers = pin["triggers_replace"]!!.jsonObject
+        assertEquals("\${local.image_salt}", triggers["salt"]!!.jsonPrimitive.content)
+        assertEquals("Ubuntu2404", triggers["distro"]!!.jsonPrimitive.content)
+        val ignore = pin["lifecycle"]!!.jsonObject["ignore_changes"]!!.jsonArray.map { it.jsonPrimitive.content }
+        assertEquals(listOf("input"), ignore)
+        val recipe = d.terraformRoot.findResource("aws_imagebuilder_image_recipe", "this")!!
+        assertEquals("\${terraform_data.base_ami.output.id}", recipe["parent_image"]!!.jsonPrimitive.content)
+        assertContains(recipe["version"]!!.jsonPrimitive.content, "terraform_data.base_ami.output.name")
+        // The pin's own input must be the only path from the live lookup into the image, or a new
+        // Ubuntu release could still force a re-bake.
+        val image = File(d.terraformRoot, "image.tf.json").readText()
+        assertEquals(2, Regex("""data\.aws_ami\.base""").findAll(image).count())
+    }
+
+    @Test
+    fun singleInstanceIgnoresBaseAmiChanges() {
+        val d = SingleDeployment()
+        d.write()
+        val instance = d.terraformRoot.findResource("aws_instance", "main")!!
+        val ignore = instance["lifecycle"]!!.jsonObject["ignore_changes"]!!.jsonArray.map { it.jsonPrimitive.content }
+        assertEquals(listOf("ami"), ignore)
+        // Replacements still need the live lookup, so they move to the latest AMI.
+        assertEquals("\${data.aws_ami.base.id}", instance["ami"]!!.jsonPrimitive.content)
+        // No terraform_data pin: its unknown output would replace existing instances on the first apply.
+        assertNull(d.terraformRoot.findResource("terraform_data", "base_ami"))
     }
 
     @Test
@@ -526,6 +558,180 @@ class Ec2BuilderGenerationTest {
         val terraform = d.terraformRoot.listFiles { f -> f.name.endsWith(".tf.json") }!!.joinToString("\n") { it.readText() }
         assertContains(terraform, "openssl enc $cipherArgs -out")
         assertContains(File(d.terraformRoot, "ec2_init.sh").readText(), "openssl enc -d $cipherArgs")
+    }
+
+    // === Distro ===
+
+    inner class DistroSingleDeployment(
+        name: String,
+        override val distro: TerraformAwsEc2BuilderBase.Distro,
+    ) : TerraformAwsSingleEc2Builder<TestServer>(TestServer) {
+        override val storageBucket = "test-tf-state"
+        override val region: Region = Region.US_WEST_2
+        override val displayName = "Distro $name"
+        override val domainZone = "example.com"
+        override val domain = "$name.example.com"
+        override val debug = true
+        override val emergencyContact = EmailAddress("ops@example.com")
+        override val instanceType = "t4g.medium"
+        override val instanceArchitecture = CPUArchitecture.Arm
+        override val applicationVpc = AwsVpc.Default
+        override val terraformRoot = File(tmpRoot, "distro-$name")
+        override fun TestServer.settings() = fulfillGlobals(cacheUrl = null)
+    }
+
+    inner class AmazonLinuxScalingDeployment : TerraformAwsScalingEc2Builder<TestServer>(TestServer) {
+        override val storageBucket = "test-tf-state"
+        override val region: Region = Region.US_WEST_2
+        override val displayName = "AL Scaling"
+        override val domainZone = "example.com"
+        override val domain = "al-scaling.example.com"
+        override val debug = true
+        override val emergencyContact = EmailAddress("ops@example.com")
+        override val instanceType = "t4g.medium"
+        override val instanceArchitecture = CPUArchitecture.Arm
+        override val distro = Distro.AmazonLinux2023
+        override val applicationVpc = terraformManagedVPC(
+            ipPrefix = "10.0",
+            availabilityZones = listOf("us-west-2a", "us-west-2b"),
+            natGateway = AwsVpc.NatGateway.Single,
+        )
+        override val terraformRoot = File(tmpRoot, "al-scaling")
+        override fun TestServer.settings() = fulfillGlobals("redis://cache:6379")
+    }
+
+    /** Finds a data source block (`data.<type>.<name>`) across all generated files. */
+    private fun File.findData(type: String, name: String): JsonObject? {
+        listFiles { f -> f.name.endsWith(".tf.json") }?.forEach { file ->
+            (Json.parseToJsonElement(file.readText()).jsonObject["data"] as? JsonObject)
+                ?.get(type)?.jsonObject?.get(name)?.let { return it.jsonObject }
+        }
+        return null
+    }
+
+    private fun assertNoDebianTooling(script: String, file: String) {
+        for (tool in listOf("apt-get", "dpkg", "snap ", "/etc/apt", "reboot-required")) {
+            assertFalse(script.contains(tool), "$file must not use $tool on Amazon Linux")
+        }
+    }
+
+    @Test
+    fun singleAmazonLinuxGenerates() {
+        val d = DistroSingleDeployment("al", TerraformAwsEc2BuilderBase.Distro.AmazonLinux2023)
+        d.write()
+        val init = File(d.terraformRoot, "ec2_init.sh").readText()
+        val base = File(d.terraformRoot, "ec2_init_base.sh").readText()
+        assertOnlyTemplateVariables(init)
+        assertOnlyTemplateVariables(base, allowed = setOf("deployment_bucket", "deployment_script_key"))
+        assertNoDebianTooling(init, "ec2_init.sh")
+        assertNoDebianTooling(base, "ec2_init_base.sh")
+
+        // Packages come from the latest release, not the one the AMI is locked to.
+        assertContains(init, "dnf -y --releasever=latest upgrade")
+        assertContains(init, "dnf install -y java-17-amazon-corretto-headless openssl unzip")
+        assertContains(init, "dnf install -y amazon-cloudwatch-agent")
+        assertContains(init, "systemctl enable amazon-ssm-agent")
+        // os-update moves to the latest release too, and asks dnf whether a reboot is needed.
+        assertContains(init, "DNF_OPTS=\"-y --releasever=latest\"")
+        assertContains(init, "dnf needs-restarting -r")
+
+        // nginx from nginx.org with its ACME module loaded at the top level of nginx.conf.
+        assertContains(init, "baseurl=https://nginx.org/packages/amzn/2023/\$basearch/")
+        assertContains(init, "dnf install -y nginx nginx-module-acme")
+        assertContains(init, "sed -i '1i load_module modules/ngx_http_acme_module.so;' /etc/nginx/nginx.conf")
+        assertContains(init, "acme_certificate letsencrypt;")
+        assertContains(init, "ssl_certificate     \$acme_certificate;")
+        assertContains(init, "systemctl restart nginx")
+
+        val ami = d.terraformRoot.findData("aws_ami", "base")!!
+        assertEquals(listOf("amazon"), ami["owners"]!!.jsonArray.map { it.jsonPrimitive.content })
+    }
+
+    @Test
+    fun singleUbuntuInstallsNginx() {
+        val d = SingleDeployment()
+        d.write()
+        val init = File(d.terraformRoot, "ec2_init.sh").readText()
+        assertOnlyTemplateVariables(init)
+        assertContains(init, "https://nginx.org/packages/ubuntu")
+        assertContains(init, "Pin: origin nginx.org")
+        assertContains(init, "install -y nginx nginx-module-acme")
+        assertContains(init, "acme_certificate letsencrypt;")
+        assertContains(init, "systemctl restart nginx")
+        assertFalse(init.contains("angie"), "Angie is no longer installed")
+    }
+
+    @Test
+    fun singleUbuntu2604Generates() {
+        val d = DistroSingleDeployment("resolute", TerraformAwsEc2BuilderBase.Distro.Ubuntu2604)
+        d.write()
+        val ami = d.terraformRoot.findData("aws_ami", "base")!!
+        val namePattern = ami["filter"]!!.jsonArray.map { it.jsonObject }
+            .single { it["name"]!!.jsonPrimitive.content == "name" }["values"]!!.jsonArray.single().jsonPrimitive.content
+        assertEquals("ubuntu/images/hvm-ssd-gp3/ubuntu-resolute-26.04-arm64-server-*", namePattern)
+        val init = File(d.terraformRoot, "ec2_init.sh").readText()
+
+        // The install scripts otherwise match 24.04's and the instance ignores AMI changes, so naming the
+        // distro in the init script is what makes a release change replace the instance.
+        assertContains(init, "EC2 Init script started on Ubuntu2604")
+        val noble = DistroSingleDeployment("resolute", TerraformAwsEc2BuilderBase.Distro.Ubuntu2404)
+        noble.write()
+        assertNotEquals(init, File(noble.terraformRoot, "ec2_init.sh").readText())
+    }
+
+    @Test
+    fun scalingUbuntu2604Generates() {
+        val d = object : TerraformAwsScalingEc2Builder<TestServer>(TestServer) {
+            override val storageBucket = "test-tf-state"
+            override val region: Region = Region.US_WEST_2
+            override val displayName = "Resolute Scaling"
+            override val domainZone = "example.com"
+            override val domain = "resolute-scaling.example.com"
+            override val debug = true
+            override val emergencyContact = EmailAddress("ops@example.com")
+            override val instanceType = "t4g.medium"
+            override val instanceArchitecture = CPUArchitecture.Arm
+            override val distro = Distro.Ubuntu2604
+            override val applicationVpc = terraformManagedVPC(
+                ipPrefix = "10.0",
+                availabilityZones = listOf("us-west-2a", "us-west-2b"),
+                natGateway = AwsVpc.NatGateway.Single,
+            )
+            override val terraformRoot = File(tmpRoot, "resolute-scaling")
+            override fun TestServer.settings() = fulfillGlobals("redis://cache:6379")
+        }
+        d.write()
+        val pin = d.terraformRoot.findResource("terraform_data", "base_ami")!!
+        assertEquals("Ubuntu2604", pin["triggers_replace"]!!.jsonObject["distro"]!!.jsonPrimitive.content)
+        assertEquals("\${data.aws_ami.base.id}", pin["input"]!!.jsonObject["id"]!!.jsonPrimitive.content)
+        val template = d.terraformRoot.findResource("aws_launch_template", "app")!!
+        assertEquals("/dev/sda1", template["block_device_mappings"]!!.jsonObject["device_name"]!!.jsonPrimitive.content)
+        assertContains(File(d.terraformRoot, "update-fleet.sh").readText(), "/var/run/reboot-required")
+    }
+
+    @Test
+    fun scalingAmazonLinuxGenerates() {
+        val d = AmazonLinuxScalingDeployment()
+        d.write()
+        val component = File(d.terraformRoot, "image_data.yaml").readText()
+        assertNoDebianTooling(component, "image_data.yaml")
+        assertContains(component, "dnf -y --releasever=latest upgrade")
+
+        // The fleet's reboot probe must ask dnf; the Ubuntu marker file never exists here.
+        val fleet = File(d.terraformRoot, "update-fleet.sh").readText()
+        assertContains(fleet, "dnf needs-restarting -r")
+        assertFalse(fleet.contains("/var/run/reboot-required"))
+
+        // The root volume is only resized when the mapping names the AMI's root device.
+        val recipe = d.terraformRoot.findResource("aws_imagebuilder_image_recipe", "this")!!
+        assertEquals("/dev/xvda", recipe["block_device_mapping"]!!.jsonObject["device_name"]!!.jsonPrimitive.content)
+        val template = d.terraformRoot.findResource("aws_launch_template", "app")!!
+        assertEquals("/dev/xvda", template["block_device_mappings"]!!.jsonObject["device_name"]!!.jsonPrimitive.content)
+
+        // Switching distro replaces the pin, re-resolving it to the new distro's latest AMI.
+        val pin = d.terraformRoot.findResource("terraform_data", "base_ami")!!
+        assertEquals("AmazonLinux2023", pin["triggers_replace"]!!.jsonObject["distro"]!!.jsonPrimitive.content)
+        assertEquals("\${data.aws_ami.base.id}", pin["input"]!!.jsonObject["id"]!!.jsonPrimitive.content)
     }
 
     @Test
