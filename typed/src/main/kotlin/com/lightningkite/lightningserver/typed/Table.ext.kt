@@ -39,8 +39,8 @@ public suspend fun <Model : HasId<ID>, ID : Comparable<ID>> Table<Model>.getOrFo
 }
 
 
-public context(server: ServerRuntime)
-fun <Model : HasId<ID>, ID : Comparable<ID>> Table<Model>.withServerRuntimeChangeListeners(
+context(server: ServerRuntime)
+public fun <Model : HasId<ID>, ID : Comparable<ID>> Table<Model>.withServerRuntimeChangeListeners(
     changeListeners: List<suspend context(ServerRuntime) (CollectionChanges<Model>) -> Unit>,
 ): Table<Model> = object : Table<Model> by this@withServerRuntimeChangeListeners {
     override val wraps = this@withServerRuntimeChangeListeners
