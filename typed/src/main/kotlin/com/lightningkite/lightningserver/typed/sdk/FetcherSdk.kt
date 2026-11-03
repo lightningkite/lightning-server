@@ -57,7 +57,7 @@ import com.lightningkite.services.data.ExperimentalLightningServer
  * - **Suspend Functions**: All HTTP endpoints are suspend functions for coroutine support
  * - **WebSocket Support**: WebSocket handlers generate `ClientWebSocket` instances
  * - **Interface Extension**: Supports extending custom client interfaces with `@LiveVersion`
- * - **Header Injection**: Built-in support for dynamic header calculation (auth tokens, etc.)
+ * - **Request Metadata**: Per-request headers such as auth tokens, via `withMetadata`
  * - **Multiplatform**: Generated code works on all Kotlin/Multiplatform targets
  *
  * ## Requirements
@@ -122,7 +122,7 @@ public class FetcherSdk(
             is Structure.MultipleFiles -> {
                 archive.appendableEntry(fileStructure.interfaceFilename) {
                     appendLine("package $packageName")
-                    appendImports(processed)
+                    appendImports(processed, "com.lightningkite.lightningserver.typed.RequestMetadata")
                     writeInterface(processed)
                 }
                 archive.appendableEntry(fileStructure.liveFilename) {
@@ -131,6 +131,7 @@ public class FetcherSdk(
                         processed,
                         "com.lightningkite.lightningserver.HttpMethod",
                         "com.lightningkite.lightningserver.typed.Fetcher",
+                        "com.lightningkite.lightningserver.typed.RequestMetadata",
                         "kotlinx.serialization.ContextualSerializer",
                         "kotlinx.serialization.builtins.*",
                         "kotlinx.serialization.ExperimentalSerializationApi"
@@ -146,6 +147,7 @@ public class FetcherSdk(
                         processed,
                         "com.lightningkite.lightningserver.HttpMethod",
                         "com.lightningkite.lightningserver.typed.Fetcher",
+                        "com.lightningkite.lightningserver.typed.RequestMetadata",
                         "kotlinx.serialization.ContextualSerializer",
                         "kotlinx.serialization.builtins.*",
                         "kotlinx.serialization.ExperimentalSerializationApi"
@@ -184,10 +186,12 @@ public class FetcherSdk(
                     "interface ${info.interfaceName}" + (if (extendsInterfaces.isEmpty()) "" else " : ${extendsInterfaces.joinToString { it.item.kotlinString() }}") + " {"
                 )
 
-                if (depth == 0) appendIdtLine(
-                    1,
-                    "fun withHeaderCalculator(calculator: suspend () -> List<Pair<String, String>>): ${info.interfaceName}"
-                )
+                if (depth == 0) {
+                    appendIdtLine(1, "fun withMetadata(block: suspend RequestMetadata.() -> Unit): ${info.interfaceName}")
+                    appendIdtLine(1, "@Deprecated(\"Use withMetadata, which can also keep or remove existing metadata\", ReplaceWith(\"withMetadata { clear(); for ((name, value) in calculator()) append(name, value) }\"))")
+                    appendIdtLine(1, "fun withHeaderCalculator(calculator: suspend () -> List<Pair<String, String>>): ${info.interfaceName} =")
+                    appendIdtLine(2, "withMetadata { clear(); for ((name, value) in calculator()) append(name, value) }")
+                }
 
                 for (function in declaredFunctions) {
                     if (includeDocComments) {
@@ -274,9 +278,9 @@ public class FetcherSdk(
 
                     appendIdtLine(
                         1,
-                        "override fun withHeaderCalculator(calculator: suspend () -> List<Pair<String, String>>): Live${info.interfaceName} = "
+                        "override fun withMetadata(block: suspend RequestMetadata.() -> Unit): Live${info.interfaceName} ="
                     )
-                    appendIdtLine(2, "Live${info.interfaceName}(fetcher.withHeaderCalculator(calculator))")
+                    appendIdtLine(2, "Live${info.interfaceName}(fetcher.withMetadata(block))")
                 } else appendIdtLine(
                     depth,
                     "inner class Live${info.interfaceName} : ${extendsInterfaces.joinToString()} {"

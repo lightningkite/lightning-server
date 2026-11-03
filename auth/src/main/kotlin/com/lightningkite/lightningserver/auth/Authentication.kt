@@ -7,7 +7,7 @@ import com.lightningkite.lightningserver.data.Caching
 import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.http.HttpHeader
-import com.lightningkite.lightningserver.http.HttpHeaders
+import com.lightningkite.lightningserver.http.HttpHeaderValue
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.Engine
@@ -259,12 +259,17 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
             server.server.authReaders.sortedByDescending { it.priority }.firstNotNullOfOrNull { reader ->
                 val auth = reader.read(input) ?: return@firstNotNullOfOrNull null
 
-                auth.masquerade(input.headers) ?: auth
+                auth.masquerade(input) ?: auth
             }
 
         context(server: ServerRuntime)
-        private suspend fun Authentication<*>.masquerade(headers: HttpHeaders): Authentication<*>? {
-            val header = headers[HttpHeader.XMasquerade] ?: return null
+        private suspend fun Authentication<*>.masquerade(request: Request<*>): Authentication<*>? {
+            // Claude: browsers cannot set WebSocket headers, so clients send it as a query parameter there.
+            val header = request.headers[HttpHeader.XMasquerade]
+                ?: request.queryParameters
+                    .find { it.first.equals(HttpHeader.XMasquerade, ignoreCase = true) }
+                    ?.let { HttpHeaderValue.parse(HttpHeader.XMasquerade, it.second) }
+                ?: return null
 
             val masquerade = header.root
 

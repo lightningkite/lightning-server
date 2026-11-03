@@ -166,4 +166,34 @@ class AuthenticationCacheKeyTest {
             }
         }
     }
+
+    @Test
+    fun `masquerade is read from the query when there is no header`() = runBlocking {
+        val adminId = Uuid.random()
+        val targetId = Uuid.random()
+        object : ServerBuilder() {
+            init {
+                register(CacheTestUser)
+                register(MasqueradeTarget)
+                authReaders.register(Authentication.Reader {
+                    Authentication(CacheTestUser, adminId, sessionId = null, issuedAt = Clock.System.now())
+                })
+            }
+        }.test({}) {
+            execute {
+                val masked = Authentication.CacheKey.calculate(
+                    HttpRequest<PathSpec>(
+                        path = RawHttpEndpoint(asString = "/", method = HttpMethod.GET),
+                        queryParameters = QueryParameters(listOf("x-masquerade" to "${MasqueradeTarget.name}/$targetId")),
+                        headers = HttpHeaders.EMPTY,
+                        domain = "example.com",
+                        protocol = "https",
+                        sourceIp = "local",
+                    )
+                )!!
+
+                assertEquals(targetId.toString(), masked.rawId)
+            }
+        }
+    }
 }

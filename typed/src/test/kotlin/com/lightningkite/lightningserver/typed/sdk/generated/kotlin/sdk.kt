@@ -2,12 +2,16 @@ package com.lightningkite.lightningserver.typed.singlesdk
 
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.typed.Fetcher
+import com.lightningkite.lightningserver.typed.RequestMetadata
 import kotlinx.serialization.ContextualSerializer
 import kotlinx.serialization.builtins.*
 import kotlinx.serialization.ExperimentalSerializationApi
 
 interface Api {
-	fun withHeaderCalculator(calculator: suspend () -> List<Pair<String, String>>): Api
+	fun withMetadata(block: suspend RequestMetadata.() -> Unit): Api
+	@Deprecated("Use withMetadata, which can also keep or remove existing metadata", ReplaceWith("withMetadata { clear(); for ((name, value) in calculator()) append(name, value) }"))
+	fun withHeaderCalculator(calculator: suspend () -> List<Pair<String, String>>): Api =
+		withMetadata { clear(); for ((name, value) in calculator()) append(name, value) }
 	/**
 	 * Index
 	 * 
@@ -170,8 +174,8 @@ interface Api {
 
 @OptIn(ExperimentalSerializationApi::class)
 class LiveApi(val fetcher: Fetcher) : Api {
-	override fun withHeaderCalculator(calculator: suspend () -> List<Pair<String, String>>): LiveApi = 
-		LiveApi(fetcher.withHeaderCalculator(calculator))
+	override fun withMetadata(block: suspend RequestMetadata.() -> Unit): LiveApi =
+		LiveApi(fetcher.withMetadata(block))
 	override suspend fun index(): kotlin.Int =
 		fetcher("", HttpMethod.GET, kotlin.Unit.serializer(), kotlin.Unit, kotlin.Int.serializer())
 	override suspend fun improperSDKFunctionName(): kotlin.Int =

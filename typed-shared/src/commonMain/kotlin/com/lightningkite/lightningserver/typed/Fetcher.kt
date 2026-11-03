@@ -17,14 +17,19 @@ import kotlinx.serialization.KSerializer
  */
 public interface Fetcher {
     /**
-     * Creates a new Fetcher with additional headers computed dynamically for each request.
+     * Returns a fetcher that runs [block] on a copy of this fetcher's [RequestMetadata] before every
+     * request and WebSocket connection, so it can supply a fresh token.
      *
-     * Headers are calculated just before each request, allowing for fresh authentication tokens.
-     *
-     * @param calculator Suspend function that returns header key-value pairs
-     * @return A new Fetcher instance with the added header calculator
+     * ```kotlin
+     * api.withMetadata { set("Authorization", accessToken()) }
+     * api.withMetadata { remove("X-Masquerade") }
+     * ```
      */
-    public fun withHeaderCalculator(calculator: suspend () -> List<Pair<String, String>>): Fetcher
+    public fun withMetadata(block: suspend RequestMetadata.() -> Unit): Fetcher
+
+    @Deprecated("Use withMetadata, which can also keep or remove existing metadata", ReplaceWith("withMetadata { clear(); for ((name, value) in calculator()) append(name, value) }"))
+    public fun withHeaderCalculator(calculator: suspend () -> List<Pair<String, String>>): Fetcher =
+        withMetadata { clear(); for ((name, value) in calculator()) append(name, value) }
 
     /**
      * Executes an HTTP request with typed serialization.

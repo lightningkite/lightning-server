@@ -2,14 +2,15 @@ package com.lightningkite.lightningserver.files
 
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.typed.Fetcher
+import com.lightningkite.lightningserver.typed.RequestMetadata
 import kotlinx.serialization.ContextualSerializer
 import kotlinx.serialization.builtins.*
 import kotlinx.serialization.ExperimentalSerializationApi
 
 @OptIn(ExperimentalSerializationApi::class)
 class LiveApi(val fetcher: Fetcher) : Api {
-	override fun withHeaderCalculator(calculator: suspend () -> List<Pair<String, String>>): LiveApi = 
-		LiveApi(fetcher.withHeaderCalculator(calculator))
+	override fun withMetadata(block: suspend RequestMetadata.() -> Unit): LiveApi =
+		LiveApi(fetcher.withMetadata(block))
 
 	override val uploadEarlyEndpoint = com.lightningkite.lightningserver.files.LiveClientUploadEarlyEndpoints(fetcher, "upload", )
 
