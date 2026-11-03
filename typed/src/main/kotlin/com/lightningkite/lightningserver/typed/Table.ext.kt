@@ -38,6 +38,14 @@ public suspend fun <Model : HasId<ID>, ID : Comparable<ID>> Table<Model>.getOrFo
         ?: throw ForbiddenException(message)
 }
 
+/**
+ * Retrieves the [Model] with [id], or throws an [IllegalStateException] with the provided [message] if not found.
+ * */
+public suspend fun <Model : HasId<ID>, ID : Comparable<ID>> Table<Model>.getOrThrow(
+    id: ID,
+    message: String = "${serializer.descriptor.serialName.substringAfterLast('.')} $id not recognized",
+): Model =
+    get(id) ?: throw IllegalStateException(message)
 
 context(server: ServerRuntime)
 public fun <Model : HasId<ID>, ID : Comparable<ID>> Table<Model>.withServerRuntimeChangeListeners(
