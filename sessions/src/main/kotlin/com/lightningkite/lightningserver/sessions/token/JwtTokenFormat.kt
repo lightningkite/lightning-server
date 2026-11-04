@@ -83,20 +83,31 @@ public class JwtTokenFormat(
     }
 
 
+    private var withDefaults: Json? = null
+
+    context(server: ServerRuntime)
+    private fun withDefaults(): Json {
+        withDefaults?.let { return it }
+
+        val json = Json(server.internalSerialization.json) { encodeDefaults = true; explicitNulls = false }
+
+        withDefaults = json
+        return json
+    }
+
     context(server: ServerRuntime)
     private suspend fun Signer.signJwt(claims: JwtClaims): String = buildString {
-        val withDefaults = Json(server.internalSerialization.json) { encodeDefaults = true; explicitNulls = false }
         val encoder = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
 
         append(
             encoder.encode(
-                withDefaults.encodeToString(JwtHeader(alg = name, kid = keyId)).encodeToByteArray()
+                withDefaults().encodeToString(JwtHeader(alg = name, kid = keyId)).encodeToByteArray()
             )
         )
         append('.')
         append(
             encoder.encode(
-                withDefaults.encodeToString(claims).encodeToByteArray()
+                withDefaults().encodeToString(claims).encodeToByteArray()
             )
         )
         val soFar = this.toString()
