@@ -19,16 +19,14 @@ import kotlin.time.Instant
  * Claims: `iat` is when the token was minted ([Authentication.tokenIssuedAt]) and `siat` is when the subject
  * authenticated ([Authentication.sessionIssuedAt]). Both are whole seconds.
  *
- * @param keyId Written to the token's `kid` header. [read] returns null for a token with a different `kid`, so
- *   several JWT formats (e.g. one per principal) can share a server. Must be unique among them; the principal's name
- *   is usually enough.
+ * The token's `prn` header is the principal's name, and [read] returns `null` for a token whose `prn` is another
+ * principal's, so one format can serve several principals.
  */
 public class JwtTokenFormat(
     public val hasher: RuntimeDeferred<Signer> = secretBasis.signer("jwt"),
     public override val expiration: Duration = 5.minutes,
     public val issuer: Runtime<String> = generalSettings.map { it.publicUrl },
     public val audience: Runtime<String> = generalSettings.map { it.publicUrl },
-    public val keyId: String,
 ) : TokenFormat {
 
     context(server: ServerRuntime)
@@ -38,22 +36,17 @@ public class JwtTokenFormat(
     ): String {
         val now = now()
         return hasher.await().signJwt(
+            principal.name,
             JwtClaims(
                 iss = issuer(),
                 sid = auth.sessionId,
                 siat = auth.sessionIssuedAt.epochSeconds,
-                sub = "${principal.name}|${
-                    server.internalSerialization.json.encodeToString(
-                        principal.idSerializer,
-                        auth.id
-                    )
-                }",
+                sub = server.internalSerialization.json.encodeToString(principal.idSerializer, auth.id),
                 aud = audience(),
                 exp = now.plus(expiration).epochSeconds,
                 iat = now.epochSeconds,
                 nbf = now.epochSeconds,
                 scope = auth.scopes.joinToString(" "),
-                thp = null, // TODO: Third parties
                 cache = server.internalSerialization.json.encodeToString(principal.cacheSerializer(), auth.cache)
             )
         )
@@ -64,20 +57,16 @@ public class JwtTokenFormat(
         principal: PrincipalType<SUBJECT, ID>,
         value: String,
     ): Authentication<SUBJECT>? {
-        val prefix = "${principal.name}|"
-        val claims = hasher.await().verifyJwt(value, audience(), issuer()) ?: return null
-
-        val rawSub = claims.sub!!
-        val sub = if (rawSub.startsWith(prefix)) rawSub.removePrefix(prefix) else return null
+        val claims = hasher.await().verifyJwt(value, principal.name, audience(), issuer()) ?: return null
 
         return Authentication(
             principalType = principal,
-            id = server.internalSerialization.json.decodeFromString(principal.idSerializer, sub),
+            id = server.internalSerialization.json.decodeFromString(principal.idSerializer, claims.sub),
             sessionId = claims.sid,
             sessionIssuedAt = Instant.fromEpochSeconds(claims.siat),
             tokenIssuedAt = Instant.fromEpochSeconds(claims.iat),
             expiration = Instant.fromEpochSeconds(claims.exp),
-            scopes = claims.scope!!.split(' ').mapTo(HashSet(), ::GrantedScope),
+            scopes = claims.scope.split(' ').mapTo(HashSet(), ::GrantedScope),
             cache = claims.cache?.let { server.internalSerialization.json.decodeFromString(principal.cacheSerializer(), it) }
         )
     }
@@ -96,12 +85,12 @@ public class JwtTokenFormat(
     }
 
     context(server: ServerRuntime)
-    private suspend fun Signer.signJwt(claims: JwtClaims): String = buildString {
+    private suspend fun Signer.signJwt(principalName: String, claims: JwtClaims): String = buildString {
         val encoder = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
 
         append(
             encoder.encode(
-                withDefaults().encodeToString(JwtHeader(alg = name, kid = keyId)).encodeToByteArray()
+                withDefaults().encodeToString(JwtHeader(alg = name, prn = principalName)).encodeToByteArray()
             )
         )
         append('.')
@@ -119,6 +108,7 @@ public class JwtTokenFormat(
     context(server: ServerRuntime)
     private suspend fun Signer.verifyJwt(
         token: String,
+        principalName: String,
         requiredAudience: String? = null,
         requiredIssuer: String? = null,
     ): JwtClaims? {
@@ -136,7 +126,7 @@ public class JwtTokenFormat(
         }
 
         // Does not belong to this Jwt Formatter, return
-        if (header.kid != keyId) return null
+        if (header.prn != principalName) return null
 
         if (header.alg != name) {
             throw JwtSignatureException("Algorithm mismatch: expected $name, got ${header.alg}")
