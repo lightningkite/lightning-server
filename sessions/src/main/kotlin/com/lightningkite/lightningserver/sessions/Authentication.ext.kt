@@ -12,7 +12,7 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
     principalType: PrincipalType<SUBJECT, ID>,
     id: ID,
     sessionId: Uuid?,
-    issuedAt: Instant = server.clock.now(),
+    sessionIssuedAt: Instant = server.clock.now(),
     expiration: Instant? = null,
     scopes: Set<GrantedScope> = setOf(GrantedScope.root),
     cache: SerializableCache? = null,
@@ -21,7 +21,7 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
         principalType = principalType,
         id = id,
         sessionId = sessionId?.toString(),
-        issuedAt = issuedAt,
+        sessionIssuedAt = sessionIssuedAt,
         expiration = expiration,
         scopes = scopes,
         cache = cache

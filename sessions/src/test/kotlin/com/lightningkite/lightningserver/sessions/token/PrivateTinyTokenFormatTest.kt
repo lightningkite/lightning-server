@@ -15,6 +15,10 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import org.junit.Test
 import kotlin.test.*
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
+import kotlin.io.encoding.Base64
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
@@ -228,6 +232,36 @@ class PrivateTinyTokenFormatTest {
             assertFailsWith<TokenException>("Tampered token should throw") {
                 format.read(TestUser, tamperedToken)
             }
+        }
+    }
+
+    @Test
+    fun `sessionIssuedAt is preserved and tokenIssuedAt is the mint time`() = runBlocking {
+        val mintTime = Instant.parse("2030-01-01T12:00:00.750Z")
+        val sessionIssuedAt = mintTime - 1.hours
+        TestServer.test({}, clock = { object : Clock { override fun now() = mintTime } }) {
+            val format = createTinyTokenFormat()
+            val auth = Authentication(
+                principalType = TestUser,
+                id = Uuid.random(),
+                sessionId = null,
+                sessionIssuedAt = sessionIssuedAt,
+                // Ignored: the format stamps its own mint time.
+                tokenIssuedAt = sessionIssuedAt,
+            )
+
+            val readAuth = format.read(TestUser, format.create(TestUser, auth))
+
+            assertNotNull(readAuth)
+            assertEquals(sessionIssuedAt, readAuth.sessionIssuedAt)
+            assertEquals(mintTime, readAuth.tokenIssuedAt)
+        }
+    }
+
+    @Test
+    fun `authentic token whose data does not decode throws TokenException`() = runBlocking {
+        TestServer.test({}) {
+            assertFailsWith<TokenException> { createTinyTokenFormat().read(TestUser, "TestUser/" + Base64.UrlSafe.encode(testBasis.cipher("tiny-token-test").encrypt(byteArrayOf(1, 2, 3)))) }
         }
     }
 

@@ -59,14 +59,17 @@ import kotlin.uuid.Uuid
  * @param ID The type of the subject's unique identifier
  * @param principal Defines the type of principal being authenticated and how to fetch/manage users
  * @param database Runtime access to the database for session storage
+ * @param cache Runtime access to the cache, used to prevent proof reuse and to store access token invalidations
  * @param tokenFormat Format for generating session tokens (defaults to PrivateTinyTokenFormat)
+ * @param tokenInvalidationChecks Whether access tokens can be revoked before they expire; see [SessionManager]
  */
 public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     principal: PrincipalType<SUBJECT, ID>,
     database: Runtime<Database>,
     private val cache: Runtime<Cache>,
     tokenFormat: Runtime<TokenFormat> = Runtime { PrivateTinyTokenFormat() },
-) : SessionManager<SUBJECT, ID>(principal, database, tokenFormat) {
+    tokenInvalidationChecks: Boolean = false,
+) : SessionManager<SUBJECT, ID>(principal, database, tokenFormat, cache, tokenInvalidationChecks) {
     init {
         sdkSettings.defaultInfo = SdkModule.Info(principal.name + "Auth")
         sdkSettings.clientInterface =
