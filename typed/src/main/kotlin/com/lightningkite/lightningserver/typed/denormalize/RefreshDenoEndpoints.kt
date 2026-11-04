@@ -31,7 +31,7 @@ public class RefreshDenoEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparab
     context(_: ServerRuntime)
     private suspend fun <Ref : HasId<RID>, RID : Comparable<RID>> Denormalization.RequiredRef<T, Ref, RID>.modification(
         model: T
-    ): Modification<T> = setDenormalizations(info.table().getOrThrow(reference.get(model)))
+    ): Modification<T> = reference.get(model)?.let { setDenormalizations(info.table().getOrThrow(it)) } ?: Modification.Nothing()
 
     context(_: ServerRuntime)
     private suspend fun <Ref : HasId<RID>, RID : Comparable<RID>> Denormalization.OptionalRef<T, Ref, RID>.modification(

@@ -19,6 +19,7 @@ import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.services.data.Denormalized
 import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.database.*
+import com.lightningkite.services.database.optics.notNull
 import kotlinx.coroutines.flow.toList
 import kotlin.test.*
 import kotlin.uuid.Uuid
@@ -66,6 +67,9 @@ class DenormalizationTest {
             }
             person.favoriteCity.denormalizes(cityInfo) { city ->
                 person.favoriteCityName watch city.name
+            }
+            person.job.notNull.city.denormalizes(cityInfo) { city ->
+                person.job.notNull.cityName watch city.name
             }
         }
 
@@ -139,6 +143,31 @@ class DenormalizationTest {
             val storedCity = cityInfo.table().get(paris._id)!!
             assertEquals("République française", storedCity.countryName)
             assertEquals("France", storedCity.countryNameWhenAssigned)
+        }
+    }
+
+    @Test
+    fun reference_under_a_nullable_parent_is_followed_when_present() = denoTest {
+        val france = DenoCountry(name = "France")
+        val paris = DenoCity(country = france._id, name = "Paris")
+        val lyon = DenoCity(country = france._id, name = "Lyon")
+        val unemployed = DenoPerson(city = paris._id)
+        val employed = DenoPerson(city = paris._id, job = DenoJob(city = paris._id))
+        execute {
+            countryInfo.table().insertOne(france)
+            cityInfo.table().insert(listOf(paris, lyon))
+            personInfo.table().insert(listOf(unemployed, employed))
+        }
+
+        execute {
+            assertEquals(null, personInfo.table().get(unemployed._id)!!.job)
+            assertEquals("Paris", personInfo.table().get(employed._id)!!.job?.cityName)
+
+            personInfo.table().updateOneById(unemployed._id, Modification { it.job assign DenoJob(city = lyon._id) })
+            assertEquals("Lyon", personInfo.table().get(unemployed._id)!!.job?.cityName)
+
+            cityInfo.table().updateOneById(paris._id, Modification { it.name assign "Paname" })
+            assertEquals("Paname", personInfo.table().get(employed._id)!!.job?.cityName)
         }
     }
 
@@ -334,4 +363,11 @@ data class DenoPerson(
     @Denormalized val countryName: String = "",
     val favoriteCity: Uuid? = null,
     @Denormalized val favoriteCityName: String? = null,
+    val job: DenoJob? = null,
 ) : HasId<Uuid>
+
+@Queryable
+data class DenoJob(
+    val city: Uuid,
+    @Denormalized val cityName: String = "",
+)

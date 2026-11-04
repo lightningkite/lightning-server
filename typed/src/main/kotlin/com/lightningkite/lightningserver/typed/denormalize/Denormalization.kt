@@ -4,7 +4,6 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.ModelInfo
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.Modification
-import com.lightningkite.services.database.optics.Lens
 import com.lightningkite.services.database.optics.Optic
 
 /**
@@ -40,9 +39,13 @@ public sealed interface Denormalization<Model : Any, Referenced : HasId<RID>, RI
     public suspend fun setDenormalizations(ref: Input): Modification<Model> =
         Modification.Chain(calculations.map { it.calculation(ref) })
 
-    /** A denormalization through a reference that is always set. */
+    /**
+     * A denormalization through a non-null reference.
+     *
+     * Where [reference] doesn't reach a value, for example under a `null` parent, the denormalization does nothing.
+     */
     public class RequiredRef<Model : Any, Referenced : HasId<RID>, RID : Comparable<RID>>(
-        public val reference: Lens<Model, RID>,
+        public val reference: Optic<Model, RID>,
         override val info: ModelInfo<*, Referenced, RID>,
         override val calculations: List<Calculation<Model, Referenced, Referenced>>
     ) : Denormalization<Model, Referenced, RID, Referenced>

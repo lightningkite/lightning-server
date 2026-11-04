@@ -212,32 +212,18 @@ private fun <Model : Any, Referenced : HasId<RID>, RID : Comparable<RID>> Table<
     deno: Denormalization.RequiredRef<Model, Referenced, RID>,
 ): Table<Model> = this
     .interceptCreate { model ->
-        val reference = deno.info.table().getOrBadRequest(deno.reference.get(model))
-        deno.setDenormalizations(reference).invoke(model)
+        val id = deno.reference.get(model) ?: return@interceptCreate model
+        deno.setDenormalizations(deno.info.table().getOrBadRequest(id)).invoke(model)
     }
     .interceptReplace { model ->
-        val reference = deno.info.table().getOrBadRequest(deno.reference.get(model))
-        deno.setDenormalizations(reference).invoke(model)
+        val id = deno.reference.get(model) ?: return@interceptReplace model
+        deno.setDenormalizations(deno.info.table().getOrBadRequest(id)).invoke(model)
     }
     .interceptModification { incomingMod ->
-        var updatedMod = incomingMod
         var newReference: RID? = null
-        incomingMod.vet(deno.reference) {
-            when (it) {
-                is Modification.Assign -> {
-                    newReference = it.value
-                }
-
-                else -> {}
-            }
-        }
-        if (newReference != null) {
-            val source = deno.info.table().getOrBadRequest(newReference)
-            updatedMod = Modification.Chain(
-                listOf(incomingMod, deno.setDenormalizations(source))
-            )
-        }
-        updatedMod
+        incomingMod.vetNullable(deno.reference) { if (it is Modification.Assign) newReference = it.value }
+        val id = newReference ?: return@interceptModification incomingMod
+        Modification.Chain(listOf(incomingMod, deno.setDenormalizations(deno.info.table().getOrBadRequest(id))))
     }
 
 /**

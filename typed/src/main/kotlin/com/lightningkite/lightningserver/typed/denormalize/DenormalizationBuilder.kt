@@ -24,7 +24,7 @@ public class DenormalizationBuilder<Model : Any> {
 
 
     /**
-     * The receiver of [denormalizes] for a reference that is always set.
+     * The receiver of [denormalizes] for a non-null reference.
      *
      * [watch] keeps fields in sync with the referenced model. [snapshot] copies them when the reference is set and
      * ignores later changes to the referenced model. Both have an infix form for a single field and a block form for
@@ -32,7 +32,7 @@ public class DenormalizationBuilder<Model : Any> {
      */
     @DenormalizationDsl
     public class RequiredRefBuilder<Model : Any, Referenced : HasId<RID>, RID : Comparable<RID>>(
-        public val reference: Lens<Model, RID>,
+        public val reference: Optic<Model, RID>,
         public val info: ModelInfo<*, Referenced, RID>,
     ) {
         private val list =
@@ -177,7 +177,7 @@ public class DenormalizationBuilder<Model : Any> {
      */
     @PublishedApi
     internal inline fun <Ref : HasId<RID>, RID : Comparable<RID>> addRequiredRef(
-        reference: Lens<Model, RID>,
+        reference: Optic<Model, RID>,
         info: ModelInfo<*, Ref, RID>,
         build: RequiredRefBuilder<Model, Ref, RID>.(Lens<Ref, Ref>) -> Unit,
     ) {

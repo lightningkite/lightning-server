@@ -7,7 +7,7 @@ import com.lightningkite.services.database.optics.Lens
 import com.lightningkite.services.database.optics.Optic
 
 context(builder: DenormalizationBuilder<Model>)
-public inline fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>> Lens<Model, RID>.denormalizes(
+public inline fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>> Optic<Model, RID>.denormalizes(
     info: ModelInfo<*, Ref, RID>,
     build: DenormalizationBuilder.RequiredRefBuilder<Model, Ref, RID>.(Lens<Ref, Ref>) -> Unit,
 ): Unit =
