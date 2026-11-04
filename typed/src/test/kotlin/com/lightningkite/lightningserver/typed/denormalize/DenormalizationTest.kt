@@ -73,7 +73,8 @@ class DenormalizationTest {
             }
         }
 
-        val personRefresh = path.path("person-deno") include RefreshDenoEndpoints(personInfo)
+        val cityRefresh = path.path("city-deno") include DenormalizationRefreshEndpoints(cityInfo)
+        val personRefresh = path.path("person-deno") include DenormalizationRefreshEndpoints(personInfo)
         val personRest = path.path("people") include ModelRestEndpoints(personInfo)
     }
 
@@ -332,10 +333,50 @@ class DenormalizationTest {
             personInfo.table().insertOne(person)
             personInfo.baseTable().updateOneById(person._id, Modification { it.countryName assign "stale" })
 
-            val applied = personRefresh.refreshAllDenormalizations()
+            val applied = personRefresh.refreshAllDenormalizations(includeSnapshots = false)
 
             assertEquals(setOf(person._id.toString()), applied.keys)
             assertEquals("France", personInfo.table().get(person._id)!!.countryName)
+        }
+    }
+
+    @Test
+    fun refresh_keeps_snapshot_values_unless_asked() = denoTest {
+        val france = DenoCountry(name = "France")
+        val paris = DenoCity(country = france._id, name = "Paris")
+        execute {
+            countryInfo.table().insertOne(france)
+            cityInfo.table().insertOne(paris)
+            cityInfo.baseTable().updateOneById(paris._id, Modification {
+                it.countryName assign "stale"
+                it.countryNameWhenAssigned assign "Gaul"
+            })
+
+            cityRefresh.refreshAllDenormalizations(includeSnapshots = false)
+            val kept = cityInfo.table().get(paris._id)!!
+            assertEquals("France", kept.countryName)
+            assertEquals("Gaul", kept.countryNameWhenAssigned)
+
+            cityRefresh.refreshAllDenormalizations(includeSnapshots = true)
+            assertEquals("France", cityInfo.table().get(paris._id)!!.countryNameWhenAssigned)
+        }
+    }
+
+    @Test
+    fun refresh_skips_rows_with_missing_references() = denoTest {
+        val france = DenoCountry(name = "France")
+        val paris = DenoCity(country = france._id, name = "Paris")
+        val stale = DenoPerson(city = paris._id, country = france._id, countryName = "stale")
+        val orphan = DenoPerson(city = Uuid.random(), country = Uuid.random())
+        execute {
+            countryInfo.table().insertOne(france)
+            cityInfo.table().insertOne(paris)
+            personInfo.baseTable().insert(listOf(stale, orphan))
+
+            val applied = personRefresh.refreshAllDenormalizations(includeSnapshots = false)
+
+            assertEquals(setOf(stale._id.toString()), applied.keys)
+            assertEquals("France", personInfo.table().get(stale._id)!!.countryName)
         }
     }
 }
