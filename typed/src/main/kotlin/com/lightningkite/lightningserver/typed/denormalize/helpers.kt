@@ -80,3 +80,10 @@ internal fun requireMarkedDenormalized(target: Optic<*, *>) {
         "$target is written by a denormalization, so it must be marked @Denormalized."
     }
 }
+
+// TODO: Api Recommendations
+// Claude:
+// - vetNullable is a placeholder name; settle it before vet/vetNullable go public in service-abstractions.
+// - When moving vet/vetNullable to service-abstractions, deprecate the list-based vet(fieldChain: List<Field>), which has the same fields-walking bugs and the null-parent crash. vet(field: Field) behaves the same as vet(Lens) and could be deprecated too.
+// - Rejecting asType and SealedSharedFieldLens steps in vetAny is untested; it needs a sealed @Queryable model.
+// - requireSourceOfTruth and requireMarkedDenormalized scan path.fields, so they can't see through a SealedSharedFieldLens.

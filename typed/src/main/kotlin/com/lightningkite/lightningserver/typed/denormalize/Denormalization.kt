@@ -7,79 +7,63 @@ import com.lightningkite.services.database.Modification
 import com.lightningkite.services.database.optics.Lens
 import com.lightningkite.services.database.optics.Optic
 
-/**
- * Internal representation of a denormalization rule.
- * Contains the logic to copy data from a referenced model into the referencing model.
- */
+/** A denormalization declared with `denormalizes` on a model created by [modelInfoWithDeno]. */
 public sealed interface Denormalization<Model : Any, Referenced : HasId<RID>, RID : Comparable<RID>> {
     public val info: ModelInfo<*, Referenced, RID>
-    public val listenForChanges: Boolean
+    public val calculations: List<Calculation<Referenced, *>>
+
+    /** Whether a change to the referenced model must update the models that reference it. */
+    public val watchesReferencedModel: Boolean get() = calculations.any { it.dependencies.isNotEmpty() }
 
     /**
-     * Internal data class pairing a set of field dependencies with their calculation function.
-     * Used to track which fields trigger denormalization updates.
+     * A [calculation] that reruns when any of its [dependencies] change.
      *
-     * An empty set of dependencies means the calculation runs on create/replace/modify but does NOT
-     * register change listeners on the referenced model. Non-empty dependencies trigger both immediate
-     * denormalization and change listener registration.
+     * With no dependencies, it runs only when the reference is set.
      */
-    public data class Calculation<Ref, T>(
-        val dependencies: Set<Optic<Ref, *>>,
-        val calculation: T,
-    )
+    public class Calculation<Ref, T>(
+        public val dependencies: Set<Optic<Ref, *>>,
+        public val calculation: T,
+    ) {
+        /** Returns `true` if any of the [dependencies] differ between [old] and [new]. */
+        public fun changedBetween(old: Ref, new: Ref?): Boolean =
+            dependencies.any { it.get(old) != new?.let(it::get) }
+    }
 
-    /**
-     * Denormalization rule for non-nullable (required) references.
-     */
-    public data class RequiredRef<Model : Any, Referenced : HasId<RID>, RID : Comparable<RID>>(
-        val reference: Lens<Model, RID>,
+    /** A denormalization through a reference that is always set. */
+    public class RequiredRef<Model : Any, Referenced : HasId<RID>, RID : Comparable<RID>>(
+        public val reference: Lens<Model, RID>,
         override val info: ModelInfo<*, Referenced, RID>,
-        val calculations: List<Calculation<Referenced, suspend context(ServerRuntime) (Referenced) -> Modification<Model>>>,
+        override val calculations: List<Calculation<Referenced, suspend context(ServerRuntime) (Referenced) -> Modification<Model>>>,
     ) : Denormalization<Model, Referenced, RID> {
+        /** Returns the modification that updates a referencing model after the referenced model changed from [old] to [new]. */
         context(_: ServerRuntime)
         public suspend fun denormalize(old: Referenced, new: Referenced): Modification<Model> =
-            Modification.Chain(
-                calculations
-                    .filter { calc ->
-                        calc.dependencies.any { it.get(old) != it.get(new) }
-                    }
-                    .map { it.calculation(new) }
-            )
+            Modification.Chain(calculations.filter { it.changedBetween(old, new) }.map { it.calculation(new) })
 
+        /** Returns the modification that fills in every denormalized field from [ref]. */
         context(_: ServerRuntime)
         public suspend fun denormalize(ref: Referenced): Modification<Model> =
-            Modification.Chain(
-                calculations.map { it.calculation(ref) }
-            )
-
-        override val listenForChanges: Boolean get() = calculations.any { it.dependencies.isNotEmpty() }
+            Modification.Chain(calculations.map { it.calculation(ref) })
     }
 
-    /**
-     * Denormalization rule for nullable (optional) references.
-     */
-    public data class OptionalRef<Model : Any, Referenced : HasId<RID>, RID : Comparable<RID>>(
-        val reference: Optic<Model, RID?>,
+    /** A denormalization through a reference that may be `null`. */
+    public class OptionalRef<Model : Any, Referenced : HasId<RID>, RID : Comparable<RID>>(
+        public val reference: Optic<Model, RID?>,
         override val info: ModelInfo<*, Referenced, RID>,
-        val calculations: List<Calculation<Referenced, suspend context(ServerRuntime) (Referenced?) -> Modification<Model>>>,
+        override val calculations: List<Calculation<Referenced, suspend context(ServerRuntime) (Referenced?) -> Modification<Model>>>,
     ) : Denormalization<Model, Referenced, RID> {
+        /**
+         * Returns the modification that updates a referencing model after the referenced model changed from [old] to [new].
+         *
+         * [new] is `null` when the referenced model was deleted.
+         */
         context(_: ServerRuntime)
         public suspend fun denormalize(old: Referenced, new: Referenced?): Modification<Model> =
-            Modification.Chain(
-                calculations
-                    .filter { calc ->
-                        calc.dependencies.any { it.get(old) != new?.let(it::get) }
-                    }
-                    .map { it.calculation(new) }
-            )
+            Modification.Chain(calculations.filter { it.changedBetween(old, new) }.map { it.calculation(new) })
 
+        /** Returns the modification that fills in every denormalized field from [ref], which is `null` when the reference is unset. */
         context(_: ServerRuntime)
         public suspend fun denormalize(ref: Referenced?): Modification<Model> =
-            Modification.Chain(
-                calculations.map { it.calculation(ref) }
-            )
-
-        override val listenForChanges: Boolean get() = calculations.any { it.dependencies.isNotEmpty() }
+            Modification.Chain(calculations.map { it.calculation(ref) })
     }
 }
-

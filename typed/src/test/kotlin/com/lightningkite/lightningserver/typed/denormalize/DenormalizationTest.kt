@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.typed.denormalize
 
 import com.lightningkite.lightningserver.BadRequestException
+import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.GeneralServerSettings
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
@@ -12,7 +13,9 @@ import com.lightningkite.lightningserver.runtime.test.testBlocking
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.settings.setStatic
+import com.lightningkite.lightningserver.typed.ModelRestEndpoints
 import com.lightningkite.lightningserver.typed.modelInfo
+import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.services.data.Denormalized
 import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.database.*
@@ -33,22 +36,28 @@ class DenormalizationTest {
             permissions = { ModelPermissions.allowAll() },
         )
 
-        val cityInfo = database.modelInfo<HasId<*>?, DenoCity, Uuid>(
+        val cityInfo = database.modelInfoWithDeno<HasId<*>?, DenoCity, Uuid>(
             auth = noAuth,
             tableName = "DenoCity",
             permissions = { ModelPermissions.allowAll() },
-        ).withDenormalizations { city ->
+        ) { city ->
             city.country.denormalizes(countryInfo) { country ->
                 city.countryName bind country.name
                 city.countryNameAtCreation set country.name
             }
         }
 
-        val personInfo = database.modelInfo<HasId<*>?, DenoPerson, Uuid>(
+        val personInfo = database.modelInfoWithDeno<HasId<*>?, DenoPerson, Uuid>(
             auth = noAuth,
             tableName = "DenoPerson",
-            permissions = { ModelPermissions.allowAll() },
-        ).withDenormalizations { person ->
+            permissions = {
+                ModelPermissions.allowAll<DenoPerson>().withAdditionalUpdateRestrictions { person ->
+                    person.country.cannotBeModified()
+                    person.countryName.cannotBeModified()
+                    person.favoriteCityName.cannotBeModified()
+                }
+            },
+        ) { person ->
             person.city.denormalizes(cityInfo) { city ->
                 person.country bind city.country
             }
@@ -61,26 +70,27 @@ class DenormalizationTest {
         }
 
         val personRefresh = path.path("person-deno") include RefreshDenoEndpoints(personInfo)
+        val personRest = path.path("people") include ModelRestEndpoints(personInfo)
     }
 
     object MisconfiguredServer : ServerBuilder() {
         val database = setting("database", Database.Settings())
 
-        val readsACopy = database.modelInfo<HasId<*>?, DenoPerson, Uuid>(
+        val readsACopy = database.modelInfoWithDeno<HasId<*>?, DenoPerson, Uuid>(
             auth = noAuth,
             tableName = "ReadsACopyPerson",
             permissions = { ModelPermissions.allowAll() },
-        ).withDenormalizations { person ->
+        ) { person ->
             person.city.denormalizes(DenoServer.cityInfo) { city ->
                 person.countryName bind city.countryName
             }
         }
 
-        val writesAnUnmarkedField = database.modelInfo<HasId<*>?, DenoCity, Uuid>(
+        val writesAnUnmarkedField = database.modelInfoWithDeno<HasId<*>?, DenoCity, Uuid>(
             auth = noAuth,
             tableName = "UnmarkedCity",
             permissions = { ModelPermissions.allowAll() },
-        ).withDenormalizations { city ->
+        ) { city ->
             city.country.denormalizes(DenoServer.countryInfo) { country ->
                 city.name bind country.name
             }
@@ -171,6 +181,41 @@ class DenormalizationTest {
     }
 
     @Test
+    fun client_reference_change_updates_restricted_denormalized_fields() = denoTest {
+        val france = DenoCountry(name = "France")
+        val spain = DenoCountry(name = "Spain")
+        val paris = DenoCity(country = france._id, name = "Paris")
+        val madrid = DenoCity(country = spain._id, name = "Madrid")
+        val person = DenoPerson(city = paris._id)
+        execute {
+            countryInfo.table().insertMany(listOf(france, spain))
+            cityInfo.table().insertMany(listOf(paris, madrid))
+            personInfo.table().insertOne(person)
+        }
+
+        val updated = personRest.modify.test(person._id, null, Modification { it.city assign madrid._id })
+
+        assertEquals("Spain", updated.countryName)
+    }
+
+    @Test
+    fun clients_cannot_write_restricted_denormalized_fields() = denoTest {
+        val france = DenoCountry(name = "France")
+        val paris = DenoCity(country = france._id, name = "Paris")
+        val person = DenoPerson(city = paris._id)
+        execute {
+            countryInfo.table().insertOne(france)
+            cityInfo.table().insertOne(paris)
+            personInfo.table().insertOne(person)
+        }
+
+        assertFailsWith<NotFoundException> {
+            personRest.modify.test(person._id, null, Modification { it.countryName assign "forged" })
+        }
+        execute { assertEquals("France", personInfo.table().get(person._id)!!.countryName) }
+    }
+
+    @Test
     fun reading_a_denormalized_field_fails_when_built() {
         val error = assertFailsWith<IllegalArgumentException> { MisconfiguredServer.readsACopy.denormalizations }
         assertContains(error.message!!, "'countryName' is itself @Denormalized")
@@ -204,8 +249,8 @@ class DenormalizationTest {
         val madrid = DenoCity(country = spain._id, name = "Madrid")
         val person = DenoPerson(city = paris._id)
         execute {
-            countryInfo.table().insertMany(listOf(france, spain))
-            cityInfo.table().insertMany(listOf(paris, madrid))
+            countryInfo.table().insert(listOf(france, spain))
+            cityInfo.table().insert(listOf(paris, madrid))
             personInfo.table().insertOne(person)
             personInfo.table().updateOneById(person._id, Modification { it.city assign madrid._id })
         }

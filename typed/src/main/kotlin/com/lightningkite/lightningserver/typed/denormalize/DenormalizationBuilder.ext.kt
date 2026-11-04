@@ -62,3 +62,8 @@ public infix fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>, T> Optic
         )
     }
 }
+
+// TODO: Api Recommendations
+// Claude:
+// - The denormalizes extensions duplicate DenormalizationBuilder.required/optional; keep one public way in.
+// - Rename `set` along with `once` (see DenormalizationBuilder.kt).

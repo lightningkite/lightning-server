@@ -12,7 +12,7 @@ import com.lightningkite.services.database.optics.Optic
 
 /**
  * Internal builder for defining denormalization rules on a model.
- * Used as the receiver in the `denormalizations` lambda of [withDenormalizations].
+ * Used as the receiver in the `denormalizations` lambda of [modelInfoWithDeno].
  */
 @DenormalizationBuilder.DenormalizationDsl
 public class DenormalizationBuilder<Model : Any> {
@@ -258,3 +258,10 @@ public class DenormalizationBuilder<Model : Any> {
         )
     }
 }
+
+// TODO: Api Recommendations
+// Claude:
+// - Shrink the public surface before release: registerDenormalization, required/optional, build(), and the builders' reference/info can be @PublishedApi internal or internal.
+// - Two ideas, four verbs: bind/watch keep a field in sync, set/once copy it when the reference is set. Neither `set` (reads like assignment, clashes with Optic.set) nor `once` (its own doc calls it misleading) says "not kept in sync". Consider one name, e.g. `snapshot`, for both copy forms.
+// - Doc examples should make the difference between the path parameter (`{ collection -> ... }`) and the referenced value (`it`) obvious.
+// - requireSourceOfTruth only sees declared dependencies; a watch/once body can still read a @Denormalized field unnoticed.
