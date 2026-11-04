@@ -1,0 +1,93 @@
+{
+    "resource": {
+        "aws_sns_topic": {
+            "emergency": {
+                "name": "ec2-demo_emergencies"
+            }
+        },
+        "aws_cloudwatch_metric_alarm": {
+            "high_memory": {
+                "alarm_name": "ec2-demo-high-memory",
+                "statistic": "Average",
+                "period": 300,
+                "metric_name": "mem_used_percent",
+                "evaluation_periods": 3,
+                "alarm_description": "High memory utilization (CWAgent mem_used_percent)",
+                "namespace": "CWAgent",
+                "comparison_operator": "GreaterThanThreshold",
+                "alarm_actions": [
+                    "${aws_sns_topic.emergency.arn}"
+                ],
+                "threshold": 90,
+                "dimensions": {
+                    "InstanceId": "${aws_instance.main.id}"
+                }
+            },
+            "system_status_check": {
+                "alarm_name": "ec2-demo-system-status-check-failed",
+                "statistic": "Maximum",
+                "period": 60,
+                "metric_name": "StatusCheckFailed_System",
+                "evaluation_periods": 2,
+                "alarm_description": "EC2 system status check failing",
+                "treat_missing_data": "breaching",
+                "namespace": "AWS/EC2",
+                "comparison_operator": "GreaterThanThreshold",
+                "alarm_actions": [
+                    "${aws_sns_topic.emergency.arn}"
+                ],
+                "threshold": 0,
+                "dimensions": {
+                    "InstanceId": "${aws_instance.main.id}"
+                }
+            },
+            "high_disk": {
+                "alarm_name": "ec2-demo-high-disk",
+                "statistic": "Average",
+                "period": 300,
+                "metric_name": "disk_used_percent",
+                "evaluation_periods": 3,
+                "alarm_description": "High root-volume disk utilization (CWAgent disk_used_percent)",
+                "namespace": "CWAgent",
+                "comparison_operator": "GreaterThanThreshold",
+                "alarm_actions": [
+                    "${aws_sns_topic.emergency.arn}"
+                ],
+                "threshold": 85,
+                "dimensions": {
+                    "InstanceId": "${aws_instance.main.id}"
+                }
+            },
+            "high_cpu": {
+                "alarm_name": "ec2-demo-high-cpu",
+                "period": 300,
+                "statistic": "Average",
+                "metric_name": "CPUUtilization",
+                "evaluation_periods": 3,
+                "alarm_description": "High CPU utilization",
+                "comparison_operator": "GreaterThanThreshold",
+                "namespace": "AWS/EC2",
+                "alarm_actions": [
+                    "${aws_sns_topic.emergency.arn}"
+                ],
+                "threshold": 90,
+                "dimensions": {
+                    "InstanceId": "${aws_instance.main.id}"
+                }
+            }
+        },
+        "aws_cloudwatch_log_group": {
+            "application": {
+                "retention_in_days": 30,
+                "name": "ec2-demo-main-log"
+            }
+        },
+        "aws_sns_topic_subscription": {
+            "emergency_primary": {
+                "protocol": "email",
+                "endpoint": "joseph@lightningkite.com",
+                "topic_arn": "${aws_sns_topic.emergency.arn}"
+            }
+        }
+    }
+}

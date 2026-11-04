@@ -10,9 +10,11 @@ import com.lightningkite.lightningserver.cors.CorsSettings
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.demo.endpoints.*
+import com.lightningkite.lightningserver.demo.models.User
 import com.lightningkite.lightningserver.files.Files
 import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
 import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.fullUrl
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.serialization.StandardWithExternalModule
@@ -84,6 +86,7 @@ object Server : ServerBuilder() {
     // Baseline security headers (X-Content-Type-Options, and HSTS over https). Installed first so it runs
     // outermost and applies to every response, including CORS-processed and error responses.
     val securityHeaders = install(SecurityHeadersInterceptor())
+
     // v4-style access log: one line per request naming the resolved principal (or "anonymous") and IP.
     val accessLog = install(AccessLogInterceptor())
     val corsInterceptor = install(CorsInterceptor(cors))
@@ -111,66 +114,22 @@ object Server : ServerBuilder() {
     // Seed an admin user. This runs as a pre-deploy task (once per deploy, before the new version
     // serves), and `doOnce` guards the actual insert so the seed happens only once ever, not on
     // every deploy - the sanctioned pattern for "run exactly once" pre-deploy work.
-    val setupAdmins = path.path("setup-admins2") bind PreDeployTask {
-        doOnce("setup-admins2", database) {
-            userInfo.table().insertOne(
+    val setupAdmins = path.path("setup-admins2") bind predeployOnce(database) {
+            UserEndpoints.info.table().insertOne(
                 User(
                     email = "joseph@lightningkite.com",
                     isSuperUser = true,
                     phone = "+18013693729".toPhoneNumber()
                 )
             )
-        }
     }
 
-    object UserAuth : PrincipalType<User, Uuid> {
-        override val idSerializer: KSerializer<Uuid> = Uuid.serializer()
-        override val subjectSerializer: KSerializer<User> = User.Companion.serializer()
-        override val name: String get() = User.serializer().descriptor.serialName.substringAfterLast('.')
 
-        context(server: ServerRuntime)
-        override suspend fun fetch(id: Uuid): User =
-            userInfo.table().get(id) ?: throw com.lightningkite.lightningserver.NotFoundException()
-
-        context(server: ServerRuntime)
-        override suspend fun fetchByProperty(property: String, value: String): User? {
-            return when (property) {
-                "email" -> userInfo.table().findOne(condition { it.email eq value }) ?: userInfo.table()
-                    .insertOne(User(email = value))
-
-                else -> super.fetchByProperty(property, value)
-            }
-        }
-    }
-
-    val userInfo: ModelInfo<User?, User, Uuid> = database.modelInfo(
-        auth = UserAuth.require() or AuthRequirement.None,
-        tableName = "User",
-        permissions = {
-            val user = authOrNull?.fetch()
-            val everyone: Condition<User> = Condition.Always
-            val self: Condition<User> = condition { it._id eqNn user?._id }
-            val admin: Condition<User> = if (user?.isSuperUser == true) Condition.Always else Condition.Never
-            ModelPermissions(
-                create = Condition.Never,
-                read = everyone,
-                readMask = mask {
-                    it.hashedPassword.mask(value = "", unless = self or admin)
-                    it.phone.mask(value = null, unless = self or admin)
-                    it.isSuperUser.mask(value = false, unless = self or admin)
-                },
-                update = self or admin,
-                delete = self or admin
-            )
-        }
-    )
 
     // A named object rather than an anonymous `object : ServerBuilder() { ... }` - Kotlin widens a
     // public property's type to its nearest supertype when the initializer is an anonymous object,
     // so `user.rest` would be invisible from other files (e.g. tests) with the anonymous form.
-    object UserEndpoints : ServerBuilder() {
-        val rest = path.path("rest") module ModelRestEndpoints(Server.userInfo)
-    }
+
 
     val user = path.path("user") include UserEndpoints
     val uploadEarly = path.path("upload") module UploadEarlyEndpoint(files, database, Runtime.Constant(listOf()))
@@ -240,7 +199,7 @@ object Server : ServerBuilder() {
 
         context(serverRuntime: ServerRuntime)
         override suspend fun handle(
-            request: WebSocketConnectRequest<com.lightningkite.lightningserver.pathing.PathSpec0>,
+            request: WebSocketConnectRequest<PathSpec0>,
             waitForFullConnect: suspend () -> Unit,
             incoming: Flow<WebSocketFrame>,
             send: suspend (WebSocketFrame) -> Unit,
@@ -280,12 +239,18 @@ object Server : ServerBuilder() {
     val proofOtp = path.path("proof").path("otp") module TimeBasedOTPProofEndpoints(database, cache)
     val proofPassword = path.path("proof").path("password") module PasswordProofEndpoints(database, cache)
     val proofDevices = path.path("proof").path("devices") module KnownDeviceProofEndpoints(database, cache)
-    val proofOauth = path.path("proof").path("github") module OauthProofEndpoints(
-        provider = OauthProviderInfo.github,
-        cache = cache,
-        credentials = githubOauth,
-        continueUiAuthUrl = { autosignIn.location.path.resolved().fullUrl() + "?proof=" + serverRuntime.externalSerialization.json.encodeToString(Proof.serializer(), it).encodeURLQueryComponent() + "&backend=" + generalSettings().publicUrl.encodeURLQueryComponent() }
-    )
+    val proofOauth: OauthProofEndpoints
+        get() = path.path("proof").path("github") module OauthProofEndpoints(
+            provider = OauthProviderInfo.github,
+            cache = cache,
+            credentials = githubOauth,
+            continueUiAuthUrl = {
+                autosignIn.location.path.resolved()
+                    .fullUrl() + "?proof=" + serverRuntime.externalSerialization.json.encodeToString(Proof.serializer(), it)
+                    .encodeURLQueryComponent() + "&backend=" + generalSettings().publicUrl.encodeURLQueryComponent()
+            }
+        )
+
     /**
      * Continuation target for [proofOauth]: the OAuth provider redirects the browser here with a
      * signed proof of the user's identity attached. Completes the login with that single proof and

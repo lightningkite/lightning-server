@@ -1,0 +1,187 @@
+{
+    "data": {
+        "aws_ami": {
+            "base": {
+                "filter": [
+                    {
+                        "values": [
+                            "al2023-ami-2023.*-kernel-*-arm64"
+                        ],
+                        "name": "name"
+                    },
+                    {
+                        "values": [
+                            "arm64"
+                        ],
+                        "name": "architecture"
+                    },
+                    {
+                        "values": [
+                            "hvm"
+                        ],
+                        "name": "virtualization-type"
+                    }
+                ],
+                "most_recent": true,
+                "owners": [
+                    "amazon"
+                ]
+            }
+        }
+    },
+    "resource": {
+        "aws_iam_role_policy_attachment": {
+            "imagebuilder_core": {
+                "policy_arn": "arn:aws:iam::aws:policy/EC2InstanceProfileForImageBuilder",
+                "role": "${aws_iam_role.imagebuilder.name}"
+            },
+            "imagebuilder_ssm": {
+                "policy_arn": "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
+                "role": "${aws_iam_role.imagebuilder.name}"
+            }
+        },
+        "aws_cloudwatch_log_group": {
+            "imagebuilder": {
+                "retention_in_days": 30,
+                "name": "/aws/imagebuilder/ec2-scaling-demo"
+            }
+        },
+        "aws_imagebuilder_image": {
+            "this": {
+                "image_tests_configuration": {
+                    "image_tests_enabled": false
+                },
+                "logging_configuration": {
+                    "log_group_name": "${aws_cloudwatch_log_group.imagebuilder.name}"
+                },
+                "infrastructure_configuration_arn": "${aws_imagebuilder_infrastructure_configuration.this.arn}",
+                "image_recipe_arn": "${aws_imagebuilder_image_recipe.this.arn}",
+                "distribution_configuration_arn": "${aws_imagebuilder_distribution_configuration.this.arn}"
+            }
+        },
+        "aws_iam_role": {
+            "imagebuilder": {
+                "name": "ec2-scaling-demo-imagebuilder-role",
+                "assume_role_policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Action\":\"sts:AssumeRole\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"ec2.amazonaws.com\"}}]}"
+            }
+        },
+        "aws_imagebuilder_distribution_configuration": {
+            "this": {
+                "name": "ec2-scaling-demo-dist",
+                "distribution": {
+                    "ami_distribution_configuration": {
+                        "name": "ec2-scaling-demo-{{ imagebuilder:buildDate }}"
+                    },
+                    "region": "us-west-2"
+                }
+            }
+        },
+        "terraform_data": {
+            "base_ami": {
+                "lifecycle": {
+                    "ignore_changes": [
+                        "input"
+                    ]
+                },
+                "input": {
+                    "name": "${data.aws_ami.base.name}",
+                    "id": "${data.aws_ami.base.id}"
+                },
+                "triggers_replace": {
+                    "distro": "AmazonLinux2023",
+                    "salt": "${local.image_salt}"
+                }
+            }
+        },
+        "aws_iam_instance_profile": {
+            "imagebuilder": {
+                "role": "${aws_iam_role.imagebuilder.name}",
+                "name": "ec2-scaling-demo-imagebuilder-profile"
+            }
+        },
+        "aws_imagebuilder_component": {
+            "install": {
+                "depends_on": [
+                    "aws_s3_object.image_data"
+                ],
+                "name": "ec2-scaling-demo-install",
+                "version": "1.${regex(\"[0-9]{8}\", terraform_data.base_ami.output.name)}.${local.image_data_version}",
+                "uri": "s3://${aws_s3_bucket.deployment.id}/${aws_s3_object.image_data.key}",
+                "platform": "Linux"
+            }
+        },
+        "aws_imagebuilder_image_recipe": {
+            "this": {
+                "lifecycle": {
+                    "create_before_destroy": true
+                },
+                "component": [
+                    {
+                        "component_arn": "arn:aws:imagebuilder:us-west-2:aws:component/aws-cli-version-2-linux/x.x.x"
+                    },
+                    {
+                        "component_arn": "arn:aws:imagebuilder:us-west-2:aws:component/amazon-cloudwatch-agent-linux/x.x.x"
+                    },
+                    {
+                        "component_arn": "${aws_imagebuilder_component.install.arn}"
+                    }
+                ],
+                "block_device_mapping": {
+                    "device_name": "/dev/xvda",
+                    "ebs": {
+                        "volume_type": "gp3",
+                        "encrypted": true,
+                        "volume_size": 20,
+                        "delete_on_termination": true
+                    }
+                },
+                "name": "ec2-scaling-demo-recipe",
+                "parent_image": "${terraform_data.base_ami.output.id}",
+                "version": "1.${regex(\"[0-9]{8}\", terraform_data.base_ami.output.name)}.${local.image_data_version}"
+            }
+        },
+        "aws_s3_object": {
+            "image_data": {
+                "bucket": "${aws_s3_bucket.deployment.id}",
+                "content_type": "text/yaml",
+                "key": "imagebuilder/component-${local.image_data_version}.yaml",
+                "content": "${local.image_data}"
+            }
+        },
+        "aws_imagebuilder_infrastructure_configuration": {
+            "this": {
+                "instance_types": [
+                    "t4g.micro"
+                ],
+                "terminate_instance_on_failure": true,
+                "instance_profile_name": "${aws_iam_instance_profile.imagebuilder.name}",
+                "instance_metadata_options": {
+                    "http_tokens": "required",
+                    "http_put_response_hop_limit": 2
+                },
+                "name": "ec2-scaling-demo-infra",
+                "subnet_id": "${module.vpc.private_subnets[0]}",
+                "security_group_ids": [
+                    "${aws_security_group.instance.id}"
+                ]
+            }
+        }
+    },
+    "locals": {
+        "image_components": [
+            {
+                "component_arn": "arn:aws:imagebuilder:us-west-2:aws:component/aws-cli-version-2-linux/x.x.x"
+            },
+            {
+                "component_arn": "arn:aws:imagebuilder:us-west-2:aws:component/amazon-cloudwatch-agent-linux/x.x.x"
+            }
+        ],
+        "image_recipe_inputs": {
+            "base_ami": "${terraform_data.base_ami.output.id}",
+            "volume_size": 20
+        },
+        "image_data": "${templatefile(\"${path.module}/image_data.yaml\", {  })}",
+        "image_salt": "1",
+        "image_data_version": "${max(1, parseint(substr(sha256(jsonencode([local.image_data, local.image_salt, local.image_components, local.image_recipe_inputs])), 0, 7), 16))}"
+    }
+}
