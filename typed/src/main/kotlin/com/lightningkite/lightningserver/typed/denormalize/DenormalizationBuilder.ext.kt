@@ -11,7 +11,7 @@ public inline fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>> Lens<Mo
     info: ModelInfo<*, Ref, RID>,
     build: DenormalizationBuilder.RequiredRefBuilder<Model, Ref, RID>.(Lens<Ref, Ref>) -> Unit,
 ): Unit =
-    builder.required(this, info, build)
+    builder.addRequiredRef(this, info, build)
 
 @JvmName("denormalizesNullable")
 context(builder: DenormalizationBuilder<Model>)
@@ -19,10 +19,11 @@ public inline fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>> Optic<M
     info: ModelInfo<*, Ref, RID>,
     build: DenormalizationBuilder.OptionalRefBuilder<Model, Ref, RID>.(Optic<Ref, Ref>) -> Unit,
 ): Unit =
-    builder.optional(this, info, build)
+    builder.addOptionalRef(this, info, build)
 
+/** Keeps this field equal to [ref] on the referenced model, updating it whenever [ref] changes. */
 context(builder: DenormalizationBuilder.RequiredRefBuilder<Model, Ref, RID>)
-public infix fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>, T> Optic<Model, in T>.bind(ref: Lens<Ref, out T>) {
+public infix fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>, T> Optic<Model, in T>.watch(ref: Lens<Ref, out T>) {
     requireMarkedDenormalized(this)
     builder.registerDenormalization(setOf(ref)) { reference ->
         this.mapModification(
@@ -31,8 +32,9 @@ public infix fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>, T> Optic
     }
 }
 
+/** Copies [ref] from the referenced model into this field whenever the reference is set, without following later changes to [ref]. */
 context(builder: DenormalizationBuilder.RequiredRefBuilder<Model, Ref, RID>)
-public infix fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>, T> Optic<Model, in T>.set(ref: Lens<Ref, out T>) {
+public infix fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>, T> Optic<Model, in T>.snapshot(ref: Lens<Ref, out T>) {
     requireMarkedDenormalized(this)
     requireSourceOfTruth(ref)
     builder.registerDenormalization(emptySet()) { reference ->
@@ -42,8 +44,9 @@ public infix fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>, T> Optic
     }
 }
 
+/** Keeps this field equal to [ref] on the referenced model, updating it whenever [ref] changes. It is `null` while the reference is unset. */
 context(builder: DenormalizationBuilder.OptionalRefBuilder<Model, Ref, RID>)
-public infix fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>, T> Optic<Model, in T?>.bind(ref: Optic<Ref, out T?>) {
+public infix fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>, T> Optic<Model, in T?>.watch(ref: Optic<Ref, out T?>) {
     requireMarkedDenormalized(this)
     builder.registerDenormalization(setOf(ref)) { reference ->
         this.mapModification(
@@ -52,8 +55,9 @@ public infix fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>, T> Optic
     }
 }
 
+/** Copies [ref] from the referenced model into this field whenever the reference is set, without following later changes to [ref]. It is `null` while the reference is unset. */
 context(builder: DenormalizationBuilder.OptionalRefBuilder<Model, Ref, RID>)
-public infix fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>, T> Optic<Model, in T?>.set(ref: Optic<Ref, out T?>) {
+public infix fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>, T> Optic<Model, in T?>.snapshot(ref: Optic<Ref, out T?>) {
     requireMarkedDenormalized(this)
     requireSourceOfTruth(ref)
     builder.registerDenormalization(emptySet()) { reference ->
@@ -62,8 +66,3 @@ public infix fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>, T> Optic
         )
     }
 }
-
-// TODO: Api Recommendations
-// Claude:
-// - The denormalizes extensions duplicate DenormalizationBuilder.required/optional; keep one public way in.
-// - Rename `set` along with `once` (see DenormalizationBuilder.kt).

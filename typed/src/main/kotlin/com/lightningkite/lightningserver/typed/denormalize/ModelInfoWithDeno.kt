@@ -45,17 +45,17 @@ public interface ModelInfoWithDeno<USER : HasId<*>?, T : HasId<ID>, ID : Compara
  * Each denormalization is declared on a reference field with `denormalizes`:
  * - On create and replace, it fetches the referenced model and fills in the denormalized fields.
  * - On a modification that changes the reference, it recalculates them.
- * - With `bind` or `watch`, a change to the referenced model updates every model that references it.
+ * - With `watch`, a change to the referenced model updates every model that references it. With `snapshot`, it doesn't.
  *
  * Denormalizations read from the source of truth only. Reading a field the referenced model marks `@Denormalized`
  * throws when the denormalizations are built. To reach a model two references away, denormalize the intermediate
  * reference onto this model and denormalize from that:
  * ```kotlin
- * a.b.denormalizes(B.info) { b -> a.c bind b.c }
- * a.c.denormalizes(C.info) { c -> a.cName bind c.name }
+ * a.b.denormalizes(B.info) { b -> a.c watch b.c }
+ * a.c.denormalizes(C.info) { c -> a.cName watch c.name }
  * ```
  *
- * Fields written by `bind` or `set` must be marked `@Denormalized`. Mark them `cannotBeModified()` in the update
+ * Fields written by the infix `watch` or `snapshot` must be marked `@Denormalized`. Mark them `cannotBeModified()` in the update
  * restrictions too, so callers can't write them; the denormalizations still can. The caller chooses the reference,
  * so a denormalized field shows the referenced model's value to anyone who can read this model.
  *
@@ -73,10 +73,10 @@ public interface ModelInfoWithDeno<USER : HasId<*>?, T : HasId<ID>, ID : Compara
  * ) { announcement ->
  *     announcement.course.denormalizes(CourseEndpoints.info) { course ->
  *         // Kept in sync: updates whenever Course.providerName changes
- *         announcement.courseProvider bind course.providerName
+ *         announcement.courseProvider watch course.providerName
  *
- *         // Not watched: only updates when announcement.course changes
- *         announcement.courseTitle set course.title
+ *         // Copied when announcement.course is set; later changes to the course are not copied
+ *         announcement.courseTitle snapshot course.title
  *     }
  * }
  * ```

@@ -24,14 +24,11 @@ public class DenormalizationBuilder<Model : Any> {
 
 
     /**
-     * Builder context for defining denormalization rules for a required (non-nullable) reference.
-     * This is the receiver of the lambda passed to [denormalizes] for non-nullable references.
+     * The receiver of [denormalizes] for a reference that is always set.
      *
-     * Common methods:
-     * - [bind] - Simple field copy that watches for changes in the source field
-     * - [set] - Simple field copy WITHOUT watching for changes (lighter weight)
-     * - [watch] - Watch specific dependencies and perform calculations when they change
-     * - [once] - Perform calculations without watching for changes in the referenced model
+     * [watch] keeps fields in sync with the referenced model. [snapshot] copies them when the reference is set and
+     * ignores later changes to the referenced model. Both have an infix form for a single field and a block form for
+     * custom calculations.
      */
     @DenormalizationDsl
     public class RequiredRefBuilder<Model : Any, Referenced : HasId<RID>, RID : Comparable<RID>>(
@@ -42,10 +39,12 @@ public class DenormalizationBuilder<Model : Any> {
             ArrayList<Denormalization.Calculation<Model, Referenced, Referenced>>()
 
         /**
-         * Low-level method to register a dependency-based calculation.
-         * Use [watch], [bind], [set], or [once] instead for most use cases.
+         * Registers a [calculation] that reruns when any of the [dependencies] change.
+         *
+         * Prefer [watch] or [snapshot], which also build the modification for you.
          */
-        public fun registerDenormalization(
+        @PublishedApi
+        internal fun registerDenormalization(
             dependencies: Set<Optic<Referenced, *>>,
             calculation: suspend context(ServerRuntime) (Referenced) -> Modification<Model>,
         ) {
@@ -54,31 +53,20 @@ public class DenormalizationBuilder<Model : Any> {
         }
 
         /**
-         * Watch specific fields on the referenced model and perform calculations when they change.
+         * Runs [calculation] when the reference is set and again whenever any of the [dependencies] change on the
+         * referenced model.
          *
-         * Use this when you need to:
-         * - Perform calculations based on the referenced data
-         * - Watch multiple dependencies for the same calculation
-         * - Fetch additional data from other tables
+         * [calculation] receives the referenced model and writes the denormalized fields. In the example, `collection`
+         * is a path into the referenced model, used to name dependencies, and `it` is the referenced model itself.
          *
-         * Example:
          * ```kotlin
          * material.collection.denormalizes(MaterialCollection.info) { collection ->
-         *     // Only update when the submitted field changes
-         *     watch(collection.submitted) {
-         *         material.submittedAt assign it.submitted?.timestamp
-         *     }
-         *
-         *     // Fetch additional data when reviewCycle changes
          *     watch(collection.reviewCycle) {
          *         val cycle = ReviewCycle.info.table().getOrBadRequest(it.reviewCycle)
          *         material.reviewCycleEndAt assign cycle.timeframe.endDate
          *     }
          * }
          * ```
-         *
-         * @param dependencies One or more fields to watch on the referenced model
-         * @param calculation Lambda to create a denormalization modification based on the referenced model
          */
         public inline fun watch(
             dependencies: Set<Optic<Referenced, *>>,
@@ -95,45 +83,18 @@ public class DenormalizationBuilder<Model : Any> {
         ): Unit = watch(setOf(dependency), calculation)
 
         /**
-         * Denormalize data from the referenced model without watching for changes in the referenced model.
+         * Runs [calculation] whenever the reference is set, on create, replace, or a modification that changes it.
          *
-         * Unlike [watch], once calculations run whenever the reference is set (create, replace, modify)
-         * but do NOT listen for changes in the referenced model itself. This means the denormalized data
-         * will only update when you change which model you're referencing, not when that referenced model changes.
+         * Unlike [watch], later changes to the referenced model are not copied, so the fields keep the values from
+         * when the reference was set.
          *
-         * **When it runs:**
-         * - On create: Yes
-         * - On replace: Yes
-         * - On modify (when reference changes): Yes
-         * - When referenced model changes: **No** (this is the key difference from watch)
-         *
-         * Use this when you want to:
-         * - Copy data from a reference without the overhead of change listeners
-         * - Denormalize fields that don't need to stay in sync with the source
-         * - Reduce database load by avoiding reactive updates
-         *
-         * **Note:** The name "once" is somewhat misleading - it actually runs on create, replace, and modify.
-         * The key distinction is that it doesn't watch for changes in the referenced model.
-         *
-         * Example:
          * ```kotlin
-         * material.collection.denormalizes(MaterialCollection.info) { collection ->
-         *     // Updates whenever material.collection reference changes, but not when
-         *     // the MaterialCollection itself is modified
-         *     once {
-         *         material.collectionName assign it.name
-         *     }
-         *
-         *     // For comparison: this DOES update when the MaterialCollection.status changes
-         *     watch(collection.status) {
-         *         material.currentStatus assign it.status
-         *     }
+         * material.collection.denormalizes(MaterialCollection.info) {
+         *     snapshot { material.collectionNameWhenAdded assign it.name }
          * }
          * ```
-         *
-         * @param calculation Lambda to create a denormalization modification based on the referenced model
          */
-        public inline fun once(
+        public inline fun snapshot(
             crossinline calculation: suspend context(ServerRuntime) ModificationBuilder<Model>.(Referenced) -> Unit,
         ) {
             registerDenormalization(emptySet()) {
@@ -145,16 +106,9 @@ public class DenormalizationBuilder<Model : Any> {
     }
 
     /**
-     * Builder context for defining denormalization rules for an optional (nullable) reference.
-     * This is the receiver of the lambda passed to [denormalizes] for nullable references.
+     * The receiver of [denormalizes] for a reference that may be `null`.
      *
-     * Similar to [RequiredRefBuilder], but lambdas receive `Referenced?` (nullable) instead of `Referenced`.
-     *
-     * Common methods:
-     * - [bind] - Simple field copy that watches for changes
-     * - [set] - Simple field copy WITHOUT watching for changes
-     * - [watch] - Watch specific dependencies with nullable reference
-     * - [once] - Perform calculations without watching for changes
+     * Works like [RequiredRefBuilder], except that calculations receive `null` while the reference is unset.
      */
     @DenormalizationDsl
     public class OptionalRefBuilder<Model : Any, Referenced : HasId<RID>, RID : Comparable<RID>>(
@@ -165,10 +119,12 @@ public class DenormalizationBuilder<Model : Any> {
             ArrayList()
 
         /**
-         * Low-level method to register a dependency-based calculation.
-         * Use [watch], [bind], [set], or [once] instead for most use cases.
+         * Registers a [calculation] that reruns when any of the [dependencies] change.
+         *
+         * Prefer [watch] or [snapshot], which also build the modification for you.
          */
-        public fun registerDenormalization(
+        @PublishedApi
+        internal fun registerDenormalization(
             dependencies: Set<Optic<Referenced, *>>,
             calculation: suspend context(ServerRuntime) (Referenced?) -> Modification<Model>,
         ) {
@@ -177,11 +133,10 @@ public class DenormalizationBuilder<Model : Any> {
         }
 
         /**
-         * Watch specific fields on the referenced model and perform calculations when they change.
-         * Same as [RequiredRefBuilder.watch] but receives `Referenced?` (nullable) instead of `Referenced`.
+         * Runs [calculation] when the reference is set and again whenever any of the [dependencies] change on the
+         * referenced model.
          *
-         * @param dependencies One or more fields to watch on the referenced model
-         * @param calculation Lambda to create a denormalization modification based on the referenced model
+         * [calculation] receives `null` while the reference is unset. See [RequiredRefBuilder.watch].
          */
         public inline fun watch(
             dependencies: Set<Optic<Referenced, *>>,
@@ -198,21 +153,11 @@ public class DenormalizationBuilder<Model : Any> {
         ): Unit = watch(setOf(dependency), calculation)
 
         /**
-         * Denormalize data from an optional referenced model without watching for changes in the referenced model.
+         * Runs [calculation] whenever the reference is set, on create, replace, or a modification that changes it.
          *
-         * Same as [RequiredRefBuilder.once] but for nullable references. The calculation receives `Referenced?`
-         * which will be null if the reference is null.
-         *
-         * **When it runs:**
-         * - On create: Yes
-         * - On replace: Yes
-         * - On modify (when reference changes): Yes
-         * - When referenced model changes: **No** (this is the key difference from watch)
-         *
-         * @param calculation Lambda to create a denormalization modification. Receives `Referenced?` (nullable).
-         * @see RequiredRefBuilder.once for detailed documentation
+         * [calculation] receives `null` while the reference is unset. See [RequiredRefBuilder.snapshot].
          */
-        public inline fun once(
+        public inline fun snapshot(
             crossinline calculation: suspend context(ServerRuntime) ModificationBuilder<Model>.(Referenced?) -> Unit,
         ) {
             registerDenormalization(emptySet()) {
@@ -230,7 +175,8 @@ public class DenormalizationBuilder<Model : Any> {
      * Register a required (non-nullable) reference denormalization.
      * Called by the [denormalizes] extension function.
      */
-    public inline fun <Ref : HasId<RID>, RID : Comparable<RID>> required(
+    @PublishedApi
+    internal inline fun <Ref : HasId<RID>, RID : Comparable<RID>> addRequiredRef(
         reference: Lens<Model, RID>,
         info: ModelInfo<*, Ref, RID>,
         build: RequiredRefBuilder<Model, Ref, RID>.(Lens<Ref, Ref>) -> Unit,
@@ -246,7 +192,8 @@ public class DenormalizationBuilder<Model : Any> {
      * Register an optional (nullable) reference denormalization.
      * Called by the [denormalizes] extension function for nullable references.
      */
-    public inline fun <Ref : HasId<RID>, RID : Comparable<RID>> optional(
+    @PublishedApi
+    internal inline fun <Ref : HasId<RID>, RID : Comparable<RID>> addOptionalRef(
         reference: Optic<Model, RID?>,
         info: ModelInfo<*, Ref, RID>,
         build: OptionalRefBuilder<Model, Ref, RID>.(Optic<Ref, Ref>) -> Unit,
@@ -262,6 +209,4 @@ public class DenormalizationBuilder<Model : Any> {
 // TODO: Api Recommendations
 // Claude:
 // - Shrink the public surface before release: registerDenormalization, required/optional, build(), and the builders' reference/info can be @PublishedApi internal or internal.
-// - Two ideas, four verbs: bind/watch keep a field in sync, set/once copy it when the reference is set. Neither `set` (reads like assignment, clashes with Optic.set) nor `once` (its own doc calls it misleading) says "not kept in sync". Consider one name, e.g. `snapshot`, for both copy forms.
-// - Doc examples should make the difference between the path parameter (`{ collection -> ... }`) and the referenced value (`it`) obvious.
-// - requireSourceOfTruth only sees declared dependencies; a watch/once body can still read a @Denormalized field unnoticed.
+// - requireSourceOfTruth only sees declared dependencies; a watch/snapshot body can still read a @Denormalized field unnoticed.

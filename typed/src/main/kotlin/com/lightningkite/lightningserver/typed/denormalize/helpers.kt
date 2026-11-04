@@ -70,7 +70,7 @@ internal fun requireSourceOfTruth(source: Optic<*, *>) {
     throw IllegalArgumentException(
         "A denormalization reads $source, but '${copied.name}' is itself @Denormalized. " +
             "Denormalize the reference '${copied.name}' comes from onto this model and read the value from its source " +
-            "instead, e.g. `a.b.denormalizes(B.info) { b -> a.c bind b.c }` then `a.c.denormalizes(C.info) { c -> a.cName bind c.name }`."
+            "instead, e.g. `a.b.denormalizes(B.info) { b -> a.c watch b.c }` then `a.c.denormalizes(C.info) { c -> a.cName watch c.name }`."
     )
 }
 

@@ -103,7 +103,7 @@ public class RefreshDenoEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparab
 
 // TODO: Api Recommendations
 // Claude:
-// - Refresh runs every calculation, so it overwrites set/once values with the referenced model's current values. Skip calculations with no dependencies.
+// - Refresh runs every calculation, so it overwrites snapshot values with the referenced model's current values. Skip calculations with no dependencies.
 // - refreshAll fetches the referenced row once per row per denormalization; fetch each distinct id once.
 // - refreshAll is a single HTTP request over the whole table, so it will time out on large tables, and one missing required reference aborts the run (getOrThrow). Run it as a Task that skips and reports bad rows.
 // - Rename to spell out "Deno", e.g. DenormalizationRefreshEndpoints.

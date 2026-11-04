@@ -42,8 +42,8 @@ class DenormalizationTest {
             permissions = { ModelPermissions.allowAll() },
         ) { city ->
             city.country.denormalizes(countryInfo) { country ->
-                city.countryName bind country.name
-                city.countryNameAtCreation set country.name
+                city.countryName watch country.name
+                city.countryNameWhenAssigned snapshot country.name
             }
         }
 
@@ -59,13 +59,13 @@ class DenormalizationTest {
             },
         ) { person ->
             person.city.denormalizes(cityInfo) { city ->
-                person.country bind city.country
+                person.country watch city.country
             }
             person.country.denormalizes(countryInfo) { country ->
-                person.countryName bind country.name
+                person.countryName watch country.name
             }
             person.favoriteCity.denormalizes(cityInfo) { city ->
-                person.favoriteCityName bind city.name
+                person.favoriteCityName watch city.name
             }
         }
 
@@ -82,7 +82,7 @@ class DenormalizationTest {
             permissions = { ModelPermissions.allowAll() },
         ) { person ->
             person.city.denormalizes(DenoServer.cityInfo) { city ->
-                person.countryName bind city.countryName
+                person.countryName watch city.countryName
             }
         }
 
@@ -92,7 +92,7 @@ class DenormalizationTest {
             permissions = { ModelPermissions.allowAll() },
         ) { city ->
             city.country.denormalizes(DenoServer.countryInfo) { country ->
-                city.name bind country.name
+                city.name watch country.name
             }
         }
     }
@@ -120,13 +120,13 @@ class DenormalizationTest {
         execute {
             val storedCity = cityInfo.table().get(paris._id)!!
             assertEquals("France", storedCity.countryName)
-            assertEquals("France", storedCity.countryNameAtCreation)
+            assertEquals("France", storedCity.countryNameWhenAssigned)
             assertEquals("France", personInfo.table().get(person._id)!!.countryName)
         }
     }
 
     @Test
-    fun bind_follows_the_referenced_model_and_set_does_not() = denoTest {
+    fun watch_follows_the_referenced_model_and_snapshot_does_not() = denoTest {
         val france = DenoCountry(name = "France")
         val paris = DenoCity(country = france._id, name = "Paris")
         execute {
@@ -138,7 +138,7 @@ class DenormalizationTest {
         execute {
             val storedCity = cityInfo.table().get(paris._id)!!
             assertEquals("République française", storedCity.countryName)
-            assertEquals("France", storedCity.countryNameAtCreation)
+            assertEquals("France", storedCity.countryNameWhenAssigned)
         }
     }
 
@@ -323,7 +323,7 @@ data class DenoCity(
     val country: Uuid,
     val name: String = "",
     @Denormalized val countryName: String = "",
-    @Denormalized val countryNameAtCreation: String = "",
+    @Denormalized val countryNameWhenAssigned: String = "",
 ) : HasId<Uuid>
 
 @Queryable
