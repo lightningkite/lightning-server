@@ -2,6 +2,8 @@ package com.lightningkite.lightningserver.demo
 
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.demo.endpoints.AuthExamplesEndpoints
+import com.lightningkite.lightningserver.demo.endpoints.UserEndpoints
+import com.lightningkite.lightningserver.demo.models.User
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.typed.test
@@ -17,8 +19,8 @@ class AuthExamplesEndpointsTest {
     @Test
     fun whoAmIReturnsTheCallersOwnIdentity() = runBlocking {
         TestHelper.testServer {
-            val user = execute { Server.userInfo.table().insertOne(User(email = "whoami@example.com"))!! }
-            val auth = Authentication(Server.UserAuth, id = user._id, sessionId = null)
+            val user = execute { UserEndpoints.info.table().insertOne(User(email = "whoami@example.com"))!! }
+            val auth = Authentication(UserAuth, id = user._id, sessionId = null)
 
             val result = AuthExamplesEndpoints.whoAmI.test(auth, Unit)
 
@@ -47,8 +49,8 @@ class AuthExamplesEndpointsTest {
     @Test
     fun greetIsPersonalForLoggedInCallers() = runBlocking {
         TestHelper.testServer {
-            val user = execute { Server.userInfo.table().insertOne(User(email = "greet@example.com"))!! }
-            val auth = Authentication(Server.UserAuth, id = user._id, sessionId = null)
+            val user = execute { UserEndpoints.info.table().insertOne(User(email = "greet@example.com"))!! }
+            val auth = Authentication(UserAuth, id = user._id, sessionId = null)
 
             val result = AuthExamplesEndpoints.greet.test(auth, Unit)
 
@@ -68,8 +70,8 @@ class AuthExamplesEndpointsTest {
     @Test
     fun adminOnlyRejectsALoggedInNonAdminFromItsHandlerBody() = runBlocking {
         TestHelper.testServer {
-            val user = execute { Server.userInfo.table().insertOne(User(email = "regular@example.com"))!! }
-            val auth = Authentication(Server.UserAuth, id = user._id, sessionId = null)
+            val user = execute { UserEndpoints.info.table().insertOne(User(email = "regular@example.com"))!! }
+            val auth = Authentication(UserAuth, id = user._id, sessionId = null)
 
             val exception = assertFailsWith<com.lightningkite.lightningserver.HttpStatusException> {
                 AuthExamplesEndpoints.adminOnly.test(auth, Unit)
@@ -83,9 +85,9 @@ class AuthExamplesEndpointsTest {
     fun adminOnlyAdmitsALoggedInSuperUserFromItsHandlerBody() = runBlocking {
         TestHelper.testServer {
             val admin = execute {
-                Server.userInfo.table().insertOne(User(email = "admin@example.com", isSuperUser = true))!!
+                UserEndpoints.info.table().insertOne(User(email = "admin@example.com", isSuperUser = true))!!
             }
-            val auth = Authentication(Server.UserAuth, id = admin._id, sessionId = null)
+            val auth = Authentication(UserAuth, id = admin._id, sessionId = null)
 
             val result = AuthExamplesEndpoints.adminOnly.test(auth, Unit)
 
@@ -94,7 +96,7 @@ class AuthExamplesEndpointsTest {
     }
 
     /**
-     * Proves that ModelPermissions.readMask on Server.userInfo actually masks fields for a
+     * Proves that ModelPermissions.readMask on UserEndpoints.info actually masks fields for a
      * non-self, non-admin caller - the concrete manifestation the task asked for, rather than a
      * new endpoint duplicating what GET /user/rest/{id} already does.
      */
@@ -102,20 +104,20 @@ class AuthExamplesEndpointsTest {
     fun aStrangerSeesAnotherUsersHashedPasswordMasked() = runBlocking {
         TestHelper.testServer {
             val (target, stranger) = execute {
-                val target = Server.userInfo.table().insertOne(
+                val target = UserEndpoints.info.table().insertOne(
                     User(email = "target@example.com", hashedPassword = "super-secret-hash")
                 )!!
-                val stranger = Server.userInfo.table().insertOne(User(email = "stranger@example.com"))!!
+                val stranger = UserEndpoints.info.table().insertOne(User(email = "stranger@example.com"))!!
                 target to stranger
             }
-            val strangerAuth = Authentication(Server.UserAuth, id = stranger._id, sessionId = null)
+            val strangerAuth = Authentication(UserAuth, id = stranger._id, sessionId = null)
 
-            val seenByStranger = Server.UserEndpoints.rest.detail.test(target._id, strangerAuth, Unit)
+            val seenByStranger = UserEndpoints.rest.detail.test(target._id, strangerAuth, Unit)
             assertEquals("", seenByStranger.hashedPassword)
 
             // Sanity check: the target sees their own hash unmasked.
-            val targetAuth = Authentication(Server.UserAuth, id = target._id, sessionId = null)
-            val seenBySelf = Server.UserEndpoints.rest.detail.test(target._id, targetAuth, Unit)
+            val targetAuth = Authentication(UserAuth, id = target._id, sessionId = null)
+            val seenBySelf = UserEndpoints.rest.detail.test(target._id, targetAuth, Unit)
             assertEquals("super-secret-hash", seenBySelf.hashedPassword)
         }
     }

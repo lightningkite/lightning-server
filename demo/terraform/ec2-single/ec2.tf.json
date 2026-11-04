@@ -1,0 +1,94 @@
+{
+    "data": {
+        "aws_ami": {
+            "base": {
+                "filter": [
+                    {
+                        "values": [
+                            "al2023-ami-2023.*-kernel-*-arm64"
+                        ],
+                        "name": "name"
+                    },
+                    {
+                        "values": [
+                            "arm64"
+                        ],
+                        "name": "architecture"
+                    },
+                    {
+                        "values": [
+                            "hvm"
+                        ],
+                        "name": "virtualization-type"
+                    }
+                ],
+                "most_recent": true,
+                "owners": [
+                    "amazon"
+                ]
+            }
+        }
+    },
+    "resource": {
+        "aws_s3_object": {
+            "init": {
+                "bucket": "${aws_s3_bucket.deployment.id}",
+                "content_type": "application/x-sh",
+                "key": "init/component-${local.ec2_init_version}.sh",
+                "content": "${local.ec2_init}"
+            }
+        },
+        "aws_instance": {
+            "main": {
+                "depends_on": [
+                    "null_resource.upload_jar",
+                    "null_resource.upload_settings",
+                    "aws_s3_object.init",
+                    "aws_ssm_parameter.settings_password",
+                    "aws_iam_role_policy_attachment.servicesAccess",
+                    "aws_iam_role_policy_attachment.ssm",
+                    "aws_iam_role_policy_attachment.cloudwatch_agent",
+                    "aws_s3_bucket_server_side_encryption_configuration.deployment"
+                ],
+                "iam_instance_profile": "${aws_iam_instance_profile.ec2.name}",
+                "metadata_options": {
+                    "http_endpoint": "enabled",
+                    "http_tokens": "required",
+                    "http_put_response_hop_limit": 1
+                },
+                "ipv6_address_count": 1,
+                "user_data": "${local.ec2_base_init}",
+                "root_block_device": {
+                    "volume_type": "gp3",
+                    "encrypted": true,
+                    "volume_size": 20,
+                    "delete_on_termination": true,
+                    "tags": {
+                        "Name": "ec2-demo-root"
+                    }
+                },
+                "tags": {
+                    "Name": "Lightning Server EC2 Demo"
+                },
+                "lifecycle": {
+                    "ignore_changes": [
+                        "ami"
+                    ]
+                },
+                "user_data_replace_on_change": true,
+                "vpc_security_group_ids": [
+                    "${aws_security_group.ec2.id}"
+                ],
+                "subnet_id": "${data.aws_subnets.main.ids[0]}",
+                "ami": "${data.aws_ami.base.id}",
+                "instance_type": "t4g.micro",
+                "enable_primary_ipv6": true
+            }
+        }
+    },
+    "locals": {
+        "ec2_base_init": "${templatefile(\"${path.module}/ec2_init_base.sh\", { deployment_bucket = aws_s3_bucket.deployment.id, deployment_script_key = aws_s3_object.init.key })}",
+        "ec2_init": "${templatefile(\"${path.module}/ec2_init.sh\", { deployment_bucket = aws_s3_bucket.deployment.id })}",
+        "ec2_init_version": "${max(1, parseint(substr(sha256(jsonencode([local.ec2_init])), 0, 7), 16))}"
+    }
+}

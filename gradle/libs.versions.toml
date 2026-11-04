@@ -33,6 +33,7 @@ vanniktechMavenPublish = "0.37.0"
 webauthn4jCore = "0.31.10.RELEASE"
 
 [libraries]
+aws-signin = { module = "software.amazon.awssdk:signin", version = { ref = "awsVersion" } }
 androidDesugaring = { module = "com.android.tools:desugar_jdk_libs", version = { ref = "androidDesugaring" } }
 aws-apiGateway = { module = "software.amazon.awssdk:apigatewaymanagementapi", version = { ref = "awsVersion" } }
 aws-lambda = { module = "software.amazon.awssdk:lambda", version = { ref = "awsVersion" } }

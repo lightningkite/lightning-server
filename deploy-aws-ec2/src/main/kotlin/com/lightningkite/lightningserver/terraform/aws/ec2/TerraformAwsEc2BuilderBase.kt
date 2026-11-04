@@ -1,11 +1,11 @@
 package com.lightningkite.lightningserver.terraform.aws.ec2
 
-import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.engine.local.engineCache
 import com.lightningkite.lightningserver.engine.local.enginePubSub
 import com.lightningkite.lightningserver.terraform.*
+import com.lightningkite.services.Untested
 import com.lightningkite.services.data.DataSize
 import com.lightningkite.services.data.DataSize.Companion.mebibytes
 import com.lightningkite.services.data.EmailAddress
@@ -148,6 +148,97 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
      *  */
     public abstract val instanceArchitecture: CPUArchitecture
 
+    public enum class Distro {
+        /** Ubuntu 24.04 LTS (Noble). */
+        Ubuntu2404,
+
+        /** Ubuntu 26.04 LTS (Resolute). */
+        @Untested
+        Ubuntu2604,
+
+        /**
+         * Amazon Linux 2023. Its package repositories are versioned and locked to the AMI's release, so
+         * every system update here passes `--releasever=latest` to pick up fixes published since.
+         */
+        AmazonLinux2023,
+    }
+
+    /**
+     * The OS the instances run, [Distro.Ubuntu2404] by default. Changing it on an existing deployment,
+     * including between Ubuntu releases, replaces the single instance, or re-bakes the scaling
+     * builder's image and rolls the fleet onto it.
+     * [additionalPackages] and custom install scripts are distro-specific and must match.
+     */
+    public open val distro: Distro get() = Distro.Ubuntu2404
+
+    /**
+     * Root volume device name of [distro]'s AMIs. A block device mapping must name it exactly to
+     * resize the root volume; any other name attaches a second, empty volume instead.
+     */
+    protected val rootDeviceName: String
+        get() = when (distro) {
+            Distro.Ubuntu2404, Distro.Ubuntu2604 -> "/dev/sda1"
+            Distro.AmazonLinux2023 -> "/dev/xvda"
+        }
+
+    /** The `data.aws_ami.base` lookup for the latest [distro] AMI on [instanceArchitecture]. */
+    protected fun TerraformJsonObject.baseAmiData() {
+        "data.aws_ami.base" {
+            "most_recent" - true
+            when (distro) {
+                Distro.Ubuntu2404, Distro.Ubuntu2604 -> {
+                    val release = if (distro == Distro.Ubuntu2604) "resolute-26.04" else "noble-24.04"
+                    "owners" - listOf("099720109477")
+                    "filter" - listOf(
+                        terraformJsonObject {
+                            "name" - "name"
+                            "values" - listOf("ubuntu/images/hvm-ssd-gp3/ubuntu-$release-${if (instanceArchitecture == CPUArchitecture.Arm) "arm64" else "amd64"}-server-*")
+                        },
+                        terraformJsonObject {
+                            "name" - "architecture"
+                            "values" - listOf(if (instanceArchitecture == CPUArchitecture.Arm) "arm64" else "x86_64")
+                        },
+                        terraformJsonObject {
+                            "name" - "virtualization-type"
+                            "values" - listOf("hvm")
+                        },
+                    )
+                }
+
+                Distro.AmazonLinux2023 -> {
+                    "owners" - listOf("amazon")
+                    "filter" - listOf(
+                        // The standard AMI; `al2023-ami-minimal-*` lacks the SSM agent and CLI tooling.
+                        terraformJsonObject {
+                            "name" - "name"
+                            "values" - listOf("al2023-ami-2023.*-kernel-*-${if (instanceArchitecture == CPUArchitecture.Arm) "arm64" else "x86_64"}")
+                        },
+                        terraformJsonObject {
+                            "name" - "architecture"
+                            "values" - listOf(if (instanceArchitecture == CPUArchitecture.Arm) "arm64" else "x86_64")
+                        },
+                        terraformJsonObject {
+                            "name" - "virtualization-type"
+                            "values" - listOf("hvm")
+                        },
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * An SSM-safe shell command (no double quotes or backslashes) that prints `REBOOT_REQUIRED=yes` or
+     * `REBOOT_REQUIRED=no` depending on whether a reboot is needed to activate installed updates.
+     */
+    protected val rebootCheckCommand: String
+        get() = when (distro) {
+            Distro.Ubuntu2404, Distro.Ubuntu2604 -> "test -f /var/run/reboot-required && echo REBOOT_REQUIRED=yes || echo REBOOT_REQUIRED=no"
+            // Exits 1 when a reboot is needed. Any other failure also reads as "yes", which costs at
+            // most one unnecessary reboot rather than leaving a patched kernel inactive.
+            Distro.AmazonLinux2023 -> "dnf needs-restarting -r >/dev/null 2>&1 && echo REBOOT_REQUIRED=no || echo REBOOT_REQUIRED=yes"
+        }
+
     /** EBS volume size in GiB. */
     public open val volumeSizeGiB: Int get() = 20
 
@@ -172,11 +263,11 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
     public open val swapSwappiness: Int get() = 10
 
     /** Max body size for any request. */
-    public open val maxBodySize: DataSize = 10.mebibytes
+    public open val maxBodySize: DataSize get() = 10.mebibytes
 
     /** IP Stack Configuration. */
-    public open val enableIPv4: Boolean = true
-    public open val enableIPv6: Boolean = true
+    public open val enableIPv4: Boolean get() = true
+    public open val enableIPv6: Boolean get() = true
 
     // === Logging Configuration ===
 
@@ -185,8 +276,8 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
 
     // === Customization Hooks ===
 
-    /** Additional packages to install on EC2 instances. */
-    public open val additionalPackages: List<String> = emptyList()
+    /** Additional packages to install on EC2 instances, named as [distro]'s package manager knows them. */
+    public open val additionalPackages: List<String> get() = emptyList()
 
     public enum class JavaVersion(public val outputString: String) {
         V_8("8"),
@@ -198,7 +289,10 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
 
     public open val javaVersion: JavaVersion get() = JavaVersion.V_17
 
-    /** Seconds apt waits for the dpkg lock (held briefly at boot by Ubuntu's apt-daily) before failing. */
+    /**
+     * Seconds apt waits for the dpkg lock (held briefly at boot by Ubuntu's apt-daily) before failing.
+     * Ubuntu only; dnf waits for its own lock.
+     */
     public open val aptLockTimeoutSeconds: Int get() = 600
 
     /**
@@ -230,7 +324,7 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
     protected val projectLogName: String get() = "$projectPrefix-main-log"
 
     /** Additional systemd environment variables. */
-    public open val systemdEnvironment: Map<String, String> = emptyMap()
+    public open val systemdEnvironment: Map<String, String> get() = emptyMap()
 
     public enum class FileType {
         Config,
@@ -262,12 +356,12 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
     /**
      * List of raw Bash scripts to be used in the setup script.
      * */
-    public open val customInstallScriptsRaw: List<String> = emptyList()
+    public open val customInstallScriptsRaw: List<String> get() = emptyList()
 
     /**
      * List of shell files to be used in the setup script.
      * */
-    public open val customInstallScripts: List<KFile> = emptyList()
+    public open val customInstallScripts: List<KFile> get() = emptyList()
 
     /**
      * Shell fragments run during instance provisioning — in the cloud-init `user_data` for the
@@ -697,8 +791,9 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
      */
     // language="Shell Script"
     protected fun StringBuilder.disableUnattendedUpgrades() {
-        appendLine(
-            """
+        when (distro) {
+            Distro.Ubuntu2404, Distro.Ubuntu2604 -> appendLine(
+                """
 # === Disable unattended upgrades ===
 echo "[INFO] Disabling unattended-upgrades and apt daily timers at $(date)"
 cat > /etc/apt/apt.conf.d/20auto-upgrades << 'AUTO_UPGRADES_EOF'
@@ -712,29 +807,69 @@ systemctl mask unattended-upgrades.service || true
 systemctl disable --now apt-daily.timer apt-daily-upgrade.timer || true
 systemctl mask apt-daily.timer apt-daily-upgrade.timer apt-daily.service apt-daily-upgrade.service || true
 """
-        )
+            )
+
+            Distro.AmazonLinux2023 ->
+                // AL2023 installs no automatic updater. Keep dnf-automatic off should a custom step add it,
+                // and stop the metadata refresh timer racing the provisioning script for the dnf lock.
+                appendLine(
+                    """
+# === Disable unattended upgrades ===
+echo "[INFO] Disabling dnf automatic update and metadata timers at $(date)"
+systemctl disable --now dnf-automatic.timer dnf-automatic-install.timer || true
+systemctl disable --now dnf-makecache.timer || true
+systemctl mask dnf-makecache.timer || true
+"""
+                )
+        }
     }
 
     /** Brings the OS fully up to date and installs the JRE, base tooling, and [additionalPackages]. */
     // language="Shell Script"
     protected fun StringBuilder.systemPackages() {
-        // A freshly-booted Ubuntu holds the dpkg lock for the first few minutes (apt-daily/
-        // unattended-upgrades); wait for it instead of failing or appearing to hang.
-        val apt = "apt-get -o DPkg::Lock::Timeout=$aptLockTimeoutSeconds"
-        appendLine("# === System update + base packages ===")
-        appendLine("""echo "[INFO] Updating system packages at $(date)"""")
-        appendLine("$apt update -y")
-        // --with-new-pkgs because a plain `upgrade` never installs new packages, and kernel
-        // security updates arrive as a new package name (linux-image-X-generic) pulled in by a
-        // dependency change on the metapackage. Without it they are silently held back.
-        appendLine("$apt -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold upgrade --with-new-pkgs")
-        appendLine("$apt install -y openjdk-${javaVersion.outputString}-jre-headless openssl curl gnupg ca-certificates unzip")
-        if (additionalPackages.isNotEmpty()) {
-            appendLine("echo \"[INFO] Installing additional packages at \$(date)\"")
-            appendLine("$apt install -y ${additionalPackages.joinToString(" ") { it.shellEscape() }}")
+        when (distro) {
+            Distro.Ubuntu2404, Distro.Ubuntu2604 -> {
+                // A freshly-booted Ubuntu holds the dpkg lock for the first few minutes (apt-daily/
+                // unattended-upgrades); wait for it instead of failing or appearing to hang.
+                val apt = "apt-get -o DPkg::Lock::Timeout=$aptLockTimeoutSeconds"
+                appendLine("# === System update + base packages ===")
+                appendLine("""echo "[INFO] Updating system packages at $(date)"""")
+                appendLine("$apt update -y")
+                // --with-new-pkgs because a plain `upgrade` never installs new packages, and kernel
+                // security updates arrive as a new package name (linux-image-X-generic) pulled in by a
+                // dependency change on the metapackage. Without it they are silently held back.
+                appendLine("$apt -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold upgrade --with-new-pkgs")
+                appendLine("$apt install -y openjdk-${javaVersion.outputString}-jre-headless openssl curl gnupg ca-certificates unzip")
+                if (additionalPackages.isNotEmpty()) {
+                    appendLine("echo \"[INFO] Installing additional packages at \$(date)\"")
+                    appendLine("$apt install -y ${additionalPackages.joinToString(" ") { it.shellEscape() }}")
+                }
+                appendLine("$apt -y autoremove")
+                appendLine()
+            }
+
+            Distro.AmazonLinux2023 -> {
+                appendLine("# === System update + base packages ===")
+                appendLine("""echo "[INFO] Updating system packages at $(date)"""")
+                // The repositories are locked to the AMI's release, so a plain upgrade would miss every
+                // update published since. --releasever=latest moves the system to the newest release.
+                appendLine("dnf -y --releasever=latest upgrade")
+                // curl, gnupg, and ca-certificates ship in the AMI (curl and gnupg as their -minimal
+                // variants, which installing the full packages would conflict with). Corretto 8 has no
+                // separate headless package.
+                val jre = when (javaVersion) {
+                    JavaVersion.V_8 -> "java-1.8.0-amazon-corretto"
+                    else -> "java-${javaVersion.outputString}-amazon-corretto-headless"
+                }
+                appendLine("dnf install -y $jre openssl unzip")
+                if (additionalPackages.isNotEmpty()) {
+                    appendLine("echo \"[INFO] Installing additional packages at \$(date)\"")
+                    appendLine("dnf install -y ${additionalPackages.joinToString(" ") { it.shellEscape() }}")
+                }
+                appendLine("dnf -y autoremove")
+                appendLine()
+            }
         }
-        appendLine("$apt -y autoremove")
-        appendLine()
     }
 
     /** Render [customInstallScripts] and [customInstallScriptsRaw] into the provisioning script. */
@@ -818,12 +953,15 @@ systemctl mask apt-daily.timer apt-daily-upgrade.timer apt-daily.service apt-dai
 
     // language="Shell Script"
     protected fun StringBuilder.ssm() {
-        appendLine(
-            $$"""
+
+        when (distro) {
+            Distro.Ubuntu2404, Distro.Ubuntu2604 -> {
+                appendLine(
+                    $$"""
 # === SSM Agent ===
 echo "[INFO] Ensuring SSM agent is installed and running at $(date)"
 # Required so terraform can drive in-place jar/settings redeploys via
-# `aws ssm send-command`. Ubuntu 24.04 ships amazon-ssm-agent as a snap; install if missing,
+# `aws ssm send-command`. Ubuntu ships amazon-ssm-agent as a snap; install if missing,
 # then enable + start so newly-created instances register with SSM.
 if ! snap list amazon-ssm-agent >/dev/null 2>&1; then
     snap install amazon-ssm-agent --classic
@@ -831,7 +969,24 @@ if ! snap list amazon-ssm-agent >/dev/null 2>&1; then
     systemctl start snap.amazon-ssm-agent.amazon-ssm-agent.service
 fi
 """
-        )
+                )
+            }
+
+            Distro.AmazonLinux2023 -> {
+                appendLine(
+                    """
+# === SSM Agent ===
+echo "[INFO] Ensuring SSM agent is installed and running at $(date)"
+# Required so terraform can drive in-place jar/settings redeploys via
+# `aws ssm send-command`. The AL2023 AMI ships amazon-ssm-agent as an RPM; install if missing,
+# then enable + start so newly-created instances register with SSM.
+rpm -q amazon-ssm-agent >/dev/null 2>&1 || dnf install -y amazon-ssm-agent
+systemctl enable amazon-ssm-agent
+systemctl start amazon-ssm-agent
+"""
+                )
+            }
+        }
     }
 
     /** Write the CloudWatch agent config (log groups + metrics) and enable the service. */
@@ -902,7 +1057,7 @@ systemctl restart amazon-cloudwatch-agent
      * it enabled for the next boot instead.
      *
      * That immediate activation is deliberately non-fatal. The caller's script runs under `set -e`, and
-     * losing the entire bootstrap — Angie, the systemd unit, the first deploy — because an overflow
+     * losing the entire bootstrap — nginx, the systemd unit, the first deploy — because an overflow
      * safety net could not be allocated is a far worse outcome than running without swap. It also matches
      * the scaling path, where the baked unit is only ordered before the app, never required by it.
      */
@@ -1360,7 +1515,7 @@ chmod 0700 /usr/local/bin/$$projectPrefix-settings-key
 # update-fleet.sh drives it one drained instance at a time; routine patching there still
 # comes from rebuilding the image and rolling the ASG.
 #
-# It restarts the app unconditionally (the JRE is an apt package and may be replaced
+# It restarts the app unconditionally (the JRE is a system package and may be replaced
 # underneath a running JVM), so it is only interruption-free on an instance already
 # drained from the load balancer.
 #
@@ -1384,6 +1539,43 @@ chown lightning-server:lightning-server "$LOG_FILE"
 exec > >(tee -a "$LOG_FILE" | logger -t os-update -s) 2>&1
 
 log "OS update started"
+$${osUpdatePackageSteps()}
+
+log "Restarting $$deploymentTag"
+systemctl restart $$projectPrefix
+sleep 5
+if ! systemctl is-active --quiet $$projectPrefix; then
+    err "Service failed to start after OS update"
+    tail -n 100 /var/log/$$projectPrefix/server.log >&2 || true
+    exit 1
+fi
+
+log "Waiting for liveness at $$localHealthUrl"
+healthy=0
+for i in $(seq 1 20); do
+    if curl -fsS -o /dev/null --max-time 5 "$$localHealthUrl"; then healthy=1; break; fi
+    sleep 3
+done
+if [ "$healthy" -ne 1 ]; then
+    err "Liveness endpoint $$localHealthUrl never returned success"
+    tail -n 100 /var/log/$$projectPrefix/server.log >&2 || true
+    exit 1
+fi
+
+$${osUpdateRebootBreadcrumb()}
+log "Done"
+UPDATE_EOF
+
+chmod +x /usr/local/bin/os-update
+echo "[INFO] Creating OS Emergency Update Script - DONE"
+"""
+        )
+    }
+
+    /** The package refresh and upgrade at the heart of [instanceUpdateScript], for [distro]. */
+    // language="Shell Script"
+    private fun osUpdatePackageSteps(): String = when (distro) {
+        Distro.Ubuntu2404, Distro.Ubuntu2604 -> $$"""
 apt-get -o DPkg::Lock::Timeout=$$aptLockTimeoutSeconds update -y
 
 # Keep existing config files on conflict; an interactive dpkg prompt would hang the SSM command.
@@ -1413,41 +1605,55 @@ else
     # happily purge old kernels and anything else currently marked auto-and-no-longer-needed,
     # which is not a blast radius to take on while chasing a single CVE.
     apt-get $APT_OPTS autoremove
-fi
+fi""".removePrefix("\n")
 
-log "Restarting $$deploymentTag"
-systemctl restart $$projectPrefix
-sleep 5
-if ! systemctl is-active --quiet $$projectPrefix; then
-    err "Service failed to start after OS update"
-    tail -n 100 /var/log/$$projectPrefix/server.log >&2 || true
-    exit 1
-fi
+        Distro.AmazonLinux2023 -> """
+# The repositories are locked to the release this host is on, so a plain upgrade only sees fixes
+# already in that release; every fix published since would be silently missed while the update
+# reported success. --releasever=latest moves to the newest release first.
+DNF_OPTS="-y --releasever=latest"
+if [ -n "${'$'}PACKAGES" ]; then
+    # `dnf upgrade` exits 0 for a package that is not installed, so a typo'd or wrong-architecture
+    # name would report a clean patch while changing nothing at all. Check each name up front and
+    # fail loudly instead.
+    for p in ${'$'}PACKAGES; do
+        if ! rpm -q "${'$'}p" >/dev/null 2>&1; then
+            err "not installed on this host, refusing to report a successful update: ${'$'}p"
+            exit 1
+        fi
+    done
+    log "Upgrading only: ${'$'}PACKAGES"
+    dnf ${'$'}DNF_OPTS upgrade ${'$'}PACKAGES
+else
+    log "Applying full upgrade"
+    dnf ${'$'}DNF_OPTS upgrade
+    # Deliberately only on the full-upgrade path. Naming packages means the operator asked for a minimal,
+    # auditable change to one or two packages; autoremove is a whole-system operation, which is not a
+    # blast radius to take on while chasing a single CVE.
+    dnf -y autoremove
+fi""".removePrefix("\n")
+    }
 
-log "Waiting for liveness at $$localHealthUrl"
-healthy=0
-for i in $(seq 1 20); do
-    if curl -fsS -o /dev/null --max-time 5 "$$localHealthUrl"; then healthy=1; break; fi
-    sleep 3
-done
-if [ "$healthy" -ne 1 ]; then
-    err "Liveness endpoint $$localHealthUrl never returned success"
-    tail -n 100 /var/log/$$projectPrefix/server.log >&2 || true
-    exit 1
-fi
+    /** The `REBOOT_REQUIRED=` log line [instanceUpdateScript] ends with, for [distro]. */
+    // language="Shell Script"
+    private fun osUpdateRebootBreadcrumb(): String = when (distro) {
+        Distro.Ubuntu2404, Distro.Ubuntu2604 -> {
+            """
+        # Breadcrumb for the CloudWatch log; a reboot is needed to activate a patched kernel. Callers that
+        # act on it (update-fleet.sh) probe /var/run/reboot-required with their own SSM command rather than
+        # reading this back, because SSM truncates command output at 24,000 characters per stream and a
+        # full apt upgrade can push a trailing marker past that cap.
+        if [ -f /var/run/reboot-required ]; then log "REBOOT_REQUIRED=yes"; else log "REBOOT_REQUIRED=no"; fi""".trimIndent()
+        }
 
-# Breadcrumb for the CloudWatch log; a reboot is needed to activate a patched kernel. Callers that
-# act on it (update-fleet.sh) probe /var/run/reboot-required with their own SSM command rather than
-# reading this back, because SSM truncates command output at 24,000 characters per stream and a
-# full apt upgrade can push a trailing marker past that cap.
-if [ -f /var/run/reboot-required ]; then log "REBOOT_REQUIRED=yes"; else log "REBOOT_REQUIRED=no"; fi
-log "Done"
-UPDATE_EOF
-
-chmod +x /usr/local/bin/os-update
-echo "[INFO] Creating OS Emergency Update Script - DONE"
-"""
-        )
+        Distro.AmazonLinux2023 -> {
+            """
+        # Breadcrumb for the CloudWatch log; a reboot is needed to activate a patched kernel. Callers that
+        # act on it (update-fleet.sh) run their own reboot check over SSM rather than reading this back,
+        # because SSM truncates command output at 24,000 characters per stream and a full upgrade can push
+        # a trailing marker past that cap. needs-restarting exits 1 when a reboot is needed.
+        if dnf needs-restarting -r >/dev/null 2>&1; then log "REBOOT_REQUIRED=no"; else log "REBOOT_REQUIRED=yes"; fi""".trimIndent()
+        }
     }
 
     /**

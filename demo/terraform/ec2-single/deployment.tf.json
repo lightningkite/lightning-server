@@ -1,0 +1,349 @@
+{
+    "data": {
+        "external": {
+            "jar_hash": {
+                "program": [
+                    "bash",
+                    "-c",
+                    "f=$(ls \"${path.module}/../../build/distributions/server.zip\" | head -1) && hash=$(sha256sum \"$f\" | cut -d' ' -f1) && printf '{\"hash\":\"%s\",\"path\":\"%s\"}' \"$hash\" \"$f\""
+                ]
+            }
+        }
+    },
+    "resource": {
+        "aws_s3_bucket_public_access_block": {
+            "deployment": {
+                "bucket": "${aws_s3_bucket.deployment.id}",
+                "block_public_policy": true,
+                "block_public_acls": true,
+                "ignore_public_acls": true,
+                "restrict_public_buckets": true
+            }
+        },
+        "aws_s3_bucket_server_side_encryption_configuration": {
+            "deployment": {
+                "bucket": "${aws_s3_bucket.deployment.id}",
+                "rule": {
+                    "blocked_encryption_types": [
+                        "SSE-C"
+                    ],
+                    "apply_server_side_encryption_by_default": {
+                        "sse_algorithm": "AES256"
+                    }
+                }
+            }
+        },
+        "aws_s3_bucket_lifecycle_configuration": {
+            "deployment": {
+                "bucket": "${aws_s3_bucket.deployment.id}",
+                "depends_on": [
+                    "aws_s3_bucket_versioning.deployment"
+                ],
+                "rule": [
+                    {
+                        "id": "expire-noncurrent-versions",
+                        "noncurrent_version_expiration": {
+                            "noncurrent_days": 30
+                        },
+                        "status": "Enabled"
+                    },
+                    {
+                        "abort_incomplete_multipart_upload": {
+                            "days_after_initiation": 7
+                        },
+                        "id": "abort-incomplete-multipart-uploads",
+                        "status": "Enabled"
+                    }
+                ]
+            }
+        },
+        "aws_iam_role_policy_attachment": {
+            "ssm": {
+                "policy_arn": "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
+                "role": "${aws_iam_role.ec2.name}"
+            },
+            "servicesAccess": {
+                "policy_arn": "${aws_iam_policy.servicesAccess.arn}",
+                "role": "${aws_iam_role.ec2.name}"
+            },
+            "cloudwatch_agent": {
+                "policy_arn": "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy",
+                "role": "${aws_iam_role.ec2.name}"
+            }
+        },
+        "null_resource": {
+            "upload_jar": {
+                "provisioner": {
+                    "local-exec": {
+                        "command": "aws s3 cp \"${data.external.jar_hash.result.path}\" s3://${aws_s3_bucket.deployment.id}/server.zip --region us-west-2 --progress-frequency 1"
+                    }
+                },
+                "depends_on": [
+                    "aws_s3_bucket.deployment"
+                ],
+                "triggers": {
+                    "jar_hash": "${data.external.jar_hash.result.hash}"
+                }
+            },
+            "encrypt_settings": {
+                "provisioner": {
+                    "local-exec": {
+                        "environment": {
+                            "SETTINGS_PASS": "${random_password.settings.result}",
+                            "SETTINGS_JSON": "${jsonencode(local.settings_raw)}"
+                        },
+                        "interpreter": [
+                            "bash",
+                            "-c"
+                        ],
+                        "command": "printf '%s' \"$SETTINGS_JSON\" | openssl enc -aes-256-cbc -pbkdf2 -iter 10000 -md sha256 -out \"${path.module}/build/settings.enc\" -pass env:SETTINGS_PASS"
+                    }
+                },
+                "triggers": {
+                    "cipher": "-aes-256-cbc -pbkdf2 -iter 10000 -md sha256",
+                    "password_hash": "${sha256(random_password.settings.result)}",
+                    "settings_hash": "${sha256(jsonencode(local.settings_raw))}"
+                }
+            },
+            "upload_settings": {
+                "provisioner": {
+                    "local-exec": {
+                        "command": "aws s3 cp \"${path.module}/build/settings.enc\" s3://${aws_s3_bucket.deployment.id}/settings.enc --region us-west-2"
+                    }
+                },
+                "depends_on": [
+                    "null_resource.encrypt_settings",
+                    "aws_s3_bucket.deployment"
+                ],
+                "triggers": {
+                    "encrypted": "${null_resource.encrypt_settings.id}"
+                }
+            }
+        },
+        "aws_iam_policy": {
+            "servicesAccess": {
+                "path": "/ec2/demo/servicesAccess/",
+                "name": "ec2-demo-servicesAccess",
+                "description": "Access to Lightning Server EC2 Demo services",
+                "policy": "${jsonencode(local.servicesAccessPolicy)}"
+            }
+        },
+        "aws_ssm_parameter": {
+            "settings_password": {
+                "name": "/ec2-demo/settings-password",
+                "description": "AES-256 passphrase used to encrypt/decrypt the Lightning Server EC2 Demo settings bundle",
+                "type": "SecureString",
+                "value": "${random_password.settings.result}"
+            }
+        },
+        "aws_iam_role": {
+            "ec2": {
+                "name": "ec2-demo-ec2-role",
+                "assume_role_policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Action\":\"sts:AssumeRole\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"ec2.amazonaws.com\"}}]}"
+            }
+        },
+        "random_password": {
+            "settings": {
+                "special": true,
+                "length": 32,
+                "override_special": "-_"
+            }
+        },
+        "aws_s3_bucket_versioning": {
+            "deployment": {
+                "bucket": "${aws_s3_bucket.deployment.id}",
+                "versioning_configuration": {
+                    "status": "Enabled"
+                }
+            }
+        },
+        "aws_iam_instance_profile": {
+            "ec2": {
+                "role": "${aws_iam_role.ec2.name}",
+                "name": "ec2-demo-ec2-profile"
+            }
+        },
+        "aws_s3_bucket": {
+            "deployment": {
+                "force_destroy": true,
+                "bucket_prefix": "ec2-demo-deploy"
+            }
+        }
+    },
+    "locals": {
+        "settings_raw": {
+            "cache": "ram",
+            "cors": {
+                "limitToDomains": [
+                    "*"
+                ],
+                "limitToHeaders": [
+                    "*"
+                ],
+                "limitToMethods": [
+                    "*"
+                ],
+                "exposedHeaders": [
+                    "*"
+                ],
+                "allowCredentials": true,
+                "cacheLength": "PT5S",
+                "forbidOnMatchFail": false
+            },
+            "secretBasis": "${random_password.secretBasis.result}",
+            "ktorRunConfig": {
+                "host": "127.0.0.1",
+                "port": 8080,
+                "realIpHeader": "X-Forwarded-For"
+            },
+            "engine-cache": "ram",
+            "phoneCall": "test",
+            "githubOauth": {
+                "id": "",
+                "secret": ""
+            },
+            "engine-pubSub": "local",
+            "nettyRunConfig": {
+                "host": "127.0.0.1",
+                "port": 8080,
+                "realIpHeader": "X-Forwarded-For"
+            },
+            "general": {
+                "projectName": "Lightning Server EC2 Demo",
+                "publicUrl": "https://ec2-demo.cs.lightningkite.com",
+                "wsUrl": "wss://ec2-demo.cs.lightningkite.com",
+                "debug": true,
+                "emergencyContact": "joseph@lightningkite.com"
+            },
+            "database": "ram",
+            "emailInbound": "console",
+            "sms": "console",
+            "files": "s3://${aws_s3_bucket.files.bucket}.s3-${aws_s3_bucket.files.region}.amazonaws.com/?signedUrlDuration=1d",
+            "logging": {
+                "default": {
+                    "filePattern": null,
+                    "toConsole": true,
+                    "level": "INFO",
+                    "additive": false
+                },
+                "logger": {
+                    "org.mongodb": {
+                        "filePattern": null,
+                        "toConsole": true,
+                        "level": "WARN",
+                        "additive": false
+                    }
+                }
+            },
+            "telemetry": {
+                "url": "noop",
+                "batching": {
+                    "frequency": "PT5M",
+                    "maxQueueSize": 2048,
+                    "maxSize": 512,
+                    "exportTimeout": "PT30S"
+                },
+                "metricReportBatching": {
+                    "frequency": "PT5M",
+                    "maxQueueSize": 2048,
+                    "maxSize": 512,
+                    "exportTimeout": "PT30S"
+                },
+                "traceReportBatching": {
+                    "frequency": "PT5M",
+                    "maxQueueSize": 2048,
+                    "maxSize": 512,
+                    "exportTimeout": "PT30S"
+                },
+                "logReportBatching": {
+                    "frequency": "PT5M",
+                    "maxQueueSize": 20480,
+                    "maxSize": 5120,
+                    "exportTimeout": "PT30S"
+                },
+                "batchingLimits": {
+                    "frequency": "PT5M",
+                    "maxQueueSize": 2048,
+                    "maxSize": 512,
+                    "exportTimeout": "PT30S"
+                },
+                "spanLimits": {
+                    "maxAttributeValueLength": 1024,
+                    "maxNumberOfAttributes": 128,
+                    "maxNumberOfEvents": 128,
+                    "maxNumberOfLinks": 128,
+                    "maxNumberOfAttributesPerEvent": 32,
+                    "maxNumberOfAttributesPerLink": 32
+                },
+                "logLimits": {
+                    "maxBodyLength": 8192,
+                    "maxStackTraceDepth": 50
+                },
+                "sampling": null,
+                "maxSpansPerSecond": null,
+                "maxLogsPerSecond": null
+            },
+            "someSecret": "Some Value",
+            "voiceAgent": "test",
+            "smsInbound": "console",
+            "email": "console",
+            "notifications": "console",
+            "pubSub": "local"
+        },
+        "servicesAccessPolicy": {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Action": [
+                        "s3:ListBucket",
+                        "s3:GetBucketLocation"
+                    ],
+                    "Effect": "Allow",
+                    "Resource": [
+                        "${aws_s3_bucket.files.arn}"
+                    ]
+                },
+                {
+                    "Action": [
+                        "s3:GetObject",
+                        "s3:PutObject",
+                        "s3:DeleteObject"
+                    ],
+                    "Effect": "Allow",
+                    "Resource": [
+                        "${aws_s3_bucket.files.arn}/*"
+                    ]
+                },
+                {
+                    "Action": [
+                        "s3:GetObject"
+                    ],
+                    "Effect": "Allow",
+                    "Resource": [
+                        "${aws_s3_bucket.deployment.arn}/*"
+                    ]
+                },
+                {
+                    "Action": [
+                        "logs:CreateLogStream",
+                        "logs:PutLogEvents",
+                        "logs:DescribeLogStreams"
+                    ],
+                    "Effect": "Allow",
+                    "Resource": [
+                        "${aws_cloudwatch_log_group.application.arn}:*"
+                    ]
+                },
+                {
+                    "Action": [
+                        "ssm:GetParameter"
+                    ],
+                    "Effect": "Allow",
+                    "Resource": [
+                        "${aws_ssm_parameter.settings_password.arn}"
+                    ]
+                }
+            ]
+        }
+    }
+}
