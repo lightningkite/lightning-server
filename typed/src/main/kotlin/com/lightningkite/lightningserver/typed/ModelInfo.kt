@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.*
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.serializer
 
 public interface ModelInfo<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> {
     public val serializer: KSerializer<T>
@@ -24,7 +25,7 @@ public interface ModelInfo<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     }
 
     public val tableName: String
-        get() = serializer.descriptor.serialName.substringBefore('/').substringBefore('<').substringAfterLast('.')
+        get() = registration.tableDefinition.name
 
     public fun registerChangeListener(action: suspend context(ServerRuntime) (CollectionChanges<T>) -> Unit)
 
@@ -53,11 +54,13 @@ public interface ModelInfo<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<I
 
     context(server: ServerRuntime)
     public suspend fun table(auth: AuthAccess<SUBJECT>): Table<T>
+
     context(server: ServerRuntime)
     public suspend fun permissions(auth: AuthAccess<SUBJECT>): ModelPermissions<T>
 
     context(server: ServerRuntime)
     public suspend fun defaultItem(auth: Authentication<SUBJECT & Any>?): T = serializer.default()
+
     context(server: ServerRuntime)
     public fun exampleItem(): T? = null
 }
@@ -67,55 +70,26 @@ public inline fun <reified USER : HasId<*>?, reified T : HasId<ID>, reified ID :
     auth: AuthRequirement<USER>,
     tableName: String,
     subscope: Subscope? = Subscope(tableName.lowercase()),
-    crossinline signals: context(ServerRuntime) (Table<T>) -> Table<T> = { it },
-    crossinline log: context(ServerRuntime) AuthAccess<USER>?.(Table<T>) -> Table<T> = { it },
-    crossinline systemAccess: context(ServerRuntime) (Table<T>) -> Table<T> = { it },
+    noinline signals: context(ServerRuntime) (Table<T>) -> Table<T> = { it },
+    noinline log: context(ServerRuntime) AuthAccess<USER>?.(Table<T>) -> Table<T> = { it },
+    noinline systemAccess: context(ServerRuntime) (Table<T>) -> Table<T> = { it },
     noinline postPermissionsForUser: suspend context(ServerRuntime) AuthAccess<USER>.(Table<T>) -> Table<T> = { it },
-    crossinline permissions: suspend context(ServerRuntime) AuthAccess<USER>.() -> ModelPermissions<T>,
+    noinline permissions: suspend context(ServerRuntime) AuthAccess<USER>.() -> ModelPermissions<T>,
     noinline prePermissionsForUser: suspend context(ServerRuntime) AuthAccess<USER>.(Table<T>) -> Table<T> = { it },
-): ModelInfo<USER, T, ID> = object : ModelInfo<USER, T, ID> {
-    override val serializer: KSerializer<T> = serializerOrContextual<T>()
-    override val idSerializer: KSerializer<ID> = serializerOrContextual<ID>()
-
-    override val auth: AuthRequirement<USER> = subscope?.let { auth.subscope(it) } ?: auth
-
-    // registerTable defines the table, registers it, and creates its (once-per-deploy) prepare task.
-    override val registration: DatabaseTableRegistration<T> = this@modelInfo.registerTable(tableName, serializer)
-
-    @UnauditedDatabaseAccess
-    context(server: ServerRuntime)
-    override fun dangerouslyDirectTable(): Table<T> = registration()
-
-    context(server: ServerRuntime)
-    override fun baseTable(): Table<T> = log(null, registration())
-
-    override val tableName: String get() = tableName
-
-    val changeListeners = ArrayList<suspend context(ServerRuntime) (CollectionChanges<T>) -> Unit>()
-    override fun registerChangeListener(action: suspend context(ServerRuntime) (CollectionChanges<T>) -> Unit) {
-        changeListeners += action
-    }
-
-    context(server: ServerRuntime)
-    override suspend fun permissions(auth: AuthAccess<USER>): ModelPermissions<T> = permissions(auth)
-
-    // Built on the undecorated table on purpose: table() and table(auth) apply `log` themselves, and
-    // going through baseTable() here would decorate twice and record every query in duplicate.
-    @OptIn(UnauditedDatabaseAccess::class)
-    context(server: ServerRuntime)
-    fun collectionWithSignals() =
-        signals(dangerouslyDirectTable().withServerRuntimeChangeListeners(changeListeners))
-
-    context(server: ServerRuntime)
-    override suspend fun table(auth: AuthAccess<USER>): Table<T> = collectionWithSignals()
-        .let { log(auth, it) }
-        .let { postPermissionsForUser(auth, it) }
-        .withPermissions(permissions(auth))
-        .let { prePermissionsForUser(auth, it) }
-
-    context(server: ServerRuntime)
-    override fun table(): Table<T> = systemAccess(log(null, collectionWithSignals()))
-}
+): ModelInfo<USER, T, ID> =
+    explicitModelInfo(
+        auth = auth,
+        serializer = serializerOrContextual<T>(),
+        idSerializer = serializerOrContextual<ID>(),
+        tableName = tableName,
+        subscope = subscope,
+        signals = signals,
+        log = log,
+        systemAccess = systemAccess,
+        postPermissionsForUser = postPermissionsForUser,
+        permissions = permissions,
+        prePermissionsForUser = prePermissionsForUser
+    )
 
 
 context(builder: ServerBuilder)

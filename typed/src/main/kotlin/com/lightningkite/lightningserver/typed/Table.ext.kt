@@ -38,9 +38,17 @@ public suspend fun <Model : HasId<ID>, ID : Comparable<ID>> Table<Model>.getOrFo
         ?: throw ForbiddenException(message)
 }
 
+/**
+ * Retrieves the [Model] with [id], or throws an [IllegalStateException] with the provided [message] if not found.
+ * */
+public suspend fun <Model : HasId<ID>, ID : Comparable<ID>> Table<Model>.getOrThrow(
+    id: ID,
+    message: String = "${serializer.descriptor.serialName.substringAfterLast('.')} $id not recognized",
+): Model =
+    get(id) ?: throw IllegalStateException(message)
 
-public context(server: ServerRuntime)
-fun <Model : HasId<ID>, ID : Comparable<ID>> Table<Model>.withServerRuntimeChangeListeners(
+context(server: ServerRuntime)
+public fun <Model : HasId<ID>, ID : Comparable<ID>> Table<Model>.withServerRuntimeChangeListeners(
     changeListeners: List<suspend context(ServerRuntime) (CollectionChanges<Model>) -> Unit>,
 ): Table<Model> = object : Table<Model> by this@withServerRuntimeChangeListeners {
     override val wraps = this@withServerRuntimeChangeListeners
