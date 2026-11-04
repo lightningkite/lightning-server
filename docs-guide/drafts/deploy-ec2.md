@@ -43,7 +43,7 @@ The module provides two concrete builders:
 
 | Class | Use case |
 |---|---|
-| `TerraformAwsSingleEc2Builder` | One instance, Elastic IP, Angie reverse proxy with Let's Encrypt. Simplest / cheapest; no HA. |
+| `TerraformAwsSingleEc2Builder` | One instance, Elastic IP, nginx reverse proxy with Let's Encrypt. Simplest / cheapest; no HA. |
 | `TerraformAwsScalingEc2Builder` | Auto Scaling Group behind an Application Load Balancer, golden AMI via EC2 Image Builder. Production-grade HA. |
 
 The rest of this page covers both.  Most properties are shared via
@@ -273,7 +273,7 @@ diff and applies only what changed.
 
 | Resource | Purpose |
 |---|---|
-| `aws_instance.ubuntu` | Ubuntu 24.04 EC2 instance |
+| `aws_instance.main` | EC2 instance running the configured `distro` (Ubuntu 24.04 by default) |
 | `aws_eip.main` | Elastic IP (static public address) |
 | `aws_s3_bucket.deployment` | Holds the distribution zip and encrypted settings |
 | `aws_iam_role.ec2` | EC2 instance role (S3, SSM, CloudWatch) |
@@ -283,7 +283,7 @@ diff and applies only what changed.
 | `aws_sns_topic.emergency` | Alert notifications to `emergencyContact` |
 | CloudWatch alarms | System status check, high CPU, high memory, high disk |
 
-The instance runs **Angie** (nginx fork) as a reverse proxy on port 443 with
+The instance runs **nginx** (with `nginx-module-acme`) as a reverse proxy on port 443 with
 automatic Let's Encrypt certificate issuance and renewal.  The application
 listens on `127.0.0.1:8080` (not exposed publicly).
 

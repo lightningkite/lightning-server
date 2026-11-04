@@ -1,0 +1,26 @@
+{
+    "resource": {
+        "null_resource": {
+            "redeploy_app": {
+                "provisioner": {
+                    "local-exec": {
+                        "command": "bash ${path.module}/redeploy.sh ${aws_instance.main.id} us-west-2"
+                    }
+                },
+                "depends_on": [
+                    "null_resource.upload_jar",
+                    "null_resource.upload_settings",
+                    "aws_instance.main",
+                    "aws_iam_role_policy_attachment.ssm",
+                    "aws_iam_role_policy_attachment.servicesAccess",
+                    "aws_eip_association.main",
+                    "aws_ssm_parameter.settings_password"
+                ],
+                "triggers": {
+                    "settings_upload": "${null_resource.upload_settings.id}",
+                    "jar_hash": "${data.external.jar_hash.result.hash}"
+                }
+            }
+        }
+    }
+}

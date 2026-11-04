@@ -338,9 +338,9 @@ Set `"realIpHeader": "X-Forwarded-For"` in `settings.json` under the engine's
 config key so Lightning Server logs the client's real IP rather than
 `127.0.0.1`.
 
-The `deploy-aws-ec2` module uses **Angie** (an nginx fork with a built-in ACME
-client) for the same role on single-instance EC2 deployments, so TLS
-certificates are issued and renewed automatically without Certbot.
+The `deploy-aws-ec2` module uses nginx with its `nginx-module-acme` module for
+the same role on single-instance EC2 deployments, so TLS certificates are issued
+and renewed automatically without Certbot.
 
 ---
 
