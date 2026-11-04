@@ -67,8 +67,7 @@ class JwtTokenFormatTest {
             hasher = RuntimeDeferred.Cached { basis.HS256("jwt-test") },
             expiration = expiration,
             issuer = Runtime { "https://test.example.com" },
-            audience = Runtime { "https://test.example.com" },
-            keyId = "jwt-test"
+            audience = Runtime { "https://test.example.com" }
         )
     }
 
@@ -150,8 +149,7 @@ class JwtTokenFormatTest {
                 hasher = RuntimeDeferred.Cached { testBasis.HS256("jwt-test") },
                 expiration = (-1).seconds, // Already expired
                 issuer = Runtime { "https://test.example.com" },
-                audience = Runtime { "https://test.example.com" },
-                keyId = "jwt-test"
+                audience = Runtime { "https://test.example.com" }
             )
 
             val expiredToken = expiredFormat.create(TestUser, auth)
@@ -168,16 +166,14 @@ class JwtTokenFormatTest {
                 hasher = RuntimeDeferred.Cached { testBasis.HS256("jwt-test") },
                 expiration = 5.minutes,
                 issuer = Runtime { "https://test.example.com" },
-                audience = Runtime { "https://test.example.com" },
-                keyId = "jwt-test"
+                audience = Runtime { "https://test.example.com" }
             )
 
             val hs384Format = JwtTokenFormat(
                 hasher = RuntimeDeferred.Cached { testBasis.HS384("jwt-test") },
                 expiration = 5.minutes,
                 issuer = Runtime { "https://test.example.com" },
-                audience = Runtime { "https://test.example.com" },
-                keyId = "jwt-test"
+                audience = Runtime { "https://test.example.com" }
             )
 
             val userId = Uuid.random()
@@ -265,16 +261,14 @@ class JwtTokenFormatTest {
                 hasher = RuntimeDeferred.Cached { testBasis.HS256("jwt-test") },
                 expiration = 5.minutes,
                 issuer = Runtime { "https://app1.example.com" },
-                audience = Runtime { "https://app1.example.com" },
-                keyId = "jwt-test"
+                audience = Runtime { "https://app1.example.com" }
             )
 
             val format2 = JwtTokenFormat(
                 hasher = RuntimeDeferred.Cached { testBasis.HS256("jwt-test") },
                 expiration = 5.minutes,
                 issuer = Runtime { "https://app2.example.com" },
-                audience = Runtime { "https://app2.example.com" },
-                keyId = "jwt-test"
+                audience = Runtime { "https://app2.example.com" }
             )
 
             val userId = Uuid.random()
@@ -299,8 +293,7 @@ class JwtTokenFormatTest {
             val issuer2 = JwtTokenFormat(
                 hasher = RuntimeDeferred.Cached { testBasis.HS256("jwt-test") },
                 issuer = Runtime { "https://other.example.com" },
-                audience = Runtime { "https://test.example.com" },
-                keyId = "jwt-test"
+                audience = Runtime { "https://test.example.com" }
             )
 
             val token = issuer2.create(
@@ -365,16 +358,14 @@ class JwtTokenFormatTest {
                 hasher = RuntimeDeferred.Cached { basis1.HS256("jwt") },
                 expiration = 5.minutes,
                 issuer = Runtime { "https://test.example.com" },
-                audience = Runtime { "https://test.example.com" },
-                keyId = "jwt-test"
+                audience = Runtime { "https://test.example.com" }
             )
 
             val format2 = JwtTokenFormat(
                 hasher = RuntimeDeferred.Cached { basis2.HS256("jwt") },
                 expiration = 5.minutes,
                 issuer = Runtime { "https://test.example.com" },
-                audience = Runtime { "https://test.example.com" },
-                keyId = "jwt-test"
+                audience = Runtime { "https://test.example.com" }
             )
 
             val userId = Uuid.random()
@@ -495,7 +486,7 @@ class JwtTokenFormatTest {
     }
 
     @Test
-    fun `token header carries the keyId as kid`() = runBlocking {
+    fun `token header carries the principal name as prn`() = runBlocking {
         TestServer.test({}) {
             val token = createJwtFormat().create(
                 TestUser,
@@ -504,39 +495,37 @@ class JwtTokenFormatTest {
             val header = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
                 .decode(token.substringBefore('.'))
                 .decodeToString()
-            assertTrue(header.contains("\"kid\":\"jwt-test\""), "Header should name the key: $header")
+            assertTrue(header.contains("\"prn\":\"TestUser\""), "Header should name the principal: $header")
         }
     }
 
     @Test
-    fun `token with a different keyId is ignored`() = runBlocking {
+    fun `another principal's token is ignored even with a different signing key`() = runBlocking {
         TestServer.test({}) {
-            // Same signing key, so only the kid tells them apart, as with one format per principal.
             val users = createJwtFormat()
-            val admins = JwtTokenFormat(
-                hasher = RuntimeDeferred.Cached { testBasis.HS256("jwt-test") },
+            val others = JwtTokenFormat(
+                hasher = RuntimeDeferred.Cached { testBasis.HS256("jwt-other") },
                 issuer = Runtime { "https://test.example.com" },
                 audience = Runtime { "https://test.example.com" },
-                keyId = "jwt-admin"
             )
 
-            val token = admins.create(
-                TestUser,
-                Authentication(principalType = TestUser, id = Uuid.random(), sessionId = null)
+            val token = others.create(
+                OtherUser,
+                Authentication(principalType = OtherUser, id = Uuid.random(), sessionId = null)
             )
 
             assertNull(users.read(TestUser, token))
-            assertNotNull(admins.read(TestUser, token))
+            assertNotNull(others.read(OtherUser, token))
         }
     }
 
     @Test
-    fun `token without a kid is ignored`() = runBlocking {
+    fun `token without a prn is ignored`() = runBlocking {
         TestServer.test({}) {
             val encoder = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
-            // A JWT in the shape minted before keyId existed.
+            // A JWT in the shape minted before prn existed.
             val header = encoder.encode("""{"typ":"JWT","alg":"HS256"}""".encodeToByteArray())
-            val payload = encoder.encode("""{"sub":"TestUser|\"${Uuid.random()}\"","exp":9999999999}""".encodeToByteArray())
+            val payload = encoder.encode("""{"sub":"\"${Uuid.random()}\"","exp":9999999999}""".encodeToByteArray())
             val signature = encoder.encode(testBasis.HS256("jwt-test").sign("$header.$payload".encodeToByteArray()))
 
             assertNull(createJwtFormat().read(TestUser, "$header.$payload.$signature"))
@@ -547,7 +536,7 @@ class JwtTokenFormatTest {
     fun `correctly signed token with malformed claims throws JwtFormatException`() = runBlocking {
         TestServer.test({}) {
             val encoder = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
-            val header = encoder.encode("""{"typ":"JWT","alg":"HS256","kid":"jwt-test"}""".encodeToByteArray())
+            val header = encoder.encode("""{"typ":"JWT","alg":"HS256","prn":"TestUser"}""".encodeToByteArray())
             val payload = encoder.encode("not json".encodeToByteArray())
             val signature = encoder.encode(testBasis.HS256("jwt-test").sign("$header.$payload".encodeToByteArray()))
 

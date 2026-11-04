@@ -316,12 +316,12 @@ By default, sessions use compact encrypted tokens. For JWT:
 val userAuth = object : SessionManager<User, Uuid>(
     principal = userPrincipal,
     database = database,
-    tokenFormat = Runtime { JwtTokenFormat(keyId = "User") }
+    tokenFormat = Runtime { JwtTokenFormat() }
 ) { /* ... */ }
 ```
 
-`keyId` is written to each token's `kid` header, and a `JwtTokenFormat` ignores tokens whose `kid` is not its own, so
-give every JWT format in a server a distinct `keyId` (the principal's name works). The token's `iat` claim is when the
+Each token's `prn` header is the principal's name, and a `JwtTokenFormat` ignores tokens whose `prn` is another
+principal's, so JWT formats for different principals can share a server. The token's `iat` claim is when the
 access token was minted, and `siat` is when the user authenticated (used by `maxAge` requirements).
 
 ### Authentication Requirements

@@ -7,21 +7,18 @@ import kotlinx.serialization.Serializable
 public data class JwtHeader(
     val typ: String = "JWT",
     val alg: String,
-    val kid: String,
+    val prn: String,
 )
 
 @Serializable
 public data class JwtClaims(
     val iss: String? = null,
-    val sub: String? = null,
+    val sub: String,
     val aud: String? = null,
     val exp: Long,
     val nbf: Long? = null,
     val iat: Long, // The token issue time
-    val jti: String? = null,
-    val userId: String? = null,
-    val scope: String? = null,
-    val thp: String? = null,
+    val scope: String,
     val sid: String? = null,
     val siat: Long, // The Session issue time.
     val cache: String? = null,

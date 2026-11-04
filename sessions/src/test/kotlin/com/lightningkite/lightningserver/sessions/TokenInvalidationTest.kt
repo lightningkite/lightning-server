@@ -144,7 +144,6 @@ class TokenInvalidationTest {
                 hasher = RuntimeDeferred.Cached { basis.HS256("jwt") },
                 issuer = Runtime { "https://test.example.com" },
                 audience = Runtime { "https://test.example.com" },
-                keyId = "InvalidationUser",
             )
         }
     }

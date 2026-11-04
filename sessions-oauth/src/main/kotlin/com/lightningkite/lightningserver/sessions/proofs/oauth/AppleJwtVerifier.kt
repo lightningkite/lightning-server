@@ -5,19 +5,36 @@ import com.lightningkite.lightningserver.encryption.Signer
 import com.lightningkite.lightningserver.encryption.verify
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
-import com.lightningkite.lightningserver.sessions.token.*
+import com.lightningkite.lightningserver.sessions.token.JwtSignatureException
 import com.lightningkite.services.http.client
 import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.algorithms.RSA
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 import dev.whyoleg.cryptography.algorithms.SHA256 as CryptoSHA256
+
+/**
+ * The claims of a Sign in with Apple `id_token` that [AppleJwtVerifier] reads.
+ *
+ * [email] may be `null` on logins after the first.
+ */
+@Serializable
+public data class AppleIdTokenClaims(
+    val iss: String,
+    val aud: String,
+    val exp: Long,
+    val nbf: Long? = null,
+    val sub: String,
+    val email: String? = null,
+    // Claude: Apple sends this as either a boolean or the string "true"; the lenient Json accepts both.
+    val email_verified: Boolean = false,
+)
 
 /**
  * Verifies Apple ID tokens (JWTs) with proper signature validation.
@@ -47,6 +64,9 @@ public object AppleJwtVerifier {
         ignoreUnknownKeys = true
         isLenient = true
     }
+
+    @Serializable
+    private data class AppleJwtHeader(val alg: String, val kid: String)
 
     @Serializable
     private data class AppleJwks(
@@ -95,7 +115,7 @@ public object AppleJwtVerifier {
      *
      * @param idToken The JWT id_token from Apple's OAuth response
      * @param expectedAudience The expected audience (your app's client ID)
-     * @return The verified JWT claims
+     * @return The verified ID token claims
      * @throws JwtSignatureException if signature verification fails
      * @throws BadRequestException if token is malformed or validation fails
      */
@@ -104,7 +124,7 @@ public object AppleJwtVerifier {
     public suspend fun verifyAppleIdToken(
         idToken: String,
         expectedAudience: String,
-    ): JwtClaims {
+    ): AppleIdTokenClaims {
         val decoder = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
 
         // Parse JWT parts
@@ -113,11 +133,8 @@ public object AppleJwtVerifier {
             throw BadRequestException("Invalid JWT format: expected 3 parts, got ${parts.size}")
         }
 
-        val headerJson = decoder.decode(parts[0]).decodeToString()
-        val header = json.decodeFromString<JwtHeader>(headerJson)
-
-        val claimsJson = decoder.decode(parts[1]).decodeToString()
-        val claims = json.decodeFromString<JwtClaims>(claimsJson)
+        val header = json.decodeFromString<AppleJwtHeader>(decoder.decode(parts[0]).decodeToString())
+        val claims = json.decodeFromString<AppleIdTokenClaims>(decoder.decode(parts[1]).decodeToString())
 
         val signature = decoder.decode(parts[2])
 
@@ -152,14 +169,8 @@ public object AppleJwtVerifier {
         // Fetch Apple's public keys
         val appleKeys = getApplePublicKeys()
 
-        // Find the key that matches the kid in the header
-        // Note: JWT kid is in the header, not typ
-        val kid = (json.parseToJsonElement(headerJson) as? JsonObject)
-            ?.get("kid")?.let { (it as JsonPrimitive).content }
-            ?: throw BadRequestException("Missing 'kid' in JWT header")
-
-        val signer = appleKeys[kid]
-            ?: throw JwtSignatureException("No matching public key found for kid: $kid")
+        val signer = appleKeys[header.kid]
+            ?: throw JwtSignatureException("No matching public key found for kid: ${header.kid}")
 
         // Verify signature using the public key
         val signatureInput = "${parts[0]}.${parts[1]}".encodeToByteArray()
