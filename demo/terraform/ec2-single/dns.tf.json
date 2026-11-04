@@ -1,0 +1,31 @@
+{
+    "data": {
+        "aws_route53_zone": {
+            "main": {
+                "name": "cs.lightningkite.com"
+            }
+        }
+    },
+    "resource": {
+        "aws_route53_record": {
+            "main": {
+                "zone_id": "${data.aws_route53_zone.main.zone_id}",
+                "records": [
+                    "${aws_eip.main.public_ip}"
+                ],
+                "name": "ec2-demo.cs.lightningkite.com",
+                "type": "A",
+                "ttl": 300
+            },
+            "main_v6": {
+                "zone_id": "${data.aws_route53_zone.main.zone_id}",
+                "records": [
+                    "${aws_instance.main.ipv6_addresses[0]}"
+                ],
+                "name": "ec2-demo.cs.lightningkite.com",
+                "type": "AAAA",
+                "ttl": 300
+            }
+        }
+    }
+}

@@ -7,6 +7,8 @@ package com.lightningkite.lightningserver.demo
 
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.demo.endpoints.AuthExamplesEndpoints
+import com.lightningkite.lightningserver.demo.endpoints.UserEndpoints
+import com.lightningkite.lightningserver.demo.models.email
 import com.lightningkite.lightningserver.runtime.test.TestRunner
 import com.lightningkite.lightningserver.runtime.test.testBlocking
 import com.lightningkite.lightningserver.sessions.proofs.FinishProof
@@ -66,12 +68,12 @@ class LoginFlowTest {
 
         // 5. UserAuth.fetchByProperty creates the User row on first login - verify it landed.
         val user = assertNotNull(
-            Server.userInfo.table().findOne(condition { it.email eq address }),
+            UserEndpoints.info.table().findOne(condition { it.email eq address }),
             "logging in for the first time should have created the user",
         )
 
         // 6. The session actually authenticates - call an auth-gated endpoint with it.
-        val auth = Authentication(Server.UserAuth, id = user._id, sessionId = null)
+        val auth = Authentication(UserAuth, id = user._id, sessionId = null)
         val whoAmI = AuthExamplesEndpoints.whoAmI.test(auth, Unit)
         assertEquals(user._id, whoAmI.id)
         assertEquals(address, whoAmI.email)
@@ -123,7 +125,7 @@ class LoginFlowTest {
 
         assertEquals(
             1,
-            Server.userInfo.table().count(condition { it.email eq address }),
+            UserEndpoints.info.table().count(condition { it.email eq address }),
             "the second login should reuse the user created by the first",
         )
     }

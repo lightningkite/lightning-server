@@ -92,9 +92,9 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
     // === SSH access (optional, for debugging) ===
 
     // sshAllowed with the related IP enabling is what will allow an ssh connection.
-    public open val sshAllowedV4CIDR: List<String> =
+    public open val sshAllowedV4CIDR: List<String> get() =
         emptyList() // Example: 0.0.0.0/0, would allow everyone in the world to attempt to ssh in
-    public open val sshAllowedV6CIDR: List<String> =
+    public open val sshAllowedV6CIDR: List<String> get() =
         emptyList() // Example: ::/0, would allow everyone in the world to attempt to ssh in
 
 

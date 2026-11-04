@@ -1,0 +1,8 @@
+{
+    "output": {
+        "application_url": {
+            "description": "Application URL",
+            "value": "https://ec2-demo.cs.lightningkite.com"
+        }
+    }
+}

@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.engine.local.engineCache
 import com.lightningkite.lightningserver.engine.local.enginePubSub
 import com.lightningkite.lightningserver.terraform.*
+import com.lightningkite.services.Untested
 import com.lightningkite.services.data.DataSize
 import com.lightningkite.services.data.DataSize.Companion.mebibytes
 import com.lightningkite.services.data.EmailAddress
@@ -152,6 +153,7 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
         Ubuntu2404,
 
         /** Ubuntu 26.04 LTS (Resolute). */
+        @Untested
         Ubuntu2604,
 
         /**
@@ -261,11 +263,11 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
     public open val swapSwappiness: Int get() = 10
 
     /** Max body size for any request. */
-    public open val maxBodySize: DataSize = 10.mebibytes
+    public open val maxBodySize: DataSize get() = 10.mebibytes
 
     /** IP Stack Configuration. */
-    public open val enableIPv4: Boolean = true
-    public open val enableIPv6: Boolean = true
+    public open val enableIPv4: Boolean get() = true
+    public open val enableIPv6: Boolean get() = true
 
     // === Logging Configuration ===
 
@@ -275,7 +277,7 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
     // === Customization Hooks ===
 
     /** Additional packages to install on EC2 instances, named as [distro]'s package manager knows them. */
-    public open val additionalPackages: List<String> = emptyList()
+    public open val additionalPackages: List<String> get() = emptyList()
 
     public enum class JavaVersion(public val outputString: String) {
         V_8("8"),
@@ -322,7 +324,7 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
     protected val projectLogName: String get() = "$projectPrefix-main-log"
 
     /** Additional systemd environment variables. */
-    public open val systemdEnvironment: Map<String, String> = emptyMap()
+    public open val systemdEnvironment: Map<String, String> get() = emptyMap()
 
     public enum class FileType {
         Config,
@@ -354,12 +356,12 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
     /**
      * List of raw Bash scripts to be used in the setup script.
      * */
-    public open val customInstallScriptsRaw: List<String> = emptyList()
+    public open val customInstallScriptsRaw: List<String> get() = emptyList()
 
     /**
      * List of shell files to be used in the setup script.
      * */
-    public open val customInstallScripts: List<KFile> = emptyList()
+    public open val customInstallScripts: List<KFile> get() = emptyList()
 
     /**
      * Shell fragments run during instance provisioning — in the cloud-init `user_data` for the
