@@ -29,26 +29,23 @@ public class RefreshDenoEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparab
     private val info: ModelInfoWithDeno<USER, T, ID>
 ) : ServerBuilder() {
     context(_: ServerRuntime)
-    private suspend fun <Ref : HasId<RID>, RID : Comparable<RID>> Denormalization<T, Ref, RID>.modification(
+    private suspend fun <Ref : HasId<RID>, RID : Comparable<RID>> Denormalization.RequiredRef<T, Ref, RID>.modification(
         model: T
-    ): Modification<T> = when (val deno = this) {
-        is Denormalization.OptionalRef<T, Ref, RID> -> {
-            val ref = deno.reference.get(model)
-            val referenced = ref?.let { deno.info.table().getOrThrow(it) }
-            val mod = deno.denormalize(referenced)
+    ): Modification<T> = setDenormalizations(info.table().getOrThrow(reference.get(model)))
 
-            if (mod(model) == model) Modification.Nothing()
-            else mod
+    context(_: ServerRuntime)
+    private suspend fun <Ref : HasId<RID>, RID : Comparable<RID>> Denormalization.OptionalRef<T, Ref, RID>.modification(
+        model: T
+    ): Modification<T> = setDenormalizations(reference.get(model)?.let { info.table().getOrThrow(it) })
+
+    context(_: ServerRuntime)
+    private suspend fun refresh(model: T): Modification<T> = Modification.Chain(info.denormalizations.map { deno ->
+        val mod = when (deno) {
+            is Denormalization.RequiredRef<T, *, *> -> deno.modification(model)
+            is Denormalization.OptionalRef<T, *, *> -> deno.modification(model)
         }
-
-        is Denormalization.RequiredRef<T, Ref, RID> -> {
-            val referenced = deno.info.table().getOrThrow(deno.reference.get(model))
-            val mod = deno.denormalize(referenced)
-
-            if (mod(model) == model) Modification.Nothing()
-            else mod
-        }
-    }
+        if (mod(model) == model) Modification.Nothing() else mod
+    })
 
     public val refreshDetail: ApiHttpHandler<PathSpec1<ID>, HasId<*>, Unit, Modification<T>> =
         path.arg(PathSpec.Segment.Wildcard("id", info.idSerializer)).post bind explicitApiHttpHandler(
@@ -59,7 +56,7 @@ public class RefreshDenoEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparab
             auth = AuthRequirement.IsAdmin,
             implementation = {
                 val model = info.table().getOrNotFound(request.arg1)
-                val mod = Modification.Chain(info.denormalizations.map { it.modification(model) })
+                val mod = refresh(model)
                 if (!mod.isNothing) info.baseTableWithDenormalizations().updateOneByIdIgnoringResult(model._id, mod)
                 mod
             }
@@ -73,7 +70,7 @@ public class RefreshDenoEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparab
         // The write pass runs after the read finishes so updates never race the cursor feeding them.
         val mods = LinkedHashMap<ID, Modification<T>>()
         info.table().all().collect { model ->
-            val mod = Modification.Chain(info.denormalizations.map { it.modification(model) })
+            val mod = refresh(model)
             if (!mod.isNothing) mods[model._id] = mod
         }
 

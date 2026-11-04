@@ -39,7 +39,7 @@ public class DenormalizationBuilder<Model : Any> {
         public val info: ModelInfo<*, Referenced, RID>,
     ) {
         private val list =
-            ArrayList<Denormalization.Calculation<Referenced, suspend context(ServerRuntime) (Referenced) -> Modification<Model>>>()
+            ArrayList<Denormalization.Calculation<Model, Referenced, Referenced>>()
 
         /**
          * Low-level method to register a dependency-based calculation.
@@ -161,7 +161,7 @@ public class DenormalizationBuilder<Model : Any> {
         public val reference: Optic<Model, RID?>,
         public val info: ModelInfo<*, Referenced, RID>,
     ) {
-        private val list: ArrayList<Denormalization.Calculation<Referenced, suspend context(ServerRuntime) (Referenced?) -> Modification<Model>>> =
+        private val list: ArrayList<Denormalization.Calculation<Model, Referenced, Referenced?>> =
             ArrayList()
 
         /**
@@ -224,7 +224,7 @@ public class DenormalizationBuilder<Model : Any> {
     }
 
     @PublishedApi
-    internal val denormalizations: ArrayList<Denormalization<Model, *, *>> = ArrayList()
+    internal val denormalizations: ArrayList<Denormalization<Model, *, *, *>> = ArrayList()
 
     /**
      * Register a required (non-nullable) reference denormalization.

@@ -27,7 +27,7 @@ import kotlinx.serialization.KSerializer
 import java.util.concurrent.atomic.AtomicBoolean
 
 public interface ModelInfoWithDeno<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> : ModelInfo<USER, T, ID> {
-    public val denormalizations: List<Denormalization<T, *, *>>
+    public val denormalizations: List<Denormalization<T, *, *, *>>
 
     /**
      * Returns [baseTable] with this model's [denormalizations] applied, so a write that changes a reference also
@@ -142,7 +142,7 @@ public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> Runtime<Databa
         prePermissionsForUser = prePermissionsForUser,
     )
     val modelInfo = object : ModelInfoWithDeno<USER, T, ID>, ModelInfo<USER, T, ID> by info {
-        override val denormalizations: List<Denormalization<T, *, *>> by built
+        override val denormalizations: List<Denormalization<T, *, *, *>> by built
 
         context(server: ServerRuntime)
         override fun baseTableWithDenormalizations(): Table<T> = baseTable().applyDenormalizations(built.value)
@@ -154,7 +154,11 @@ public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> Runtime<Databa
             // Claude: listeners live on the ModelInfo, which can outlive the engine, so a second engine in the same process (as in tests) must not add them again.
             if (!listening.compareAndSet(false, true)) return@StartupTask
             for (d in modelInfo.denormalizations) {
-                if (d.watchesReferencedModel) d.listenForDenormalizations { modelInfo.baseTableWithDenormalizations() }
+                if (!d.watchesReferencedModel) continue
+                when (d) {
+                    is Denormalization.RequiredRef<T, *, *> -> d.listenForDenormalizations { modelInfo.baseTableWithDenormalizations() }
+                    is Denormalization.OptionalRef<T, *, *> -> d.listenForDenormalizations { modelInfo.baseTableWithDenormalizations() }
+                }
             }
         }
     }
@@ -162,7 +166,7 @@ public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> Runtime<Databa
 }
 
 context(_: ServerRuntime)
-private fun <T : Any> Table<T>.applyDenormalizations(denormalizations: List<Denormalization<T, *, *>>): Table<T> =
+private fun <T : Any> Table<T>.applyDenormalizations(denormalizations: List<Denormalization<T, *, *, *>>): Table<T> =
     // Claude: foldRight so the first declared denormalization intercepts first; later ones read the references it sets.
     denormalizations.foldRight(this) { deno, table ->
         when (deno) {
@@ -171,39 +175,27 @@ private fun <T : Any> Table<T>.applyDenormalizations(denormalizations: List<Deno
         }
     }
 
-private fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>> Denormalization<Model, Ref, RID>.listenForDenormalizations(
+private fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>> Denormalization.RequiredRef<Model, Ref, RID>.listenForDenormalizations(
     table: context(ServerRuntime) () -> Table<Model>,
 ) {
     info.registerChangeListener { changes ->
         for ((old, new) in changes.changes) {
-            if (old != null) updateReferencing(table(), old, new)
+            if (old == null || new == null) continue
+            val mod = updateDenormalizations(old, new)
+            if (!mod.isNothing) table().updateManyIgnoringResult(reference.mapCondition(Condition.Equal(old._id)), mod)
         }
     }
 }
 
-context(_: ServerRuntime)
-private suspend fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>> Denormalization<Model, Ref, RID>.updateReferencing(
-    table: Table<Model>,
-    old: Ref,
-    new: Ref?,
+private fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>> Denormalization.OptionalRef<Model, Ref, RID>.listenForDenormalizations(
+    table: context(ServerRuntime) () -> Table<Model>,
 ) {
-    when (this) {
-        is Denormalization.RequiredRef<Model, Ref, RID> -> {
-            if (new == null) return
-            val mod = denormalize(old, new)
-            if (mod.isNothing) return
-            table.updateManyIgnoringResult(reference.mapCondition(Condition.Equal(old._id)), mod)
-        }
-
-        is Denormalization.OptionalRef<Model, Ref, RID> -> {
-            val mod = denormalize(old, new)
-            val removeRef =
-                if (new == null) reference.mapModification(   // model is deleted, remove reference
-                    Modification.Assign(null)
-                )
-                else null
-
-            if (!mod.isNothing || removeRef != null) table.updateManyIgnoringResult(
+    info.registerChangeListener { changes ->
+        for ((old, new) in changes.changes) {
+            if (old == null) continue
+            val mod = updateDenormalizations(old, new)
+            val removeRef = if (new == null) reference.mapModification(Modification.Assign(null)) else null
+            if (!mod.isNothing || removeRef != null) table().updateManyIgnoringResult(
                 reference.mapCondition(Condition.Equal(old._id)),
                 Modification.Chain(listOfNotNull(removeRef, mod))
             )
@@ -221,11 +213,11 @@ private fun <Model : Any, Referenced : HasId<RID>, RID : Comparable<RID>> Table<
 ): Table<Model> = this
     .interceptCreate { model ->
         val reference = deno.info.table().getOrBadRequest(deno.reference.get(model))
-        deno.denormalize(reference).invoke(model)
+        deno.setDenormalizations(reference).invoke(model)
     }
     .interceptReplace { model ->
         val reference = deno.info.table().getOrBadRequest(deno.reference.get(model))
-        deno.denormalize(reference).invoke(model)
+        deno.setDenormalizations(reference).invoke(model)
     }
     .interceptModification { incomingMod ->
         var updatedMod = incomingMod
@@ -242,7 +234,7 @@ private fun <Model : Any, Referenced : HasId<RID>, RID : Comparable<RID>> Table<
         if (newReference != null) {
             val source = deno.info.table().getOrBadRequest(newReference)
             updatedMod = Modification.Chain(
-                listOf(incomingMod, deno.denormalize(source))
+                listOf(incomingMod, deno.setDenormalizations(source))
             )
         }
         updatedMod
@@ -258,11 +250,11 @@ private fun <Model : Any, Referenced : HasId<RID>, RID : Comparable<RID>> Table<
 ): Table<Model> = this
     .interceptCreate { model ->
         val reference = deno.reference.get(model)?.let { deno.info.table().getOrBadRequest(it) }
-        deno.denormalize(reference).invoke(model)
+        deno.setDenormalizations(reference).invoke(model)
     }
     .interceptReplace { model ->
         val reference = deno.reference.get(model)?.let { deno.info.table().getOrBadRequest(it) }
-        deno.denormalize(reference).invoke(model)
+        deno.setDenormalizations(reference).invoke(model)
     }
     .interceptModification { incomingMod ->
         var updatedMod = incomingMod
@@ -281,7 +273,7 @@ private fun <Model : Any, Referenced : HasId<RID>, RID : Comparable<RID>> Table<
         if (changed) {
             val source = newReference?.let { deno.info.table().getOrBadRequest(it) }
             updatedMod = Modification.Chain(
-                listOf(incomingMod, deno.denormalize(source))
+                listOf(incomingMod, deno.setDenormalizations(source))
             )
         }
         updatedMod
