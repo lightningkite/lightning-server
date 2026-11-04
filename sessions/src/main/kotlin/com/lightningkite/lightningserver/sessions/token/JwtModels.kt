@@ -2,8 +2,13 @@ package com.lightningkite.lightningserver.sessions.token
 
 import kotlinx.serialization.Serializable
 
+
 @Serializable
-public data class JwtHeader(val typ: String = "JWT", val alg: String = "HS256")
+public data class JwtHeader(
+    val typ: String = "JWT",
+    val alg: String,
+    val kid: String,
+)
 
 @Serializable
 public data class JwtClaims(
@@ -12,12 +17,13 @@ public data class JwtClaims(
     val aud: String? = null,
     val exp: Long,
     val nbf: Long? = null,
-    val iat: Long = System.currentTimeMillis() / 1000L,
+    val iat: Long, // The token issue time
     val jti: String? = null,
     val userId: String? = null,
     val scope: String? = null,
     val thp: String? = null,
     val sid: String? = null,
+    val siat: Long, // The Session issue time.
     val cache: String? = null,
 )
 

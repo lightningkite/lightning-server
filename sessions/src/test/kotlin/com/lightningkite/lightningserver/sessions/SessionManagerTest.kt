@@ -1,27 +1,22 @@
 // by Claude
 package com.lightningkite.lightningserver.sessions
 
-import com.lightningkite.lightningserver.ForbiddenException
-import com.lightningkite.lightningserver.UnauthorizedException
-import com.lightningkite.lightningserver.HttpMethod
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
+import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
-import com.lightningkite.lightningserver.plainText
-import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.handle
-import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.runtime.test.test
-import ch.qos.logback.classic.Level
-import ch.qos.logback.classic.Logger
-import ch.qos.logback.classic.spi.ILoggingEvent
-import ch.qos.logback.core.read.ListAppender
-import org.slf4j.LoggerFactory
 import com.lightningkite.lightningserver.sessions.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.typed.ModelRestEndpoints
 import com.lightningkite.lightningserver.typed.test
+import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
@@ -29,13 +24,12 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import org.junit.Test
+import org.slf4j.LoggerFactory
 import kotlin.test.*
-import kotlin.time.Duration
-import kotlin.time.Clock
+import kotlin.time.*
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
-import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -66,13 +60,15 @@ class SessionManagerTest {
 
     class TestSessionManager(
         database: Runtime<Database>,
+        cache: Runtime<Cache>,
         private val expirationDuration: Duration? = 30.days,
         private val staleDuration: Duration? = 7.days,
         private val allowedScopes: (SessionTestUser) -> Set<GrantedScope> = { setOf(GrantedScope.root) },
     ) : SessionManager<SessionTestUser, Uuid>(
         principal = SessionTestUser,
         database = database,
-        tokenFormat = Runtime { PrivateTinyTokenFormat() }
+        tokenFormat = Runtime { PrivateTinyTokenFormat() },
+        cache = cache,
     ) {
         context(server: ServerRuntime)
         override suspend fun sessionExpiration(subject: SessionTestUser): Instant? =
@@ -97,8 +93,9 @@ class SessionManagerTest {
 
         object : ServerBuilder() {
             val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
 
-            val sessions = path.path("auth") include TestSessionManager(database = database)
+            val sessions = path.path("auth") include TestSessionManager(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
                 // Create a new session
@@ -131,10 +128,13 @@ class SessionManagerTest {
 
         object : ServerBuilder() {
             val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
 
-            init { install(AccessLogInterceptor()) }
+            init {
+                install(AccessLogInterceptor())
+            }
 
-            val sessions = path.path("auth") include TestSessionManager(database = database)
+            val sessions = path.path("auth") include TestSessionManager(database = database, cache = cache)
             val ping = path.path("ping").get bind HttpHandler<PathSpec0> { HttpResponse.plainText("pong") }
         }.let { server ->
             server.test({}) {
@@ -148,19 +148,17 @@ class SessionManagerTest {
                 logbackLogger.level = Level.INFO
                 logbackLogger.addAppender(appender)
                 try {
-                    runBlocking {
-                        serverRuntime.handle(
-                            HttpRequest<PathSpec>(
-                                path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
-                                queryParameters = QueryParameters.EMPTY,
-                                headers = HttpHeaders { add(HttpHeader.Authorization, "Bearer $accessToken") },
-                                domain = "example.com",
-                                protocol = "https",
-                                sourceIp = "local",
-                                requestId = generateRequestId(),
-                            )
+                    serverRuntime.handle(
+                        HttpRequest<PathSpec>(
+                            path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
+                            queryParameters = QueryParameters.EMPTY,
+                            headers = HttpHeaders { add(HttpHeader.Authorization, "Bearer $accessToken") },
+                            domain = "example.com",
+                            protocol = "https",
+                            sourceIp = "local",
+                            requestId = generateRequestId(),
                         )
-                    }
+                    )
                 } finally {
                     logbackLogger.detachAppender(appender)
                 }
@@ -184,8 +182,9 @@ class SessionManagerTest {
 
         object : ServerBuilder() {
             val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
 
-            val sessions = path.path("auth") include TestSessionManager(database = database)
+            val sessions = path.path("auth") include TestSessionManager(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
                 // Create a new session
@@ -209,8 +208,9 @@ class SessionManagerTest {
 
         object : ServerBuilder() {
             val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
 
-            val sessions = path.path("auth") include TestSessionManager(database = database)
+            val sessions = path.path("auth") include TestSessionManager(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
                 // Try with invalid refresh token
@@ -230,8 +230,9 @@ class SessionManagerTest {
 
         object : ServerBuilder() {
             val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
 
-            val sessions = path.path("auth") include TestSessionManager(database = database)
+            val sessions = path.path("auth") include TestSessionManager(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
                 val (_, refreshToken) = server.sessions.newSession(userId)
@@ -253,8 +254,9 @@ class SessionManagerTest {
 
         object : ServerBuilder() {
             val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
 
-            val sessions = path.path("auth") include TestSessionManager(database = database)
+            val sessions = path.path("auth") include TestSessionManager(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
                 // Create a new session
@@ -280,8 +282,9 @@ class SessionManagerTest {
 
         object : ServerBuilder() {
             val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
 
-            val sessions = path.path("auth") include TestSessionManager(database = database)
+            val sessions = path.path("auth") include TestSessionManager(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
                 val limitedScopes = setOf(GrantedScope("api:read"))
@@ -306,8 +309,9 @@ class SessionManagerTest {
 
         object : ServerBuilder() {
             val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
 
-            val sessions = path.path("auth") include TestSessionManager(database = database)
+            val sessions = path.path("auth") include TestSessionManager(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
                 val (session, _) = server.sessions.newSession(
@@ -329,8 +333,9 @@ class SessionManagerTest {
 
         object : ServerBuilder() {
             val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
 
-            val sessions = path.path("auth") include TestSessionManager(database = database)
+            val sessions = path.path("auth") include TestSessionManager(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
                 // Create parent session
@@ -356,8 +361,9 @@ class SessionManagerTest {
 
         object : ServerBuilder() {
             val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
 
-            val sessions = path.path("auth") include TestSessionManager(database = database)
+            val sessions = path.path("auth") include TestSessionManager(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
                 // Create parent session
@@ -375,8 +381,9 @@ class SessionManagerTest {
 
         object : ServerBuilder() {
             val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
 
-            val sessions = path.path("auth") include TestSessionManager(database = database)
+            val sessions = path.path("auth") include TestSessionManager(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
                 // Create multiple sessions
@@ -406,8 +413,9 @@ class SessionManagerTest {
 
         object : ServerBuilder() {
             val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
 
-            val sessions = path.path("auth") include TestSessionManager(database = database)
+            val sessions = path.path("auth") include TestSessionManager(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
                 val (session, refreshToken) = server.sessions.newSession(userId)
@@ -430,8 +438,9 @@ class SessionManagerTest {
 
         object : ServerBuilder() {
             val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
 
-            val sessions = path.path("auth") include TestSessionManager(database = database)
+            val sessions = path.path("auth") include TestSessionManager(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
                 val (session, refreshToken) = server.sessions.newSession(userId)
@@ -455,10 +464,15 @@ class SessionManagerTest {
 
         object : ServerBuilder() {
             val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
 
-            val sessions = path.path("auth") include TestSessionManager(database = database)
+            val sessions = path.path("auth") include TestSessionManager(database = database, cache = cache)
         }.let { server ->
-            server.test({}, clock = { object : Clock { override fun now() = time } }) {
+            server.test({}, clock = {
+                object : Clock {
+                    override fun now() = time
+                }
+            }) {
                 val (parent, _) = server.sessions.newSession(userId)
                 time += 1.hours
 
@@ -479,7 +493,8 @@ class SessionManagerTest {
     @Test
     fun `legacy stored session without authenticatedAt is treated as authenticated at createdAt`() = runBlocking {
         val createdAt = Instant.parse("2024-01-01T00:00:00Z")
-        val json = """{"secretHash":"x","subjectId":"${Uuid.random()}","createdAt":"$createdAt","lastUsed":"$createdAt"}"""
+        val json =
+            """{"secretHash":"x","subjectId":"${Uuid.random()}","createdAt":"$createdAt","lastUsed":"$createdAt"}"""
         val session = Json.decodeFromString(
             Session.serializer(SessionTestUser.serializer(), Uuid.serializer()),
             json
@@ -487,11 +502,12 @@ class SessionManagerTest {
 
         object : ServerBuilder() {
             val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
 
-            val sessions = path.path("auth") include TestSessionManager(database = database)
+            val sessions = path.path("auth") include TestSessionManager(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
-                assertEquals(createdAt, with(server.sessions) { session.toAuth() }.issuedAt)
+                assertEquals(createdAt, with(server.sessions) { session.toAuth() }.sessionIssuedAt)
             }
         }
     }
@@ -504,8 +520,9 @@ class SessionManagerTest {
 
         object : ServerBuilder() {
             val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
 
-            val sessions = path.path("auth") include TestSessionManager(database = database)
+            val sessions = path.path("auth") include TestSessionManager(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
                 val (parent, _) = server.sessions.newSession(userId)
@@ -550,8 +567,9 @@ class SessionManagerTest {
             }
 
             val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
 
-            val sessions = path.path("auth") include TestSessionManager(database = database)
+            val sessions = path.path("auth") include TestSessionManager(database = database, cache = cache)
             val rest = path.path("sessions") include ModelRestEndpoints(sessions.sessionInfo)
         }.let { server ->
             server.test({}) {
@@ -588,8 +606,9 @@ class SessionManagerTest {
 
         object : ServerBuilder() {
             val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
 
-            val sessions = path.path("auth") include TestSessionManager(database = database)
+            val sessions = path.path("auth") include TestSessionManager(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
                 val (parent, _) = server.sessions.newSession(userId)
@@ -611,8 +630,9 @@ class SessionManagerTest {
 
         object : ServerBuilder() {
             val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
 
-            val sessions = path.path("auth") include TestSessionManager(database = database)
+            val sessions = path.path("auth") include TestSessionManager(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
                 val (parent, _) = server.sessions.newSession(userId, scopes = setOf(GrantedScope("auth:sessions")))
@@ -648,9 +668,11 @@ class SessionManagerTest {
 
         object : ServerBuilder() {
             val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
 
             val sessions = path.path("auth") include TestSessionManager(
                 database = database,
+                cache = cache,
                 allowedScopes = { if (mfaEstablished) setOf(GrantedScope.root) else setupOnly },
             )
         }.let { server ->
@@ -664,7 +686,10 @@ class SessionManagerTest {
 
                 mfaEstablished = true
                 val full = server.sessions.tokenSimple.test(null, refreshToken.string)
-                assertEquals(setOf(GrantedScope.root), server.sessions.tokenFormat().read(SessionTestUser, full)!!.scopes)
+                assertEquals(
+                    setOf(GrantedScope.root),
+                    server.sessions.tokenFormat().read(SessionTestUser, full)!!.scopes
+                )
             }
         }
     }
@@ -678,9 +703,11 @@ class SessionManagerTest {
 
         object : ServerBuilder() {
             val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
 
             val sessions = path.path("auth") include TestSessionManager(
                 database = database,
+                cache = cache,
                 allowedScopes = { setupOnly },
             )
         }.let { server ->
@@ -710,9 +737,11 @@ class SessionManagerTest {
 
         object : ServerBuilder() {
             val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
 
             val sessions = path.path("auth") include TestSessionManager(
                 database = database,
+                cache = cache,
                 allowedScopes = { setOf(GrantedScope("api"), GrantedScope("admin:read")) },
             )
         }.let { server ->
@@ -741,8 +770,9 @@ class SessionManagerTest {
 
         object : ServerBuilder() {
             val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
 
-            val sessions = path.path("auth") include TestSessionManager(database = database)
+            val sessions = path.path("auth") include TestSessionManager(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
                 val (_, refreshToken) = server.sessions.newSession(userId)
@@ -778,8 +808,9 @@ class SessionManagerTest {
 
         object : ServerBuilder() {
             val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
 
-            val sessions = path.path("auth") include TestSessionManager(database = database)
+            val sessions = path.path("auth") include TestSessionManager(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
                 val (_, refreshToken) = server.sessions.newSession(userId)
@@ -802,8 +833,9 @@ class SessionManagerTest {
 
         object : ServerBuilder() {
             val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
 
-            val sessions = path.path("auth") include TestSessionManager(database = database)
+            val sessions = path.path("auth") include TestSessionManager(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
                 val (target, targetRefresh) = server.sessions.newSession(ownerId)
@@ -835,8 +867,9 @@ class SessionManagerTest {
 
         object : ServerBuilder() {
             val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
 
-            val sessions = path.path("auth") include TestSessionManager(database = database)
+            val sessions = path.path("auth") include TestSessionManager(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
                 SessionTestUser.fetchCount = 0

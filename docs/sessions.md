@@ -251,6 +251,41 @@ authEndpoints.terminateSession()
 authEndpoints.terminateSession(sessionId)
 ```
 
+### Revoking Access Tokens
+
+Access tokens are self-contained, so by default a terminated session's access tokens stay valid until they expire
+(5 minutes for the built-in formats). To reject them immediately, turn on `tokenInvalidationChecks`:
+
+```kotlin
+val auth = object : AuthEndpoints<User, Uuid>(
+    principal = UserPrincipal,
+    database = database,
+    cache = cache,
+    tokenInvalidationChecks = true,
+) { /* ... */ }
+```
+
+With it on:
+
+- Terminating or deleting a session through the session table also rejects the live access tokens of that session
+  and of every session derived from it.
+- `invalidateSession(sessionId)` rejects a session's current access tokens but keeps the session. The client's next
+  refresh gets a new, valid token, so use it after changing what a session or user may do.
+- `invalidateSubject(userId)` does the same for every session of one user.
+
+```kotlin
+// e.g. after removing a user's admin role
+auth.invalidateSubject(user._id)
+```
+
+Each invalidation rejects tokens minted before the call and is kept in the cache for one token lifetime. Every request
+authenticated with an access token then reads the cache once or twice, and fails if the cache is unavailable.
+JWT mint times are whole seconds, so a JWT minted in the same second as an invalidation, just after it, is also
+rejected. The client gets a 401 and refreshes again.
+
+A `SessionManager` used directly takes the same `cache` and `tokenInvalidationChecks` parameters; `cache` is optional
+when the checks are off.
+
 ## Security Considerations
 
 1. **Always use HTTPS** - Authentication credentials must be transmitted securely
@@ -275,15 +310,19 @@ val pinHandler = PinHandler(
 
 ### Token Format
 
-By default, sessions use compact signed tokens. For JWT:
+By default, sessions use compact encrypted tokens. For JWT:
 
 ```kotlin
 val userAuth = object : SessionManager<User, Uuid>(
     principal = userPrincipal,
     database = database,
-    tokenFormat = Runtime { JwtTokenFormat(secretBasis()) }
+    tokenFormat = Runtime { JwtTokenFormat(keyId = "User") }
 ) { /* ... */ }
 ```
+
+`keyId` is written to each token's `kid` header, and a `JwtTokenFormat` ignores tokens whose `kid` is not its own, so
+give every JWT format in a server a distinct `keyId` (the principal's name works). The token's `iat` claim is when the
+access token was minted, and `siat` is when the user authenticated (used by `maxAge` requirements).
 
 ### Authentication Requirements
 

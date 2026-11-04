@@ -14,9 +14,11 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.sessions.token.*
 import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.services.cache.*
 import com.lightningkite.services.database.*
 import dev.whyoleg.cryptography.random.CryptographyRandom
 import io.opentelemetry.api.trace.Span
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.builtins.serializer
 import kotlin.io.encoding.Base64
@@ -84,16 +86,41 @@ import kotlin.uuid.Uuid
  * - Sub-sessions cannot have broader permissions than their parent
  * - Terminated sessions are marked but not deleted for audit trail
  *
+ * ## Access Token Invalidation
+ *
+ * Access tokens are self-contained, so by default terminating a session doesn't affect access tokens already minted
+ * from it; they stay valid until they expire (5 minutes for the built-in formats). Set `tokenInvalidationChecks = true`
+ * (which requires a cache) to revoke them early:
+ *
+ * - Terminating or deleting a session through the session table rejects the live access tokens of that session and
+ *   of every session derived from it.
+ * - [invalidateSession] rejects a session's current access tokens without ending the session; the client can refresh
+ *   to get a new one (e.g. after changing the session's permissions).
+ * - [invalidateSubject] does the same for every session of one subject.
+ *
+ * Each rejects tokens minted before the call. Invalidations are stored in the cache for one token lifetime, and every
+ * request authenticated by an access token then costs one or two cache reads. If the cache can't be read, the
+ * request fails rather than skipping the check.
+ *
+ * JWTs record their mint time in whole seconds, so a JWT minted in the same second as an invalidation, just after
+ * it, is also rejected. The client gets a 401 and has to refresh again.
+ *
  * @param SUBJECT The type of the authenticated entity (e.g., User, ServiceAccount)
  * @param ID The type of the subject's identifier (e.g., Uuid, String, Long)
  * @param principal The PrincipalType that defines how subjects are identified and authorized
  * @param database Runtime provider for the database where sessions are stored
  * @param tokenFormat Runtime provider for the token encoding/decoding strategy (defaults to PrivateTinyTokenFormat)
+ * @param cache Runtime provider for the cache that stores access token invalidations. Required when
+ *   [tokenInvalidationChecks] is true.
+ * @param tokenInvalidationChecks Whether access tokens can be revoked before they expire. See
+ *   "Access Token Invalidation" above.
  */
 public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     public val principal: PrincipalType<SUBJECT, ID>,
     database: Runtime<Database>,
     public val tokenFormat: Runtime<TokenFormat> = Runtime { PrivateTinyTokenFormat() },
+    private val cache: Runtime<Cache>? = null,
+    public val tokenInvalidationChecks: Boolean = false,
 ) : ServerBuilder(), Authentication.Reader<SUBJECT> {
     public object Scopes {
         public val self: RequiredScope = RequiredScope("auth:self")
@@ -102,10 +129,9 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     }
 
     init {
+        if (tokenInvalidationChecks && cache == null)
+            throw IllegalArgumentException("cache is required when tokenInvalidationChecks = true")
         register(principal)
-    }
-
-    init {
         authReaders.register(this)
     }
 
@@ -188,12 +214,22 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             tableName = principal.name + "Session",
             // Covers every way a session ends, including a superuser's REST update or delete.
             signals = { table ->
-                table
-                    .postChange { old, new ->
-                        if (old.terminated == null && new.terminated != null)
-                            terminateDerivedFrom(new._id)
+                table.postRawChanges { changes ->
+                    val ended = changes.mapNotNull { change ->
+                        val old = change.old ?: return@mapNotNull null
+                        val new = change.new
+                        if (old.terminated == null && (new == null || new.terminated != null)) old else null
                     }
-                    .postDelete { terminateDerivedFrom(it._id) }
+                    if (ended.isEmpty()) return@postRawChanges
+                    terminateDerivedFrom(ended.map { it._id })
+                    try {
+                        if (tokenInvalidationChecks) invalidateSessionsWithLiveTokens(ended)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        logger.error(e) { "Failed to post session invalidations to the cache" }
+                    }
+                }
             },
             permissions = {
                 val auth = this.authOrNull
@@ -217,6 +253,17 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 )
             }
         )
+
+    private fun sessionInvalidationCacheKey(sessionId: Uuid) = "invalid-session:$sessionId"
+    private fun subjectInvalidationCacheKey(subjectType: String, subjectId: ID) =
+        "invalid-subject:$subjectType:$subjectId"
+
+    context(server: ServerRuntime)
+    private suspend fun isTokenInvalidated(key: String, auth: Authentication<SUBJECT>): Boolean {
+        val time = cache!!().get<Instant>(key) ?: return false
+        return time > (auth.tokenIssuedAt ?: return true)
+    }
+
 
     /**
      * Reads authentication from an HTTP request.
@@ -256,6 +303,25 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         try {
             return tokenFormat().read(principal, token)
                 ?.also { auth ->
+
+                    // A way to invalidate access tokens but not expire a session
+                    if (tokenInvalidationChecks &&
+                        coroutineScope {
+                            listOfNotNull(
+                                auth.sessionId
+                                    ?.let(Uuid::parseOrNull)
+                                    ?.let { sessionId ->
+                                        async { isTokenInvalidated(sessionInvalidationCacheKey(sessionId), auth) }
+                                    },
+                                async { isTokenInvalidated(subjectInvalidationCacheKey(principal.name, auth.id), auth) }
+                            )
+                        }
+                            .awaitAll()
+                            .any { it }
+                    ) {
+                        throw UnauthorizedException("Invalid access token")
+                    }
+
                     val span = Span.current()
                     auth.sessionId?.let { span.setAttribute("session.id", it) }
                     span.setAttribute("user.id", auth.id.toString())
@@ -270,6 +336,49 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                     }
         } catch (e: TokenException) {
             throw UnauthorizedException(e.message ?: "JWT issue")
+        }
+    }
+
+    /**
+     * Rejects every access token minted from the session [sessionId] before now, without ending the session. Its
+     * refresh token keeps working, so the client can get a new access token.
+     *
+     * Requires [tokenInvalidationChecks]; otherwise this only logs a warning.
+     */
+    context(server: ServerRuntime)
+    public suspend fun invalidateSession(sessionId: Uuid) {
+        if (tokenInvalidationChecks) {
+            cache!!().set(sessionInvalidationCacheKey(sessionId), now(), tokenFormat().expiration)
+        } else {
+            logger.warn { "SessionManager invalidateSession was called but tokenInvalidationChecks is false" }
+        }
+    }
+
+    // An access token is only minted by [tokenSimple], which goes through [session] and sets lastUsed first. A session
+    // last used more than one token lifetime ago therefore has no live access token and needs no cache entry.
+    context(server: ServerRuntime)
+    private suspend fun invalidateSessionsWithLiveTokens(sessions: List<Session<SUBJECT, ID>>) {
+        val cutoff = now() - tokenFormat().expiration
+        sessions
+            .filter { it.lastUsed >= cutoff }
+            .chunked(INVALIDATION_CONCURRENCY)
+            .forEach { chunk ->
+                coroutineScope { chunk.map { async { invalidateSession(it._id) } }.awaitAll() }
+            }
+    }
+
+    /**
+     * Rejects every access token minted for the subject [subjectID] before now, across all of their sessions, without
+     * ending any session. Their refresh tokens keep working, so clients can get new access tokens.
+     *
+     * Requires [tokenInvalidationChecks]; otherwise this only logs a warning.
+     */
+    context(server: ServerRuntime)
+    public suspend fun invalidateSubject(subjectID: ID) {
+        if (tokenInvalidationChecks) {
+            cache!!().set(subjectInvalidationCacheKey(principal.name, subjectID), now(), tokenFormat().expiration)
+        } else {
+            logger.warn { "SessionManager invalidateSubject was called but tokenInvalidationChecks is false" }
         }
     }
 
@@ -344,7 +453,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         // Generate a cryptographically secure 24-byte random secret
         val secret = Base64.encode(CryptographyRandom.nextBytes(24))
 
-        if(!permitAuthentication(subject)){
+        if (!permitAuthentication(subject)) {
             throw ForbiddenException()
         }
 
@@ -404,7 +513,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             principalType = principal,
             id = subjectId,
             sessionId = _id,
-            issuedAt = authenticatedAt ?: createdAt,
+            sessionIssuedAt = authenticatedAt ?: createdAt,
             scopes = effectiveScopes,
             cache = SerializableCache().apply { set(principal.subjectCacheKey, subject) },
         )
@@ -419,15 +528,15 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         if (requireOwnershipOf != null && updated.new == null) throw ForbiddenException()
     }
 
-    // Collected breadth-first, then terminated in one update. Recursing level by level through the postChange hook
-    // overflows the stack on a long chain of sub-sessions when the database never suspends (RAM, JSON files).
-    // `seen` stops a derivedFrom cycle, which a superuser could create through the REST endpoints.
-    // The root is already terminated or deleted, so with no descendants there's nothing to update. That's also the
-    // case for each descendant when this update's postChange hook runs again for it.
+    // Collected breadth-first from every root at once, then terminated in one update. Recursing level by level
+    // through the change hook overflows the stack on a long chain of sub-sessions when the database never suspends
+    // (RAM, JSON files). `seen` stops a derivedFrom cycle, which a superuser could create through the REST endpoints.
+    // The roots are already terminated or deleted, so with no descendants there's nothing to update. That's also the
+    // case when this update's change hook runs again for the descendants, which is where their tokens are invalidated.
     context(server: ServerRuntime)
-    private suspend fun terminateDerivedFrom(root: Uuid) {
-        val seen = hashSetOf(root)
-        var parents = listOf(root)
+    private suspend fun terminateDerivedFrom(roots: Collection<Uuid>) {
+        val seen = roots.toHashSet()
+        var parents = roots.toList()
         while (parents.isNotEmpty()) {
             parents = sessionInfo.table()
                 .find((spath.derivedFrom inside parents) and (spath.terminated eq null))
@@ -436,7 +545,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 .filter { it !in seen }
             seen += parents
         }
-        seen -= root
+        seen -= roots.toSet()
         if (seen.isEmpty()) return
         sessionInfo.table().updateMany(
             (spath._id inside seen) and (spath.terminated eq null),
@@ -554,6 +663,8 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 val (session, subject) = RefreshToken(refresh).session(request)
                     ?: throw BadRequestException("Refresh token not recognized")
 
+                // This is the only place access tokens are minted, and [session] has just set lastUsed.
+                // invalidateSessionsWithLiveTokens relies on that; any new mint path must update lastUsed too.
                 tokenFormat().create(principal, session.toAuth(subject).apply { precache(principal.precache) })
             }
         )
@@ -722,6 +833,8 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 //        )
 //    }
 }
+
+private const val INVALIDATION_CONCURRENCY: Int = 100
 
 /*
  * TODO: SessionManager API Improvements and Recommendations
