@@ -14,6 +14,7 @@ import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCod
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.settings.setStatic
 import com.lightningkite.lightningserver.typed.ModelRestEndpoints
+import com.lightningkite.lightningserver.typed.denormalize.denormalizes
 import com.lightningkite.lightningserver.typed.modelInfo
 import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.services.data.Denormalized
@@ -411,4 +412,18 @@ data class DenoPerson(
 data class DenoJob(
     val city: Uuid,
     @Denormalized val cityName: String = "",
+)
+
+@Queryable
+data class VetRoot(
+    val name: String = "",
+    val inner: VetInner = VetInner(),
+    val maybe: VetInner? = null,
+    val tags: List<String> = listOf(),
+)
+
+@Queryable
+data class VetInner(
+    val value: Int = 0,
+    val label: String = "",
 )

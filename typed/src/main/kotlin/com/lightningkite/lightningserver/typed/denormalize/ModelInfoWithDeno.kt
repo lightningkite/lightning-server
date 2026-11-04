@@ -20,6 +20,7 @@ import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.ModelPermissions
 import com.lightningkite.services.database.Modification
+import com.lightningkite.services.database.vet
 import com.lightningkite.services.database.interceptCreate
 import com.lightningkite.services.database.interceptModification
 import com.lightningkite.services.database.interceptReplace
@@ -221,7 +222,7 @@ private fun <Model : Any, Referenced : HasId<RID>, RID : Comparable<RID>> Table<
     }
     .interceptModification { incomingMod ->
         var newReference: RID? = null
-        incomingMod.vetNullable(deno.reference) { if (it is Modification.Assign) newReference = it.value }
+        incomingMod.vet(deno.reference) { if (it is Modification.Assign) newReference = it.value }
         val id = newReference ?: return@interceptModification incomingMod
         Modification.Chain(listOf(incomingMod, deno.setDenormalizations(deno.info.table().getOrBadRequest(id))))
     }
@@ -246,7 +247,7 @@ private fun <Model : Any, Referenced : HasId<RID>, RID : Comparable<RID>> Table<
         var updatedMod = incomingMod
         var changed = false
         var newReference: RID? = null
-        incomingMod.vetNullable(deno.reference) {
+        incomingMod.vet(deno.reference) {
             when (it) {
                 is Modification.Assign -> {
                     changed = true
