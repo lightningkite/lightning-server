@@ -1,0 +1,27 @@
+{
+    "resource": {
+        "aws_elasticache_replication_group": {
+            "valkey": {
+                "node_type": "cache.t4g.micro",
+                "engine": "valkey",
+                "port": 6379,
+                "parameter_group_name": "default.valkey9",
+                "description": "Valkey cache for ec2-scaling-demo-valkey",
+                "num_cache_clusters": 1,
+                "replication_group_id": "ec2-scaling-demo-valkey",
+                "engine_version": "9.0",
+                "subnet_group_name": "${aws_elasticache_subnet_group.valkey.name}",
+                "automatic_failover_enabled": false,
+                "security_group_ids": [
+                    "${aws_security_group.internal.id}"
+                ]
+            }
+        },
+        "aws_elasticache_subnet_group": {
+            "valkey": {
+                "name": "ec2-scaling-demo-valkey",
+                "subnet_ids": "${module.vpc.private_subnets}"
+            }
+        }
+    }
+}

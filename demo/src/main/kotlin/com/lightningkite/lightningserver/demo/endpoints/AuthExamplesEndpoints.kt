@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.auth.or
 import com.lightningkite.lightningserver.auth.require
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.demo.Server
+import com.lightningkite.lightningserver.demo.UserAuth
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.auth
@@ -41,7 +42,7 @@ object AuthExamplesEndpoints : ServerBuilder() {
     val whoAmI = path.path("auth-examples").path("whoami").get bind ApiHttpHandler(
         summary = "Who Am I",
         description = "Reads the authenticated caller's identity from the session.",
-        auth = Server.UserAuth.require(),
+        auth = UserAuth.require(),
         implementation = { _: Unit ->
             val user = auth.fetch()
             WhoAmIResponse(id = auth.id, email = user.email, isSuperUser = user.isSuperUser)
@@ -57,7 +58,7 @@ object AuthExamplesEndpoints : ServerBuilder() {
     val greet = path.path("auth-examples").path("greet").get bind ApiHttpHandler(
         summary = "Greet",
         description = "Greets anonymous callers generically and logged-in callers by email.",
-        auth = Server.UserAuth.require() or AuthRequirement.None,
+        auth = UserAuth.require() or AuthRequirement.None,
         implementation = { _: Unit ->
             authOrNull?.fetch()?.let { "Welcome back, ${it.email}!" } ?: "Hello, anonymous visitor!"
         }
@@ -73,7 +74,7 @@ object AuthExamplesEndpoints : ServerBuilder() {
     val adminOnly = path.path("auth-examples").path("admin-only").get bind ApiHttpHandler(
         summary = "Admin Only",
         description = "Requires the caller's isSuperUser flag; returns 403 for everyone else.",
-        auth = Server.UserAuth.require(),
+        auth = UserAuth.require(),
         implementation = { _: Unit ->
             val user = auth.fetch()
             if (!user.isSuperUser) throw ForbiddenException("This endpoint requires super-user access.")

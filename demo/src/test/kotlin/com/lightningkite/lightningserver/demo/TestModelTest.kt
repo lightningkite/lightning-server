@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.demo
 
+import com.lightningkite.lightningserver.demo.models.*
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
