@@ -144,7 +144,7 @@ class AuthRequirementTest {
                 TestUser,
                 id = Uuid.random(),
                 sessionId = null,
-                issuedAt = oldTime,
+                sessionIssuedAt = oldTime,
                 scopes = setOf(GrantedScope.root)
             )
 
@@ -266,7 +266,7 @@ class AuthRequirementTest {
                 TestUser,
                 id = Uuid.random(),
                 sessionId = null,
-                issuedAt = oldTime,
+                sessionIssuedAt = oldTime,
                 scopes = setOf(GrantedScope.root)
             )
 

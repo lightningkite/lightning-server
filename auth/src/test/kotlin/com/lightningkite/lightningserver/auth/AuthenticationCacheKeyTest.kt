@@ -137,7 +137,7 @@ class AuthenticationCacheKeyTest {
     }
 
     @Test
-    fun `masquerade keeps the original issuedAt so maxAge still applies`() = runBlocking {
+    fun `masquerade keeps the original sessionIssuedAt so maxAge still applies`() = runBlocking {
         val adminId = Uuid.random()
         val targetId = Uuid.random()
         object : ServerBuilder() {
@@ -145,7 +145,13 @@ class AuthenticationCacheKeyTest {
                 register(CacheTestUser)
                 register(MasqueradeTarget)
                 authReaders.register(Authentication.Reader {
-                    Authentication(CacheTestUser, adminId, sessionId = null, issuedAt = Clock.System.now() - 1.hours)
+                    Authentication(
+                        CacheTestUser,
+                        adminId,
+                        sessionId = null,
+                        sessionIssuedAt = Clock.System.now() - 1.hours,
+                        tokenIssuedAt = Clock.System.now(),
+                    )
                 })
             }
         }.test({}) {
@@ -162,7 +168,12 @@ class AuthenticationCacheKeyTest {
                 )!!
 
                 assertEquals(targetId.toString(), masked.rawId)
-                assertIs<AuthRequirement.Result.Rejected>(AuthRequirement.Authenticated(maxAge = 10.minutes).check(masked))
+                // The masquerade wasn't minted as a token; the original's token time stays on fromMasquerade.
+                assertNull(masked.tokenIssuedAt)
+                assertNotNull(masked.fromMasquerade?.tokenIssuedAt)
+                assertIs<AuthRequirement.Result.Rejected>(
+                    AuthRequirement.Authenticated(maxAge = 10.minutes).check(masked)
+                )
             }
         }
     }
@@ -176,7 +187,7 @@ class AuthenticationCacheKeyTest {
                 register(CacheTestUser)
                 register(MasqueradeTarget)
                 authReaders.register(Authentication.Reader {
-                    Authentication(CacheTestUser, adminId, sessionId = null, issuedAt = Clock.System.now())
+                    Authentication(CacheTestUser, adminId, sessionId = null, sessionIssuedAt = Clock.System.now())
                 })
             }
         }.test({}) {

@@ -33,13 +33,15 @@ import kotlin.uuid.Uuid
  *
  * @param principal Defines the type of principal being authenticated and how to fetch it.
  * @param tokenFormat The format of generated session tokens.
+ * @param tokenInvalidationChecks Whether access tokens can be revoked before they expire; see [SessionManager]
  */
 public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     principal: PrincipalType<SUBJECT, ID>,
     database: Runtime<Database>,
     private val cache: Runtime<Cache>,
     tokenFormat: Runtime<TokenFormat> = Runtime { PrivateTinyTokenFormat() },
-) : SessionManager<SUBJECT, ID>(principal, database, tokenFormat) {
+    tokenInvalidationChecks: Boolean = false,
+) : SessionManager<SUBJECT, ID>(principal, database, tokenFormat, cache, tokenInvalidationChecks) {
     init {
         sdkSettings.defaultInfo = SdkModule.Info(principal.name + "Auth")
         sdkSettings.clientInterface =
