@@ -81,31 +81,5 @@ public sealed interface Denormalization<Model : Any, Referenced : HasId<RID>, RI
 
         override val listenForChanges: Boolean get() = calculations.any { it.dependencies.isNotEmpty() }
     }
-
-//    data class Chained<
-//        M : Any, R1 : HasId<R1_ID>, R1_ID : Comparable<R1_ID>,
-//        R2 : HasId<R2_ID>, R2_ID : Comparable<R2_ID>
-//    >(
-//        val first: Denormalization<M, R1, R1_ID>,
-//        val second: Denormalization<R1, R2, R2_ID>
-//    ) : Denormalization<M, R2, R2_ID> {
-//        override val info: ModelInfo<*, R2, R2_ID> get() = second.info
-//        override val listenForChanges: Boolean get() = first.listenForChanges || second.listenForChanges
-//
-//        context(_: ServerRuntime)
-//        suspend fun denormalize(old: R2, new: R2?): Modification<M> {
-//            when (second) {
-//                is Chained<R1, *, *, R2, R2_ID> -> TODO()
-//                is OptionalRef<*, *, *> -> TODO()
-//                is RequiredRef<*, *, *> -> TODO()
-//            }
-//        }
-//
-//        context(_: ServerRuntime)
-//        suspend fun denormalize(ref: Referenced?): Modification<Model> =
-//            Modification.Chain(
-//                calculations.map { it.calculation(ref) }
-//            )
-//    }
 }
 

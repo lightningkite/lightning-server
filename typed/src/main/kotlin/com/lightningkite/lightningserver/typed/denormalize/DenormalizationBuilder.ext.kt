@@ -9,7 +9,7 @@ import com.lightningkite.services.database.optics.Optic
 context(builder: DenormalizationBuilder<Model>)
 public inline fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>> Lens<Model, RID>.denormalizes(
     info: ModelInfo<*, Ref, RID>,
-    build: DenormalizationBuilder.RequiredRefBuilder<Model, Ref, RID>.(Optic<Ref, Ref>) -> Unit,
+    build: DenormalizationBuilder.RequiredRefBuilder<Model, Ref, RID>.(Lens<Ref, Ref>) -> Unit,
 ): Unit =
     builder.required(this, info, build)
 
@@ -23,6 +23,7 @@ public inline fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>> Optic<M
 
 context(builder: DenormalizationBuilder.RequiredRefBuilder<Model, Ref, RID>)
 public infix fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>, T> Optic<Model, in T>.bind(ref: Lens<Ref, out T>) {
+    requireMarkedDenormalized(this)
     builder.registerDenormalization(setOf(ref)) { reference ->
         this.mapModification(
             Modification.Assign(ref.get(reference))
@@ -32,6 +33,8 @@ public infix fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>, T> Optic
 
 context(builder: DenormalizationBuilder.RequiredRefBuilder<Model, Ref, RID>)
 public infix fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>, T> Optic<Model, in T>.set(ref: Lens<Ref, out T>) {
+    requireMarkedDenormalized(this)
+    requireSourceOfTruth(ref)
     builder.registerDenormalization(emptySet()) { reference ->
         this.mapModification(
             Modification.Assign(ref.get(reference))
@@ -41,6 +44,7 @@ public infix fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>, T> Optic
 
 context(builder: DenormalizationBuilder.OptionalRefBuilder<Model, Ref, RID>)
 public infix fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>, T> Optic<Model, in T?>.bind(ref: Optic<Ref, out T?>) {
+    requireMarkedDenormalized(this)
     builder.registerDenormalization(setOf(ref)) { reference ->
         this.mapModification(
             Modification.Assign(reference?.let(ref::get))
@@ -50,6 +54,8 @@ public infix fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>, T> Optic
 
 context(builder: DenormalizationBuilder.OptionalRefBuilder<Model, Ref, RID>)
 public infix fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>, T> Optic<Model, in T?>.set(ref: Optic<Ref, out T?>) {
+    requireMarkedDenormalized(this)
+    requireSourceOfTruth(ref)
     builder.registerDenormalization(emptySet()) { reference ->
         this.mapModification(
             Modification.Assign(reference?.let(ref::get))

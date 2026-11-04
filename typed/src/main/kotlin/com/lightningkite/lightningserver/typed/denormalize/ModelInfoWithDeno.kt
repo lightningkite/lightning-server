@@ -9,17 +9,25 @@ import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.Table
 import com.lightningkite.services.database.optics.IdentityLens
 import com.lightningkite.services.database.optics.Lens
-import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.typed.getOrBadRequest
 import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.Modification
 import com.lightningkite.services.database.interceptCreate
 import com.lightningkite.services.database.interceptModification
 import com.lightningkite.services.database.interceptReplace
-import com.lightningkite.services.database.vet
+import java.util.concurrent.atomic.AtomicBoolean
 
 public interface ModelInfoWithDeno<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> : ModelInfo<USER, T, ID> {
     public val denormalizations: List<Denormalization<T, *, *>>
+
+    /**
+     * Returns [baseTable] with this model's [denormalizations] applied, so a write that changes a reference also
+     * recalculates the fields denormalized from it.
+     *
+     * Like [baseTable], writes through this table skip permissions and signals.
+     */
+    context(server: ServerRuntime)
+    public fun baseTableWithDenormalizations(): Table<T>
 }
 
 /**
@@ -34,22 +42,30 @@ public interface ModelInfoWithDeno<USER : HasId<*>?, T : HasId<ID>, ID : Compara
  * - On modify: Detects reference changes and updates denormalized fields
  * - On referenced model change: Automatically updates all referencing models (if listenForChanges = true)
  *
+ * Denormalizations read from the source of truth only. Reading a field the referenced model marks `@Denormalized`
+ * throws when the denormalizations are built. To reach a model two references away, denormalize the intermediate
+ * reference onto this model and denormalize from that:
+ * ```kotlin
+ * a.b.denormalizes(B.info) { b -> a.c bind b.c }
+ * a.c.denormalizes(C.info) { c -> a.cName bind c.name }
+ * ```
+ *
+ * Fields written by `bind` or `set` must be marked `@Denormalized`.
+ *
  * Example:
  * ```kotlin
- * object AnnouncementEndpoints : ServerBuilder() {
- *     private val info = Server.database.modelInfoWithDeno(
- *         auth = UserAuth.require(),
- *         permissions = { permissions(auth) },
- *         denormalizations = { announcement ->
- *             announcement.course.denormalizes(Course.info) {
- *                 // Watch for changes - updates when Course.submitter.courseProvider changes
- *                 announcement.courseProvider assign it.submitter.courseProvider
+ * val announcementInfo = Server.database.modelInfo<User, Announcement, Announcement.ID>(
+ *     auth = UserAuth.require(),
+ *     tableName = "Announcement",
+ *     permissions = { permissions(auth) },
+ * ).withDenormalizations { announcement ->
+ *     announcement.course.denormalizes(CourseEndpoints.info) { course ->
+ *         // Kept in sync: updates whenever Course.providerName changes
+ *         announcement.courseProvider bind course.providerName
  *
- *                 // No change watching - only updates when announcement.course reference changes
- *                 announcement.courseTitle assignOnce it.title
- *             }
- *         }
- *     )
+ *         // Not watched: only updates when announcement.course changes
+ *         announcement.courseTitle set course.title
+ *     }
  * }
  * ```
  *
@@ -65,15 +81,26 @@ public fun <SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ModelInfo<S
     denormalizations: DenormalizationBuilder<T>.(Lens<T, T>) -> Unit,
 ): ModelInfoWithDeno<SUBJECT, T, ID> =
     object : ModelInfoWithDeno<SUBJECT, T, ID>, ModelInfo<SUBJECT, T, ID> by this@withDenormalizations {
-        override val denormalizations by lazy {  // lazy so that we don't run into initialization order issues when declaring modelInfo
+        override val denormalizations: List<Denormalization<T, *, *>> by lazy {  // lazy so that we don't run into initialization order issues when declaring modelInfo
             DenormalizationBuilder<T>().apply { denormalizations(IdentityLens(serializer)) }.denormalizations
         }
 
         context(server: ServerRuntime)
         private fun wrapWithDeno(table: Table<T>): Table<T> =
-            this.denormalizations.fold(table) { t, deno -> t.denormalize(deno) }
+            // Claude: foldRight so the first declared denormalization intercepts first; later ones read the references it sets.
+            this.denormalizations.foldRight(table) { deno, t ->
+                when (deno) {
+                    is Denormalization.RequiredRef<T, *, *> -> t.denormalizeImpl(deno)
+                    is Denormalization.OptionalRef<T, *, *> -> t.denormalizeNullableImpl(deno)
+                }
+            }
 
         private val wraps = this@withDenormalizations
+
+        context(server: ServerRuntime)
+        override fun baseTableWithDenormalizations(): Table<T> = wrapWithDeno(baseTable())
+
+        private val listening = AtomicBoolean(false)
 
         context(server: ServerRuntime)
         override suspend fun table(auth: AuthAccess<SUBJECT>): Table<T> = wrapWithDeno(wraps.table(auth))
@@ -85,65 +112,53 @@ public fun <SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ModelInfo<S
             val modelInfo = this
             with(builder) {
                 builder.path.path("$tableName-deno") bind StartupTask {
-                    modelInfo.denormalizations
-                        .filter { it.listenForChanges }
-                        .takeUnless { it.isEmpty() }
-                        ?.let { deno ->
-                            val table = Runtime { baseTable() }
-                            for (d in deno) d.listenForDenormalizations(table)
-                        }
+                    // Claude: listeners live on the ModelInfo, which can outlive the engine, so a second engine in the same process (as in tests) must not add them again.
+                    if (!listening.compareAndSet(false, true)) return@StartupTask
+                    for (d in modelInfo.denormalizations) {
+                        if (d.listenForChanges) d.listenForDenormalizations { modelInfo.baseTableWithDenormalizations() }
+                    }
                 }
             }
         }
     }
 
 
-context(runtime: ServerRuntime)
-private fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>> Table<Model>.denormalize(
-    calculation: Denormalization<Model, Ref, RID>,
-): Table<Model> = when (calculation) {
-    is Denormalization.RequiredRef<Model, Ref, RID> -> denormalizeImpl(calculation)
-    is Denormalization.OptionalRef<Model, Ref, RID> -> denormalizeNullableImpl(calculation)
+private fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>> Denormalization<Model, Ref, RID>.listenForDenormalizations(
+    table: context(ServerRuntime) () -> Table<Model>,
+) {
+    info.registerChangeListener { changes ->
+        for ((old, new) in changes.changes) {
+            if (old != null) updateReferencing(table(), old, new)
+        }
+    }
 }
 
-private fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>> Denormalization<Model, Ref, RID>.listenForDenormalizations(
-    table: Runtime<Table<Model>>,
+context(_: ServerRuntime)
+private suspend fun <Model : Any, Ref : HasId<RID>, RID : Comparable<RID>> Denormalization<Model, Ref, RID>.updateReferencing(
+    table: Table<Model>,
+    old: Ref,
+    new: Ref?,
 ) {
     when (this) {
-        is Denormalization.RequiredRef<Model, Ref, RID> -> info.registerChangeListener { changes ->
-            for ((old, new) in changes.changes) {
-                if (old == null || new == null) continue
-
-                val mod = denormalize(old, new)
-                if (mod.isNothing) continue
-
-                table().updateManyIgnoringResult(
-                    reference.mapCondition(Condition.Equal(old._id)),
-                    mod
-                )
-            }
+        is Denormalization.RequiredRef<Model, Ref, RID> -> {
+            if (new == null) return
+            val mod = denormalize(old, new)
+            if (mod.isNothing) return
+            table.updateManyIgnoringResult(reference.mapCondition(Condition.Equal(old._id)), mod)
         }
 
-        is Denormalization.OptionalRef<Model, Ref, RID> -> info.registerChangeListener { changes ->
-            for ((old, new) in changes.changes) {
-                if (old == null) continue
-
-                val mod = denormalize(old, new)
-                val removeRef =
-                    if (new == null) reference.mapModification(   // model is deleted, remove reference
-                        Modification.Assign(null)
-                    )
-                    else null
-
-                if (!mod.isNothing || removeRef != null) table().updateManyIgnoringResult(
-                    reference.mapCondition(
-                        Condition.Equal(new?._id ?: old._id)
-                    ),
-                    Modification.Chain(
-                        listOfNotNull(removeRef, mod)
-                    )
+        is Denormalization.OptionalRef<Model, Ref, RID> -> {
+            val mod = denormalize(old, new)
+            val removeRef =
+                if (new == null) reference.mapModification(   // model is deleted, remove reference
+                    Modification.Assign(null)
                 )
-            }
+                else null
+
+            if (!mod.isNothing || removeRef != null) table.updateManyIgnoringResult(
+                reference.mapCondition(Condition.Equal(old._id)),
+                Modification.Chain(listOfNotNull(removeRef, mod))
+            )
         }
     }
 }
@@ -205,7 +220,7 @@ private fun <Model : Any, Referenced : HasId<RID>, RID : Comparable<RID>> Table<
         var updatedMod = incomingMod
         var changed = false
         var newReference: RID? = null
-        incomingMod.vet(deno.reference) {
+        incomingMod.vetNullable(deno.reference) {
             when (it) {
                 is Modification.Assign -> {
                     changed = true

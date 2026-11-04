@@ -42,9 +42,7 @@ public class RefreshDenoEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparab
         }
 
         is Denormalization.RequiredRef<T, Ref, RID> -> {
-            val referenced = deno.info.table().getOrThrow(
-                deno.reference.get(model) ?: throw IllegalStateException("Could not get ref ${deno.reference} for ${info.tableName} $model")
-            )
+            val referenced = deno.info.table().getOrThrow(deno.reference.get(model))
             val mod = deno.denormalize(referenced)
 
             if (mod(model) == model) Modification.Nothing()
@@ -55,14 +53,14 @@ public class RefreshDenoEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparab
     public val refreshDetail: ApiHttpHandler<PathSpec1<ID>, HasId<*>, Unit, Modification<T>> =
         path.arg(PathSpec.Segment.Wildcard("id", info.idSerializer)).post bind explicitApiHttpHandler(
             summary = "Refresh Denormalizations",
-            description = "Refreshes the denormalized ",
+            description = "Recalculates every denormalized field on this ${info.tableName} from its references and returns the modification applied.",
             inputType = Unit.serializer(),
             outputType = Modification.serializer(info.serializer),
             auth = AuthRequirement.IsAdmin,
             implementation = {
                 val model = info.table().getOrNotFound(request.arg1)
                 val mod = Modification.Chain(info.denormalizations.map { it.modification(model) })
-                if (!mod.isNothing) info.baseTable().updateOneByIdIgnoringResult(model._id, mod)
+                if (!mod.isNothing) info.baseTableWithDenormalizations().updateOneByIdIgnoringResult(model._id, mod)
                 mod
             }
         )
@@ -81,7 +79,7 @@ public class RefreshDenoEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparab
 
         // Rows needing the identical modification go out in one write, so the change notifications
         // this produces scale with the number of distinct changes rather than the number of rows.
-        val table = info.baseTable()
+        val table = info.baseTableWithDenormalizations()
         for ((mod, ids) in mods.entries.groupBy({ it.value }, { it.key })) {
             for (idBatch in ids.chunked(UPDATE_BATCH)) {
                 table.updateManyIgnoringResult(

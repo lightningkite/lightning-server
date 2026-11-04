@@ -49,6 +49,7 @@ public class DenormalizationBuilder<Model : Any> {
             dependencies: Set<Optic<Referenced, *>>,
             calculation: suspend context(ServerRuntime) (Referenced) -> Modification<Model>,
         ) {
+            dependencies.forEach(::requireSourceOfTruth)
             list.add(Denormalization.Calculation(dependencies, calculation))
         }
 
@@ -171,6 +172,7 @@ public class DenormalizationBuilder<Model : Any> {
             dependencies: Set<Optic<Referenced, *>>,
             calculation: suspend context(ServerRuntime) (Referenced?) -> Modification<Model>,
         ) {
+            dependencies.forEach(::requireSourceOfTruth)
             list.add(Denormalization.Calculation(dependencies, calculation))
         }
 
@@ -231,7 +233,7 @@ public class DenormalizationBuilder<Model : Any> {
     public inline fun <Ref : HasId<RID>, RID : Comparable<RID>> required(
         reference: Lens<Model, RID>,
         info: ModelInfo<*, Ref, RID>,
-        build: RequiredRefBuilder<Model, Ref, RID>.(Optic<Ref, Ref>) -> Unit,
+        build: RequiredRefBuilder<Model, Ref, RID>.(Lens<Ref, Ref>) -> Unit,
     ) {
         denormalizations.add(
             RequiredRefBuilder(reference, info)
