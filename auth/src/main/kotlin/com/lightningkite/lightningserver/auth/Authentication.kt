@@ -7,10 +7,10 @@ import com.lightningkite.lightningserver.data.Caching
 import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.http.HttpHeader
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.http.HttpHeaderValue
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.data.Unsafe
@@ -29,7 +29,10 @@ import kotlin.time.Instant
  * @param principalType The type of principal being authenticated
  * @param id The ID of the authenticated subject
  * @param sessionId Optional session identifier for tracking user sessions
- * @param issuedAt When the authentication was issued (defaults to current time)
+ * @param sessionIssuedAt When the subject last proved their identity for this session (defaults to current time).
+ *   [AuthRequirement] `maxAge` checks measure from this.
+ * @param tokenIssuedAt When the access token carrying this authentication was minted, or null if it didn't come
+ *   from an access token. Token formats set this themselves when creating a token.
  * @param expiration When the authentication expires (null = no expiration)
  * @param scopes The scopes granted to this authentication (defaults to root)
  * @param fromMasquerade If this is a masquerade, the original authentication
@@ -41,14 +44,26 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
     principalType: PrincipalType<SUBJECT, ID>,
     id: ID,
     sessionId: String?,
-    issuedAt: Instant = server.clock.now(),
+    sessionIssuedAt: Instant = server.clock.now(),
+    tokenIssuedAt: Instant? = null,
     expiration: Instant? = null,
     scopes: Set<GrantedScope> = setOf(GrantedScope.root),
     fromMasquerade: Authentication<*>? = null,
     cache: SerializableCache<Authentication<SUBJECT>>? = null,
 ): Authentication<SUBJECT> =
     @OptIn(Unsafe::class) // SAFETY: Invariants upheld by function signature and type params.
-    Authentication.fromRawParts(principalType, id, rawId = principalType.idString(id), sessionId, issuedAt, expiration, scopes, fromMasquerade, cache)
+    Authentication.fromRawParts(
+        principalType = principalType,
+        id = id,
+        rawId = principalType.idString(id),
+        sessionId = sessionId,
+        sessionIssuedAt = sessionIssuedAt,
+        tokenIssuedAt = tokenIssuedAt,
+        expiration = expiration,
+        scopes = scopes,
+        fromMasquerade = fromMasquerade,
+        cache = cache
+    )
 
 /**
  * Represents an authenticated entity with associated permissions and metadata.
@@ -112,7 +127,11 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
  * @property principalName The name of the principal type (for deserialization)
  * @property rawId The serialized ID of the subject
  * @property sessionId Optional session identifier for tracking
- * @property issuedAt When this authentication was created
+ * @property sessionIssuedAt When the subject last proved their identity for this session. For a session-backed
+ *   authentication this is the session's `authenticatedAt`, which sub-sessions and refreshed access tokens inherit,
+ *   so `maxAge` requirements measure time since the user actually authenticated.
+ * @property tokenIssuedAt When the access token carrying this authentication was minted. Null when the
+ *   authentication didn't come from an access token (refresh tokens used directly, masquerades, test auths).
  * @property expiration When this authentication expires (null = no expiration)
  * @property scopes The permissions granted to this authentication
  * @property fromMasquerade If masquerading, the original authentication
@@ -128,7 +147,8 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
     public val principalName: String,
     public val rawId: String,
     public val sessionId: String?,
-    public val issuedAt: Instant,
+    public val sessionIssuedAt: Instant,
+    public val tokenIssuedAt: Instant? = null,
     public val expiration: Instant? = null,
     public val scopes: Set<GrantedScope> = setOf(GrantedScope.root),
     public val fromMasquerade: Authentication<*>? = null,
@@ -142,7 +162,8 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
             id: Comparable<*>,
             rawId: String,
             sessionId: String?,
-            issuedAt: Instant,
+            sessionIssuedAt: Instant,
+            tokenIssuedAt: Instant?,
             expiration: Instant?,
             scopes: Set<GrantedScope>,
             fromMasquerade: Authentication<*>?,
@@ -152,7 +173,8 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
                 principalName = principalType.name,
                 rawId = rawId,
                 sessionId = sessionId,
-                issuedAt = issuedAt,
+                sessionIssuedAt = sessionIssuedAt,
+                tokenIssuedAt = tokenIssuedAt,
                 expiration = expiration,
                 scopes = scopes,
                 fromMasquerade = fromMasquerade,
@@ -228,12 +250,14 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
 
     public fun copy(
         expiration: Instant? = this.expiration,
+        tokenIssuedAt: Instant? = this.tokenIssuedAt,
         scopes: Set<GrantedScope> = this.scopes,
     ): Authentication<SUBJECT> = Authentication(
         principalName = this.principalName,
         rawId = this.rawId,
         sessionId = this.sessionId,
-        issuedAt = this.issuedAt,
+        sessionIssuedAt = this.sessionIssuedAt,
+        tokenIssuedAt = tokenIssuedAt,
         expiration = expiration,
         scopes = scopes,
         fromMasquerade = this.fromMasquerade,
@@ -315,7 +339,8 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
                 rawId = idString,
                 sessionId = null,
                 // Masquerading is not re-authenticating; maxAge must still see the original time.
-                issuedAt = this.issuedAt,
+                sessionIssuedAt = this.sessionIssuedAt,
+                tokenIssuedAt = null,
                 expiration = this.expiration,
                 scopes = this.scopes,
                 fromMasquerade = this,

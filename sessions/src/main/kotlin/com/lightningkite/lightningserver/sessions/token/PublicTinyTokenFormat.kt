@@ -13,7 +13,7 @@ import kotlin.time.Duration.Companion.minutes
 
 public class PublicTinyTokenFormat(
     public val hasher: RuntimeDeferred<Signer> = secretBasis.signer("public-tiny-token"),
-    public val expiration: Duration = 5.minutes,
+    public override val expiration: Duration = 5.minutes,
 ) : TokenFormat {
     public val resultSize: RuntimeDeferred<Int> = hasher.mapSuspending { it.sign(byteArrayOf(1, 2, 3)).size }
 
@@ -21,14 +21,19 @@ public class PublicTinyTokenFormat(
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> create(
         principal: PrincipalType<SUBJECT, ID>,
         auth: Authentication<SUBJECT>,
-    ): String =
-        "tt/${principal.name}/" + server.internalSerialization.kotlinBytesFormat
+    ): String {
+        val now = now()
+        return "tt/${principal.name}/" + server.internalSerialization.kotlinBytesFormat
             .encodeToByteArray(
                 Authentication.serializer(principal.subjectSerializer),
-                auth.copy(expiration = now().plus(expiration))
+                auth.copy(
+                    tokenIssuedAt = now,
+                    expiration = now.plus(expiration)
+                )
             )
             .let { hasher.await().sign(it) + it }
             .let(Base64.UrlSafe::encode)
+    }
 
     context(server: ServerRuntime)
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> read(
@@ -46,10 +51,15 @@ public class PublicTinyTokenFormat(
         // Good: Signature verification happens before deserialization, preventing tampering
         if (!hasher.await().verify(data, signature)) throw TokenException("Incorrect signature")
 
-        val auth = server.internalSerialization.kotlinBytesFormat.decodeFromByteArray(
-            Authentication.serializer(principal.subjectSerializer),
-            data
-        )
+        val auth = try {
+            server.internalSerialization.kotlinBytesFormat.decodeFromByteArray(
+                Authentication.serializer(principal.subjectSerializer),
+                data
+            )
+        } catch (e: Exception) {
+            throw TokenException("Invalid Token Data", e)
+        }
+
         if (auth.expiration != null && now() > auth.expiration!!) throw TokenException("Token has expired")
         return auth
     }

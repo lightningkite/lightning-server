@@ -354,7 +354,7 @@ fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>.testAu
 ```
 
 - **subject**: The user object to authenticate as
-- **issuedAt**: When the authentication was issued (defaults to now)
+- **issuedAt**: When the subject authenticated, stored as `Authentication.sessionIssuedAt` (defaults to now). `maxAge` requirements measure from this.
 - **scopes**: The granted scopes (defaults to root/full access)
 
 ### Testing with Limited Scopes

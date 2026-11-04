@@ -32,7 +32,7 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>
     issuedAt: Instant = server.clock.now(),
     scopes: Set<GrantedScope> = setOf(GrantedScope.root),
 ): Authentication<SUBJECT> =
-    Authentication(this, id = subject._id, issuedAt = issuedAt, expiration = null, scopes = scopes, sessionId = null)
+    Authentication(this, id = subject._id, sessionIssuedAt = issuedAt, expiration = null, scopes = scopes, sessionId = null)
 
 public fun Authentication<*>.meetsRequirements(scopes: Set<RequiredScope>): Boolean =
     this.scopes.meetsRequirements(scopes)
@@ -48,14 +48,15 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
     fromMasquerade: Authentication<*>? = null,
 ): Authentication<SUBJECT> =
     Authentication(
-        principalType,
-        subject._id,
-        sessionId,
-        issuedAt,
-        expiration,
-        scopes,
-        fromMasquerade,
-        SerializableCache<Authentication<SUBJECT>>().apply {
+        principalType = principalType,
+        id = subject._id,
+        sessionId = sessionId,
+        sessionIssuedAt = issuedAt,
+        tokenIssuedAt = null,
+        expiration = expiration,
+        scopes = scopes,
+        fromMasquerade = fromMasquerade,
+        cache = SerializableCache<Authentication<SUBJECT>>().apply {
             set(principalType.subjectCacheKey, subject)
         }
     )
