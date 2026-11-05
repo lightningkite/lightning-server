@@ -103,26 +103,6 @@ private class AuditQueryLogTable<T : Any>(
         return wraps.findPartial(fields, condition, orderBy, skip, limit, maxQueryMs)
     }
 
-    override suspend fun findSimilar(
-        vectorField: Optic<T, Embedding>,
-        params: DenseVectorSearchParams,
-        condition: Condition<T>,
-        maxQueryMs: Long,
-    ): Flow<ScoredResult<T>> {
-        record(AuditQueryRecord.Operation.Find, condition, groupBy = vectorField.toString(), aggregate = params.toString())
-        return wraps.findSimilar(vectorField, params, condition, maxQueryMs)
-    }
-
-    override suspend fun findSimilarSparse(
-        vectorField: Optic<T, SparseEmbedding>,
-        params: SparseVectorSearchParams,
-        condition: Condition<T>,
-        maxQueryMs: Long,
-    ): Flow<ScoredResult<T>> {
-        record(AuditQueryRecord.Operation.Find, condition, groupBy = vectorField.toString(), aggregate = params.toString())
-        return wraps.findSimilarSparse(vectorField, params, condition, maxQueryMs)
-    }
-
     override suspend fun count(condition: Condition<T>): Int {
         record(AuditQueryRecord.Operation.Count, condition)
         return wraps.count(condition)

@@ -206,4 +206,6 @@ class ServerTest {
 }
 ```
 
+For every built-in setting key and setting type, see the [Settings Reference](settings-reference.md).
+
 NEXT: [Endpoints](endpoints.md)
