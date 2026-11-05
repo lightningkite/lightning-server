@@ -28,7 +28,7 @@ oneTimePass = "3.0.0"
 orgCrac = "0.1.3"
 proguard = "7.10.0"
 scrimage = "4.6.8"
-serviceAbstractions = "1.3.0-vectordatabase-129-be8c13a7"
+serviceAbstractions = "1.4.0-prerelease-128-ea909d37"
 vanniktechMavenPublish = "0.37.0"
 webauthn4jCore = "0.31.10.RELEASE"
 
@@ -38,6 +38,7 @@ aws-apiGateway = { module = "software.amazon.awssdk:apigatewaymanagementapi", ve
 aws-lambda = { module = "software.amazon.awssdk:lambda", version = { ref = "awsVersion" } }
 aws-s3 = { module = "software.amazon.awssdk:s3", version = { ref = "awsVersion" } }
 aws-secrets-manager = { module = "software.amazon.awssdk:secretsmanager", version = { ref = "awsVersion" } }
+aws-signin = { module = "software.amazon.awssdk:signin", version.ref = "awsVersion" }on = { ref = "ktor" } }
 commons-codec = { module = "commons-codec:commons-codec", version = { ref = "commonsCodec" } }
 coroutines-reactive = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactive", version = { ref = "coroutines" } }
 dynamodb = { module = "software.amazon.awssdk:dynamodb", version = { ref = "awsVersion" } }
