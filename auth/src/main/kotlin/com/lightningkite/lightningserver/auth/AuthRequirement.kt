@@ -274,7 +274,7 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
         context(runtime: ServerRuntime)
         override suspend fun check(auth: Authentication<*>?): Result<HasId<*>> {
             if (auth == null) return Result.Rejected("Auth required")
-            if (maxAge != null && now() - auth.issuedAt > maxAge) return Result.Rejected("Auth is older than max age $maxAge")
+            if (maxAge != null && now() - auth.sessionIssuedAt > maxAge) return Result.Rejected("Auth is older than max age $maxAge")
             if (!auth.meetsRequirements(scopes)) return Result.Rejected("Auth does not have required scopes $scopes")
             if (requirement?.invoke(
                     runtime,
@@ -337,7 +337,7 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
         override suspend fun check(auth: Authentication<*>?): Result<SUBJECT> {
             if (auth == null) return Result.Rejected("Auth required")
             if (principalType !== auth.untypedPrincipal) return Result.Rejected("Auth is not of type ${principalType.name}")
-            if (maxAge != null && now() - auth.issuedAt > maxAge) return Result.Rejected("Auth is older than max age $maxAge")
+            if (maxAge != null && now() - auth.sessionIssuedAt > maxAge) return Result.Rejected("Auth is older than max age $maxAge")
             if (!auth.meetsRequirements(scopes)) return Result.Rejected("Auth does not have required scopes $scopes")
 
             @Suppress("UNCHECKED_CAST") // typecheck done when principal type was checked

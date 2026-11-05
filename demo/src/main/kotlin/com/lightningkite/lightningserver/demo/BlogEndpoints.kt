@@ -12,7 +12,7 @@ import com.lightningkite.services.database.ModelPermissions
 object BlogEndpoints : ServerBuilder() {
     // The correct way of doing it
     val info = Server.database.modelInfo(
-        auth = Server.UserAuth.require(),
+        auth = UserAuth.require(),
         tableName = "BlogPost",
         permissions = {
             if (auth.fetch().isSuperUser)

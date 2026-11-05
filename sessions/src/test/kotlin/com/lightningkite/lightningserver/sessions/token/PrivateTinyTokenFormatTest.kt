@@ -16,9 +16,13 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import org.junit.Test
+import kotlin.io.encoding.Base64
 import kotlin.test.*
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -235,24 +239,71 @@ class PrivateTinyTokenFormatTest {
     }
 
     @Test
+    fun `sessionIssuedAt is preserved and tokenIssuedAt is the mint time`() = runBlocking {
+        val mintTime = Instant.parse("2030-01-01T12:00:00.750Z")
+        val sessionIssuedAt = mintTime - 1.hours
+        TestServer.test({}, clock = {
+            object : Clock {
+                override fun now() = mintTime
+            }
+        }) {
+            execute {
+                val format = createTinyTokenFormat()
+                val auth = Authentication(
+                    principalType = TestUser,
+                    id = Uuid.random(),
+                    sessionId = null,
+                    sessionIssuedAt = sessionIssuedAt,
+                    // Ignored: the format stamps its own mint time.
+                    tokenIssuedAt = sessionIssuedAt,
+                )
+
+                val readAuth = format.read(TestUser, format.create(TestUser, auth))
+
+                assertNotNull(readAuth)
+                assertEquals(sessionIssuedAt, readAuth.sessionIssuedAt)
+                assertEquals(mintTime, readAuth.tokenIssuedAt)
+            }
+        }
+    }
+
+    @Test
+    fun `authentic token whose data does not decode throws TokenException`() = runBlocking {
+        TestServer.test({}) {
+            execute {
+                assertFailsWith<TokenException> {
+                    createTinyTokenFormat().read(
+                        TestUser,
+                        "TestUser/" + Base64.UrlSafe.encode(
+                            testBasis.cipher("tiny-token-test").encrypt(byteArrayOf(1, 2, 3))
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
     fun `session ID is preserved`() = runBlocking {
         TestServer.test({}) {
-            val format = createTinyTokenFormat()
-            val userId = Uuid.random()
-            val sessionId = "unique-session-${Uuid.random()}"
+            execute {
+                val format = createTinyTokenFormat()
+                val userId = Uuid.random()
+                val sessionId = "unique-session-${Uuid.random()}"
 
-            val auth = Authentication(
-                principalType = TestUser,
-                id = userId,
-                sessionId = sessionId,
-                scopes = setOf(GrantedScope.root)
-            )
+                val auth = Authentication(
+                    principalType = TestUser,
+                    id = userId,
+                    sessionId = sessionId,
+                    scopes = setOf(GrantedScope.root)
+                )
 
-            val token = execute { format.create(TestUser, auth) }
-            val readAuth = execute { format.read(TestUser, token) }
+                val token = execute { format.create(TestUser, auth) }
+                val readAuth = execute { format.read(TestUser, token) }
 
-            assertNotNull(readAuth)
-            assertEquals(sessionId, readAuth.sessionId)
+                assertNotNull(readAuth)
+                assertEquals(sessionId, readAuth.sessionId)
+            }
         }
     }
 

@@ -16,19 +16,24 @@ import kotlin.time.Duration.Companion.minutes
 
 public class PrivateTinyTokenFormat(
     public val cipher: RuntimeDeferred<Cipher> = secretBasis.cipher("tinyToken"),
-    public val expiration: Duration = 5.minutes,
+    public override val expiration: Duration = 5.minutes,
 ) : TokenFormat {
     context(server: ServerRuntime)
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> create(
         principal: PrincipalType<SUBJECT, ID>,
         auth: Authentication<SUBJECT>,
-    ): String =
-        principal.name + '/' + cipher.await().encrypt(
+    ): String {
+        val now = now()
+        return principal.name + '/' + cipher.await().encrypt(
             server.internalSerialization.kotlinBytesFormat.encodeToByteArray(
                 Authentication.serializer(principal.subjectSerializer),
-                auth.copy(expiration = now().plus(expiration))
+                auth.copy(
+                    tokenIssuedAt = now,
+                    expiration = now.plus(expiration),
+                )
             )
         ).let(Base64.UrlSafe::encode)
+    }
 
     context(server: ServerRuntime)
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> read(
@@ -40,10 +45,15 @@ public class PrivateTinyTokenFormat(
             val decoded = Base64.UrlSafe.decode(value.substringAfter('/'))
             val decrypted = cipher.await().decrypt(decoded)
 
-            val auth = server.internalSerialization.kotlinBytesFormat.decodeFromByteArray(
-                Authentication.serializer(principal.subjectSerializer),
-                decrypted
-            )
+            val auth = try {
+                server.internalSerialization.kotlinBytesFormat.decodeFromByteArray(
+                    Authentication.serializer(principal.subjectSerializer),
+                    decrypted
+                )
+            } catch (e: Exception) {
+                throw TokenException("Invalid Token Data", e)
+            }
+
             if (auth.expiration != null && now() > auth.expiration!!) throw TokenException("Token has expired")
             return auth
         } catch (e: AEADBadTagException) {

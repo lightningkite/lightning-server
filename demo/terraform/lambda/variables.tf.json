@@ -1,0 +1,6 @@
+{
+    "variable": {
+        "grafana_cloud_service_account_token": {},
+        "grafana_cloud_api_key": {}
+    }
+}

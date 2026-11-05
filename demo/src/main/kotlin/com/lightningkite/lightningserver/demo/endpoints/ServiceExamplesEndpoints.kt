@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.demo.endpoints
 import com.lightningkite.lightningserver.auth.require
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.demo.Server
+import com.lightningkite.lightningserver.demo.UserAuth
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
@@ -34,7 +35,7 @@ object ServiceExamplesEndpoints : ServerBuilder() {
     val sendEmail = path.path("service-examples").path("email").post bind ApiHttpHandler(
         summary = "Send Demo Email",
         description = "Sends a plain-text message through the configured EmailService.",
-        auth = Server.UserAuth.require(),
+        auth = UserAuth.require(),
         implementation = { to: EmailAddress ->
             Server.email().send(
                 Email(
@@ -53,7 +54,7 @@ object ServiceExamplesEndpoints : ServerBuilder() {
     val sendSms = path.path("service-examples").path("sms").post bind ApiHttpHandler(
         summary = "Send Demo SMS",
         description = "Sends a message through the configured SMS service.",
-        auth = Server.UserAuth.require(),
+        auth = UserAuth.require(),
         implementation = { to: PhoneNumber ->
             Server.sms().send(to, "Lightning Server Demo message.")
             "Sent to ${to.raw} via ${Server.sms()::class.simpleName}."
@@ -68,7 +69,7 @@ object ServiceExamplesEndpoints : ServerBuilder() {
     val placeCall = path.path("service-examples").path("phone-call").post bind ApiHttpHandler(
         summary = "Place Demo Phone Call",
         description = "Starts a call, speaks a line, then hangs up.",
-        auth = Server.UserAuth.require(),
+        auth = UserAuth.require(),
         implementation = { to: PhoneNumber ->
             val phone = Server.phoneCall()
             val callId = phone.startCall(to, OutboundCallOptions())
@@ -87,7 +88,7 @@ object ServiceExamplesEndpoints : ServerBuilder() {
     val pushNotification = path.path("service-examples").path("notify").post bind ApiHttpHandler(
         summary = "Push Demo Notification",
         description = "Sends a push notification to the given device token via the configured NotificationService.",
-        auth = Server.UserAuth.require(),
+        auth = UserAuth.require(),
         implementation = { deviceToken: String ->
             val results = Server.notifications().send(
                 listOf(deviceToken),
@@ -107,7 +108,7 @@ object ServiceExamplesEndpoints : ServerBuilder() {
     val readSecret = path.path("service-examples").path("secret").get bind ApiHttpHandler(
         summary = "Read Demo Secret",
         description = "Returns the current value of the someSecret setting.",
-        auth = Server.UserAuth.require(),
+        auth = UserAuth.require(),
         implementation = { _: Unit ->
             "someSecret is currently: ${Server.newSecret()}"
         }

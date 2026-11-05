@@ -85,8 +85,8 @@ class AuthenticationExtTest {
             val auth = AuthUser.testAuth(user)
             val after = com.lightningkite.lightningserver.runtime.now()
 
-            assertTrue(auth.issuedAt >= before)
-            assertTrue(auth.issuedAt <= after)
+            assertTrue(auth.sessionIssuedAt >= before)
+            assertTrue(auth.sessionIssuedAt <= after)
         }
     }
 
@@ -97,7 +97,7 @@ class AuthenticationExtTest {
             val customTime = com.lightningkite.lightningserver.runtime.now() - 1.hours
             val auth = AuthUser.testAuth(user, issuedAt = customTime)
 
-            assertEquals(customTime, auth.issuedAt)
+            assertEquals(customTime, auth.sessionIssuedAt)
         }
     }
 
@@ -272,7 +272,7 @@ class AuthenticationExtTest {
             assertEquals(auth.principalName, copied.principalName)
             assertEquals(auth.rawId, copied.rawId)
             assertEquals(auth.sessionId, copied.sessionId)
-            assertEquals(auth.issuedAt, copied.issuedAt)
+            assertEquals(auth.sessionIssuedAt, copied.sessionIssuedAt)
         }
     }
 
@@ -286,6 +286,22 @@ class AuthenticationExtTest {
             val copied = auth.copy(expiration = newExpiration)
 
             assertEquals(newExpiration, copied.expiration)
+        }
+    }
+
+    @Test
+    fun `copy allows setting tokenIssuedAt without changing sessionIssuedAt`() = runBlocking {
+        TestServer.test({}) {
+            val user = AuthUser()
+            val auth = AuthUser.testAuth(user, issuedAt = com.lightningkite.lightningserver.runtime.now() - 1.hours)
+            assertNull(auth.tokenIssuedAt)
+            val minted = com.lightningkite.lightningserver.runtime.now()
+
+            val copied = auth.copy(tokenIssuedAt = minted)
+
+            assertEquals(minted, copied.tokenIssuedAt)
+            assertEquals(auth.sessionIssuedAt, copied.sessionIssuedAt)
+            assertEquals(minted, copied.copy(scopes = setOf(GrantedScope("limited"))).tokenIssuedAt)
         }
     }
 

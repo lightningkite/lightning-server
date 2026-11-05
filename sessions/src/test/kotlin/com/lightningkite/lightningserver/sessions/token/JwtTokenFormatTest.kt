@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.encryption.*
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.execute
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.services.database.HasId
@@ -17,7 +18,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import org.junit.Test
 import kotlin.test.*
+import kotlin.io.encoding.Base64
 import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -247,23 +250,16 @@ class JwtTokenFormatTest {
             val tamperedPayload = payload.joinToString("")
             val tamperedToken = "${parts[0]}.$tamperedPayload.${parts[2]}"
 
-            // Tampered payload may throw either JwtSignatureException (signature mismatch)
-            // or a parsing exception (invalid JSON). Either way, the token is rejected.
-            var rejected = false
-            try {
+            // The signature is checked before the payload is parsed, so even a payload that is no longer valid
+            // JSON fails on the signature.
+            assertFailsWith<JwtSignatureException>("Tampered payload should be rejected") {
                 execute { jwtFormat.read(TestUser, tamperedToken) }
-            } catch (e: JwtSignatureException) {
-                rejected = true
-            } catch (e: Exception) {
-                // JSON decoding error or other parsing error - also acceptable rejection
-                rejected = true
             }
-            assert(rejected) { "Tampered payload should be rejected" }
         }
     }
 
     @Test
-    fun `wrong audience returns null`() = runBlocking {
+    fun `wrong audience is rejected`() = runBlocking {
         TestServer.test({}) {
             val format1 = JwtTokenFormat(
                 hasher = RuntimeDeferred.Cached { testBasis.HS256("jwt-test") },
@@ -290,8 +286,26 @@ class JwtTokenFormatTest {
             val token = execute { format1.create(TestUser, auth) }
 
             // Token for app1 should not work with app2's audience
-            val result = execute { format2.read(TestUser, token) }
-            assertNull(result, "Token for different audience should return null")
+            assertFailsWith<JwtException> {  execute { format2.read(TestUser, token) } }
+        }
+    }
+
+    @Test
+    fun `wrong issuer is rejected`() = runBlocking {
+        TestServer.test({}) {
+            val issuer1 = createJwtFormat()
+            val issuer2 = JwtTokenFormat(
+                hasher = RuntimeDeferred.Cached { testBasis.HS256("jwt-test") },
+                issuer = Runtime { "https://other.example.com" },
+                audience = Runtime { "https://test.example.com" }
+            )
+
+            val token = execute { issuer2.create(
+                TestUser,
+                Authentication(principalType = TestUser, id = Uuid.random(), sessionId = null)
+            ) }
+
+            assertFailsWith<JwtException> { execute { issuer1.read(TestUser, token) } }
         }
     }
 
@@ -450,26 +464,87 @@ class JwtTokenFormatTest {
     }
 
     @Test
-    fun `issuedAt is preserved`() = runBlocking {
-        TestServer.test({}) {
+    fun `sessionIssuedAt is preserved and tokenIssuedAt is the mint time`() = runBlocking {
+        val mintTime = Instant.parse("2030-01-01T12:00:00.750Z")
+        val sessionIssuedAt = mintTime - 1.hours
+        TestServer.test({}, clock = { object : Clock { override fun now() = mintTime } }) {
             val jwtFormat = createJwtFormat()
-            val userId = Uuid.random()
-            val issuedAt = Clock.System.now()
 
             val auth = Authentication(
                 principalType = TestUser,
-                id = userId,
+                id = Uuid.random(),
                 sessionId = null,
-                issuedAt = issuedAt,
+                sessionIssuedAt = sessionIssuedAt,
+                // Ignored: the format stamps its own mint time.
+                tokenIssuedAt = sessionIssuedAt,
                 scopes = setOf(GrantedScope.root)
             )
 
-            val token = execute { jwtFormat.create(TestUser, auth) }
-            val readAuth = execute { jwtFormat.read(TestUser, token) }
+            val readAuth = execute { jwtFormat.read(TestUser, jwtFormat.create(TestUser, auth)) }
 
             assertNotNull(readAuth)
-            // JWT stores time in seconds, so we compare at second precision
-            assertEquals(issuedAt.epochSeconds, readAuth.issuedAt.epochSeconds)
+            // JWT stores times in whole seconds (siat and iat).
+            assertEquals(Instant.fromEpochSeconds(sessionIssuedAt.epochSeconds), readAuth.sessionIssuedAt)
+            assertEquals(Instant.fromEpochSeconds(mintTime.epochSeconds), readAuth.tokenIssuedAt)
+        }
+    }
+
+    @Test
+    fun `token header carries the principal name as prn`() = runBlocking {
+        TestServer.test({}) {
+            val token = execute { createJwtFormat().create(
+                TestUser,
+                Authentication(principalType = TestUser, id = Uuid.random(), sessionId = null)
+            ) }
+            val header = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
+                .decode(token.substringBefore('.'))
+                .decodeToString()
+            assertTrue(header.contains("\"prn\":\"TestUser\""), "Header should name the principal: $header")
+        }
+    }
+
+    @Test
+    fun `another principal's token is ignored even with a different signing key`() = runBlocking {
+        TestServer.test({}) {
+            val users = createJwtFormat()
+            val others = JwtTokenFormat(
+                hasher = RuntimeDeferred.Cached { testBasis.HS256("jwt-other") },
+                issuer = Runtime { "https://test.example.com" },
+                audience = Runtime { "https://test.example.com" },
+            )
+
+            val token = execute { others.create(
+                OtherUser,
+                Authentication(principalType = OtherUser, id = Uuid.random(), sessionId = null)
+            ) }
+
+            execute { assertNull(users.read(TestUser, token)) }
+            execute { assertNotNull(others.read(OtherUser, token)) }
+        }
+    }
+
+    @Test
+    fun `token without a prn is ignored`() = runBlocking {
+        TestServer.test({}) {
+            val encoder = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
+            // A JWT in the shape minted before prn existed.
+            val header = encoder.encode("""{"typ":"JWT","alg":"HS256"}""".encodeToByteArray())
+            val payload = encoder.encode("""{"sub":"\"${Uuid.random()}\"","exp":9999999999}""".encodeToByteArray())
+            val signature = encoder.encode(testBasis.HS256("jwt-test").sign("$header.$payload".encodeToByteArray()))
+
+            execute { assertNull(createJwtFormat().read(TestUser, "$header.$payload.$signature")) }
+        }
+    }
+
+    @Test
+    fun `correctly signed token with malformed claims throws JwtFormatException`() = runBlocking {
+        TestServer.test({}) {
+            val encoder = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
+            val header = encoder.encode("""{"typ":"JWT","alg":"HS256","prn":"TestUser"}""".encodeToByteArray())
+            val payload = encoder.encode("not json".encodeToByteArray())
+            val signature = encoder.encode(testBasis.HS256("jwt-test").sign("$header.$payload".encodeToByteArray()))
+
+            assertFailsWith<JwtFormatException> { execute { createJwtFormat().read(TestUser, "$header.$payload.$signature") } }
         }
     }
 
