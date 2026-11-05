@@ -38,7 +38,7 @@ aws-apiGateway = { module = "software.amazon.awssdk:apigatewaymanagementapi", ve
 aws-lambda = { module = "software.amazon.awssdk:lambda", version = { ref = "awsVersion" } }
 aws-s3 = { module = "software.amazon.awssdk:s3", version = { ref = "awsVersion" } }
 aws-secrets-manager = { module = "software.amazon.awssdk:secretsmanager", version = { ref = "awsVersion" } }
-aws-signin = { module = "software.amazon.awssdk:signin", version.ref = "awsVersion" }on = { ref = "ktor" } }
+aws-signin = { module = "software.amazon.awssdk:signin", version.ref = "awsVersion" }
 commons-codec = { module = "commons-codec:commons-codec", version = { ref = "commonsCodec" } }
 coroutines-reactive = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactive", version = { ref = "coroutines" } }
 dynamodb = { module = "software.amazon.awssdk:dynamodb", version = { ref = "awsVersion" } }
