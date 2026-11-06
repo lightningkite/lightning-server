@@ -2,8 +2,6 @@ package com.lightningkite.lightningserver.files
 
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.LSError
-import com.lightningkite.lightningserver.auth.AuthRequirement
-import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.encryption.Signer
@@ -26,11 +24,11 @@ import kotlin.uuid.Uuid
  * Holds what every early upload shares: the tokens, the ServerFile serializer, the tracking table and
  * its cleanup. It declares no endpoints of its own; [UploadEndpoints] modules declare those.
  *
- * Include it once, then give each place that accepts uploads its own [UploadEndpoints] with [uploadEndpoints]:
+ * Include it once, then give each place that accepts uploads its own [UploadEndpoints]:
  * ```kotlin
  * val uploads = path.path("uploads") include UploadBasis(files, database, fileScanner = { listOf() })
- * val avatarUpload = path.path("users").path("avatar-upload") include
- *     uploads.uploadEndpoints("users/avatars", UserAuth.require())
+ * val avatarUpload = path.path("users").path("avatar-upload") module
+ *     UploadEndpoints(uploads, "users/avatars", UserAuth.require())
  * ```
  *
  * Flow:
@@ -52,7 +50,7 @@ import kotlin.uuid.Uuid
  * - Upload tokens are time-limited by [expiration]. Ensure your client uses them promptly.
  * - This installs the contextual ServerFile serializer, so a server should include only one basis.
  */
-public class UploadBasis(
+public class FileUploadBasis(
     public val files: Runtime<ExternalFileSystem>,
     public val database: Runtime<Database>,
     public val fileScanner: Runtime<List<FileScanner>>,
@@ -178,73 +176,70 @@ public class UploadBasis(
     }
 
     /**
-     * Scans the file [upload] names and promotes it to the ready location, keeping it in [folder].
+     * Scans the file [upload] names and promotes it to the ready location, keeping it in the folder it was uploaded to.
      *
      * Returns a [ServerFile] whose location is the scanned token, not a URL, so it must be encoded with
      * [DirectServerFileSerializer]; the contextual serializer resolves it only when a later request sends it back.
      */
     context(_: ServerRuntime)
-    internal suspend fun verify(folder: String, upload: UnverifiedUploadToken): ServerFile {
-        val parsed = tokens().parseOrNull(upload.raw)
-            ?: throw IllegalArgumentException("Not an upload token.")
-        if (parsed.key.substringBeforeLast('/', "") != folder)
-            throw IllegalArgumentException("This token was issued for a different upload endpoint.")
-        return when (parsed) {
-            // Already verified. Returning the token unchanged makes a retry safe.
-            is UploadToken.Scanned -> ServerFile(upload.raw)
+    internal suspend fun verify(upload: UnverifiedUploadToken): ServerFile = when (
+        val parsed = tokens().parseOrNull(upload.raw) ?: throw IllegalArgumentException("Not an upload token.")
+    ) {
+        // Already verified. Returning the token unchanged makes a retry safe.
+        is UploadToken.Scanned -> ServerFile(upload.raw)
 
-            is UploadToken.Unscanned -> {
-                // Promote under a fresh server-chosen key rather than reusing the client's. The
-                // jail stays writable through the presigned upload URL for the whole expiration
-                // window, so a client that re-uploads and verifies again would otherwise
-                // overwrite - or, when the rescan fails, delete - a file it had already had
-                // certified and handed out. Distinct keys make every certified file immutable.
-                val promotedKey = newKey(folder)
-                val safe = ready().then(promotedKey)
+        is UploadToken.Unscanned -> {
+            // Promote under a fresh server-chosen key rather than reusing the client's. The
+            // jail stays writable through the presigned upload URL for the whole expiration
+            // window, so a client that re-uploads and verifies again would otherwise
+            // overwrite - or, when the rescan fails, delete - a file it had already had
+            // certified and handed out. Distinct keys make every certified file immutable.
+            // Claude: the token is signed, so its folder is one this server chose; keep it.
+            val promotedKey = newKey(parsed.key.substringBeforeLast('/', ""))
+            val safe = ready().then(promotedKey)
 
-                // Record the file before creating it. The cleanup task collects by row, so
-                // inserting first means a crash anywhere below leaves a tracked file rather
-                // than an orphan nothing will ever delete.
-                uploadForNextRequestTable().insertOne(
-                    UploadForNextRequest(expires = now().plus(expiration), file = safe.serverFile)
-                )
+            // Record the file before creating it. The cleanup task collects by row, so
+            // inserting first means a crash anywhere below leaves a tracked file rather
+            // than an orphan nothing will ever delete.
+            uploadForNextRequestTable().insertOne(
+                UploadForNextRequest(expires = now().plus(expiration), file = safe.serverFile)
+            )
 
-                // Copy first, then scan the copy - never scan the jail file in place, because
-                // the client could swap the bytes afterwards through that same upload URL.
-                // Nothing can write to the ready location, so once copied the bytes are frozen
-                // and the scan below covers exactly what will later be served.
-                jail().then(parsed.key).copyTo(safe)
+            // Copy first, then scan the copy - never scan the jail file in place, because
+            // the client could swap the bytes afterwards through that same upload URL.
+            // Nothing can write to the ready location, so once copied the bytes are frozen
+            // and the scan below covers exactly what will later be served.
+            jail().then(parsed.key).copyTo(safe)
+            try {
+                fileScanner().scan(safe)
+            } catch (cancellation: CancellationException) {
+                // The cleanup below is suspend work, which fails immediately in a cancelled
+                // scope and would only bury the cancellation under a suppressed exception.
+                // The row inserted above already guarantees the file gets collected.
+                throw cancellation
+            } catch (e: Exception) {
+                // Nothing can reference an unscanned ready file - only the line below mints
+                // a Scanned token, and promotedKey is unguessable - so this is prompt
+                // hygiene rather than the thing keeping us safe. Suppress rather than mask:
+                // the scan failure is the error worth reporting.
                 try {
-                    fileScanner().scan(safe)
-                } catch (cancellation: CancellationException) {
-                    // The cleanup below is suspend work, which fails immediately in a cancelled
-                    // scope and would only bury the cancellation under a suppressed exception.
-                    // The row inserted above already guarantees the file gets collected.
-                    throw cancellation
-                } catch (e: Exception) {
-                    // Nothing can reference an unscanned ready file - only the line below mints
-                    // a Scanned token, and promotedKey is unguessable - so this is prompt
-                    // hygiene rather than the thing keeping us safe. Suppress rather than mask:
-                    // the scan failure is the error worth reporting.
-                    try {
-                        safe.delete()
-                    } catch (cleanupFailure: Exception) {
-                        e.addSuppressed(cleanupFailure)
-                    }
-                    // A scanner rejecting the file is the client's fault, not ours.
-                    if (e is FileScanException) throw BadRequestException(
-                        detail = fileScanFailedError.detail,
-                        message = e.message ?: fileScanFailedError.message,
-                        cause = e,
-                    )
-                    throw e
+                    safe.delete()
+                } catch (cleanupFailure: Exception) {
+                    e.addSuppressed(cleanupFailure)
                 }
-
-                // The jail copy is deliberately left in place: its own row expires and the
-                // cleanup task collects it, and leaving it lets a client that lost our response
-                // retry without re-uploading.
-                ServerFile(tokens().sign(UploadToken.Scanned(promotedKey), expiration))
+                // A scanner rejecting the file is the client's fault, not ours.
+                if (e is FileScanException) throw BadRequestException(
+                    detail = fileScanFailedError.detail,
+                    message = e.message ?: fileScanFailedError.message,
+                    cause = e,
+                )
+                throw e
             }
+
+            // The jail copy is deliberately left in place: its own row expires and the
+            // cleanup task collects it, and leaving it lets a client that lost our response
+            // retry without re-uploading.
+            ServerFile(tokens().sign(UploadToken.Scanned(promotedKey), expiration))
         }
     }
 
@@ -252,7 +247,7 @@ public class UploadBasis(
      * Daily cleanup of expired uploads. Removes database entries and attempts to delete the associated file.
      */
     public val cleanupSchedule: ScheduledTask = path.path("cleanupUploads") bind ScheduledTask(frequency = 1.days) {
-        uploadForNextRequestTable().deleteMany(Condition { it.expires lt now() }).forEach {
+        uploadForNextRequestTable().deleteMany(UploadForNextRequest.expires lt now()).forEach {
             try {
                 it.file.externalFile.delete()
             } catch (e: Exception) {
@@ -260,19 +255,4 @@ public class UploadBasis(
             }
         }
     }
-
-    /**
-     * Returns a [UploadEndpoints] module that stores uploads under [folder] using this basis.
-     *
-     * The module still has to be included at a path:
-     * ```kotlin
-     * val avatarUpload = path.path("avatar-upload") include Server.uploads.uploadEndpoints("users/avatars", UserAuth.require())
-     * ```
-     *
-     * [auth] defaults to [noAuth], which lets anyone upload; pass a requirement unless that is intended.
-     *
-     * @throws IllegalArgumentException if [folder] is blank or starts or ends with `/`.
-     */
-    public fun uploadEndpoints(folder: String, auth: AuthRequirement<*> = noAuth): UploadEndpoints =
-        UploadEndpoints(this, folder, auth)
 }

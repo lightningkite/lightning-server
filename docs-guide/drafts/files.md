@@ -82,7 +82,7 @@ object FileServer : ServerBuilder() {
 | `jailFilePath` | `"upload-jail"` | subdirectory for freshly-uploaded, unscanned files |
 | `filePath` | `"uploaded"` | subdirectory for scanned, ready-to-use files |
 | `expiration` | `1.days` | how long upload tokens remain valid |
-| `authOptions` | `noAuth` | require authentication on the upload endpoint |
+| `auth` | `noAuth` | require authentication on the upload endpoint |
 
 ## The Upload-Early Flow
 

@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.files
 
+import com.lightningkite.services.data.Index
 import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.files.ServerFile
@@ -18,8 +19,12 @@ import kotlin.uuid.Uuid
 @Queryable
 public data class UploadForNextRequest(
     override val _id: Uuid = Uuid.random(),
-    /** The file location (as a ServerFile URL) associated with this prepared upload. */
-    val file: ServerFile,
+    /**
+     * The file location (as a ServerFile URL) associated with this prepared upload.
+     *
+     * Indexed because the ServerFile serializer deletes the row by this field each time a request claims an upload.
+     */
+    @Index val file: ServerFile,
     /** Expiration time after which the upload is considered invalid/garbage. */
     val expires: Instant,
 ) : HasId<Uuid>

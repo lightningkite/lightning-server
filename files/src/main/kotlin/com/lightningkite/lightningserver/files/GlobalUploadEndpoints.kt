@@ -21,8 +21,8 @@ public typealias UploadEarlyEndpoint = GlobalUploadEndpoints
 /**
  * Provides a single endpoint pair for early file upload, storing every file at the root of [filePath].
  *
- * See [UploadBasis] for the flow and its gotchas. To give each feature its own folder and permission
- * check instead, include an [UploadBasis] and declare a [UploadEndpoints] per feature.
+ * See [FileUploadBasis] for the flow and its gotchas. To give each feature its own folder and permission
+ * check instead, include an [FileUploadBasis] and declare a [UploadEndpoints] per feature.
  */
 public class GlobalUploadEndpoints(
     public val files: Runtime<ExternalFileSystem>,
@@ -38,7 +38,7 @@ public class GlobalUploadEndpoints(
         sdkSettings.clientInterface = ClientFileUploadEndpoints::class.info()
     }
 
-    public val basis: UploadBasis = path include UploadBasis(
+    public val basis: FileUploadBasis = path include FileUploadBasis(
         files = files,
         database = database,
         fileScanner = fileScanner,
@@ -51,7 +51,7 @@ public class GlobalUploadEndpoints(
     /** Mints and checks the tokens this endpoint hands to clients. */
     public val tokens: Runtime<UploadTokens> get() = basis.tokens
 
-    /** Contextual serializer used for ServerFile values; see [UploadBasis.serializer]. */
+    /** Contextual serializer used for ServerFile values; see [FileUploadBasis.serializer]. */
     public val serializer: Runtime<ExternalServerFileSerializer> get() = basis.serializer
 
     /**
@@ -83,9 +83,9 @@ public class GlobalUploadEndpoints(
             functionName = "verifyUpload",
             description = "Scans an uploaded file and moves it out of jail so later requests can use it.",
             errorCases = listOf(basis.fileScanFailedError),
-            implementation = { upload: UnverifiedUploadToken -> basis.verify(folder = "", upload) }
+            implementation = { upload: UnverifiedUploadToken -> basis.verify(upload) }
         )
 
-    /** Daily cleanup of expired uploads; see [UploadBasis.cleanupSchedule]. */
+    /** Daily cleanup of expired uploads; see [FileUploadBasis.cleanupSchedule]. */
     public val cleanupSchedule: ScheduledTask get() = basis.cleanupSchedule
 }
