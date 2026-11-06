@@ -6,7 +6,10 @@
 Rate limiting protects your server from callers that consume a disproportionate share of its
 time — either through bursts of fast requests, slow expensive calls, or abuse.  Lightning
 Server's rate limiter is a single interceptor (`RateLimitInterceptor`) backed by any
-configured `Cache`.  It covers both HTTP and WebSocket connections.
+configured `Cache`.  It checks and charges each request a client makes on its own: requests the
+engine received, each `/meta/bulk` part, and each WebSocket connect, multiplexed virtual sockets
+included.  Endpoints called from server code are not charged separately, since the request that
+made the call already pays for its time.
 
 The limiter uses a **borrow-and-repay** model: each request reserves a nominal slice of future
 server time up front, then refunds the unused portion after the request completes.  When a
@@ -49,23 +52,36 @@ classpath if you use `Cache` elsewhere).
 ## Enabling rate limiting
 
 Rate limiting is an interceptor, so you install it with `install(...)` inside your
-`ServerBuilder`.  You supply three things:
+`ServerBuilder`.  You supply:
 
 1. A `Runtime<RateLimitSettings?>` — resolved from a `setting` declaration.  When the
    runtime value is `null`, rate limiting is completely disabled (useful for staging).
 2. A `Runtime<Cache>` — where per-key reservation state is stored.
 3. A `requestLimits` lambda — maps each incoming request to a `RequestLimits`, or returns
    `null` to exempt the request entirely.
+4. Optionally, `exempt` and `exemptSockets` — handlers that only carry other requests, such as
+   `MetaEndpoints.bulk` and a `MultiplexWebSocketHandler`.  What they carry is charged itself, so
+   charging the wrapper too would count the work twice.
 
 ```kotlin
 object Server : ServerBuilder() {
     val rateLimitConfig = setting("rateLimit", RateLimitSettings())
     val cache           = setting("cache", Cache.Settings())
+    val database        = setting("database", Database.Settings())
+
+    val meta            = path.path("meta") module MetaEndpoints("com.example", database, cache)
+    val multiplex       = path.path("multiplex") bind MultiplexWebSocketHandler()
+
+    init {
+        install(CorsInterceptor(setting("cors", CorsSettings())))
+    }
 
     val rateLimiter = install(
         RateLimitInterceptor(
             settings      = rateLimitConfig,
             cache         = cache,
+            exempt        = listOf(meta.bulk),
+            exemptSockets = listOf(multiplex),
             requestLimits = { request ->
                 // Key every request by the caller's IP address.
                 // Return null to exempt a request (no limit applied).
@@ -83,7 +99,7 @@ object Server : ServerBuilder() {
 `install(...)` registers the interceptor globally — every HTTP handler and every WebSocket
 connection in this `ServerBuilder` is covered from that point on.  Install `RateLimitInterceptor`
 after `CorsInterceptor` so that CORS preflight `OPTIONS` requests are not counted against the
-caller's budget.
+caller's budget, and so a browser can read the 429s and rate-limit headers.
 
 ---
 
@@ -155,9 +171,9 @@ requestLimits = { request ->
         RequestLimits(key = "anon:${request.sourceIp}")
 }
 
-// Exempt internal health-check paths entirely
+// Exempt health-check paths entirely
 requestLimits = { request ->
-    if (request.path.asString.startsWith("/meta/")) null
+    if (request.path.asString.startsWith("/meta/health")) null
     else RequestLimits(key = request.sourceIp)
 }
 ```
@@ -184,6 +200,10 @@ the next request is rejected.
 - If the caller pauses 1 second between requests, the reservation shrinks by 1s each pause,
   so they can sustain roughly one request every 12.5 seconds indefinitely.
 
+A rejected request is charged `borrowTime`, as if it had done no work.  A blocked caller that
+retries more often than every `borrowTime` therefore stays blocked; one that waits as
+`Retry-After` says gets in on schedule.
+
 Tighten the limit by raising `multiplier` or lowering `leeway`.  Loosen it by doing the
 opposite.  Use `overhead` to charge for per-request fixed costs that the measured duration
 misses.
@@ -194,7 +214,7 @@ misses.
 
 A caller who exceeds their budget receives:
 
-- **HTTP 429 Too Many Requests**
+- **HTTP 429 Too Many Requests**, with a `Retry-After` header and CORS headers
 - Body: `LSError` JSON with `detail = "rate-limit-{rateLimiterId}"` and a human-readable
   `message` that includes `at` (when they may retry) and `wait` (duration to wait)
 
@@ -207,7 +227,8 @@ A caller who exceeds their budget receives:
 }
 ```
 
-When `includeHeaders = true`, successful responses also carry diagnostic headers:
+When `includeHeaders = true`, responses, rejected ones included, also carry diagnostic headers.
+A `/meta/bulk` response reports the furthest any of its parts reserved or was told to wait:
 
 | Header | Value |
 |---|---|
@@ -219,11 +240,10 @@ When `includeHeaders = true`, successful responses also carry diagnostic headers
 
 ## WebSocket connections
 
-`RateLimitInterceptor` also implements `WebSocketHandlerInterceptor`.  A WebSocket connection
-request goes through the same budget check during `willConnect`.  If the caller is over budget,
-the upgrade is rejected before the WebSocket opens.  Because `install(...)` handles both
-`HttpInterceptor` and `WebSocketHandlerInterceptor` in a single call, no extra wiring is
-needed.
+Each WebSocket connect goes through the same budget check, including each virtual socket opened
+over a `MultiplexWebSocketHandler`.  If the caller is over budget, the connection is rejected
+before it opens; a rejected virtual socket gets an `end` message with an error.  Messages and
+disconnects on a socket that is already open are not charged.
 
 ---
 
@@ -282,6 +302,5 @@ class RateLimitTest {
   preflight requests are not counted against the caller's budget.
 - **Authentication** — key the limiter by user ID instead of IP for authenticated endpoints;
   this prevents IP sharing (NAT, corporate proxies) from causing false positives.
-- **Bulk requests** — the `/meta/bulk` endpoint fans out to multiple sub-handlers.  The
-  limiter sees only the outer request, so the whole bulk call is charged once for its
-  wall-clock duration.
+- **Bulk requests** — each `/meta/bulk` part is charged on its own, so pass
+  `MetaEndpoints.bulk` in `exempt` to avoid also charging the bulk call that carries them.

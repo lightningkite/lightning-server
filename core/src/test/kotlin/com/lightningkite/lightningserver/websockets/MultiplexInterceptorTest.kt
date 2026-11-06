@@ -26,11 +26,13 @@ class MultiplexInterceptorTest {
 
     private object Observed {
         val connects: MutableList<String> = Collections.synchronizedList(mutableListOf())
+        val virtualConnects: MutableList<String> = Collections.synchronizedList(mutableListOf())
         val disconnects: MutableList<String> = Collections.synchronizedList(mutableListOf())
         val physicalConnects: MutableList<String> = Collections.synchronizedList(mutableListOf())
         val physicalMessages: MutableList<String> = Collections.synchronizedList(mutableListOf())
         fun reset() {
             connects.clear()
+            virtualConnects.clear()
             disconnects.clear()
             physicalConnects.clear()
             physicalMessages.clear()
@@ -46,7 +48,10 @@ class MultiplexInterceptorTest {
             if (invocation is Invocation.WebSocket) {
                 val path = "/" + invocation.request.path.pathSegments.toString()
                 when (invocation.execution.phase) {
-                    Execution.WebSocket.Phase.Connect -> Observed.connects.add(path)
+                    Execution.WebSocket.Phase.Connect -> {
+                        Observed.connects.add(path)
+                        if (invocation.virtual) Observed.virtualConnects.add(path)
+                    }
                     Execution.WebSocket.Phase.Disconnect -> Observed.disconnects.add(path)
                     else -> {}
                 }
@@ -118,6 +123,29 @@ class MultiplexInterceptorTest {
                     "/mirror" in Observed.connects,
                     "the virtual socket bypassed the execution interceptors; saw ${Observed.connects}",
                 )
+            }
+        }
+    }
+
+    @Test
+    fun `only the multiplexed channel is marked virtual`() = runBlocking {
+        Observed.reset()
+        TestServer.test(settings = {}) {
+            runBlocking {
+                val mux = TestServer.multiplex.test()
+                val json = engine.externalSerialization.json
+
+                mux.send(
+                    WebSocketFrame.Text(
+                        json.encodeToString(
+                            MultiplexMessage.serializer(),
+                            MultiplexMessage(channel = "a", path = "/mirror", start = true),
+                        )
+                    )
+                )
+
+                assertEquals(listOf("/multiplex", "/mirror"), Observed.connects.toList())
+                assertEquals(listOf("/mirror"), Observed.virtualConnects.toList())
             }
         }
     }

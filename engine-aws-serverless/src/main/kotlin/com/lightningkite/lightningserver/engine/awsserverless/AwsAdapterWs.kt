@@ -562,6 +562,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                                                 phase = Execution.WebSocket.Phase.ClientMessage,
                                             ),
                                             mid.request,
+                                            virtual = false,
                                         ),
                                     ) {
                                         mid.send(WebSocketFrame("!!! DEBUG AWS INFO !!! - ${mid.currentState}"))

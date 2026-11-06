@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver
 
+import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
@@ -29,6 +30,8 @@ public fun LSError.toException(
  * These are caught and result in a well formed response with a proper status code.
  * At anytime if there is a problem with the request such as Unauthorized, you can
  * throw these exceptions to end calculations and send a response.
+ *
+ * [headers] are added to that response, such as a `Retry-After` on a 429 or 503.
  */
 public open class HttpStatusException(
     public val status: HttpStatus,
@@ -36,6 +39,7 @@ public open class HttpStatusException(
     override val message: String = "",
     public val data: String = "",
     cause: Throwable? = null,
+    public val headers: HttpHeaders = HttpHeaders.EMPTY,
 ) : Exception(message, cause) {
     public constructor(lsError: LSError) : this(
         status = HttpStatus(lsError.http),

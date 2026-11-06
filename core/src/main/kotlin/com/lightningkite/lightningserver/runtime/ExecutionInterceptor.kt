@@ -1,20 +1,28 @@
 package com.lightningkite.lightningserver.runtime
 
 /**
- * Wraps one whole execution, whatever kind of execution it is.
+ * Wraps every execution the server runs, whatever its kind.
  *
- * This is the chain for logical concerns: it sees every execution the server runs — an HTTP request,
- * each WebSocket lifecycle phase, a task, a schedule tick, a startup task, a pre-deploy task — including
- * the `/meta/bulk` sub-requests, internal endpoint calls and multiplexed virtual sockets that the
- * [com.lightningkite.lightningserver.http.HttpInterceptor] and
- * [com.lightningkite.lightningserver.websockets.WebSocketInterceptor] chains never see. The [Invocation]
- * names the kind of execution and carries its request, if it has one.
+ * An execution is an HTTP request, a WebSocket phase, a task, a schedule tick, or a startup or
+ * pre-deploy task. The [Invocation] says which kind it is and carries the request, if there is one.
  *
- * It wraps outside the HTTP and WebSocket chains, which run inside the execution this one wraps, and
- * inside the execution's own telemetry span. An exception thrown here therefore skips those chains,
- * so a rejection that must still get CORS or security headers belongs in an `HttpInterceptor`.
+ * [HttpInterceptor][com.lightningkite.lightningserver.http.HttpInterceptor] and
+ * [WebSocketInterceptor][com.lightningkite.lightningserver.websockets.WebSocketInterceptor] only see
+ * requests and sockets the engine actually received. This one also sees `/meta/bulk` sub-requests,
+ * internal endpoint calls, and multiplexed virtual sockets.
  *
- * Install on a `ServerBuilder`; the first installed is the outermost, as with the other two chains.
+ * It runs outside the HTTP and WebSocket chains, and inside the execution's telemetry span.
+ *
+ * If it throws during an HTTP execution, the server's exception handler turns the exception into the
+ * response. An [HttpStatusException][com.lightningkite.lightningserver.HttpStatusException] keeps its
+ * status, so a 429 stays a 429. Interceptors installed outside this one see the exception, not the
+ * response. If it throws during any other kind of execution, that execution fails.
+ *
+ * For a request the engine received, when it throws matters. Before calling `cont`, the error
+ * response still goes through the HTTP chain and gets CORS and security headers. After `cont`, the
+ * HTTP chain has already run, so the response goes out without them. Reject before calling `cont`.
+ *
+ * Install it on a `ServerBuilder`. The first one installed is the outermost, like the other chains.
  *
  * ```kotlin
  * object Server : ServerBuilder() {
@@ -36,16 +44,17 @@ package com.lightningkite.lightningserver.runtime
  */
 public interface ExecutionInterceptor {
     /**
-     * The name of this interceptor, used for instrumentation and debugging.
-     * Defaults to the simple class name or "anonymous" for lambdas.
+     * The name shown in traces and debugging.
+     *
+     * Defaults to the simple class name, or "anonymous" if the class has none.
      */
     public val name: String get() = this::class.simpleName ?: "anonymous"
 
     /**
      * Wraps [cont], which is the rest of the chain and then the execution itself.
      *
-     * [invocation] holds the same execution as the runtime in context. Skipping [cont] skips the
-     * execution entirely, so an interceptor that means to let the work happen must call it.
+     * [invocation] describes the same execution as the runtime in context. If [cont] is not called,
+     * the execution does not run at all.
      */
     context(runtime: ServerRuntime)
     public suspend fun <T> intercept(
@@ -54,10 +63,9 @@ public interface ExecutionInterceptor {
     ): T
 
     /**
-     * The compiled chain for "nothing installed" — it runs the execution untouched.
+     * Stands for "no interceptors installed" and just runs the execution.
      *
-     * Chain machinery, not something to install; a chain link around a pass-through would only cost a
-     * span. [compileAndInstrument] drops these rather than wrapping them.
+     * Do not install this. [compileAndInstrument] drops it.
      */
     public object NoOp : ExecutionInterceptor {
         context(runtime: ServerRuntime)
@@ -69,12 +77,10 @@ public interface ExecutionInterceptor {
 }
 
 /**
- * Wraps the intercept call in its own instrumentation span, so time spent in each interceptor is
- * attributable.
+ * Calls [ExecutionInterceptor.intercept] inside its own span, so each interceptor's time shows up separately.
  *
- * Unlike the HTTP counterpart this does not recover from exceptions: an execution's result type is
- * whatever that kind of execution returns, so there is no response to fabricate here. Failures
- * propagate to the kind-specific handling at the seam.
+ * Unlike the HTTP version, this does not catch exceptions. There is no generic response to make here,
+ * so failures go to the handling for that kind of execution.
  */
 context(runtime: ServerRuntime)
 private suspend fun <T> ExecutionInterceptor.interceptInstrumented(
@@ -82,7 +88,7 @@ private suspend fun <T> ExecutionInterceptor.interceptInstrumented(
     cont: suspend context(ServerRuntime) () -> T,
 ): T = instrument(name) { intercept(invocation, cont) }
 
-/** One link of a compiled chain, wrapping [interceptor] in its own instrumentation span. */
+/** Wraps [interceptor] so that it runs inside its own span. */
 private fun instrumentedLink(interceptor: ExecutionInterceptor): ExecutionInterceptor =
     object : ExecutionInterceptor {
         override val name: String get() = interceptor.name
@@ -94,7 +100,7 @@ private fun instrumentedLink(interceptor: ExecutionInterceptor): ExecutionInterc
         ): T = interceptor.interceptInstrumented(invocation, cont)
     }
 
-/** Nests [inner] inside [outer], so [outer] runs first and can post-process what [inner] returns. */
+/** Returns an interceptor that runs [outer] around [inner]. */
 private fun composeLinks(outer: ExecutionInterceptor, inner: ExecutionInterceptor): ExecutionInterceptor =
     object : ExecutionInterceptor {
         override val name: String get() = "${outer.name} -> ${inner.name}"
@@ -107,11 +113,10 @@ private fun composeLinks(outer: ExecutionInterceptor, inner: ExecutionIntercepto
     }
 
 /**
- * Compiles a list of interceptors into a single chained interceptor with instrumentation.
+ * Combines this list into one interceptor, giving each its own span.
  *
- * The first interceptor in the list executes first and so wraps everything the rest of the chain
- * wraps, matching the HTTP and WebSocket chains. [ExecutionInterceptor.NoOp] entries are dropped
- * rather than wrapped, since a chain link around a pass-through only costs a span.
+ * The first interceptor is the outermost, like the HTTP and WebSocket chains.
+ * [ExecutionInterceptor.NoOp] entries are dropped.
  */
 internal fun List<ExecutionInterceptor>.compileAndInstrument(): ExecutionInterceptor {
     val effective = filter { it !== ExecutionInterceptor.NoOp }

@@ -2,6 +2,8 @@
 
 package com.lightningkite.lightningserver.runtime
 
+import com.lightningkite.lightningserver.HttpMethod
+import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.definition.GeneralServerSettings
 import com.lightningkite.lightningserver.definition.PreDeployTask
@@ -10,14 +12,20 @@ import com.lightningkite.lightningserver.definition.StartupTask
 import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
+import com.lightningkite.lightningserver.cors.CorsInterceptor
+import com.lightningkite.lightningserver.cors.CorsSettings
+import com.lightningkite.lightningserver.http.HttpHeader
+import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpInterceptor
 import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.HttpStatus
+import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
+import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.pathing.RawWebSocketPath
 import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.runtime.test.execute
@@ -186,6 +194,116 @@ class ExecutionInterceptorTest {
         server.test(settings = { generalSettings set GeneralServerSettings() }) {
             runBlocking {
                 assertEquals(HttpStatus.InternalServerError, server.endpoint.test().status)
+            }
+        }
+    }
+
+    @Test
+    fun `an execution interceptor's HttpStatusException keeps its status, for roots and sub-requests`() {
+        val server = object : ServerBuilder() {
+            init {
+                registerBasicMediaTypeCoders()
+                install(object : ExecutionInterceptor {
+                    context(runtime: ServerRuntime)
+                    override suspend fun <T> intercept(invocation: Invocation, cont: suspend context(ServerRuntime) () -> T): T {
+                        if (invocation is Invocation.Http && invocation.request.path.pathSegments.toString() == "limited")
+                            throw HttpStatusException(HttpStatus.TooManyRequests, detail = "limited", message = "Limited.")
+                        return cont()
+                    }
+                })
+            }
+
+            val limited = path.path("limited").get bind HttpHandler { HttpResponse.plainText("hi") }
+            val dispatcher = path.path("dispatcher").get bind HttpHandler { request ->
+                val sub = serverRuntime.handle(request.subRequest(RawHttpEndpoint("limited", HttpMethod.GET)))
+                HttpResponse.plainText(sub.status.code.toString())
+            }
+        }
+        server.test(settings = { generalSettings set GeneralServerSettings() }) {
+            runBlocking {
+                assertEquals(HttpStatus.TooManyRequests, server.limited.test().status)
+                assertEquals("429", server.dispatcher.test().body!!.text())
+            }
+        }
+    }
+
+    /** Rejects `/early` before the HTTP chain runs and `/late` after it has, counting runs of the HTTP chain. */
+    private class RejectingServer : ServerBuilder() {
+        var httpChainRuns = 0
+
+        init {
+            registerBasicMediaTypeCoders()
+            install(CorsInterceptor(setting("cors", CorsSettings(limitToDomains = listOf("https://example.com")))))
+            install(object : HttpInterceptor {
+                context(runtime: ServerRuntime)
+                override suspend fun <PATH : PathSpec> intercept(
+                    request: HttpRequest<PATH>,
+                    cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
+                ): HttpResponse {
+                    httpChainRuns++
+                    return cont(request)
+                }
+            })
+            install(object : ExecutionInterceptor {
+                context(runtime: ServerRuntime)
+                override suspend fun <T> intercept(invocation: Invocation, cont: suspend context(ServerRuntime) () -> T): T {
+                    val path = (invocation as? Invocation.Http)?.request?.path?.pathSegments?.toString()
+                    if (path == "early") throw HttpStatusException(HttpStatus.TooManyRequests, detail = "limited", message = "Limited.")
+                    val result = cont()
+                    if (path == "late") throw HttpStatusException(HttpStatus.TooManyRequests, detail = "limited", message = "Limited.")
+                    return result
+                }
+            })
+        }
+
+        val early = path.path("early").get bind HttpHandler { HttpResponse.plainText("hi") }
+        val late = path.path("late").get bind HttpHandler { HttpResponse.plainText("hi") }
+    }
+
+    private val fromExample = HttpHeaders { add(HttpHeader.Origin, "https://example.com") }
+
+    @Test
+    fun `a rejection before the HTTP chain runs still gets CORS headers`() {
+        val server = RejectingServer()
+        server.test(settings = { generalSettings set GeneralServerSettings() }) {
+            runBlocking {
+                val response = server.early.test(headers = fromExample)
+                assertEquals(HttpStatus.TooManyRequests, response.status)
+                assertEquals("https://example.com", response.headers[HttpHeader.AccessControlAllowOrigin]?.root)
+                assertEquals(1, server.httpChainRuns)
+            }
+        }
+    }
+
+    @Test
+    fun `a rejected preflight is still answered by CORS`() {
+        val server = RejectingServer()
+        server.test(settings = { generalSettings set GeneralServerSettings() }) {
+            runBlocking {
+                val response = engine.handleRoot(
+                    HttpRequest(
+                        path = RawHttpEndpoint(asString = "/early", method = HttpMethod.OPTIONS),
+                        queryParameters = QueryParameters.EMPTY,
+                        headers = fromExample,
+                        domain = "example.com",
+                        protocol = "https",
+                        sourceIp = "local",
+                    ),
+                    Execution.ID.generate(),
+                )
+                assertEquals(HttpStatus.NoContent, response.status)
+                assertEquals("https://example.com", response.headers[HttpHeader.AccessControlAllowOrigin]?.root)
+            }
+        }
+    }
+
+    @Test
+    fun `a rejection after the HTTP chain ran does not run it again`() {
+        val server = RejectingServer()
+        server.test(settings = { generalSettings set GeneralServerSettings() }) {
+            runBlocking {
+                assertEquals(HttpStatus.TooManyRequests, server.late.test(headers = fromExample).status)
+                assertEquals(1, server.httpChainRuns)
             }
         }
     }

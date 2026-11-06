@@ -93,6 +93,7 @@ class TaskParentageTest {
                 Invocation.Http(
                     Execution.Http(id = requestId, endpoint = endpoint),
                     HttpRequest(endpoint, QueryParameters.EMPTY, HttpHeaders.EMPTY, domain = "example.com", protocol = "https", sourceIp = "local"),
+                    origin = Invocation.Http.Origin.Engine,
                 )
             ) {
                 TestServer.first(Unit)

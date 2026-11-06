@@ -79,6 +79,7 @@ public interface HttpExceptionHandler {
 
             return HttpResponse(
                 status = HttpStatus(lsError.http),
+                headers = (exception as? HttpStatusException)?.headers ?: HttpHeaders.EMPTY,
                 body = lsError.toTypedData(request.headers.accept)
             )
         }

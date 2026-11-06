@@ -131,6 +131,28 @@ public abstract class ServerBuilder : Extendable {
             webSocketInterceptors.register(it)
         }
 
+    @JvmName("installExecutionAndHttpInterceptor")
+    public fun <T> install(interceptor: T): T where T : ExecutionInterceptor, T : HttpInterceptor =
+        interceptor.also {
+            executionInterceptors.register(it)
+            httpInterceptors.register(it)
+        }
+
+    @JvmName("installExecutionAndWebSocketInterceptor")
+    public fun <T> install(interceptor: T): T where T : ExecutionInterceptor, T : WebSocketInterceptor =
+        interceptor.also {
+            executionInterceptors.register(it)
+            webSocketInterceptors.register(it)
+        }
+
+    @JvmName("installExecutionAndHttpAndWebSocketInterceptor")
+    public fun <T> install(interceptor: T): T where T : ExecutionInterceptor, T : HttpInterceptor, T : WebSocketInterceptor =
+        interceptor.also {
+            executionInterceptors.register(it)
+            httpInterceptors.register(it)
+            webSocketInterceptors.register(it)
+        }
+
     @JvmName("installEncodingInterceptor")
     public fun <T : EncodingInterceptor> install(interceptor: T): T =
         interceptor.also { encodingInterceptors.register(it) }

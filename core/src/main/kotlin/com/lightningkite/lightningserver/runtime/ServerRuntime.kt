@@ -13,6 +13,9 @@ import com.lightningkite.services.telemetry.TelemetryAttributes
 import com.lightningkite.services.telemetry.TelemetryTrace
 import com.lightningkite.services.telemetry.emptyTelemetryAttributes
 import com.lightningkite.services.telemetry.telemetryTrace
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.EmptyCoroutineContext
 
@@ -73,11 +76,19 @@ context(runner: ServerRuntime)
 public val serverRuntime: ServerRuntime get() = runner
 
 
+/**
+ * Runs [action] as [invocation]'s execution, inside its telemetry span and the server's execution interceptors.
+ *
+ * @param recover Turns an exception that escapes the interceptors or [action] into a result. It runs on the
+ *   execution's runtime but outside the interceptors, which have already failed. When `null`, the exception is
+ *   rethrown.
+ */
 @InternalLightningServerApi
 public suspend inline fun <T> Engine.execute(
     opName: String,
     invocation: Invocation,
     attributes: TelemetryAttributes = emptyTelemetryAttributes(),
+    noinline recover: (suspend ServerRuntime.(trace: TelemetryTrace, e: Exception) -> T)? = null,
     crossinline action: suspend ServerRuntime.(trace: TelemetryTrace) -> T
 ): T {
     @OptIn(Unsafe::class)
@@ -86,7 +97,13 @@ public suspend inline fun <T> Engine.execute(
         telemetryTrace(opName, attributes) { trace ->
             val requestTrace = if (invocation is Invocation.Requested) RequestTrace(trace) else EmptyCoroutineContext
             withContext(requestTrace) {
-                server.compiledExecutionInterceptors.intercept(invocation) { serverRuntime.action(trace) }
+                try {
+                    server.compiledExecutionInterceptors.intercept(invocation) { serverRuntime.action(trace) }
+                } catch (e: Exception) {
+                    if (e is CancellationException) currentCoroutineContext().ensureActive()
+                    if (recover == null) throw e
+                    serverRuntime.recover(trace, e)
+                }
             }
         }
     }

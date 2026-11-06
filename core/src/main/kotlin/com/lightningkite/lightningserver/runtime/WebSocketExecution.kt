@@ -236,6 +236,7 @@ private fun WebSocketConnectRequest<*>.connectPhase(parent: Execution?): Invocat
         phase = Execution.WebSocket.Phase.Connect,
     ),
     this,
+    virtual = parent != null,
 )
 
 context(engine: Engine)
@@ -251,6 +252,7 @@ private fun WebSocketConnection<*, *>.phase(
         phase = phase,
     ),
     request,
+    virtual = parent != null,
 )
 
 context(engine: Engine)

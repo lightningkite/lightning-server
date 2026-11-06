@@ -3,9 +3,13 @@ package com.lightningkite.lightningserver.ratelimit
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.HttpStatusException
+import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
+import com.lightningkite.lightningserver.runtime.Engine
+import com.lightningkite.lightningserver.runtime.Execution
+import com.lightningkite.lightningserver.runtime.Invocation
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
@@ -18,6 +22,11 @@ import kotlin.test.Test
 import kotlin.time.*
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
+
+@OptIn(InternalLightningServerApi::class)
+context(engine: Engine)
+private fun fromClient(request: HttpRequest<*>) =
+    Invocation.Http(Execution.Http(id = Execution.ID.generate(), endpoint = request.path), request, Invocation.Http.Origin.Engine)
 
 class RateLimiterTest {
 
@@ -57,7 +66,7 @@ class RateLimiterTest {
         for (i in 0..1000) {
             try {
                 time += delayBetween
-                limiter.intercept(dummy) {
+                limiter.intercept(fromClient(dummy)) {
                     time += requestTime
                     HttpResponse()
                 }
@@ -83,7 +92,7 @@ class RateLimiterTest {
                 RateLimitInterceptor(
                     limiter,
                     cache,
-                    { null }
+                    requestLimits = { null }
                 )
 
                 execute {
@@ -92,7 +101,7 @@ class RateLimiterTest {
                         limiter = RateLimitInterceptor(
                             limiter,
                             cache,
-                            {
+                            requestLimits = {
                                 RequestLimits(
                                     key = "simpleTest",
                                     leeway = 200.seconds,
@@ -115,7 +124,7 @@ class RateLimiterTest {
                         limiter = RateLimitInterceptor(
                             limiter,
                             cache,
-                            {
+                            requestLimits = {
                                 RequestLimits(
                                     key = "simpleTest",
                                     leeway = 200.seconds,
@@ -138,7 +147,7 @@ class RateLimiterTest {
                         limiter = RateLimitInterceptor(
                             limiter,
                             cache,
-                            {
+                            requestLimits = {
                                 RequestLimits(
                                     key = "simpleTest",
                                     leeway = 200.seconds,
@@ -162,7 +171,7 @@ class RateLimiterTest {
                         limiter = RateLimitInterceptor(
                             limiter,
                             cache,
-                            {
+                            requestLimits = {
                                 RequestLimits(
                                     key = "simpleTest",
                                     leeway = 200.seconds,
@@ -186,7 +195,7 @@ class RateLimiterTest {
                         limiter = RateLimitInterceptor(
                             limiter,
                             cache,
-                            {
+                            requestLimits = {
                                 RequestLimits(
                                     key = "simpleTest",
                                     leeway = 200.seconds,
@@ -211,7 +220,7 @@ class RateLimiterTest {
                         limiter = RateLimitInterceptor(
                             limiter,
                             cache,
-                            {
+                            requestLimits = {
                                 RequestLimits(
                                     key = "simpleTest",
                                     leeway = 200.seconds,
@@ -243,7 +252,7 @@ class RateLimiterTest {
                 val limiter = RateLimitInterceptor(
                     limiter,
                     cache,
-                    {
+                    requestLimits = {
                         RequestLimits(
                             key = "test",
                             leeway = 200.seconds,
@@ -269,7 +278,7 @@ class RateLimiterTest {
                     try {
                         time += 2.seconds
                         execute {
-                            limiter.intercept(dummy) {
+                            limiter.intercept(fromClient(dummy)) {
                                 time += 4.seconds
                                 HttpResponse()
                             }
@@ -283,7 +292,7 @@ class RateLimiterTest {
                     repeat(10) {
                         time += 2.seconds
                         execute {
-                            limiter.intercept(dummy) {
+                            limiter.intercept(fromClient(dummy)) {
                                 time += 4.seconds
                                 HttpResponse()
                             }
@@ -299,7 +308,7 @@ class RateLimiterTest {
                     try {
                         time += 2.seconds
                         execute {
-                            limiter.intercept(dummy) {
+                            limiter.intercept(fromClient(dummy)) {
                                 time += 4.seconds
                                 HttpResponse()
                             }
@@ -313,7 +322,7 @@ class RateLimiterTest {
                     repeat(10) {
                         time += 2.seconds
                         execute {
-                            limiter.intercept(dummy) {
+                            limiter.intercept(fromClient(dummy)) {
                                 time += 4.seconds
                                 HttpResponse()
                             }

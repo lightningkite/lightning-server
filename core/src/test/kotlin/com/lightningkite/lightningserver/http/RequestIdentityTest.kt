@@ -36,6 +36,7 @@ private val outerId = Execution.ID(UuidV7.fromRawUnchecked(Uuid.parse("00000000-
 private fun outer() = Invocation.Http(
     Execution.Http(id = outerId, endpoint = RawHttpEndpoint(asString = "/outer", method = HttpMethod.POST)),
     subTestRequest("/outer"),
+    origin = Invocation.Http.Origin.Engine,
 )
 
 private fun subTestRequest(path: String): HttpRequest<PathSpec> = HttpRequest(

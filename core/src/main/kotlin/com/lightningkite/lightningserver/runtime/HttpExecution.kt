@@ -7,7 +7,10 @@ import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.services.telemetry.TelemetryAttributes
 import com.lightningkite.services.telemetry.TelemetryKey
 import com.lightningkite.services.telemetry.TelemetryKeys
+import com.lightningkite.services.telemetry.TelemetryTrace
 import com.lightningkite.services.telemetry.Untraced
+import com.lightningkite.services.telemetry.enrich
+import com.lightningkite.services.telemetry.telemetryAttributesOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withContext
@@ -31,6 +34,7 @@ public suspend fun <PATH : PathSpec> HttpHandler<PATH>.handleWithMetrics(
     request,
     @OptIn(InternalLightningServerApi::class)
     Execution.Http(id = Execution.ID.generate(), parent = runtime.execution, endpoint = request.path),
+    Invocation.Http.Origin.Server,
     HttpInterceptor.NoOp,
 ) { req ->
     // Claude: `this@` because a bare `handle` resolves to ServerRuntime.handle, which routes the request.
@@ -76,15 +80,19 @@ public suspend fun Engine.handleRoot(
         request,
         @OptIn(InternalLightningServerApi::class)
         Execution.Http(id = executionId, endpoint = request.path),
+        Invocation.Http.Origin.Engine,
         server.compiledHttpInterceptors,
         ServerRuntime::routeHttpRequest
     )
 
 /**
- * Routes [request] as a sub-request of the current execution, such as one part of a `/meta/bulk` call.
+ * Routes [request] as a sub-request the client asked for inside the current execution, such as one part
+ * of a `/meta/bulk` call.
  *
  * The sub-request runs through the server's execution interceptors but not its HTTP interceptors, and
- * exceptions are turned into the returned response.
+ * exceptions are turned into the returned response. Its origin is [Invocation.Http.Origin.Client], so
+ * per-client concerns such as rate limiting treat it as a request of its own; to call an endpoint from
+ * server code, use [handleWithMetrics] instead.
  */
 public suspend fun ServerRuntime.handle(
     request: HttpRequest<*>,
@@ -93,6 +101,7 @@ public suspend fun ServerRuntime.handle(
     request,
     @OptIn(InternalLightningServerApi::class)
     Execution.Http(id = executionId, parent = execution, endpoint = request.path),
+    Invocation.Http.Origin.Client,
     HttpInterceptor.NoOp,
     ServerRuntime::routeHttpRequest
 )
@@ -114,6 +123,7 @@ public suspend fun <PATH : PathSpec, T> HttpHandler<PATH>.executeWithMetrics(
     Invocation.Http(
         Execution.Http(id = Execution.ID.generate(), parent = runtime.execution, endpoint = request.path),
         request,
+        Invocation.Http.Origin.Server,
     ),
     request.telemetryAttributes(),
 ) {
@@ -163,27 +173,31 @@ private suspend inline fun <T> ServerRuntime.withHandlerTimeout(timeout: Duratio
 private suspend fun <PATH : PathSpec> Engine.executeHttp(
     request: HttpRequest<PATH>,
     execution: Execution.Http,
+    origin: Invocation.Http.Origin,
     interceptors: HttpInterceptor,
     dispatch: suspend ServerRuntime.(HttpRequest<PATH>) -> HttpResponse,
 ): HttpResponse = try {
     val telemetryContext = if (request.path.tryResolve()?.value?.traced == false) Untraced else request.traceParent()
+    var httpChainStarted = false
     withContext(telemetryContext) {
-        execute(request.operationName(), Invocation.Http(execution, request), request.telemetryAttributes()) { trace ->
-            var handledError: String? = null
-            suspend fun handleError(e: Exception): HttpResponse {
-                handledError = e::class.simpleName
-                val response = try {
-                    instrument("exceptionHandler") { serverRuntime.server.exceptionHandler.handle(request, e) }
-                } catch (_: Exception) {
-                    handledError = "unhandled_exception"
-                    HttpResponse(status = HttpStatus.InternalServerError)
-                }
-                if (response.status.serverError) reportException(e)
-                return response
-            }
-
-        val response = try {
-            interceptors.intercept(request) { req ->
+        execute(
+            request.operationName(),
+            Invocation.Http(execution, request, origin),
+            request.telemetryAttributes(),
+            recover = { trace, e ->
+                if (e is HttpStatusException) logger.debug(e) { "HttpStatusException in execution interceptor chain" }
+                else logger.error(e) { "Exception in execution interceptor chain" }
+                // Claude: a rejection before the HTTP chain ran still goes through it, so CORS headers make it
+                // readable to browsers. Once the chain has run, running it again would repeat its side effects.
+                val response =
+                    if (httpChainStarted) errorResponse(request, e, trace)
+                    else interceptors.interceptRecovering(request, trace) { errorResponse(request, e, trace) }
+                trace.enrich(TelemetryKeys.Http.statusCode to response.status.code.toLong())
+                response
+            },
+        ) { trace ->
+            httpChainStarted = true
+            val response = interceptors.interceptRecovering(request, trace) { req ->
                 // Map handler and routing exceptions to responses in-place so the surrounding
                 // interceptors (CORS, etc.) still post-process error responses.
                 try {
@@ -192,28 +206,52 @@ private suspend fun <PATH : PathSpec> Engine.executeHttp(
                     // HttpStatusExceptions are expected client-facing outcomes (400, 401, 404, ...), not server faults.
                     if (e is HttpStatusException) serverRuntime.logger.debug(e) { "HttpStatusException in HTTP" }
                     else serverRuntime.logger.error(e) { "Exception in HTTP" }
-                    handleError(e)
+                    errorResponse(request, e, trace)
                 }
             }
-        } catch (e: Exception) {
-            if (e is HttpStatusException) logger.debug(e) { "HttpStatusException in HTTP interceptor chain" }
-            else logger.error(e) { "Exception in HTTP interceptor chain" }
-            handleError(e)
-        }
 
-            trace.enrich(TelemetryAttributes {
-                put(TelemetryKeys.Http.statusCode, response.status.code.toLong())
-                handledError?.let { put(errorType, it) }
-            })
+            trace.enrich(TelemetryKeys.Http.statusCode to response.status.code.toLong())
             response
         }
     }
 } catch (e: CancellationException) {
     throw e
 } catch (e: Exception) {
-    // Claude: the execution interceptors wrap the error handling above, so their own failures land here.
+    // Claude: only failures outside the execution itself, such as in telemetry setup, land here.
     reportException(e)
     HttpResponse(status = HttpStatus.InternalServerError)
+}
+
+/** Runs [request] through this HTTP chain with [end] as its innermost step, turning the chain's own failures into a response. */
+context(runtime: ServerRuntime)
+private suspend fun <PATH : PathSpec> HttpInterceptor.interceptRecovering(
+    request: HttpRequest<PATH>,
+    trace: TelemetryTrace,
+    end: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
+): HttpResponse = try {
+    intercept(request, end)
+} catch (e: Exception) {
+    if (e is HttpStatusException) runtime.logger.debug(e) { "HttpStatusException in HTTP interceptor chain" }
+    else runtime.logger.error(e) { "Exception in HTTP interceptor chain" }
+    errorResponse(request, e, trace)
+}
+
+/** Returns the server's exception handler's response to [e], reporting it if that response is a server error. */
+context(runtime: ServerRuntime)
+private suspend fun errorResponse(request: HttpRequest<*>, e: Exception, trace: TelemetryTrace): HttpResponse {
+    var errorName = e::class.simpleName
+    val response = try {
+        instrument("exceptionHandler") { runtime.server.exceptionHandler.handle(request, e) }
+    } catch (_: Exception) {
+        errorName = "unhandled_exception"
+        HttpResponse(status = HttpStatus.InternalServerError)
+    }
+    if (response.status.serverError) runtime.reportException(e)
+    trace.enrich(TelemetryAttributes {
+        put(TelemetryKeys.Http.statusCode, response.status.code.toLong())
+        errorName?.let { put(errorType, it) }
+    })
+    return response
 }
 
 

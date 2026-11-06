@@ -207,8 +207,9 @@ fun main() {
 - Interceptor chains: `HttpInterceptor` and `WebSocketInterceptor` are physical: they run only for requests and
   sockets the engine received, never for `/meta/bulk` sub-requests, internal endpoint calls, or virtual sockets.
   `ExecutionInterceptor` is logical: it wraps every execution of every kind, and its `Invocation` carries the HTTP or
-  WebSocket request when there is one. It runs outside the physical chains, so a rejection that needs CORS headers
-  belongs in an `HttpInterceptor`.
+  WebSocket request when there is one. It runs outside the physical chains. For a request the engine received, a
+  rejection thrown before calling `cont` still runs through the HTTP chain, so it gets CORS headers; one thrown after
+  `cont` does not.
 
 ### Endpoint Definition
 
