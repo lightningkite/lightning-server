@@ -13,12 +13,15 @@ import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.typed.registerTable
 import com.lightningkite.services.database.*
 import com.lightningkite.services.files.*
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.modules.SerializersModule
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.uuid.Uuid
+
+private val logger = KotlinLogging.logger {}
 
 /**
  * Holds what every early upload shares: the tokens, the ServerFile serializer, the tracking table and
@@ -251,7 +254,8 @@ public class FileUploadBasis(
             try {
                 it.file.externalFile.delete()
             } catch (e: Exception) {
-                e.printStackTrace()
+                // TODO: Should this re-add the file to the table?
+                logger.error(e) { "Failed to delete file during cleanup: ${it.file.location.substringBefore("?")}" }
             }
         }
     }
