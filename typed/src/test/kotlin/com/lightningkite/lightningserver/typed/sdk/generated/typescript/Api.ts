@@ -6,9 +6,6 @@ export interface Api {
 	improperSDKFunctionName(): Promise<number>
 	inlinedEndpoint(id: Uuid, category: Uuid): Promise<number>
 
-	readonly predefinedEndpoints: {
-		preDefinedEndpoint(input: number): Promise<number>
-	}
 	readonly module: {
 		testSdkEndpoint(first: string, input: TestInput): Promise<string>
 		inlinedEndpoint(id: Uuid, category: Uuid): Promise<number>

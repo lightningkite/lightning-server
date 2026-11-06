@@ -30,18 +30,6 @@ interface Api {
 	 * */
 	suspend fun inlinedEndpoint(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int
 
-	interface PredefinedEndpoints {
-		/**
-		 * Pre-Defined Endpoint
-		 * 
-		 * This is an endpoint included through a pre-build definition
-		 * 
-		 * **Auth Requirements:** User with scope pre:defined *or* User with scope foo *or* IsSuperUser (User with root access and an additional requirement)
-		 * */
-		suspend fun preDefinedEndpoint(input: kotlin.Int): kotlin.Int
-	}
-	val predefinedEndpoints: PredefinedEndpoints
-
 	interface ModuleApi : com.lightningkite.lightningserver.typed.ClientModelRestEndpoints<com.lightningkite.lightningserver.typed.sdk.TestModel, com.lightningkite.lightningserver.typed.sdk.TestModel.ID> {
 		/**
 		 * Test Endpoint

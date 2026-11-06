@@ -111,16 +111,6 @@ export interface Api {
 	 * */
 	inlinedEndpoint(id: Uuid, category: Uuid): Promise<number>
 
-	readonly predefinedEndpoints: {
-		/**
-		 * Pre-Defined Endpoint
-		 * 
-		 * This is an endpoint included through a pre-build definition
-		 * 
-		 * **Auth Requirements:** User with scope pre:defined *or* User with scope foo *or* IsSuperUser (User with root access and an additional requirement)
-		 * */
-		preDefinedEndpoint(input: number): Promise<number>
-	}
 	readonly module: {
 		/**
 		 * Test Endpoint
@@ -1352,9 +1342,6 @@ export class LiveApi implements Api {
 	improperSDKFunctionName: Api["improperSDKFunctionName"] = () => this.fetcher(`/`, "POST", undefined)
 	inlinedEndpoint: Api["inlinedEndpoint"] = (id, category) => this.fetcher(`/inline/action/${id}/${category}`, "POST", undefined)
 
-	readonly predefinedEndpoints: Api["predefinedEndpoints"] = {
-		preDefinedEndpoint: (input) => this.fetcher(`/predefined/foo`, "POST", input),
-	}
 	readonly module: Api["module"] = {
 		testSdkEndpoint: (first, input) => this.fetcher(`/m1/endpoint/${first}`, "POST", input),
 		inlinedEndpoint: (id, category) => this.fetcher(`/m1/inline/again/action/${id}/${category}`, "POST", undefined),
