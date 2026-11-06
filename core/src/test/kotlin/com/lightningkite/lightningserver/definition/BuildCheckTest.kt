@@ -26,10 +26,13 @@ class BuildCheckTest {
     }
 
     @Test
-    fun checksReceiveTheBuiltDefinition() {
+    fun moduleChecksReceiveTheWholeServer() {
         var seen: ServerDefinition? = null
-        val root = object : ServerBuilder() {
+        val child = object : ServerBuilder() {
             init { buildCheck { seen = it } }
+        }
+        val root = object : ServerBuilder() {
+            init { path.path("child") include child }
         }
         assertSame(root.build(), seen)
     }

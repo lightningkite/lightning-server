@@ -29,7 +29,7 @@ public class EventRegistry private constructor(
     }
 
     public companion object {
-        public val ServerBuilder.events: EventRegistry by Key
+        public val ServerBuilder.eventsRegistry: EventRegistry by Key
         public val ServerDefinition.events: Map<EventType.Name, EventDefinition<*, *>> by Key
     }
 }

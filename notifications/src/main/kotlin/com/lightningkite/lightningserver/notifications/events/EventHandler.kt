@@ -3,7 +3,7 @@ package com.lightningkite.lightningserver.notifications.events
 import com.lightningkite.lightningserver.LightningServerDsl
 import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.notifications.events.EventRegistry.Companion.events
+import com.lightningkite.lightningserver.notifications.events.EventRegistry.Companion.eventsRegistry
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.invoke
 import com.lightningkite.lightningserver.typed.ModelInfo
@@ -139,7 +139,7 @@ public fun <HANDLER : EventHandler, T : HasId<ID>, ID : Comparable<ID>> HANDLER.
 ): EventLauncher<HANDLER, T, ID> {
     val type = EventDefinition(name, tags, info)
 
-    builder.events.register(type)
+    builder.eventsRegistry.register(type)
 
     additionalSetup(type)
 

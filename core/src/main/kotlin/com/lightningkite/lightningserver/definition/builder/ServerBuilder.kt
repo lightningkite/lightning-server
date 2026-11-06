@@ -188,7 +188,7 @@ public abstract class ServerBuilder : Extendable {
     }
 
     /**
-     * Registers [check] to run right after this builder is built.
+     * Registers [check] to run once the server this builder is part of is built.
      *
      * @see BuildCheck
      */
@@ -340,12 +340,19 @@ public abstract class ServerBuilder : Extendable {
      * It performs a full build process that involves:
      * 1. Creating a [ServerDefinition.Module] of this builder's direct configuration
      * 2. Recursively building all included modules
-     * 3. Running this builder's [BuildCheck]s, after its modules have run theirs
+     * 3. Running every [BuildCheck] in this builder and its modules against the result, modules' checks first
      *
      * @return A complete [ServerDefinition] with all modules flattened and ready for deployment
      */
+    public fun build(): ServerDefinition {
+        val checks = ArrayList<BuildCheck>()
+        val definition = build(checks)
+        checks.forEach { it.check(definition) }
+        return definition
+    }
+
     @OptIn(InternalLightningServerApi::class)
-    public fun build(): ServerDefinition = ServerDefinition(
+    private fun build(checks: MutableList<BuildCheck>): ServerDefinition = ServerDefinition(
         thisLayer = ServerDefinition.Module(
             moduleId = moduleId,
             internalSerializersModule = internalSerialization,
@@ -377,6 +384,6 @@ public abstract class ServerBuilder : Extendable {
             mediaTypeEncoders = mediaTypeEncoders.toSealedMap(),
             settingOverrides = settingOverrides.toSealedMap()
         ),
-        modules = modules.mapItems { it.build() }.toSealedList()
-    ).also { definition -> buildChecks.forEach { it.check(definition) } }
+        modules = modules.mapItems { it.build(checks) }.toSealedList()
+    ).also { checks += buildChecks }
 }

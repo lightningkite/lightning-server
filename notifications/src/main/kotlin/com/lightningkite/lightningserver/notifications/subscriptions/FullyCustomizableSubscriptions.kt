@@ -3,7 +3,6 @@ package com.lightningkite.lightningserver.notifications.subscriptions
 import com.lightningkite.services.database.optics.*
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.auth.*
-import com.lightningkite.lightningserver.definition.StartupTask
 import com.lightningkite.lightningserver.definition.builder.MapRegistry
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.notifications.*
@@ -349,11 +348,13 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
         users.registerChangeListener { updateDefaultSubscriptions(it.changes, null) }
     }
 
-    private val verify = path.path("verify") bind StartupTask {
-        val registry = serverRuntime.server.events
-        require(defaultSubscriptions.keys.containsAll(registry.keys)) {
-            val missing = registry.keys - defaultSubscriptions.keys
-            "Default subscriptions are missing for (${missing.size}) event definitions: $missing"
+    init {
+        buildCheck { definition ->
+            val registry = definition.events
+            require(defaultSubscriptions.keys.containsAll(registry.keys)) {
+                val missing = registry.keys - defaultSubscriptions.keys
+                "Default subscriptions are missing for (${missing.size}) event definitions: $missing"
+            }
         }
     }
 
