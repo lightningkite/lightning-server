@@ -5,7 +5,7 @@
 
 Lightning Server provides a unified abstraction for file storage through `ExternalFileSystem`.  Files are
 addressed server-side as `ExternalFile` values and serialized to clients as `ServerFile` URLs.  The
-`UploadEarlyEndpoint` handles the standard upload workflow where a client uploads a file before
+`GlobalUploadEndpoints` handles the standard upload workflow where a client uploads a file before
 referencing it in a subsequent API call.
 
 ## Imports
@@ -43,7 +43,7 @@ Converting between the two:
 - `fileObject.serverFile` — wraps the `ExternalFile`'s internal URL in a `ServerFile`
   (available everywhere; no runtime needed).
 - `serverFile.fileObject` — resolves a `ServerFile` back to a `ExternalFile` using the contextual
-  serializer registered by `UploadEarlyEndpoint`.  Requires a `ServerRuntime` context; throws
+  serializer registered by `GlobalUploadEndpoints`. Requires a `ServerRuntime` context; throws
   `IllegalStateException` if no serializer is configured.
 
 ## Declaring the Files Setting
@@ -69,12 +69,12 @@ object FileServer : ServerBuilder() {
 }
 ```
 
-> **Singleton rule:** Instantiate `UploadEarlyEndpoint` exactly **once** per server.  The endpoint
+> **Singleton rule:** Instantiate `GlobalUploadEndpoints` exactly **once** per server. The endpoint
 > registers a contextual serializer for `ServerFile`; a second instance registers a conflicting
 > serializer and causes runtime serialization errors (500 responses) that are difficult to trace.
 > See also: CLAUDE.md testing pitfalls.
 
-`UploadEarlyEndpoint` constructor parameters (all optional beyond `files` and `database`):
+`GlobalUploadEndpoints` constructor parameters (all optional beyond `files` and `database`):
 
 | Parameter | Default | Purpose |
 |---|---|---|
@@ -171,7 +171,7 @@ data class Post(
 ) : HasId<Uuid>
 ```
 
-When `Post` is returned by an endpoint within the same server that contains `UploadEarlyEndpoint`,
+When `Post` is returned by an endpoint within the same server that contains `GlobalUploadEndpoints`,
 `image` is automatically signed before it reaches the client.  When a client submits a `Post` with
 `image` set to a `futureCallToken`, the serializer validates, resolves, and cleans up the token.
 
@@ -281,5 +281,5 @@ external database is needed.
   [Media Processing](media.md).
 - **Validation** — annotate `ServerFile` fields with `@MimeType(…)` and register
   `AnnotationValidators.Files` to enforce file type and size limits at the model layer.
-- **Cleanup** — `UploadEarlyEndpoint` includes a built-in `cleanupSchedule` that runs daily and
+- **Cleanup** — `GlobalUploadEndpoints` includes a built-in `cleanupSchedule` that runs daily and
   removes expired upload records and their associated files.

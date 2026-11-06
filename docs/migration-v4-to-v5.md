@@ -190,7 +190,7 @@ See [WebSockets](websockets.md) for the current API.
   needs `context(runtime: ServerRuntime)`.
 - **`collection()` unresolved.** Replace `.collection()`/`.baseCollection()` with `.table()`/`.baseTable()`.
 - **Wrong `Instant` import.** Use `kotlin.time.Instant`, not `kotlinx.datetime.Instant`.
-- **Duplicate `UploadEarlyEndpoint`.** Instantiate it exactly once; multiple instances register conflicting
+- **Duplicate `GlobalUploadEndpoints`.** Instantiate it exactly once; multiple instances register conflicting
   `ServerFile` serializers and cause runtime 500s. See [File Systems](files.md).
 
 ## Client and KiteUI migration

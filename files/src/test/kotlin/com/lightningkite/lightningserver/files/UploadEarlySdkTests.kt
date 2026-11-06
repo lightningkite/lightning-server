@@ -20,7 +20,7 @@ class UploadEarlySdkTests {
         val database = setting("database", Database.Settings())
         val files = setting("files", ExternalFileSystem.Settings())
 
-        val uploadEarly = path.path("upload") module UploadEarlyEndpoint(
+        val uploadEarly = path.path("upload") module GlobalUploadEndpoints(
             files = files,
             database = database,
             fileScanner = Runtime.Constant(emptyList())

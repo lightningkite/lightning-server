@@ -427,11 +427,11 @@ Server.typedEndpoint.test("pathArg", auth = auth, input = RequestData(...))
 
 ⚠️ **Duplicate UploadEarlyEndpoint Declarations**
 
-If you create multiple instances of `UploadEarlyEndpoint` (e.g., in different modules or endpoints), they will have *
+If you create multiple instances of `GlobalUploadEndpoints` (e.g., in different modules or endpoints), they will have *
 *conflicting declarations for how `ServerFile` is serialized**. This causes runtime serialization errors that manifest
 as `500 Internal Server Error` responses in tests, even though the code compiles successfully.
 
-**Solution:** Only instantiate `UploadEarlyEndpoint` once in your server definition:
+**Solution:** Only instantiate `GlobalUploadEndpoints` once in your server definition:
 
 ```kotlin
 object Server : ServerBuilder() {
@@ -445,7 +445,7 @@ object Server : ServerBuilder() {
 }
 ```
 
-If you need multiple upload endpoints, reuse the same `UploadEarlyEndpoint` instance or use different endpoint patterns.
+If you need multiple upload endpoints, reuse the same `GlobalUploadEndpoints` instance or use different endpoint patterns.
 
 ## Common Patterns
 
