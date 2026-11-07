@@ -564,8 +564,9 @@ REGION="${'$'}AWS_REGION_NAME"""",
 
             runCustomInstallScripts()
 
-            // Enable (but do not start) the service so it auto-starts after the boot-time deploy.
-            appendLine("systemctl enable $projectPrefix || true")
+            // The app service is deliberately NOT enabled here. Enabled in the AMI, systemd would start it
+            // early in first boot, before boot.sh (cloud-final) has deployed settings, and it would crash-loop
+            // while the redeploy runs. boot.sh enables it after the first successful redeploy instead.
             appendLine("systemctl enable amazon-cloudwatch-agent || true")
         }
     }
