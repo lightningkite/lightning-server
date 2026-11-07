@@ -101,6 +101,7 @@ public class TimeBasedOTPProofEndpoints(
     public val establish: ApiHttpHandler<PathSpec0, HasId<*>, EstablishTotp, String> =
         path.path("establish").post bind explicitApiHttpHandler(
             summary = "Establish Time Based One Time Password",
+            functionName = "establishOneTimePassword",
             inputType = EstablishTotp.serializer(),
             outputType = String.serializer(),
             description = "Generates a new Time Based One Time Password configuration. Any confirmed one stays " +
@@ -133,6 +134,7 @@ public class TimeBasedOTPProofEndpoints(
         path.path("prove").post bind ApiHttpHandler(
             auth = noAuth,
             summary = "Prove TOTP",
+            functionName = "proveOTP",
             description = "Logs in to the given account with an TOTP code. Only confirmed secrets are accepted, since " +
                     "an unconfirmed one was never shown to be in the user's possession. Limits to 10 attempts per hour.",
             errorCases = listOf(),
@@ -207,6 +209,7 @@ public class TimeBasedOTPProofEndpoints(
     private fun confirmHandler(deprecatedPath: Boolean): ApiHttpHandler<PathSpec0, HasId<*>, String, Unit> =
         explicitApiHttpHandler(
             summary = "Confirm Time Based One Time Password" + if (deprecatedPath) " (Deprecated Path)" else "",
+            functionName = if (deprecatedPath) "confirmTimeBasedOneTimePasswordDeprecatedPath" else "confirmOneTimePassword",
             inputType = String.serializer(),
             outputType = Unit.serializer(),
             description = (if (deprecatedPath) "Deprecated: use the confirm path instead. " else "") +
