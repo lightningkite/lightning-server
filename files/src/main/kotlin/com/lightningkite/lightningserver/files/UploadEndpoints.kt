@@ -1,7 +1,6 @@
 package com.lightningkite.lightningserver.files
 
 import com.lightningkite.lightningserver.auth.AuthRequirement
-import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
@@ -12,6 +11,7 @@ import com.lightningkite.lightningserver.typed.AuthAccess
 import com.lightningkite.lightningserver.typed.explicitApiHttpHandler
 import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
+import com.lightningkite.services.data.Unsafe
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.files.DirectServerFileSerializer
 import com.lightningkite.services.files.ServerFile
@@ -19,15 +19,15 @@ import com.lightningkite.services.files.ServerFile
 /**
  * Creates upload endpoints that store every file under the fixed [folder].
  *
- * @throws IllegalArgumentException if [folder] is not a valid relative path.
+ * @throws IllegalArgumentException if [folder] is not a valid folder; see [requireValidRelativeFolderPath].
  */
 public fun <USER : HasId<*>?> UploadEndpoints(
     basis: FileUploadBasis,
     folder: String,
     auth: AuthRequirement<USER>
 ): UploadEndpoints<USER> {
-    require(isValidFolder(folder)) { invalidFolderMessage(folder) }
-    return UploadEndpoints(basis, auth, { folder })
+    requireValidRelativeFolderPath(folder)
+    return UploadEndpoints(basis, auth) { folder }
 }
 
 /**
@@ -42,8 +42,8 @@ public fun <USER : HasId<*>?> UploadEndpoints(
  * ```kotlin
  * UploadEndpoints(uploads, UserAuth.require()) { "users/${auth.rawId}/avatars" }
  * ```
- * It must return a relative path such as `"users/avatars"`: not blank, no leading or trailing `/`, and no
- * empty, `.` or `..` segments. Anything else fails the upload with an [IllegalStateException].
+ * It must return a valid folder (see [requireValidRelativeFolderPath]); anything else fails the upload with an
+ * [IllegalArgumentException].
  */
 public class UploadEndpoints<USER : HasId<*>?>(
     public val basis: FileUploadBasis,
@@ -62,6 +62,7 @@ public class UploadEndpoints<USER : HasId<*>?>(
      * GET handler to prepare an upload. Returns an [UploadTarget] containing the presigned upload URL and
      * the [UnverifiedUploadToken] to pass to [verify].
      */
+    @OptIn(Unsafe::class) // SAFETY: auth is required above and the folder comes from server code, not the client.
     public val upload: ApiHttpHandler<PathSpec0, USER, Unit, UploadTarget> =
         path.get bind ApiHttpHandler(
             auth = auth,
@@ -71,9 +72,7 @@ public class UploadEndpoints<USER : HasId<*>?>(
                 "then use the result as a file in a later request. Both expire in ${basis.expiration}.",
             errorCases = listOf(),
             implementation = { _: Unit ->
-                val folder = folder()
-                check(isValidFolder(folder)) { invalidFolderMessage(folder) }
-                basis.prepare(folder)
+                basis.prepare(folder())
             }
         )
 
@@ -81,6 +80,7 @@ public class UploadEndpoints<USER : HasId<*>?>(
      * POST handler to verify a file uploaded through [upload], scanning it and promoting it to the ready
      * location. Returns a [ServerFile] to send in a later request.
      */
+    @OptIn(Unsafe::class) // SAFETY: the output is encoded with DirectServerFileSerializer.
     public val verify: ApiHttpHandler<PathSpec0, USER, UnverifiedUploadToken, ServerFile> =
         path.path("verify").post bind explicitApiHttpHandler(
             auth = auth,
@@ -96,8 +96,14 @@ public class UploadEndpoints<USER : HasId<*>?>(
         )
 }
 
-private fun isValidFolder(folder: String): Boolean =
-    folder.split('/').none { it.isBlank() || it == "." || it == ".." }
-
-private fun invalidFolderMessage(folder: String): String =
-    "Upload folder must be a relative path with no empty, '.' or '..' segments; got '$folder'."
+/**
+ * Throws an [IllegalArgumentException] if [folder] is not a valid upload folder.
+ *
+ * A valid folder is either `""`, meaning the root, or a relative path such as `"users/avatars"`: no leading or
+ * trailing `/`, and no blank, `.` or `..` segments.
+ */
+public fun requireValidRelativeFolderPath(folder: String) {
+    require(folder.isEmpty() || folder.split('/').none { it.isBlank() || it == "." || it == ".." }) {
+        "Upload folder must be \"\" or a relative path with no empty, '.' or '..' segments; got '$folder'."
+    }
+}

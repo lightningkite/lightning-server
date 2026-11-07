@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.explicitApiHttpHandler
 import com.lightningkite.lightningserver.typed.sdk.*
+import com.lightningkite.services.data.Unsafe
 import com.lightningkite.services.database.*
 import com.lightningkite.services.files.*
 import kotlin.time.Duration
@@ -58,6 +59,7 @@ public class GlobalUploadEndpoints(
      * GET handler to prepare an upload. Returns an [UploadTarget] containing the presigned upload URL and
      * the [UnverifiedUploadToken] to pass to [verify].
      */
+    @OptIn(Unsafe::class) // SAFETY: authOptions is required above and the folder is the root.
     public val endpoint: ApiHttpHandler<PathSpec0, HasId<*>?, Unit, UploadTarget> =
         path.get bind ApiHttpHandler(
             auth = authOptions,
@@ -72,6 +74,7 @@ public class GlobalUploadEndpoints(
      * POST handler to verify a previously uploaded file, scanning it and promoting it to the ready
      * location. Returns a [ServerFile] to send in a later request.
      */
+    @OptIn(Unsafe::class) // SAFETY: the output is encoded with DirectServerFileSerializer.
     public val verify: ApiHttpHandler<PathSpec0, HasId<*>?, UnverifiedUploadToken, ServerFile> =
         path.path("verify").post bind explicitApiHttpHandler(
             auth = authOptions,
