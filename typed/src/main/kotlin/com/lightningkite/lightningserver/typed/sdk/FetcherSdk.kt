@@ -327,7 +327,7 @@ public class FetcherSdk(
     private fun InterfaceInfo.needsGeneration() =
         type.annotations.none { it is LiveVersion }
 
-    context(server: ServerRuntime)
+    context(server: Engine)
     private fun Appendable.writeGeneratedLiveVersions(data: SDK.Data) {
         data.asSequence()
             .flatMap { it.layer.endpoints.entries }
@@ -361,8 +361,8 @@ public class FetcherSdk(
                                     functionName = it.value.functionName
                                 )
                             }
-                            ?: endpoints.websocket?.takeIf { it.functionName == func.name }?.let { websocket ->
-                                SDK.Function.Websocket(
+                            ?: endpoints.webSocket?.takeIf { it.functionName == func.name }?.let { websocket ->
+                                SDK.Function.WebSocket(
                                     handler = websocket,
                                     path = path,
                                     fromInterface = inter,
@@ -433,7 +433,7 @@ public class FetcherSdk(
                             appendIdtLine(2, if (function.inputType.isUnit()) "kotlin.Unit," else "input,")
                             appendIdtLine(2, function.outputType.kotlinSerializerWithReplacements(serializerReplacements))
                         }
-                        is SDK.Function.Websocket -> {
+                        is SDK.Function.WebSocket -> {
                             appendLine("fetcher.websocket(")
                             appendIdtLine(
                                 2,
@@ -476,7 +476,7 @@ public class FetcherSdk(
         if (this.isNotEmpty()) joinTo(buffer, separator, prefix, postfix, transform = transform)
     }
 
-    context(_: ServerRuntime)
+    context(_: Engine)
     private fun PathSpec.toCodeString(
         quoted: Boolean = true,
         replacements: Map<KSerializer<*>, String> = emptyMap()
@@ -501,7 +501,7 @@ public class FetcherSdk(
         }
     }
 
-    context(_: ServerRuntime)
+    context(_: Engine)
     private fun SDK.Function.kdoc(depth: Int, includeAuth: Boolean): String = buildString {
         val lines = buildList {
             if (summary.isNotBlank()) {

@@ -76,7 +76,7 @@ public fun KSerializer<*>.kotlinSerializer(): String {
 
 
 @OptIn(ExperimentalSerializationApi::class)
-context(server: ServerRuntime)
+context(server: Engine)
 internal fun KSerializer<*>.kotlinSerializerWithReplacements(
     replacements: Map<KSerializer<*>, String>
 ): String {
