@@ -12,7 +12,7 @@ import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.demo.endpoints.*
 import com.lightningkite.lightningserver.demo.models.User
 import com.lightningkite.lightningserver.files.Files
-import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
+import com.lightningkite.lightningserver.files.GlobalUploadEndpoints
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.fullUrl
@@ -130,7 +130,7 @@ object Server : ServerBuilder() {
 
 
     val user = path.path("user") include UserEndpoints
-    val uploadEarly = path.path("upload") module UploadEarlyEndpoint(files, database, Runtime.Constant(listOf()))
+    val uploadEarly = path.path("upload") module GlobalUploadEndpoints(files, database, Runtime.Constant(listOf()))
 
     /**
      * Basic Examples - Simple HTTP endpoints demonstrating fundamental patterns.

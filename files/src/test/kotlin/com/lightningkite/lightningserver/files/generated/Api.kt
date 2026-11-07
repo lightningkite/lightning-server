@@ -8,7 +8,7 @@ interface Api {
 	fun withHeaderCalculator(calculator: suspend () -> List<Pair<String, String>>): Api =
 		withMetadata { clear(); for ((name, value) in calculator()) append(name, value) }
 
-	val uploadEarlyEndpoint: com.lightningkite.lightningserver.files.ClientUploadEarlyEndpoints
+	val globalUpload: com.lightningkite.lightningserver.files.ClientFileUploadEndpoints
 
 	val module: com.lightningkite.lightningserver.typed.ClientModelRestEndpoints<com.lightningkite.lightningserver.files.UploadEarlySdkTests.Model, kotlin.uuid.Uuid>
 }
