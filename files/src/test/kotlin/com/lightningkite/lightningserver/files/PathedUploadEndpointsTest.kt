@@ -166,9 +166,9 @@ class PathedUploadEndpointsTest {
         files set ExternalFileSystem.Settings("file://build/testfiles/${Uuid.random()}?serveUrl=http://localhost:8080/files")
         database set Database.Settings()
     }) {
-        for (bad in listOf("../escape", "a/../b", "a//b", "/abs", "trailing/", "", "./a")) {
+        for (bad in listOf("../escape", "a/../b", "a//b", "/abs", "trailing/", " ", "./a")) {
             Server.nextFolder = bad
-            assertFailsWith<IllegalStateException>(bad) { dynamic.upload.test(null, Unit) }
+            assertFailsWith<IllegalArgumentException>(bad) { dynamic.upload.test(null, Unit) }
         }
     }
 
@@ -176,7 +176,7 @@ class PathedUploadEndpointsTest {
     fun folderMustBeRelative() {
         assertFailsWith<IllegalArgumentException> { UploadEndpoints(Server.uploads, "/avatars", noAuth) }
         assertFailsWith<IllegalArgumentException> { UploadEndpoints(Server.uploads, "avatars/", noAuth) }
-        assertFailsWith<IllegalArgumentException> { UploadEndpoints(Server.uploads, "", noAuth) }
+        assertFailsWith<IllegalArgumentException> { UploadEndpoints(Server.uploads, " ", noAuth) }
         assertFailsWith<IllegalArgumentException> { UploadEndpoints(Server.uploads, "a/../b", noAuth) }
     }
 

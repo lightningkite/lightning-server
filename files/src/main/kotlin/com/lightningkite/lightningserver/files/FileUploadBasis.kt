@@ -11,14 +11,18 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.engine
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.typed.registerTable
+import com.lightningkite.services.data.Unsafe
 import com.lightningkite.services.database.*
 import com.lightningkite.services.files.*
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.modules.SerializersModule
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.uuid.Uuid
+
+private val logger = KotlinLogging.logger {}
 
 /**
  * Holds what every early upload shares: the tokens, the ServerFile serializer, the tracking table and
@@ -153,9 +157,19 @@ public class FileUploadBasis(
     private fun newKey(folder: String): String =
         if (folder.isEmpty()) "${Uuid.random()}.file" else "$folder/${Uuid.random()}.file"
 
-    /** Returns an upload URL and token for a new file under [folder]. */
+    /**
+     * Returns an upload URL and token for a new file under [folder], for building custom upload endpoints.
+     *
+     * This does not authorize the caller, so prefer [UploadEndpoints], which does. A caller must authorize
+     * the request itself, and must choose [folder] on the server: it is signed into the token and [verify]
+     * trusts it, so a folder taken from the client lets the client place files anywhere in storage.
+     *
+     * @throws IllegalArgumentException if [folder] is not a valid folder; see [requireValidRelativeFolderPath].
+     */
+    @Unsafe("The caller must authorize the request, and the folder must be chosen by the server")
     context(_: ServerRuntime)
-    internal suspend fun prepare(folder: String): UploadTarget {
+    public suspend fun prepare(folder: String): UploadTarget {
+        requireValidRelativeFolderPath(folder)
         val key = newKey(folder)
         // With no scanners there is nothing to promote, so the client uploads straight to the
         // ready location and its token is born scanned.
@@ -176,14 +190,21 @@ public class FileUploadBasis(
     }
 
     /**
-     * Scans the file [upload] names and promotes it to the ready location, keeping it in the folder it was uploaded to.
+     * Scans the file [upload] names and promotes it to the ready location, keeping it in the folder it was
+     * uploaded to, for building custom verify endpoints.
      *
-     * Returns a [ServerFile] whose location is the scanned token, not a URL, so it must be encoded with
-     * [DirectServerFileSerializer]; the contextual serializer resolves it only when a later request sends it back.
+     * The returned [ServerFile]'s location is the scanned token, not a URL, so it **must** be encoded with
+     * [DirectServerFileSerializer], e.g. as the `outputType` of an `explicitApiHttpHandler`. The contextual
+     * serializer would send a signed URL instead: the client could use it, but the server never claims
+     * the upload, so the cleanup task deletes the file once [expiration] passes. Retrying with an already
+     * verified token returns it unchanged.
+     *
+     * @throws BadRequestException if [upload] is not a token this basis issued, or a file scanner rejects the file.
      */
+    @Unsafe("The returned ServerFile must be serialized with DirectServerFileSerializer")
     context(_: ServerRuntime)
-    internal suspend fun verify(upload: UnverifiedUploadToken): ServerFile = when (
-        val parsed = tokens().parseOrNull(upload.raw) ?: throw IllegalArgumentException("Not an upload token.")
+    public suspend fun verify(upload: UnverifiedUploadToken): ServerFile = when (
+        val parsed = tokens().parseOrNull(upload.raw) ?: throw BadRequestException("Not an upload token.")
     ) {
         // Already verified. Returning the token unchanged makes a retry safe.
         is UploadToken.Scanned -> ServerFile(upload.raw)
@@ -251,7 +272,8 @@ public class FileUploadBasis(
             try {
                 it.file.externalFile.delete()
             } catch (e: Exception) {
-                e.printStackTrace()
+                // TODO: Should this re-add the file to the table?
+                logger.error(e) { "Failed to delete file during cleanup: ${it.file.location.substringBefore("?")}" }
             }
         }
     }
