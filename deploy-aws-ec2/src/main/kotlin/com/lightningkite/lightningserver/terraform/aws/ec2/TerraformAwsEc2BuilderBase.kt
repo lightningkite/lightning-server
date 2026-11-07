@@ -1381,10 +1381,6 @@ log "Verified settings decrypt"
 [ -f "$CONF_DIR/settings.enc" ] && mv "$CONF_DIR/settings.enc" "$CONF_DIR/settings.enc.old"
 mv "$CONF_DIR/settings.enc.new" "$CONF_DIR/settings.enc"
 
-# Mount point for the unit's read-only settings bind mount. Created as the service user: it owns
-# this directory, so root must not follow anything that may have been placed here.
-[ -e "$STATE_DIR/settings.json" ] || sudo -u lightning-server touch "$STATE_DIR/settings.json"
-
 log "Restarting $$deploymentTag"
 systemctl restart $$projectPrefix
 sleep 5
