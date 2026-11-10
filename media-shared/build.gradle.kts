@@ -88,3 +88,6 @@ lkLibrary(
 ) {
     description.set("A set of classes shared between the server and client for handling images.")
 }
+// commonMain compiles the common KSP output as plain source, so every other KSP run and compile must wait for it.
+tasks.matching { (it.name.startsWith("ksp") || it.name.startsWith("compile")) && it.name != "kspCommonMainKotlinMetadata" }
+    .configureEach { dependsOn("kspCommonMainKotlinMetadata") }
