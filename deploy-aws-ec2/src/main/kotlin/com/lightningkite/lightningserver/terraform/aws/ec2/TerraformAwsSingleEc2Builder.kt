@@ -60,7 +60,11 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
         privateSubnets = TerraformJsonObject.expression("module.vpc.private_subnets"),
         publicSubnets = TerraformJsonObject.expression("module.vpc.public_subnets"),
         applicationRouteTables = TerraformJsonObject.expression("module.vpc.public_route_table_ids"),
-        natGatewayIps = TerraformJsonObject.expression("module.vpc.nat_public_ips"),
+        // Claude: the instance sits in a public subnet, so it reaches the internet as its Elastic IP, not
+        // through the NAT. Services allowlist these IPs (e.g. the MongoDB Atlas access list).
+        natGatewayIps = TerraformJsonObject.expression(
+            if (enableIPv4) "[aws_eip.main.public_ip]" else "module.vpc.nat_public_ips"
+        ),
     )
 
     /**
@@ -774,21 +778,8 @@ rm -rf aws/ awscliv2.zip
         )
     }
 
-    /**
-     * The `server` blocks for [domain]: a catch-all that drops unknown hosts, an HTTP-to-HTTPS redirect,
-     * and the TLS proxy to the app.
-     */
+    /** The `server` blocks for [domain]: an HTTP-to-HTTPS redirect and the TLS proxy to the app. */
     private fun nginxServers(domain: String, includeUpgrade: Boolean): String = $$"""
-# Drop requests for any other host name or a bare IP
-server {
-    listen 80 default_server;
-    listen [::]:80 default_server;
-    listen 443 ssl default_server;
-    listen [::]:443 ssl default_server;
-    ssl_reject_handshake on;
-    return 444;
-}
-
 # HTTP: redirect to HTTPS (nginx-module-acme answers ACME challenges before this)
 server {
     listen 80;
@@ -904,6 +895,16 @@ acme_issuer letsencrypt {
     uri https://acme-v02.api.letsencrypt.org/directory;
     state_path /var/cache/nginx/acme-letsencrypt;
     accept_terms_of_service;
+}
+
+# Drop requests for any other host name or a bare IP. nginx allows only one default_server per port.
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+    ssl_reject_handshake on;
+    return 444;
 }
 $${nginxServers(domain, wsDomain == domain)}
 $${if (wsDomain != domain) nginxServers(wsDomain, true) else ""}
