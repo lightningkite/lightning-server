@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.terraform.aws.ec2
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.services.Untested
 import com.lightningkite.services.terraform.*
+import org.intellij.lang.annotations.Language
 
 
 /**
@@ -40,12 +41,13 @@ import com.lightningkite.services.terraform.*
  *
  * @param S The ServerBuilder type being deployed
  */
-@Untested
 public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
     builder: S,
-) : TerraformAwsEc2BuilderBase<S>(builder) {
+) : TerraformAwsEc2BuilderBase<S>(builder), TerraformEmitterKnownIpAddresses {
 
     abstract override val applicationVpc: AwsVpc.EC2Safe
+
+    override val applicationIpAddresses: String = TerraformJsonObject.expression("[aws_eip.main.public_ip]")
 
     public fun terraformManagedVPC(
         ipPrefix: String,
@@ -60,7 +62,7 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
         privateSubnets = TerraformJsonObject.expression("module.vpc.private_subnets"),
         publicSubnets = TerraformJsonObject.expression("module.vpc.public_subnets"),
         applicationRouteTables = TerraformJsonObject.expression("module.vpc.public_route_table_ids"),
-        natGatewayIps = TerraformJsonObject.expression("module.vpc.nat_public_ips"),
+        natGatewayIps = TerraformJsonObject.expression("module.vpc.nat_public_ips")
     )
 
     /**
@@ -111,8 +113,7 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
         (applicationVpc as? VpcInfoTerraformManaged)?.also {
             emitVpc(it, enableIPv6)
         }
-        if (enableIPv4)
-            emitEIPResources()
+        emitEIPResources()
         emitEc2Resources()
         emitDnsResources()
         emitMonitoringResources()
@@ -151,13 +152,13 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
                     "settings_upload" - expression("null_resource.upload_settings.id")
                 }
 
-                "depends_on" - listOfNotNull(
+                "depends_on" - listOf(
                     "null_resource.upload_jar",
                     "null_resource.upload_settings",
                     "aws_instance.main",
                     "aws_iam_role_policy_attachment.ssm",
                     "aws_iam_role_policy_attachment.servicesAccess",
-                    if (enableIPv4) "aws_eip_association.main" else null,
+                    "aws_eip_association.main",
                     "aws_ssm_parameter.settings_password",
                 )
                 "provisioner" {
@@ -287,14 +288,13 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
             }
 
             // A Record pointing to EC2
-            if (enableIPv4)
-                "resource.aws_route53_record.main" {
-                    "zone_id" - domainZoneId
-                    "name" - domain
-                    "type" - "A"
-                    "ttl" - 300
-                    "records" - listOf(expression("aws_eip.main.public_ip"))
-                }
+            "resource.aws_route53_record.main" {
+                "zone_id" - domainZoneId
+                "name" - domain
+                "type" - "A"
+                "ttl" - 300
+                "records" - listOf(expression("aws_eip.main.public_ip"))
+            }
             if (enableIPv6)
                 "resource.aws_route53_record.main_v6" {
                     "zone_id" - domainZoneId
@@ -307,14 +307,13 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
 
             if (wsDomain != domain) {
                 // A Record pointing to EC2 for wsDomain
-                if (enableIPv4)
-                    "resource.aws_route53_record.ws_main" {
-                        "zone_id" - domainZoneId
-                        "name" - wsDomain
-                        "type" - "A"
-                        "ttl" - 300
-                        "records" - listOf(expression("aws_eip.main.public_ip"))
-                    }
+                "resource.aws_route53_record.ws_main" {
+                    "zone_id" - domainZoneId
+                    "name" - wsDomain
+                    "type" - "A"
+                    "ttl" - 300
+                    "records" - listOf(expression("aws_eip.main.public_ip"))
+                }
                 if (enableIPv6)
                     "resource.aws_route53_record.ws_main_v6" {
                         "zone_id" - domainZoneId
@@ -479,41 +478,40 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
                 }
             }
 
-
             "resource.aws_vpc_security_group_egress_rule.access_outside" {
                 "security_group_id" - expression("aws_security_group.ec2.id")
                 "ip_protocol" - -1
                 "cidr_ipv4" - "0.0.0.0/0"
             }
 
-            if (enableIPv4) {
-                "resource.aws_vpc_security_group_ingress_rule.http" {
-                    "security_group_id" - expression("aws_security_group.ec2.id")
-                    "ip_protocol" - "tcp"
-                    "from_port" - 80
-                    "to_port" - 80
-                    "cidr_ipv4" - "0.0.0.0/0"
-                }
-                "resource.aws_vpc_security_group_ingress_rule.https" {
-                    "security_group_id" - expression("aws_security_group.ec2.id")
-                    "ip_protocol" - "tcp"
-                    "from_port" - 443
-                    "to_port" - 443
-                    "cidr_ipv4" - "0.0.0.0/0"
-                }
-                val v4CIDRs = sshAllowedV4CIDR.joinToString { "\"$it\"" }
-                if (v4CIDRs.isNotBlank())
-                    "resource.aws_vpc_security_group_ingress_rule.ssh" {
-                        "for_each" - expression(
-                            $$"""toset([$${v4CIDRs}])"""
-                        )
-                        "security_group_id" - expression("aws_security_group.ec2.id")
-                        "ip_protocol" - "tcp"
-                        "from_port" - 22
-                        "to_port" - 22
-                        "cidr_ipv4" - expression("each.key")
-                    }
+            "resource.aws_vpc_security_group_ingress_rule.http" {
+                "security_group_id" - expression("aws_security_group.ec2.id")
+                "ip_protocol" - "tcp"
+                "from_port" - 80
+                "to_port" - 80
+                "cidr_ipv4" - "0.0.0.0/0"
             }
+
+            "resource.aws_vpc_security_group_ingress_rule.https" {
+                "security_group_id" - expression("aws_security_group.ec2.id")
+                "ip_protocol" - "tcp"
+                "from_port" - 443
+                "to_port" - 443
+                "cidr_ipv4" - "0.0.0.0/0"
+            }
+
+            val v4CIDRs = sshAllowedV4CIDR.joinToString { "\"$it\"" }
+            if (v4CIDRs.isNotBlank())
+                "resource.aws_vpc_security_group_ingress_rule.ssh" {
+                    "for_each" - expression(
+                        $$"""toset([$${v4CIDRs}])"""
+                    )
+                    "security_group_id" - expression("aws_security_group.ec2.id")
+                    "ip_protocol" - "tcp"
+                    "from_port" - 22
+                    "to_port" - 22
+                    "cidr_ipv4" - expression("each.key")
+                }
 
             if (enableIPv6) {
                 "resource.aws_vpc_security_group_egress_rule.access_outside_v6" {
@@ -774,10 +772,8 @@ rm -rf aws/ awscliv2.zip
         )
     }
 
-    /**
-     * The `server` blocks for [domain]: a catch-all that drops unknown hosts, an HTTP-to-HTTPS redirect,
-     * and the TLS proxy to the app.
-     */
+    /** The `server` blocks for [domain]: an HTTP-to-HTTPS redirect and the TLS proxy to the app. */
+    @Language("TEXT")
     private fun nginxServers(domain: String, includeUpgrade: Boolean): String = $$"""
 # Drop requests for any other host name or a bare IP
 server {
