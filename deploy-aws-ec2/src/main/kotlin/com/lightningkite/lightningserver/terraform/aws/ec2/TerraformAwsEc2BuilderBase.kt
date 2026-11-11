@@ -266,7 +266,6 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
     public open val maxBodySize: DataSize get() = 10.mebibytes
 
     /** IP Stack Configuration. */
-    public open val enableIPv4: Boolean get() = true
     public open val enableIPv6: Boolean get() = true
 
     // === Logging Configuration ===
@@ -444,8 +443,6 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
     protected open fun validateConfiguration() {}
 
     override fun prepareForWrite() {
-        if (!enableIPv6 && !enableIPv4) throw IllegalStateException("At least one IP stack must be enabled.")
-
         if (projectPrefix.any { !it.isLetterOrDigit() && !(it == '-' || it == '_') })
             throw IllegalArgumentException("The projectPrefix has illegal characters in it. It can only contain: Letters, Digits, '-', and '_'.")
 
@@ -1380,10 +1377,6 @@ log "Verified settings decrypt"
 [ -f "$CONF_DIR/settings.enc.old" ] && rm "$CONF_DIR/settings.enc.old"
 [ -f "$CONF_DIR/settings.enc" ] && mv "$CONF_DIR/settings.enc" "$CONF_DIR/settings.enc.old"
 mv "$CONF_DIR/settings.enc.new" "$CONF_DIR/settings.enc"
-
-# Mount point for the unit's read-only settings bind mount. Created as the service user: it owns
-# this directory, so root must not follow anything that may have been placed here.
-[ -e "$STATE_DIR/settings.json" ] || sudo -u lightning-server touch "$STATE_DIR/settings.json"
 
 log "Restarting $$deploymentTag"
 systemctl restart $$projectPrefix
