@@ -1,4 +1,3 @@
-import com.lightningkite.deployhelpers.lkLibrary
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -49,7 +48,7 @@ kotlin {
         val commonMain = getByName("commonMain") {
             dependencies {
                 api(libs.kotlinx.serialization.json)
-                api(libs.services.database.shared)
+                api(sa.database.shared)
                 // The event taxonomy belongs to the module that raises the events, not to the one
                 // that records them. One-directional: auth-shared knows nothing about auditing.
                 api(project(":auth-shared"))
@@ -71,7 +70,7 @@ kotlin {
 
 dependencies {
     configurations.filter { it.name.startsWith("ksp") && it.name != "ksp" }.forEach {
-        add(it.name, libs.services.database.processor)
+        add(it.name, sa.database.processor)
     }
 }
 
@@ -79,12 +78,8 @@ dependencies {
     coreLibraryDesugaring(libs.androidDesugaring)
 }
 
-lkLibrary(
-    "lightningkite",
-    "lightning-server",
-    mavenAutomaticRelease = project.findProperty("mavenAutomaticRelease") as? Boolean ?: false
-) {
-    description.set("Markers and record shapes for the disclosure audit log, shared between server and client.")
+mavenPublishing {
+    pom { description.set("Markers and record shapes for the disclosure audit log, shared between server and client.") }
 }
 
 // commonMain compiles the database processor's shared output (written by kspCommonMainKotlinMetadata alone) as plain

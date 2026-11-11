@@ -1,4 +1,3 @@
-import com.lightningkite.deployhelpers.lkLibrary
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
@@ -15,10 +14,10 @@ dependencies {
     api(project(":auth"))
     api(project(":typed"))
     api(project(":sessions-shared"))
-    api(libs.services.database)
-    api(libs.services.cache)
+    api(sa.database)
+    api(sa.cache)
 
-    ksp(libs.services.database.processor)
+    ksp(sa.database.processor)
 
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)
@@ -38,10 +37,6 @@ kotlin {
     }
 }
 
-lkLibrary(
-    "lightningkite",
-    "lightning-server",
-    mavenAutomaticRelease = project.findProperty("mavenAutomaticRelease") as? Boolean ?: false
-) {
-    description.set("A set of tools and endpoints for managing user sessions.")
+mavenPublishing {
+    pom { description.set("A set of tools and endpoints for managing user sessions.") }
 }

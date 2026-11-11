@@ -1,4 +1,3 @@
-import com.lightningkite.deployhelpers.lkLibrary
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -49,7 +48,7 @@ kotlin {
         val commonMain = getByName("commonMain") {
             dependencies {
                 api(libs.kotlinx.datetime)
-                api(libs.services.database.shared)
+                api(sa.database.shared)
             }
         }
         val commonTest = getByName("commonTest") {
@@ -67,10 +66,6 @@ dependencies {
     coreLibraryDesugaring(libs.androidDesugaring)
 }
 
-lkLibrary(
-    "lightningkite",
-    "lightning-server",
-    mavenAutomaticRelease = project.findProperty("mavenAutomaticRelease") as? Boolean ?: false
-) {
-    description.set("A set of models that can be shared between the client and the server projects.")
+mavenPublishing {
+    pom { description.set("A set of models that can be shared between the client and the server projects.") }
 }

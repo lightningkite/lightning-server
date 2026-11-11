@@ -1,4 +1,3 @@
-import com.lightningkite.deployhelpers.lkLibrary
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
@@ -11,9 +10,9 @@ plugins {
 
 dependencies {
     api(project(":core"))
-    api(libs.services.database)
-    api(libs.services.cache)
-    api(libs.services.pubsub)
+    api(sa.database)
+    api(sa.cache)
+    api(sa.pubsub)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)
 
@@ -32,10 +31,6 @@ kotlin {
     }
 }
 
-lkLibrary(
-    "lightningkite",
-    "lightning-server",
-    mavenAutomaticRelease = project.findProperty("mavenAutomaticRelease") as? Boolean ?: false
-) {
-    description.set("The abstract engine implementation to use in dedicated deployments.")
+mavenPublishing {
+    pom { description.set("The abstract engine implementation to use in dedicated deployments.") }
 }

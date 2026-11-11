@@ -60,3 +60,13 @@ include(":load-test")
 include(":demo")
 
 include(":docs-guide")
+
+dependencyResolutionManagement {
+    repositories {
+        mavenLocal()
+        maven("https://lightningkite-maven.s3.us-west-2.amazonaws.com")
+    }
+    versionCatalogs {
+        create("sa") { from("com.lightningkite.stack:service-abstractions-catalog:unreleased") }
+    }
+}

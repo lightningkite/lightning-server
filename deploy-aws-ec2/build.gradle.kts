@@ -1,5 +1,3 @@
-import com.lightningkite.deployhelpers.*
-
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.ksp)
@@ -16,7 +14,7 @@ dependencies {
         exclude("software.amazon.awssdk:netty-nio-client")
         exclude("software.amazon.awssdk:apache-client")
     }
-    api(libs.services.aws.client) { excludeNetty() }
+    api(sa.aws.client) { excludeNetty() }
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)
 }
@@ -39,6 +37,6 @@ kotlin {
     }
 }
 
-lkLibrary("lightningkite", "lightning-server") {
-    description.set("AWS EC2 deployment with Auto Scaling and Load Balancing for Lightning Server.")
+mavenPublishing {
+    pom { description.set("AWS EC2 deployment with Auto Scaling and Load Balancing for Lightning Server.") }
 }

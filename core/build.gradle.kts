@@ -1,4 +1,3 @@
-import com.lightningkite.deployhelpers.lkLibrary
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
@@ -14,12 +13,12 @@ dependencies {
     api(libs.kotlinx.serialization.json)
     api(libs.kotlinx.serialization.json.io)
     api(libs.serialization.properties)
-    api(libs.services.data)
-    api(libs.services.basis)
-    api(libs.services.kotlin.bytes.format)
-    api(libs.services.otel.jvm)
-    api(libs.services.webhook.subservice)
-    api(libs.services.pubsub)
+    api(sa.data)
+    api(sa.basis)
+    api(sa.kotlin.bytes.format)
+    api(sa.otel.jvm)
+    api(sa.webhook.subservice)
+    api(sa.pubsub)
     api(libs.kotlin.html.jvm)
     api(project(":core-shared"))
 
@@ -40,10 +39,6 @@ kotlin {
     }
 }
 
-lkLibrary(
-    "lightningkite",
-    "lightning-server",
-    mavenAutomaticRelease = project.findProperty("mavenAutomaticRelease") as? Boolean ?: false
-) {
-    description.set("The core components that make up a Lightning Server framework.")
+mavenPublishing {
+    pom { description.set("The core components that make up a Lightning Server framework.") }
 }
