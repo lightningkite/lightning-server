@@ -67,6 +67,6 @@ dependencyResolutionManagement {
         maven("https://lightningkite-maven.s3.us-west-2.amazonaws.com")
     }
     versionCatalogs {
-        create("sa") { from("com.lightningkite.stack:service-abstractions-catalog:unreleased") }
+        create("sa") { from("com.lightningkite.stack:service-abstractions-catalog:2026.11.11.0952") }
     }
 }
