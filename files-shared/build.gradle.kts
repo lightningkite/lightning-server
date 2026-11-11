@@ -2,7 +2,6 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
-    alias(libs.plugins.ksp)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.androidKmpLibrary)
     alias(libs.plugins.dokka)
@@ -53,16 +52,10 @@ kotlin {
                 api(sa.files.client)
                 api(sa.database.shared)
             }
-            kotlin {
-                srcDir(file("build/generated/ksp/common/commonMain/kotlin"))
-            }
         }
         val commonTest = getByName("commonTest") {
             dependencies {
                 implementation(libs.kotlin.test)
-            }
-            kotlin {
-                srcDir(file("build/generated/ksp/common/commonTest/kotlin"))
             }
         }
         val jvmMain = getByName("jvmMain") {}

@@ -62,6 +62,15 @@ public fun SDK.Module.ensureUniqueNames(): SDK.Module = copy(
         }
 )
 
+public fun SDK.Module.walkTopDown(): Sequence<SDK.Module> = sequence {
+    suspend fun SequenceScope<SDK.Module>.dfs(module: SDK.Module) {
+        yield(module)
+        for (child in module.children) dfs(child)
+    }
+
+    dfs(this@walkTopDown)
+}
+
 public class TypingGenerationException internal constructor(
     name: String,
     path: Any,

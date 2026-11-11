@@ -1,6 +1,7 @@
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.ksp)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.dokka)
     id("signing")
@@ -13,6 +14,8 @@ dependencies {
     api(sa.database)
     api(sa.files)
 
+    ksp(libs.services.database.processor)
+
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)
 }
@@ -22,6 +25,9 @@ kotlin {
     compilerOptions {
         optIn.add("kotlin.time.ExperimentalTime")
         optIn.add("kotlin.uuid.ExperimentalUuidApi")
+    }
+    sourceSets.main {
+        kotlin.srcDir("build/generated/ksp/main/kotlin")
     }
 }
 

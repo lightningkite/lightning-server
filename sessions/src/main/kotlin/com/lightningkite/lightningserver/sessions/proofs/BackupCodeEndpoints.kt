@@ -284,6 +284,7 @@ public class BackupCodeEndpoints(
         path.path("prove").post bind ApiHttpHandler(
             auth = noAuth,
             summary = "Prove With Backup Code",
+            functionName = "proveBackupCode",
             description = "Use an established backup code as an authentication method.",
             errorCases = listOf(),
             examples = listOf(

@@ -164,7 +164,7 @@ public class FileSystemEndpoints(
         try {
             kotlinx.parseUploadUrl(it.externalUrl())!!.put(it.body!!)
         } catch (e: Exception) {
-            throw BadRequestException("Invalid file Upload URL")
+            throw BadRequestException("Invalid file Upload URL", cause = e)
         }
 
         HttpResponse(status = HttpStatus.NoContent)

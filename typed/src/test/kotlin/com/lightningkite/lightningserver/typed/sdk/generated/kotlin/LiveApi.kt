@@ -18,12 +18,6 @@ class LiveApi(val fetcher: Fetcher) : Api {
 	override suspend fun inlinedEndpoint(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int =
 		fetcher("inline/action/${fetcher.url(id, kotlin.uuid.Uuid.serializer())}/${fetcher.url(category, kotlin.uuid.Uuid.serializer())}", HttpMethod.POST, kotlin.Unit.serializer(), kotlin.Unit, kotlin.Int.serializer())
 
-	inner class LivePredefinedEndpoints : Api.PredefinedEndpoints {
-		override suspend fun preDefinedEndpoint(input: kotlin.Int): kotlin.Int =
-			fetcher("predefined/foo", HttpMethod.POST, kotlin.Int.serializer(), input, kotlin.Int.serializer())
-	}
-	override val predefinedEndpoints = LivePredefinedEndpoints()
-
 	inner class LiveModuleApi : Api.ModuleApi, com.lightningkite.lightningserver.typed.ClientModelRestEndpoints<com.lightningkite.lightningserver.typed.sdk.TestModel, com.lightningkite.lightningserver.typed.sdk.TestModel.ID> by com.lightningkite.lightningserver.typed.LiveClientModelRestEndpoints(fetcher, "m1/rest", com.lightningkite.lightningserver.typed.sdk.TestModel.serializer(), com.lightningkite.lightningserver.typed.sdk.TestModel.ID.serializer()) {
 		override suspend fun testSdkEndpoint(first: kotlin.String, input: com.lightningkite.lightningserver.typed.sdk.TestInput): kotlin.String =
 			fetcher("m1/endpoint/${fetcher.url(first, kotlin.String.serializer())}", HttpMethod.POST, com.lightningkite.lightningserver.typed.sdk.TestInput.serializer(), input, kotlin.String.serializer())

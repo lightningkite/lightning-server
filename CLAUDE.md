@@ -107,12 +107,12 @@ calls encode their output.
 
 #### Common Testing Pitfalls
 
-**Duplicate UploadEarlyEndpoint declarations**: If you create multiple instances of `UploadEarlyEndpoint` (e.g., in
+**Duplicate UploadEarlyEndpoint declarations**: If you create multiple instances of `GlobalUploadEndpoints` (e.g., in
 different modules or test files), they will have conflicting declarations for how `ServerFile` is serialized. This
 causes runtime serialization errors that manifest as `500 Internal Server Error` responses in tests, even though the
 code compiles successfully.
 
-**Solution**: Only instantiate `UploadEarlyEndpoint` once in your server definition and reference it from tests. Do not
+**Solution**: Only instantiate `GlobalUploadEndpoints` once in your server definition and reference it from tests. Do not
 create separate instances for testing.
 
 ## Architecture

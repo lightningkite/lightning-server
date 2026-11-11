@@ -31,7 +31,7 @@ class UploadEarlyEndpointTest {
         val files = setting("files", ExternalFileSystem.Settings())
         val database = setting("database", Database.Settings())
         val served = path.path("files") include FileSystemEndpoints(files)
-        val uploadEarly = path.path("upload") include UploadEarlyEndpoint(
+        val uploadEarly = path.path("upload") include GlobalUploadEndpoints(
             files = files,
             database = database,
             fileScanner = { listOf() }
@@ -129,11 +129,11 @@ class UploadEarlyEndpointTest {
                     body = TypedData.text("Hello world!", MediaType.Text.Plain)
                 )
             }
-            val ready = Server.uploadEarly.verify.test(null, prepare.futureCallToken)
+            val ready = Server.uploadEarly.verify.test(null, prepare.token)
 
             val clientSideServerFile = Server.consume.test(
                 body = TypedData.text(
-                    Json.encodeToString(ServerFile(ready)),
+                    Json.encodeToString(ready),
                     MediaType.Application.Json
                 )
             )

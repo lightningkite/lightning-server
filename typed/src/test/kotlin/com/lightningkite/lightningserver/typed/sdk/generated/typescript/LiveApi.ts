@@ -12,9 +12,6 @@ export class LiveApi implements Api {
 	improperSDKFunctionName: Api["improperSDKFunctionName"] = () => this.fetcher(`/`, "POST", undefined)
 	inlinedEndpoint: Api["inlinedEndpoint"] = (id, category) => this.fetcher(`/inline/action/${id}/${category}`, "POST", undefined)
 
-	readonly predefinedEndpoints: Api["predefinedEndpoints"] = {
-		preDefinedEndpoint: (input) => this.fetcher(`/predefined/foo`, "POST", input),
-	}
 	readonly module: Api["module"] = {
 		testSdkEndpoint: (first, input) => this.fetcher(`/m1/endpoint/${first}`, "POST", input),
 		inlinedEndpoint: (id, category) => this.fetcher(`/m1/inline/again/action/${id}/${category}`, "POST", undefined),

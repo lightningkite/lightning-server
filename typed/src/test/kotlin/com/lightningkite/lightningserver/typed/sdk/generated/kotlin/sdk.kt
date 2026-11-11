@@ -35,18 +35,6 @@ interface Api {
 	 * */
 	suspend fun inlinedEndpoint(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int
 
-	interface PredefinedEndpoints {
-		/**
-		 * Pre-Defined Endpoint
-		 * 
-		 * This is an endpoint included through a pre-build definition
-		 * 
-		 * **Auth Requirements:** User with scope pre:defined *or* User with scope foo *or* IsSuperUser (User with root access and an additional requirement)
-		 * */
-		suspend fun preDefinedEndpoint(input: kotlin.Int): kotlin.Int
-	}
-	val predefinedEndpoints: PredefinedEndpoints
-
 	interface ModuleApi : com.lightningkite.lightningserver.typed.ClientModelRestEndpoints<com.lightningkite.lightningserver.typed.sdk.TestModel, com.lightningkite.lightningserver.typed.sdk.TestModel.ID> {
 		/**
 		 * Test Endpoint
@@ -182,12 +170,6 @@ class LiveApi(val fetcher: Fetcher) : Api {
 		fetcher("", HttpMethod.POST, kotlin.Unit.serializer(), kotlin.Unit, kotlin.Int.serializer())
 	override suspend fun inlinedEndpoint(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int =
 		fetcher("inline/action/${fetcher.url(id, kotlin.uuid.Uuid.serializer())}/${fetcher.url(category, kotlin.uuid.Uuid.serializer())}", HttpMethod.POST, kotlin.Unit.serializer(), kotlin.Unit, kotlin.Int.serializer())
-
-	inner class LivePredefinedEndpoints : Api.PredefinedEndpoints {
-		override suspend fun preDefinedEndpoint(input: kotlin.Int): kotlin.Int =
-			fetcher("predefined/foo", HttpMethod.POST, kotlin.Int.serializer(), input, kotlin.Int.serializer())
-	}
-	override val predefinedEndpoints = LivePredefinedEndpoints()
 
 	inner class LiveModuleApi : Api.ModuleApi, com.lightningkite.lightningserver.typed.ClientModelRestEndpoints<com.lightningkite.lightningserver.typed.sdk.TestModel, com.lightningkite.lightningserver.typed.sdk.TestModel.ID> by com.lightningkite.lightningserver.typed.LiveClientModelRestEndpoints(fetcher, "m1/rest", com.lightningkite.lightningserver.typed.sdk.TestModel.serializer(), com.lightningkite.lightningserver.typed.sdk.TestModel.ID.serializer()) {
 		override suspend fun testSdkEndpoint(first: kotlin.String, input: com.lightningkite.lightningserver.typed.sdk.TestInput): kotlin.String =

@@ -10,9 +10,9 @@ import com.lightningkite.services.data.toSealedMap
 import kotlin.uuid.Uuid
 
 /**
- * Wraps a server module or definition with SDK generation metadata.
+ * Wraps a server module with SDK generation metadata.
  *
- * This class associates a [ServerBuilder] or [ServerDefinition] with naming information
+ * This class associates a [ServerBuilder] with naming information
  * used during SDK generation. When modules are included in a server using the [module]
  * DSL function, this metadata is registered and used by SDK generators to create
  * properly named client interfaces and implementation classes.
@@ -139,28 +139,6 @@ public data class SdkModule<S>(
             valueName: String = sdkSettings.defaultInfo?.valueName ?: interfaceName.camelCase().removeSuffix("Api"),
         ): SdkModule<S> =
             SdkModule(this, interfaceName, valueName)
-
-        /**
-         * Wraps a [ServerDefinition] with SDK generation metadata.
-         *
-         * This extension associates a server definition with naming information for SDK generation.
-         * Unlike the [ServerBuilder] version, names cannot be inferred and must be provided explicitly.
-         *
-         * @param interfaceName The interface name for SDK generation
-         * @param valueName The value name for SDK generation (defaults to camelCase of interfaceName)
-         * @return A [SdkModule] wrapping this server definition with the specified metadata
-         *
-         * @sample
-         * ```kotlin
-         * val definition: ServerDefinition = myServer.build()
-         * val module = definition.withSdkInfo("MyApi", "myApi")
-         * ```
-         */
-        public fun ServerDefinition.withSdkInfo(
-            interfaceName: String,
-            valueName: String = interfaceName.camelCase(),
-        ): SdkModule<ServerDefinition> =
-            SdkModule(this, interfaceName, valueName)
     }
 }
 
@@ -222,36 +200,6 @@ public infix fun <S : ServerBuilder> PathSpec0.module(module: SdkModule<S>): S {
 @LightningServerDsl
 context(builder: ServerBuilder)
 public infix fun <S : ServerBuilder> PathSpec0.module(module: S): S = module(module.withSdkInfo())
-
-/**
- * Includes a server definition at the specified path with SDK generation metadata.
- *
- * This overload allows including pre-built [ServerDefinition] instances (from other servers
- * or modules) with SDK metadata. This is useful for composing servers or reusing definitions.
- *
- * @receiver The path where the definition should be mounted
- * @param module The [SdkModule] wrapping a [ServerDefinition] and SDK metadata
- * @return The included server definition
- *
- * @sample
- * ```kotlin
- * val sharedDefinition: ServerDefinition = sharedServer.build()
- *
- * with(serverBuilder) {
- *     path("shared").module(
- *         sharedDefinition.withSdkInfo("SharedApi", "shared")
- *     )
- * }
- * ```
- */
-@Suppress("DSL_MARKER_APPLIED_TO_WRONG_TARGET")
-@LightningServerDsl
-context(builder: ServerBuilder)
-public infix fun PathSpec0.module(module: SdkModule<ServerDefinition>): ServerDefinition {
-    builder.extensions[ModuleRegistry][module.value.thisLayer.sdkId] = module.info
-    return with(builder) { include(module.value) }
-}
-
 
 // ============================================================================
 // Implementation Details

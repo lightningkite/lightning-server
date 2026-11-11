@@ -103,13 +103,13 @@ public abstract class ServerBuilder : Extendable {
     private val startupTasks: MapRegistry<PathSpec0, StartupTask> = MapRegistry()
     private val schedules: MapRegistry<PathSpec0, ScheduledTask> = MapRegistry()
     private val tasks: MapRegistry<PathSpec0, Task<*>> = MapRegistry()
+    private val buildChecks: ListRegistry<BuildCheck> = ListRegistry()
 
     private val mediaTypeDecoders: MediaTypeDecoderRegistry = MediaTypeDecoderRegistry()
     private val mediaTypeEncoders: MediaTypeEncoderRegistry = MediaTypeEncoderRegistry()
 
     public override val extensions: MutableExtensions = MutableExtensions()
 
-    private val imports: ListRegistry<Locationed<PathSpec0, ServerDefinition>> = ListRegistry()
     private val modules: ListRegistry<Locationed<PathSpec0, ServerBuilder>> = ListRegistry()
 
     @JvmName("installExecutionInterceptor")
@@ -185,6 +185,16 @@ public abstract class ServerBuilder : Extendable {
     public infix fun PathSpec0.bind(schedule: ScheduledTask): ScheduledTask {
         schedules.register(this, schedule)
         return schedule
+    }
+
+    /**
+     * Registers [check] to run once the server this builder is part of is built.
+     *
+     * @see BuildCheck
+     */
+    public fun buildCheck(check: BuildCheck): BuildCheck {
+        buildChecks.register(check)
+        return check
     }
 
     public fun <PATH : PathSpec, T> PATH.topic(type: KSerializer<T>): WebSocketTopic<PATH, T> {
@@ -309,11 +319,6 @@ public abstract class ServerBuilder : Extendable {
         return module
     }
 
-    public infix fun PathSpec0.include(import: ServerDefinition): ServerDefinition {
-        imports.register(Locationed(this, import))
-        return import
-    }
-
     public fun register(decoder: MediaTypeDecoder) {
         mediaTypeDecoders.register(decoder)
     }
@@ -334,12 +339,20 @@ public abstract class ServerBuilder : Extendable {
      * This is the primary method for converting a [ServerBuilder] into a deployable server configuration.
      * It performs a full build process that involves:
      * 1. Creating a [ServerDefinition.Module] of this builder's direct configuration
-     * 2. Recursively building all imported modules
+     * 2. Recursively building all included modules
+     * 3. Running every [BuildCheck] in this builder and its modules against the result, modules' checks first
      *
      * @return A complete [ServerDefinition] with all modules flattened and ready for deployment
      */
+    public fun build(): ServerDefinition {
+        val checks = ArrayList<BuildCheck>()
+        val definition = build(checks)
+        checks.forEach { it.check(definition) }
+        return definition
+    }
+
     @OptIn(InternalLightningServerApi::class)
-    public fun build(): ServerDefinition = ServerDefinition(
+    private fun build(checks: MutableList<BuildCheck>): ServerDefinition = ServerDefinition(
         thisLayer = ServerDefinition.Module(
             moduleId = moduleId,
             internalSerializersModule = internalSerialization,
@@ -371,6 +384,6 @@ public abstract class ServerBuilder : Extendable {
             mediaTypeEncoders = mediaTypeEncoders.toSealedMap(),
             settingOverrides = settingOverrides.toSealedMap()
         ),
-        modules = (imports + modules.mapItems { it.build() }).toSealedList()
-    )
+        modules = modules.mapItems { it.build(checks) }.toSealedList()
+    ).also { checks += buildChecks }
 }

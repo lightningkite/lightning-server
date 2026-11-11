@@ -201,6 +201,7 @@ public class WebAuthNProofEndpoints(
         path.path("register-start").post bind ApiHttpHandler(
             auth = proofMethodAuth,
             summary = "Issue WebAuthN creation challenge",
+            functionName = "registerStart",
             description = "Returns a challenge to be passed on to a client authenticator for the creation of a new Public Key Credential.",
             errorCases = listOf(),
             examples = listOf(),
@@ -260,6 +261,7 @@ public class WebAuthNProofEndpoints(
         path.path("register-finish").post bind ApiHttpHandler(
             auth = proofMethodAuth,
             summary = "Establish WebAuthN Credential",
+            functionName = "registerFinish",
             description = "Validates and Accepts a public key credential created from a previously issued creation challenge.",
             errorCases = listOf(),
             examples = listOf(),
@@ -371,6 +373,7 @@ public class WebAuthNProofEndpoints(
         path.path("start").post bind ApiHttpHandler(
             auth = anyAuth or noAuth,
             summary = "Begin WebAuthN challenge",
+            functionName = "start",
             description = "Returns a challenge to be passed on to a client authenticator for signing.",
             errorCases = listOf(),
             examples = listOf(),
@@ -447,6 +450,7 @@ public class WebAuthNProofEndpoints(
         path.path("prove").post bind ApiHttpHandler(
             auth = noAuth,
             summary = "Prove WebAuthN ownership",
+            functionName = "prove",
             description = "Returns a challenge to be passed on to a client authenticator for signing.",
             errorCases = listOf(),
             examples = listOf(),
