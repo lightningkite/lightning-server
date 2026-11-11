@@ -15,6 +15,7 @@ interface Api {
 	/**
 	 * Index
 	 * 
+	 * 
 	 * **Auth Requirements:** No Requirements
 	 * */
 	suspend fun index(): kotlin.Int

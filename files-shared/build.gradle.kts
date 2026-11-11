@@ -64,19 +64,9 @@ kotlin {
 }
 
 dependencies {
-    configurations.filter { it.name.startsWith("ksp") && it.name != "ksp" }.forEach {
-        add(it.name, sa.database.processor)
-    }
-}
-
-dependencies {
     coreLibraryDesugaring(libs.androidDesugaring)
 }
 
 mavenPublishing {
     pom { description.set("A set of models shared between the server and client for managing PublicFileSystem files.") }
 }
-// commonMain compiles the database processor's shared output (written by kspCommonMainKotlinMetadata alone) as plain
-// source, so every other KSP run and compile must wait for it.
-tasks.matching { (it.name.startsWith("ksp") || it.name.startsWith("compile")) && it.name != "kspCommonMainKotlinMetadata" }
-    .configureEach { dependsOn("kspCommonMainKotlinMetadata") }

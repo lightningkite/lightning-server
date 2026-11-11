@@ -153,14 +153,6 @@ export interface Api {
 		 * */
 		insert(input: TestModel): Promise<TestModel>
 		/**
-		 * Permissions
-		 * 
-		 * Returns the user's permissions for this collection.
-		 * 
-		 * **Auth Requirements:** No Requirements
-		 * */
-		permissions(): Promise<ModelPermissions<TestModel>>
-		/**
 		 * QueryPartial
 		 * 
 		 * Gets parts of TestModels that match the given query.
@@ -168,14 +160,6 @@ export interface Api {
 		 * **Auth Requirements:** No Requirements
 		 * */
 		queryPartial(input: QueryPartial<TestModel>): Promise<Array<Partial<TestModel>>>
-		/**
-		 * Group Aggregate 2
-		 * 
-		 * Aggregates a property of TestModels matching the given condition divided by group.
-		 * 
-		 * **Auth Requirements:** No Requirements
-		 * */
-		groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 		/**
 		 * Group Aggregate
 		 * 
@@ -209,6 +193,46 @@ export interface Api {
 		 * */
 		count(input: Condition<TestModel>): Promise<number>
 		/**
+		 * Group Count 2
+		 * 
+		 * Gets the total number of TestModels matching the given condition divided by group.
+		 * 
+		 * **Auth Requirements:** No Requirements
+		 * */
+		groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
+		/**
+		 * Aggregate
+		 * 
+		 * Aggregates a property of TestModels matching the given condition.
+		 * 
+		 * **Auth Requirements:** No Requirements
+		 * */
+		aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
+		/**
+		 * Default
+		 * 
+		 * Returns the user's permissions for this collection.
+		 * 
+		 * **Auth Requirements:** No Requirements
+		 * */
+		default(): Promise<TestModel>
+		/**
+		 * Permissions
+		 * 
+		 * Returns the user's permissions for this collection.
+		 * 
+		 * **Auth Requirements:** No Requirements
+		 * */
+		permissions(): Promise<ModelPermissions<TestModel>>
+		/**
+		 * Group Aggregate 2
+		 * 
+		 * Aggregates a property of TestModels matching the given condition divided by group.
+		 * 
+		 * **Auth Requirements:** No Requirements
+		 * */
+		groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
+		/**
 		 * Group Count
 		 * 
 		 * Gets the total number of TestModels matching the given condition divided by group.
@@ -241,14 +265,6 @@ export interface Api {
 		 * */
 		bulkModify(input: MassModification<TestModel>): Promise<number>
 		/**
-		 * Group Count 2
-		 * 
-		 * Gets the total number of TestModels matching the given condition divided by group.
-		 * 
-		 * **Auth Requirements:** No Requirements
-		 * */
-		groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
-		/**
 		 * Bulk Delete
 		 * 
 		 * Deletes all matching TestModels, returning the number of deleted items.
@@ -256,14 +272,6 @@ export interface Api {
 		 * **Auth Requirements:** No Requirements
 		 * */
 		bulkDelete(input: Condition<TestModel>): Promise<number>
-		/**
-		 * Aggregate
-		 * 
-		 * Aggregates a property of TestModels matching the given condition.
-		 * 
-		 * **Auth Requirements:** No Requirements
-		 * */
-		aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
 		/**
 		 * Detail
 		 * 
@@ -347,14 +355,6 @@ export interface Api {
 			 * */
 			insert(input: TestModel): Promise<TestModel>
 			/**
-			 * Permissions
-			 * 
-			 * Returns the user's permissions for this collection.
-			 * 
-			 * **Auth Requirements:** Authenticated
-			 * */
-			permissions(): Promise<ModelPermissions<TestModel>>
-			/**
 			 * QueryPartial
 			 * 
 			 * Gets parts of TestModels that match the given query.
@@ -362,14 +362,6 @@ export interface Api {
 			 * **Auth Requirements:** Authenticated
 			 * */
 			queryPartial(input: QueryPartial<TestModel>): Promise<Array<Partial<TestModel>>>
-			/**
-			 * Group Aggregate 2
-			 * 
-			 * Aggregates a property of TestModels matching the given condition divided by group.
-			 * 
-			 * **Auth Requirements:** Authenticated
-			 * */
-			groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 			/**
 			 * Group Aggregate
 			 * 
@@ -403,6 +395,46 @@ export interface Api {
 			 * */
 			count(input: Condition<TestModel>): Promise<number>
 			/**
+			 * Group Count 2
+			 * 
+			 * Gets the total number of TestModels matching the given condition divided by group.
+			 * 
+			 * **Auth Requirements:** Authenticated
+			 * */
+			groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
+			/**
+			 * Aggregate
+			 * 
+			 * Aggregates a property of TestModels matching the given condition.
+			 * 
+			 * **Auth Requirements:** Authenticated
+			 * */
+			aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
+			/**
+			 * Default
+			 * 
+			 * Returns the user's permissions for this collection.
+			 * 
+			 * **Auth Requirements:** Authenticated
+			 * */
+			default(): Promise<TestModel>
+			/**
+			 * Permissions
+			 * 
+			 * Returns the user's permissions for this collection.
+			 * 
+			 * **Auth Requirements:** Authenticated
+			 * */
+			permissions(): Promise<ModelPermissions<TestModel>>
+			/**
+			 * Group Aggregate 2
+			 * 
+			 * Aggregates a property of TestModels matching the given condition divided by group.
+			 * 
+			 * **Auth Requirements:** Authenticated
+			 * */
+			groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
+			/**
 			 * Group Count
 			 * 
 			 * Gets the total number of TestModels matching the given condition divided by group.
@@ -435,14 +467,6 @@ export interface Api {
 			 * */
 			bulkModify(input: MassModification<TestModel>): Promise<number>
 			/**
-			 * Group Count 2
-			 * 
-			 * Gets the total number of TestModels matching the given condition divided by group.
-			 * 
-			 * **Auth Requirements:** Authenticated
-			 * */
-			groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
-			/**
 			 * Bulk Delete
 			 * 
 			 * Deletes all matching TestModels, returning the number of deleted items.
@@ -450,14 +474,6 @@ export interface Api {
 			 * **Auth Requirements:** Authenticated
 			 * */
 			bulkDelete(input: Condition<TestModel>): Promise<number>
-			/**
-			 * Aggregate
-			 * 
-			 * Aggregates a property of TestModels matching the given condition.
-			 * 
-			 * **Auth Requirements:** Authenticated
-			 * */
-			aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
 			/**
 			 * Detail
 			 * 
@@ -552,14 +568,6 @@ export interface Api {
 			 * */
 			insert(input: TestModel): Promise<TestModel>
 			/**
-			 * Permissions
-			 * 
-			 * Returns the user's permissions for this collection.
-			 * 
-			 * **Auth Requirements:** Authenticated
-			 * */
-			permissions(): Promise<ModelPermissions<TestModel>>
-			/**
 			 * QueryPartial
 			 * 
 			 * Gets parts of TestModels that match the given query.
@@ -567,14 +575,6 @@ export interface Api {
 			 * **Auth Requirements:** Authenticated
 			 * */
 			queryPartial(input: QueryPartial<TestModel>): Promise<Array<Partial<TestModel>>>
-			/**
-			 * Group Aggregate 2
-			 * 
-			 * Aggregates a property of TestModels matching the given condition divided by group.
-			 * 
-			 * **Auth Requirements:** Authenticated
-			 * */
-			groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 			/**
 			 * Group Aggregate
 			 * 
@@ -608,6 +608,46 @@ export interface Api {
 			 * */
 			count(input: Condition<TestModel>): Promise<number>
 			/**
+			 * Group Count 2
+			 * 
+			 * Gets the total number of TestModels matching the given condition divided by group.
+			 * 
+			 * **Auth Requirements:** Authenticated
+			 * */
+			groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
+			/**
+			 * Aggregate
+			 * 
+			 * Aggregates a property of TestModels matching the given condition.
+			 * 
+			 * **Auth Requirements:** Authenticated
+			 * */
+			aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
+			/**
+			 * Default
+			 * 
+			 * Returns the user's permissions for this collection.
+			 * 
+			 * **Auth Requirements:** Authenticated
+			 * */
+			default(): Promise<TestModel>
+			/**
+			 * Permissions
+			 * 
+			 * Returns the user's permissions for this collection.
+			 * 
+			 * **Auth Requirements:** Authenticated
+			 * */
+			permissions(): Promise<ModelPermissions<TestModel>>
+			/**
+			 * Group Aggregate 2
+			 * 
+			 * Aggregates a property of TestModels matching the given condition divided by group.
+			 * 
+			 * **Auth Requirements:** Authenticated
+			 * */
+			groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
+			/**
 			 * Group Count
 			 * 
 			 * Gets the total number of TestModels matching the given condition divided by group.
@@ -640,14 +680,6 @@ export interface Api {
 			 * */
 			bulkModify(input: MassModification<TestModel>): Promise<number>
 			/**
-			 * Group Count 2
-			 * 
-			 * Gets the total number of TestModels matching the given condition divided by group.
-			 * 
-			 * **Auth Requirements:** Authenticated
-			 * */
-			groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
-			/**
 			 * Bulk Delete
 			 * 
 			 * Deletes all matching TestModels, returning the number of deleted items.
@@ -655,14 +687,6 @@ export interface Api {
 			 * **Auth Requirements:** Authenticated
 			 * */
 			bulkDelete(input: Condition<TestModel>): Promise<number>
-			/**
-			 * Aggregate
-			 * 
-			 * Aggregates a property of TestModels matching the given condition.
-			 * 
-			 * **Auth Requirements:** Authenticated
-			 * */
-			aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
 			/**
 			 * Detail
 			 * 
@@ -758,14 +782,6 @@ export interface Api {
 		 * */
 		insert(input: TestModel): Promise<TestModel>
 		/**
-		 * Permissions
-		 * 
-		 * Returns the user's permissions for this collection.
-		 * 
-		 * **Auth Requirements:** Authenticated
-		 * */
-		permissions(): Promise<ModelPermissions<TestModel>>
-		/**
 		 * QueryPartial
 		 * 
 		 * Gets parts of TestModels that match the given query.
@@ -773,14 +789,6 @@ export interface Api {
 		 * **Auth Requirements:** Authenticated
 		 * */
 		queryPartial(input: QueryPartial<TestModel>): Promise<Array<Partial<TestModel>>>
-		/**
-		 * Group Aggregate 2
-		 * 
-		 * Aggregates a property of TestModels matching the given condition divided by group.
-		 * 
-		 * **Auth Requirements:** Authenticated
-		 * */
-		groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 		/**
 		 * Group Aggregate
 		 * 
@@ -814,6 +822,46 @@ export interface Api {
 		 * */
 		count(input: Condition<TestModel>): Promise<number>
 		/**
+		 * Group Count 2
+		 * 
+		 * Gets the total number of TestModels matching the given condition divided by group.
+		 * 
+		 * **Auth Requirements:** Authenticated
+		 * */
+		groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
+		/**
+		 * Aggregate
+		 * 
+		 * Aggregates a property of TestModels matching the given condition.
+		 * 
+		 * **Auth Requirements:** Authenticated
+		 * */
+		aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
+		/**
+		 * Default
+		 * 
+		 * Returns the user's permissions for this collection.
+		 * 
+		 * **Auth Requirements:** Authenticated
+		 * */
+		default(): Promise<TestModel>
+		/**
+		 * Permissions
+		 * 
+		 * Returns the user's permissions for this collection.
+		 * 
+		 * **Auth Requirements:** Authenticated
+		 * */
+		permissions(): Promise<ModelPermissions<TestModel>>
+		/**
+		 * Group Aggregate 2
+		 * 
+		 * Aggregates a property of TestModels matching the given condition divided by group.
+		 * 
+		 * **Auth Requirements:** Authenticated
+		 * */
+		groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
+		/**
 		 * Group Count
 		 * 
 		 * Gets the total number of TestModels matching the given condition divided by group.
@@ -846,14 +894,6 @@ export interface Api {
 		 * */
 		bulkModify(input: MassModification<TestModel>): Promise<number>
 		/**
-		 * Group Count 2
-		 * 
-		 * Gets the total number of TestModels matching the given condition divided by group.
-		 * 
-		 * **Auth Requirements:** Authenticated
-		 * */
-		groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
-		/**
 		 * Bulk Delete
 		 * 
 		 * Deletes all matching TestModels, returning the number of deleted items.
@@ -861,14 +901,6 @@ export interface Api {
 		 * **Auth Requirements:** Authenticated
 		 * */
 		bulkDelete(input: Condition<TestModel>): Promise<number>
-		/**
-		 * Aggregate
-		 * 
-		 * Aggregates a property of TestModels matching the given condition.
-		 * 
-		 * **Auth Requirements:** Authenticated
-		 * */
-		aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
 		/**
 		 * Detail
 		 * 
@@ -973,14 +1005,6 @@ export interface Api {
 			 * */
 			insert(input: TestModel): Promise<TestModel>
 			/**
-			 * Permissions
-			 * 
-			 * Returns the user's permissions for this collection.
-			 * 
-			 * **Auth Requirements:** No Requirements
-			 * */
-			permissions(): Promise<ModelPermissions<TestModel>>
-			/**
 			 * QueryPartial
 			 * 
 			 * Gets parts of TestModels that match the given query.
@@ -988,14 +1012,6 @@ export interface Api {
 			 * **Auth Requirements:** No Requirements
 			 * */
 			queryPartial(input: QueryPartial<TestModel>): Promise<Array<Partial<TestModel>>>
-			/**
-			 * Group Aggregate 2
-			 * 
-			 * Aggregates a property of TestModels matching the given condition divided by group.
-			 * 
-			 * **Auth Requirements:** No Requirements
-			 * */
-			groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 			/**
 			 * Group Aggregate
 			 * 
@@ -1029,6 +1045,46 @@ export interface Api {
 			 * */
 			count(input: Condition<TestModel>): Promise<number>
 			/**
+			 * Group Count 2
+			 * 
+			 * Gets the total number of TestModels matching the given condition divided by group.
+			 * 
+			 * **Auth Requirements:** No Requirements
+			 * */
+			groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
+			/**
+			 * Aggregate
+			 * 
+			 * Aggregates a property of TestModels matching the given condition.
+			 * 
+			 * **Auth Requirements:** No Requirements
+			 * */
+			aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
+			/**
+			 * Default
+			 * 
+			 * Returns the user's permissions for this collection.
+			 * 
+			 * **Auth Requirements:** No Requirements
+			 * */
+			default(): Promise<TestModel>
+			/**
+			 * Permissions
+			 * 
+			 * Returns the user's permissions for this collection.
+			 * 
+			 * **Auth Requirements:** No Requirements
+			 * */
+			permissions(): Promise<ModelPermissions<TestModel>>
+			/**
+			 * Group Aggregate 2
+			 * 
+			 * Aggregates a property of TestModels matching the given condition divided by group.
+			 * 
+			 * **Auth Requirements:** No Requirements
+			 * */
+			groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
+			/**
 			 * Group Count
 			 * 
 			 * Gets the total number of TestModels matching the given condition divided by group.
@@ -1061,14 +1117,6 @@ export interface Api {
 			 * */
 			bulkModify(input: MassModification<TestModel>): Promise<number>
 			/**
-			 * Group Count 2
-			 * 
-			 * Gets the total number of TestModels matching the given condition divided by group.
-			 * 
-			 * **Auth Requirements:** No Requirements
-			 * */
-			groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
-			/**
 			 * Bulk Delete
 			 * 
 			 * Deletes all matching TestModels, returning the number of deleted items.
@@ -1076,14 +1124,6 @@ export interface Api {
 			 * **Auth Requirements:** No Requirements
 			 * */
 			bulkDelete(input: Condition<TestModel>): Promise<number>
-			/**
-			 * Aggregate
-			 * 
-			 * Aggregates a property of TestModels matching the given condition.
-			 * 
-			 * **Auth Requirements:** No Requirements
-			 * */
-			aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
 			/**
 			 * Detail
 			 * 
@@ -1159,14 +1199,6 @@ export interface Api {
 			 * */
 			insert(input: TestModel): Promise<TestModel>
 			/**
-			 * Permissions
-			 * 
-			 * Returns the user's permissions for this collection.
-			 * 
-			 * **Auth Requirements:** No Requirements
-			 * */
-			permissions(): Promise<ModelPermissions<TestModel>>
-			/**
 			 * QueryPartial
 			 * 
 			 * Gets parts of TestModels that match the given query.
@@ -1174,14 +1206,6 @@ export interface Api {
 			 * **Auth Requirements:** No Requirements
 			 * */
 			queryPartial(input: QueryPartial<TestModel>): Promise<Array<Partial<TestModel>>>
-			/**
-			 * Group Aggregate 2
-			 * 
-			 * Aggregates a property of TestModels matching the given condition divided by group.
-			 * 
-			 * **Auth Requirements:** No Requirements
-			 * */
-			groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 			/**
 			 * Group Aggregate
 			 * 
@@ -1215,6 +1239,46 @@ export interface Api {
 			 * */
 			count(input: Condition<TestModel>): Promise<number>
 			/**
+			 * Group Count 2
+			 * 
+			 * Gets the total number of TestModels matching the given condition divided by group.
+			 * 
+			 * **Auth Requirements:** No Requirements
+			 * */
+			groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
+			/**
+			 * Aggregate
+			 * 
+			 * Aggregates a property of TestModels matching the given condition.
+			 * 
+			 * **Auth Requirements:** No Requirements
+			 * */
+			aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
+			/**
+			 * Default
+			 * 
+			 * Returns the user's permissions for this collection.
+			 * 
+			 * **Auth Requirements:** No Requirements
+			 * */
+			default(): Promise<TestModel>
+			/**
+			 * Permissions
+			 * 
+			 * Returns the user's permissions for this collection.
+			 * 
+			 * **Auth Requirements:** No Requirements
+			 * */
+			permissions(): Promise<ModelPermissions<TestModel>>
+			/**
+			 * Group Aggregate 2
+			 * 
+			 * Aggregates a property of TestModels matching the given condition divided by group.
+			 * 
+			 * **Auth Requirements:** No Requirements
+			 * */
+			groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
+			/**
 			 * Group Count
 			 * 
 			 * Gets the total number of TestModels matching the given condition divided by group.
@@ -1247,14 +1311,6 @@ export interface Api {
 			 * */
 			bulkModify(input: MassModification<TestModel>): Promise<number>
 			/**
-			 * Group Count 2
-			 * 
-			 * Gets the total number of TestModels matching the given condition divided by group.
-			 * 
-			 * **Auth Requirements:** No Requirements
-			 * */
-			groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
-			/**
 			 * Bulk Delete
 			 * 
 			 * Deletes all matching TestModels, returning the number of deleted items.
@@ -1262,14 +1318,6 @@ export interface Api {
 			 * **Auth Requirements:** No Requirements
 			 * */
 			bulkDelete(input: Condition<TestModel>): Promise<number>
-			/**
-			 * Aggregate
-			 * 
-			 * Aggregates a property of TestModels matching the given condition.
-			 * 
-			 * **Auth Requirements:** No Requirements
-			 * */
-			aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
 			/**
 			 * Detail
 			 * 
@@ -1348,20 +1396,21 @@ export class LiveApi implements Api {
 		inlinedEndpoint2: (id, category) => this.fetcher(`/m1/inline/action/${id}/${category}`, "POST", undefined),
 		list: (input) => this.fetcher(`/m1/rest`, "GET", input),
 		insert: (input) => this.fetcher(`/m1/rest`, "POST", input),
-		permissions: () => this.fetcher(`/m1/rest/_permissions_`, "GET", undefined),
 		queryPartial: (input) => this.fetcher(`/m1/rest/query-partial`, "POST", input),
-		groupAggregate2: (input) => this.fetcher(`/m1/rest/group-aggregate-2`, "POST", input),
 		groupAggregate: (input) => this.fetcher(`/m1/rest/group-aggregate`, "POST", input),
 		query: (input) => this.fetcher(`/m1/rest/query`, "POST", input),
 		textQuery: (input) => this.fetcher(`/m1/rest/text-query`, "POST", input),
 		count: (input) => this.fetcher(`/m1/rest/count`, "POST", input),
+		groupCount2: (input) => this.fetcher(`/m1/rest/group-count-2`, "POST", input),
+		aggregate: (input) => this.fetcher(`/m1/rest/aggregate`, "POST", input),
+		default: () => this.fetcher(`/m1/rest/_default_`, "GET", undefined),
+		permissions: () => this.fetcher(`/m1/rest/_permissions_`, "GET", undefined),
+		groupAggregate2: (input) => this.fetcher(`/m1/rest/group-aggregate-2`, "POST", input),
 		groupCount: (input) => this.fetcher(`/m1/rest/group-count`, "POST", input),
 		insertBulk: (input) => this.fetcher(`/m1/rest/bulk`, "POST", input),
 		bulkReplace: (input) => this.fetcher(`/m1/rest/bulk`, "PUT", input),
 		bulkModify: (input) => this.fetcher(`/m1/rest/bulk`, "PATCH", input),
-		groupCount2: (input) => this.fetcher(`/m1/rest/group-count-2`, "POST", input),
 		bulkDelete: (input) => this.fetcher(`/m1/rest/bulk-delete`, "POST", input),
-		aggregate: (input) => this.fetcher(`/m1/rest/aggregate`, "POST", input),
 		detail: (id) => this.fetcher(`/m1/rest/${id}`, "GET", undefined),
 		upsert: (id, input) => this.fetcher(`/m1/rest/${id}`, "POST", input),
 		replace: (id, input) => this.fetcher(`/m1/rest/${id}`, "PUT", input),
@@ -1374,20 +1423,21 @@ export class LiveApi implements Api {
 			testSdkEndpoint: (second, input) => this.fetcher(`/m1/second/endpoint/${second}`, "POST", input),
 			list: (input) => this.fetcher(`/m1/second/rest`, "GET", input),
 			insert: (input) => this.fetcher(`/m1/second/rest`, "POST", input),
-			permissions: () => this.fetcher(`/m1/second/rest/_permissions_`, "GET", undefined),
 			queryPartial: (input) => this.fetcher(`/m1/second/rest/query-partial`, "POST", input),
-			groupAggregate2: (input) => this.fetcher(`/m1/second/rest/group-aggregate-2`, "POST", input),
 			groupAggregate: (input) => this.fetcher(`/m1/second/rest/group-aggregate`, "POST", input),
 			query: (input) => this.fetcher(`/m1/second/rest/query`, "POST", input),
 			textQuery: (input) => this.fetcher(`/m1/second/rest/text-query`, "POST", input),
 			count: (input) => this.fetcher(`/m1/second/rest/count`, "POST", input),
+			groupCount2: (input) => this.fetcher(`/m1/second/rest/group-count-2`, "POST", input),
+			aggregate: (input) => this.fetcher(`/m1/second/rest/aggregate`, "POST", input),
+			default: () => this.fetcher(`/m1/second/rest/_default_`, "GET", undefined),
+			permissions: () => this.fetcher(`/m1/second/rest/_permissions_`, "GET", undefined),
+			groupAggregate2: (input) => this.fetcher(`/m1/second/rest/group-aggregate-2`, "POST", input),
 			groupCount: (input) => this.fetcher(`/m1/second/rest/group-count`, "POST", input),
 			insertBulk: (input) => this.fetcher(`/m1/second/rest/bulk`, "POST", input),
 			bulkReplace: (input) => this.fetcher(`/m1/second/rest/bulk`, "PUT", input),
 			bulkModify: (input) => this.fetcher(`/m1/second/rest/bulk`, "PATCH", input),
-			groupCount2: (input) => this.fetcher(`/m1/second/rest/group-count-2`, "POST", input),
 			bulkDelete: (input) => this.fetcher(`/m1/second/rest/bulk-delete`, "POST", input),
-			aggregate: (input) => this.fetcher(`/m1/second/rest/aggregate`, "POST", input),
 			detail: (id) => this.fetcher(`/m1/second/rest/${id}`, "GET", undefined),
 			upsert: (id, input) => this.fetcher(`/m1/second/rest/${id}`, "POST", input),
 			replace: (id, input) => this.fetcher(`/m1/second/rest/${id}`, "PUT", input),
@@ -1404,20 +1454,21 @@ export class LiveApi implements Api {
 			testSdkEndpoint: (second, input) => this.fetcher(`/m1/duplicate/endpoint/${second}`, "POST", input),
 			list: (input) => this.fetcher(`/m1/duplicate/rest`, "GET", input),
 			insert: (input) => this.fetcher(`/m1/duplicate/rest`, "POST", input),
-			permissions: () => this.fetcher(`/m1/duplicate/rest/_permissions_`, "GET", undefined),
 			queryPartial: (input) => this.fetcher(`/m1/duplicate/rest/query-partial`, "POST", input),
-			groupAggregate2: (input) => this.fetcher(`/m1/duplicate/rest/group-aggregate-2`, "POST", input),
 			groupAggregate: (input) => this.fetcher(`/m1/duplicate/rest/group-aggregate`, "POST", input),
 			query: (input) => this.fetcher(`/m1/duplicate/rest/query`, "POST", input),
 			textQuery: (input) => this.fetcher(`/m1/duplicate/rest/text-query`, "POST", input),
 			count: (input) => this.fetcher(`/m1/duplicate/rest/count`, "POST", input),
+			groupCount2: (input) => this.fetcher(`/m1/duplicate/rest/group-count-2`, "POST", input),
+			aggregate: (input) => this.fetcher(`/m1/duplicate/rest/aggregate`, "POST", input),
+			default: () => this.fetcher(`/m1/duplicate/rest/_default_`, "GET", undefined),
+			permissions: () => this.fetcher(`/m1/duplicate/rest/_permissions_`, "GET", undefined),
+			groupAggregate2: (input) => this.fetcher(`/m1/duplicate/rest/group-aggregate-2`, "POST", input),
 			groupCount: (input) => this.fetcher(`/m1/duplicate/rest/group-count`, "POST", input),
 			insertBulk: (input) => this.fetcher(`/m1/duplicate/rest/bulk`, "POST", input),
 			bulkReplace: (input) => this.fetcher(`/m1/duplicate/rest/bulk`, "PUT", input),
 			bulkModify: (input) => this.fetcher(`/m1/duplicate/rest/bulk`, "PATCH", input),
-			groupCount2: (input) => this.fetcher(`/m1/duplicate/rest/group-count-2`, "POST", input),
 			bulkDelete: (input) => this.fetcher(`/m1/duplicate/rest/bulk-delete`, "POST", input),
-			aggregate: (input) => this.fetcher(`/m1/duplicate/rest/aggregate`, "POST", input),
 			detail: (id) => this.fetcher(`/m1/duplicate/rest/${id}`, "GET", undefined),
 			upsert: (id, input) => this.fetcher(`/m1/duplicate/rest/${id}`, "POST", input),
 			replace: (id, input) => this.fetcher(`/m1/duplicate/rest/${id}`, "PUT", input),
@@ -1435,20 +1486,21 @@ export class LiveApi implements Api {
 		testSdkEndpoint: (second, input) => this.fetcher(`/m2/endpoint/${second}`, "POST", input),
 		list: (input) => this.fetcher(`/m2/rest`, "GET", input),
 		insert: (input) => this.fetcher(`/m2/rest`, "POST", input),
-		permissions: () => this.fetcher(`/m2/rest/_permissions_`, "GET", undefined),
 		queryPartial: (input) => this.fetcher(`/m2/rest/query-partial`, "POST", input),
-		groupAggregate2: (input) => this.fetcher(`/m2/rest/group-aggregate-2`, "POST", input),
 		groupAggregate: (input) => this.fetcher(`/m2/rest/group-aggregate`, "POST", input),
 		query: (input) => this.fetcher(`/m2/rest/query`, "POST", input),
 		textQuery: (input) => this.fetcher(`/m2/rest/text-query`, "POST", input),
 		count: (input) => this.fetcher(`/m2/rest/count`, "POST", input),
+		groupCount2: (input) => this.fetcher(`/m2/rest/group-count-2`, "POST", input),
+		aggregate: (input) => this.fetcher(`/m2/rest/aggregate`, "POST", input),
+		default: () => this.fetcher(`/m2/rest/_default_`, "GET", undefined),
+		permissions: () => this.fetcher(`/m2/rest/_permissions_`, "GET", undefined),
+		groupAggregate2: (input) => this.fetcher(`/m2/rest/group-aggregate-2`, "POST", input),
 		groupCount: (input) => this.fetcher(`/m2/rest/group-count`, "POST", input),
 		insertBulk: (input) => this.fetcher(`/m2/rest/bulk`, "POST", input),
 		bulkReplace: (input) => this.fetcher(`/m2/rest/bulk`, "PUT", input),
 		bulkModify: (input) => this.fetcher(`/m2/rest/bulk`, "PATCH", input),
-		groupCount2: (input) => this.fetcher(`/m2/rest/group-count-2`, "POST", input),
 		bulkDelete: (input) => this.fetcher(`/m2/rest/bulk-delete`, "POST", input),
-		aggregate: (input) => this.fetcher(`/m2/rest/aggregate`, "POST", input),
 		detail: (id) => this.fetcher(`/m2/rest/${id}`, "GET", undefined),
 		upsert: (id, input) => this.fetcher(`/m2/rest/${id}`, "POST", input),
 		replace: (id, input) => this.fetcher(`/m2/rest/${id}`, "PUT", input),
@@ -1468,20 +1520,21 @@ export class LiveApi implements Api {
 		rest: {
 			list: (input) => this.fetcher(`/third/rest`, "GET", input),
 			insert: (input) => this.fetcher(`/third/rest`, "POST", input),
-			permissions: () => this.fetcher(`/third/rest/_permissions_`, "GET", undefined),
 			queryPartial: (input) => this.fetcher(`/third/rest/query-partial`, "POST", input),
-			groupAggregate2: (input) => this.fetcher(`/third/rest/group-aggregate-2`, "POST", input),
 			groupAggregate: (input) => this.fetcher(`/third/rest/group-aggregate`, "POST", input),
 			query: (input) => this.fetcher(`/third/rest/query`, "POST", input),
 			textQuery: (input) => this.fetcher(`/third/rest/text-query`, "POST", input),
 			count: (input) => this.fetcher(`/third/rest/count`, "POST", input),
+			groupCount2: (input) => this.fetcher(`/third/rest/group-count-2`, "POST", input),
+			aggregate: (input) => this.fetcher(`/third/rest/aggregate`, "POST", input),
+			default: () => this.fetcher(`/third/rest/_default_`, "GET", undefined),
+			permissions: () => this.fetcher(`/third/rest/_permissions_`, "GET", undefined),
+			groupAggregate2: (input) => this.fetcher(`/third/rest/group-aggregate-2`, "POST", input),
 			groupCount: (input) => this.fetcher(`/third/rest/group-count`, "POST", input),
 			insertBulk: (input) => this.fetcher(`/third/rest/bulk`, "POST", input),
 			bulkReplace: (input) => this.fetcher(`/third/rest/bulk`, "PUT", input),
 			bulkModify: (input) => this.fetcher(`/third/rest/bulk`, "PATCH", input),
-			groupCount2: (input) => this.fetcher(`/third/rest/group-count-2`, "POST", input),
 			bulkDelete: (input) => this.fetcher(`/third/rest/bulk-delete`, "POST", input),
-			aggregate: (input) => this.fetcher(`/third/rest/aggregate`, "POST", input),
 			detail: (id) => this.fetcher(`/third/rest/${id}`, "GET", undefined),
 			upsert: (id, input) => this.fetcher(`/third/rest/${id}`, "POST", input),
 			replace: (id, input) => this.fetcher(`/third/rest/${id}`, "PUT", input),
@@ -1493,20 +1546,21 @@ export class LiveApi implements Api {
 		rest2: {
 			list: (input) => this.fetcher(`/third/rest2`, "GET", input),
 			insert: (input) => this.fetcher(`/third/rest2`, "POST", input),
-			permissions: () => this.fetcher(`/third/rest2/_permissions_`, "GET", undefined),
 			queryPartial: (input) => this.fetcher(`/third/rest2/query-partial`, "POST", input),
-			groupAggregate2: (input) => this.fetcher(`/third/rest2/group-aggregate-2`, "POST", input),
 			groupAggregate: (input) => this.fetcher(`/third/rest2/group-aggregate`, "POST", input),
 			query: (input) => this.fetcher(`/third/rest2/query`, "POST", input),
 			textQuery: (input) => this.fetcher(`/third/rest2/text-query`, "POST", input),
 			count: (input) => this.fetcher(`/third/rest2/count`, "POST", input),
+			groupCount2: (input) => this.fetcher(`/third/rest2/group-count-2`, "POST", input),
+			aggregate: (input) => this.fetcher(`/third/rest2/aggregate`, "POST", input),
+			default: () => this.fetcher(`/third/rest2/_default_`, "GET", undefined),
+			permissions: () => this.fetcher(`/third/rest2/_permissions_`, "GET", undefined),
+			groupAggregate2: (input) => this.fetcher(`/third/rest2/group-aggregate-2`, "POST", input),
 			groupCount: (input) => this.fetcher(`/third/rest2/group-count`, "POST", input),
 			insertBulk: (input) => this.fetcher(`/third/rest2/bulk`, "POST", input),
 			bulkReplace: (input) => this.fetcher(`/third/rest2/bulk`, "PUT", input),
 			bulkModify: (input) => this.fetcher(`/third/rest2/bulk`, "PATCH", input),
-			groupCount2: (input) => this.fetcher(`/third/rest2/group-count-2`, "POST", input),
 			bulkDelete: (input) => this.fetcher(`/third/rest2/bulk-delete`, "POST", input),
-			aggregate: (input) => this.fetcher(`/third/rest2/aggregate`, "POST", input),
 			detail: (id) => this.fetcher(`/third/rest2/${id}`, "GET", undefined),
 			upsert: (id, input) => this.fetcher(`/third/rest2/${id}`, "POST", input),
 			replace: (id, input) => this.fetcher(`/third/rest2/${id}`, "PUT", input),

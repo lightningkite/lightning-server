@@ -14,7 +14,7 @@ dependencies {
     api(sa.database)
     api(sa.files)
 
-    ksp(libs.services.database.processor)
+    ksp(sa.database.processor)
 
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)

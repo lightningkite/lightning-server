@@ -12,20 +12,21 @@ export interface Api {
 		inlinedEndpoint2(id: Uuid, category: Uuid): Promise<number>
 		list(input: Query<TestModel>): Promise<Array<TestModel>>
 		insert(input: TestModel): Promise<TestModel>
-		permissions(): Promise<ModelPermissions<TestModel>>
 		queryPartial(input: QueryPartial<TestModel>): Promise<Array<Partial<TestModel>>>
-		groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 		groupAggregate(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 		query(input: Query<TestModel>): Promise<Array<TestModel>>
 		textQuery(input: TextIndexQuery<TestModel>): Promise<Array<ScoredResult<TestModel>>>
 		count(input: Condition<TestModel>): Promise<number>
+		groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
+		aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
+		default(): Promise<TestModel>
+		permissions(): Promise<ModelPermissions<TestModel>>
+		groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 		groupCount(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
 		insertBulk(input: Array<TestModel>): Promise<Array<TestModel>>
 		bulkReplace(input: Array<TestModel>): Promise<Array<TestModel>>
 		bulkModify(input: MassModification<TestModel>): Promise<number>
-		groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
 		bulkDelete(input: Condition<TestModel>): Promise<number>
-		aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
 		detail(id: TestModel.ID): Promise<TestModel>
 		upsert(id: TestModel.ID, input: TestModel): Promise<TestModel>
 		replace(id: TestModel.ID, input: TestModel): Promise<TestModel>
@@ -38,20 +39,21 @@ export interface Api {
 			testSdkEndpoint(second: string, input: TestInput): Promise<string>
 			list(input: Query<TestModel>): Promise<Array<TestModel>>
 			insert(input: TestModel): Promise<TestModel>
-			permissions(): Promise<ModelPermissions<TestModel>>
 			queryPartial(input: QueryPartial<TestModel>): Promise<Array<Partial<TestModel>>>
-			groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 			groupAggregate(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 			query(input: Query<TestModel>): Promise<Array<TestModel>>
 			textQuery(input: TextIndexQuery<TestModel>): Promise<Array<ScoredResult<TestModel>>>
 			count(input: Condition<TestModel>): Promise<number>
+			groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
+			aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
+			default(): Promise<TestModel>
+			permissions(): Promise<ModelPermissions<TestModel>>
+			groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 			groupCount(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
 			insertBulk(input: Array<TestModel>): Promise<Array<TestModel>>
 			bulkReplace(input: Array<TestModel>): Promise<Array<TestModel>>
 			bulkModify(input: MassModification<TestModel>): Promise<number>
-			groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
 			bulkDelete(input: Condition<TestModel>): Promise<number>
-			aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
 			detail(id: TestModel.ID): Promise<TestModel>
 			upsert(id: TestModel.ID, input: TestModel): Promise<TestModel>
 			replace(id: TestModel.ID, input: TestModel): Promise<TestModel>
@@ -68,20 +70,21 @@ export interface Api {
 			testSdkEndpoint(second: string, input: TestInput): Promise<string>
 			list(input: Query<TestModel>): Promise<Array<TestModel>>
 			insert(input: TestModel): Promise<TestModel>
-			permissions(): Promise<ModelPermissions<TestModel>>
 			queryPartial(input: QueryPartial<TestModel>): Promise<Array<Partial<TestModel>>>
-			groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 			groupAggregate(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 			query(input: Query<TestModel>): Promise<Array<TestModel>>
 			textQuery(input: TextIndexQuery<TestModel>): Promise<Array<ScoredResult<TestModel>>>
 			count(input: Condition<TestModel>): Promise<number>
+			groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
+			aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
+			default(): Promise<TestModel>
+			permissions(): Promise<ModelPermissions<TestModel>>
+			groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 			groupCount(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
 			insertBulk(input: Array<TestModel>): Promise<Array<TestModel>>
 			bulkReplace(input: Array<TestModel>): Promise<Array<TestModel>>
 			bulkModify(input: MassModification<TestModel>): Promise<number>
-			groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
 			bulkDelete(input: Condition<TestModel>): Promise<number>
-			aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
 			detail(id: TestModel.ID): Promise<TestModel>
 			upsert(id: TestModel.ID, input: TestModel): Promise<TestModel>
 			replace(id: TestModel.ID, input: TestModel): Promise<TestModel>
@@ -99,20 +102,21 @@ export interface Api {
 		testSdkEndpoint(second: string, input: TestInput): Promise<string>
 		list(input: Query<TestModel>): Promise<Array<TestModel>>
 		insert(input: TestModel): Promise<TestModel>
-		permissions(): Promise<ModelPermissions<TestModel>>
 		queryPartial(input: QueryPartial<TestModel>): Promise<Array<Partial<TestModel>>>
-		groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 		groupAggregate(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 		query(input: Query<TestModel>): Promise<Array<TestModel>>
 		textQuery(input: TextIndexQuery<TestModel>): Promise<Array<ScoredResult<TestModel>>>
 		count(input: Condition<TestModel>): Promise<number>
+		groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
+		aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
+		default(): Promise<TestModel>
+		permissions(): Promise<ModelPermissions<TestModel>>
+		groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 		groupCount(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
 		insertBulk(input: Array<TestModel>): Promise<Array<TestModel>>
 		bulkReplace(input: Array<TestModel>): Promise<Array<TestModel>>
 		bulkModify(input: MassModification<TestModel>): Promise<number>
-		groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
 		bulkDelete(input: Condition<TestModel>): Promise<number>
-		aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
 		detail(id: TestModel.ID): Promise<TestModel>
 		upsert(id: TestModel.ID, input: TestModel): Promise<TestModel>
 		replace(id: TestModel.ID, input: TestModel): Promise<TestModel>
@@ -132,20 +136,21 @@ export interface Api {
 		readonly rest: {
 			list(input: Query<TestModel>): Promise<Array<TestModel>>
 			insert(input: TestModel): Promise<TestModel>
-			permissions(): Promise<ModelPermissions<TestModel>>
 			queryPartial(input: QueryPartial<TestModel>): Promise<Array<Partial<TestModel>>>
-			groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 			groupAggregate(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 			query(input: Query<TestModel>): Promise<Array<TestModel>>
 			textQuery(input: TextIndexQuery<TestModel>): Promise<Array<ScoredResult<TestModel>>>
 			count(input: Condition<TestModel>): Promise<number>
+			groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
+			aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
+			default(): Promise<TestModel>
+			permissions(): Promise<ModelPermissions<TestModel>>
+			groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 			groupCount(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
 			insertBulk(input: Array<TestModel>): Promise<Array<TestModel>>
 			bulkReplace(input: Array<TestModel>): Promise<Array<TestModel>>
 			bulkModify(input: MassModification<TestModel>): Promise<number>
-			groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
 			bulkDelete(input: Condition<TestModel>): Promise<number>
-			aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
 			detail(id: TestModel.ID): Promise<TestModel>
 			upsert(id: TestModel.ID, input: TestModel): Promise<TestModel>
 			replace(id: TestModel.ID, input: TestModel): Promise<TestModel>
@@ -157,20 +162,21 @@ export interface Api {
 		readonly rest2: {
 			list(input: Query<TestModel>): Promise<Array<TestModel>>
 			insert(input: TestModel): Promise<TestModel>
-			permissions(): Promise<ModelPermissions<TestModel>>
 			queryPartial(input: QueryPartial<TestModel>): Promise<Array<Partial<TestModel>>>
-			groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 			groupAggregate(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 			query(input: Query<TestModel>): Promise<Array<TestModel>>
 			textQuery(input: TextIndexQuery<TestModel>): Promise<Array<ScoredResult<TestModel>>>
 			count(input: Condition<TestModel>): Promise<number>
+			groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
+			aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
+			default(): Promise<TestModel>
+			permissions(): Promise<ModelPermissions<TestModel>>
+			groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 			groupCount(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
 			insertBulk(input: Array<TestModel>): Promise<Array<TestModel>>
 			bulkReplace(input: Array<TestModel>): Promise<Array<TestModel>>
 			bulkModify(input: MassModification<TestModel>): Promise<number>
-			groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
 			bulkDelete(input: Condition<TestModel>): Promise<number>
-			aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
 			detail(id: TestModel.ID): Promise<TestModel>
 			upsert(id: TestModel.ID, input: TestModel): Promise<TestModel>
 			replace(id: TestModel.ID, input: TestModel): Promise<TestModel>
