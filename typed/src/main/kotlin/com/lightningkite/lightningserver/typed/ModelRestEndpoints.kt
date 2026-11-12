@@ -52,7 +52,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
     public val default: ApiHttpHandler<PathSpec0, USER, Unit, T> =
         path.path("_default_").get bind explicitApiHttpHandler(
             summary = "Default",
-            description = "Returns the user's permissions for this collection.",
+            description = "Gets a default ${info.tableName} to start from when creating a new one.",
             inputType = Unit.serializer(),
             outputType = info.serializer,
             auth = info.auth.subscope(ModelInfo.Scopes.read),
