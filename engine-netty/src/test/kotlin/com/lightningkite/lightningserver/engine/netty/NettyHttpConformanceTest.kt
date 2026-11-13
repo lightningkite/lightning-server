@@ -17,10 +17,6 @@ import kotlin.time.Duration.Companion.seconds
 /**
  * Runs the shared cross-engine HTTP conformance suite against the Netty engine.
  * See [EngineHttpConformanceSuite] for the behaviors asserted.
- *
- * Netty caps request bodies via [NettyRuntimeSettings.maxAggregatedContentLength] (its HTTP
- * aggregator), not [EngineReliabilitySettings.maxBodySize] like the other engines, so the shared
- * [maxBodySize] is mapped onto that field here.
  */
 class NettyHttpConformanceTest : EngineHttpConformanceSuite() {
     override fun startEngine(port: Int, maxBodySize: Long): RunningEngine {
@@ -38,10 +34,12 @@ class NettyHttpConformanceTest : EngineHttpConformanceSuite() {
             nettyRunConfig set NettyRuntimeSettings(
                 host = "127.0.0.1",
                 port = port,
-                maxAggregatedContentLength = maxBodySize.bytes,
                 // Keep per-test teardown fast; the default 25s drain otherwise leaves worker groups
                 // lingering across all nine tests and drags out the run.
-                reliability = EngineReliabilitySettings(shutdownDrainTimeout = 1.seconds),
+                reliability = EngineReliabilitySettings(
+                    maxBodySize = maxBodySize.bytes,
+                    shutdownDrainTimeout = 1.seconds,
+                ),
             )
         }
         // NettyEngine.start() blocks on the server channel's closeFuture().sync(), so it runs on a

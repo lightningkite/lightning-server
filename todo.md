@@ -80,18 +80,18 @@
   split
 - [ ] engine-netty/.../NettyEngine.kt: Add metrics/telemetry for request/response timing, error rates, concurrent
   connections
-- [ ] engine-netty/.../NettyEngine.kt: Add streaming support for large responses instead of loading entire body into
+- [x] engine-netty/.../NettyEngine.kt: Add streaming support for large responses instead of loading entire body into
   memory (line 489)
-- [ ] engine-netty/.../NettyEngine.kt: Make idle timeout configurable via NettyRuntimeSettings
-- [ ] engine-netty/.../NettyEngine.kt: Add logging/metrics for WebSocket failures (line 387, 413)
+- [x] engine-netty/.../NettyEngine.kt: Make idle timeout configurable via NettyRuntimeSettings
+- [x] engine-netty/.../NettyEngine.kt: Add logging/metrics for WebSocket failures (line 387, 413)
 - [ ] engine-netty/.../NettyEngine.kt: Document thread safety characteristics of currentState in
   LocalWebSocketConnection
-- [ ] engine-netty/.../NettyEngine.kt: Remove unused TypeRetriever class if not referenced elsewhere
+- [x] engine-netty/.../NettyEngine.kt: Remove unused TypeRetriever class if not referenced elsewhere
 - [ ] engine-netty/.../NettyRuntimeSettings.kt: Validate workerThreads is positive when non-null
 - [ ] engine-netty/.../NettyRuntimeSettings.kt: Add separate settings for boss thread count (currently hardcoded to 1)
-- [ ] engine-netty/.../NettyRuntimeSettings.kt: Use Int directly for backlog instead of DataSize converted to int
+- [x] engine-netty/.../NettyRuntimeSettings.kt: Use Int directly for backlog instead of DataSize converted to int
 - [ ] engine-netty/.../NettyRuntimeSettings.kt: Document when to adjust recvBufBytes/sendBufBytes for performance tuning
-- [ ] engine-netty/.../NettyRuntimeSettings.kt: Add idle timeout configuration
+- [x] engine-netty/.../NettyRuntimeSettings.kt: Add idle timeout configuration
 - [ ] engine-ktor/.../extensions.kt: Complete MultiPart support implementation or remove commented code
 - [ ] engine-ktor/.../extensions.kt: Fix Headers.adapt() to handle Set-Cookie properly (shouldn't split comma-separated
   values)

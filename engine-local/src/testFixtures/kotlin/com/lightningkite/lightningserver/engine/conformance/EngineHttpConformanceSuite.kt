@@ -13,6 +13,7 @@ import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
+import com.lightningkite.lightningserver.serialization.takeUnlessEmpty
 import com.lightningkite.lightningserver.settings.ServerSettings
 import kotlinx.coroutines.delay
 import java.net.InetSocketAddress
@@ -277,6 +278,116 @@ public abstract class EngineHttpConformanceSuite {
         }
     }
 
+    @Test
+    public fun request_without_a_body_has_a_null_body() {
+        startEngine(freePort(), maxBodySize).use { running ->
+            // The JDK client sends `Content-Length: 0` for an empty POST.
+            val declaredEmpty = client().send(
+                request(running.port, "/body-kind").POST(HttpRequest.BodyPublishers.noBody()).build(),
+                BodyHandlers.ofString(),
+            )
+            assertEquals("null", declaredEmpty.body(), "Content-Length: 0 means there is no body")
+
+            // No Content-Length and no Transfer-Encoding at all, which no client library will send for a POST.
+            val undeclared = java.net.Socket("127.0.0.1", running.port).use { socket ->
+                socket.soTimeout = 5_000
+                socket.getOutputStream().apply {
+                    write("POST /body-kind HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n".toByteArray())
+                    flush()
+                }
+                // Read until the body has arrived rather than until the server hangs up: not every
+                // engine closes the connection just because it was asked to.
+                val text = StringBuilder()
+                val chunk = ByteArray(4096)
+                try {
+                    while (!text.contains("\r\n\r\n") || text.endsWith("\r\n\r\n")) {
+                        val read = socket.getInputStream().read(chunk)
+                        if (read < 0) break
+                        text.append(String(chunk, 0, read))
+                    }
+                } catch (_: java.net.SocketTimeoutException) {
+                    // Fall through with whatever arrived; the assertions below report it.
+                }
+                text.toString()
+            }
+            assertTrue(undeclared.startsWith("HTTP/1.1 200"), "unexpected response: $undeclared")
+            assertTrue(undeclared.trimEnd().endsWith("null"), "a request with no body framing has no body: $undeclared")
+        }
+    }
+
+    @Test
+    public fun request_with_a_body_has_a_body() {
+        startEngine(freePort(), maxBodySize).use { running ->
+            val declared = client().send(
+                request(running.port, "/body-kind").POST(HttpRequest.BodyPublishers.ofString("abc")).build(),
+                BodyHandlers.ofString(),
+            )
+            assertEquals("3 bytes", declared.body())
+
+            // A stream publisher has no known length, so this body is sent chunked.
+            val chunked = client().send(
+                request(running.port, "/body-kind")
+                    .POST(HttpRequest.BodyPublishers.ofInputStream { java.io.ByteArrayInputStream("abcde".toByteArray()) })
+                    .build(),
+                BodyHandlers.ofString(),
+            )
+            assertEquals("5 bytes", chunked.body())
+        }
+    }
+
+    @Test
+    public fun empty_body_of_undeclared_length_reads_as_no_body() {
+        startEngine(freePort(), maxBodySize).use { running ->
+            // A stream publisher has no known length, so each of these goes out chunked: the headers
+            // promise a body, and only reading it shows whether anything is in it.
+            fun send(content: String) = client().send(
+                request(running.port, "/content-kind")
+                    .POST(HttpRequest.BodyPublishers.ofInputStream { java.io.ByteArrayInputStream(content.toByteArray()) })
+                    .build(),
+                BodyHandlers.ofString(),
+            ).body()
+
+            assertEquals("none", send(""), "a chunked body with nothing in it is no body")
+            assertEquals("5 bytes", send("abcde"), "checking a body for content must not lose any of it")
+        }
+    }
+
+    @Test
+    public fun oversized_body_of_undeclared_length_returns_413() {
+        startEngine(freePort(), maxBodySize).use { running ->
+            // A stream publisher has no known length, so the body goes out chunked: there is no
+            // Content-Length to reject up front, and the limit can only be hit while a handler reads.
+            val resp = client().send(
+                request(running.port, "/echo")
+                    .POST(HttpRequest.BodyPublishers.ofInputStream { java.io.ByteArrayInputStream(ByteArray(50_000)) })
+                    .build(),
+                BodyHandlers.ofString(),
+            )
+            assertEquals(
+                HttpStatus.PayloadTooLarge.code,
+                resp.statusCode(),
+                "A body that passes the cap part-way through being read should still yield 413",
+            )
+        }
+    }
+
+    @Test
+    public fun oversized_body_returns_413_even_if_the_handler_swallows_the_failure() {
+        startEngine(freePort(), maxBodySize).use { running ->
+            val resp = client().send(
+                request(running.port, "/swallow")
+                    .POST(HttpRequest.BodyPublishers.ofInputStream { java.io.ByteArrayInputStream(ByteArray(50_000)) })
+                    .build(),
+                BodyHandlers.ofString(),
+            )
+            assertEquals(
+                HttpStatus.PayloadTooLarge.code,
+                resp.statusCode(),
+                "A handler that catches the failed read must not be able to answer an oversized upload with success; body was: ${resp.body()}",
+            )
+        }
+    }
+
     /**
      * The single definition every engine serves. Kept private so the concrete engine tests reach it
      * only through [conformanceDefinition], and so its (effectively private) endpoint members don't trip
@@ -312,6 +423,26 @@ public abstract class EngineHttpConformanceSuite {
         }
         val echo = path.path("echo").post bind HttpHandler<PathSpec0> { request ->
             val size = request.body?.data?.bytes()?.size ?: 0
+            HttpResponse.plainText("received $size")
+        }
+
+        // Reports whether the engine handed the handler a body at all.
+        val bodyKind = path.path("body-kind").post bind HttpHandler<PathSpec0> { request ->
+            HttpResponse.plainText(request.body?.let { "${it.data.bytes().size} bytes" } ?: "null")
+        }
+
+        // Reports what the body holds, counting an empty one as no body.
+        val contentKind = path.path("content-kind").post bind HttpHandler<PathSpec0> { request ->
+            HttpResponse.plainText(request.body?.takeUnlessEmpty()?.let { "${it.data.bytes().size} bytes" } ?: "none")
+        }
+
+        // Catches whatever reading the body throws and answers as though nothing happened.
+        val swallow = path.path("swallow").post bind HttpHandler<PathSpec0> { request ->
+            val size = try {
+                request.body?.data?.bytes()?.size ?: 0
+            } catch (_: Exception) {
+                -1
+            }
             HttpResponse.plainText("received $size")
         }
     }

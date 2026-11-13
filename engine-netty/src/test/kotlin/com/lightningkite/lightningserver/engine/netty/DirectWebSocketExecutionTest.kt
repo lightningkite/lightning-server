@@ -1,12 +1,16 @@
 package com.lightningkite.lightningserver.engine.netty
 
+import com.lightningkite.lightningserver.OverrideOnly
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.engine.local.forceWebSocketPubSub
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.pubsub.PubSub
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.serializer
 import okhttp3.*
 import okio.ByteString
 import java.net.InetSocketAddress
@@ -59,6 +63,45 @@ class DirectWebSocketExecutionTest {
                 send(WebSocketFrame.Text("Hello from server!"))
                 incoming.collect { /* consume */ }
             }
+        }
+
+        // A bare direct handler that ends its session after one message without closing anything itself.
+        val returnsHandler = path.path("returns") bind object : DirectExecutableWebSocketHandler<PathSpec0, Unit> {
+            override val storageSerializer: KSerializer<Unit> = Unit.serializer()
+
+            @OverrideOnly
+            context(server: ServerRuntime)
+            override suspend fun handleDirect(
+                request: WebSocketConnectRequest<PathSpec0>,
+                incoming: ReceiveChannel<WebSocketFrame>,
+                send: suspend (WebSocketFrame) -> Unit,
+                close: suspend (WebSocketClose) -> Unit,
+            ) {
+                incoming.receive()
+            }
+
+            @OverrideOnly
+            context(serverRuntime: ServerRuntime)
+            override suspend fun willConnect(request: WebSocketConnectRequest<PathSpec0>) = Unit
+
+            @OverrideOnly
+            context(serverRuntime: ServerRuntime)
+            override suspend fun didConnect(connection: WebSocketConnection<PathSpec0, Unit>) {}
+
+            @OverrideOnly
+            context(serverRuntime: ServerRuntime)
+            override suspend fun messageFromClient(connection: WebSocketConnection<PathSpec0, Unit>, frame: WebSocketFrame) {}
+
+            @OverrideOnly
+            context(serverRuntime: ServerRuntime)
+            override suspend fun messageFromSubscription(
+                connection: WebSocketConnection<PathSpec0, Unit>,
+                topic: WebSocketSubscriptionMessage<*, *>,
+            ) {}
+
+            @OverrideOnly
+            context(serverRuntime: ServerRuntime)
+            override suspend fun disconnect(connection: WebSocketConnection<PathSpec0, Unit>, reason: WebSocketClose) {}
         }
 
         // Handler that sends multiple messages
@@ -133,6 +176,29 @@ class DirectWebSocketExecutionTest {
     }
 
     // ============= DIRECT EXECUTION TESTS (default) =============
+
+    @Test
+    fun direct_handler_that_returns_closes_the_socket() {
+        startEngine(forcePubSub = false)
+
+        val closed = CompletableFuture<Int>()
+        val request = Request.Builder().url("ws://127.0.0.1:$port/returns").build()
+        val ws = client.newWebSocket(request, object : WebSocketListener() {
+            // Called when the server's close frame arrives.
+            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                closed.complete(code)
+            }
+
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                closed.completeExceptionally(t)
+            }
+        })
+
+        // The handler returns as soon as it has this; the server should then close the socket cleanly.
+        assertTrue(ws.send("bye"))
+        assertEquals(1000, closed.get(5, TimeUnit.SECONDS), "the socket was left open after its handler returned")
+        ws.cancel()
+    }
 
     @Test
     fun direct_execution_echo_works() {

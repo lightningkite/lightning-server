@@ -33,7 +33,8 @@ import kotlinx.serialization.Transient
  * @property protocol The protocol used ("http" or "https")
  * @property sourceIp The originating IP address of the client
  * @property cache A cache for storing request-scoped data across interceptors
- * @property body The request body as TypedData, or null if no body
+ * @property body The request body as TypedData, or null if the request has none. A body that is not
+ *   null can still be empty; `takeUnlessEmpty` treats that the same as no body.
  */
 @Serializable
 public data class HttpRequest<PATH : PathSpec>(

@@ -5,7 +5,13 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
+import com.lightningkite.services.data.MediaType
+import com.lightningkite.services.data.TypedData
+import com.lightningkite.services.data.asSuspendingSource
+import kotlinx.io.Buffer
+import kotlinx.io.writeString
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import kotlin.test.assertEquals
@@ -75,6 +81,31 @@ class NullablePrimitiveTest {
             // Test with null value
             val result2 = TestServer.testNullableIntInput.test(null, null)
             assertEquals("Received: null", result2)
+        }
+    }
+
+    /** A request body of unknown size, as a chunked upload arrives. */
+    private fun streamedJson(text: String) = TypedData.suspendingSource(
+        Buffer().apply { writeString(text) }.asSuspendingSource(),
+        MediaType.Application.Json,
+    )
+
+    @Test
+    fun emptyBodyOfUnknownSizeIsNullInput() = runBlocking {
+        TestServer.test({}) {
+            // Sent as a request rather than called directly, so the body really is parsed.
+            val response = TestServer.testNullableIntInput.test(body = streamedJson(""))
+            assertEquals(HttpStatus.OK, response.status)
+            assertEquals("\"Received: null\"", response.body!!.text())
+        }
+    }
+
+    @Test
+    fun bodyOfUnknownSizeIsStillParsed() = runBlocking {
+        TestServer.test({}) {
+            val response = TestServer.testNullableIntInput.test(body = streamedJson("42"))
+            assertEquals(HttpStatus.OK, response.status)
+            assertEquals("\"Received: 42\"", response.body!!.text())
         }
     }
 

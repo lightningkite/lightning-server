@@ -22,6 +22,7 @@ import kotlinx.io.buffered
 import kotlinx.serialization.Serializable
 import java.net.InetSocketAddress
 import java.util.concurrent.*
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Clock
 
 /**
@@ -135,12 +136,15 @@ public class JdkEngine(
                     exchange.respondPlain(HttpStatus.NotImplemented.code, "WebSockets are not supported by this server")
                     return@createContext
                 }
-                val (request, executionId) =
-                    exchange.requestToLightningServer(cfg.realIpHeader, cfg.requestIdHeader, this@JdkEngine, maxBody)
+                val bodyExceeded = AtomicBoolean(false)
+                val (request, executionId) = exchange.requestToLightningServer(
+                    cfg.realIpHeader, cfg.requestIdHeader, this@JdkEngine, maxBody, bodyExceeded
+                )
                 // Request timeout is enforced centrally in ServerRuntime.handle (per-handler HttpHandler.timeout).
                 runBlocking {
                     val result: HttpResponse = this@JdkEngine.handleRoot(request, executionId)
-                    exchange.write(result)
+                    // 2.5: a body that passed the cap mid-read is a 413, whatever the handler made of it.
+                    exchange.write(enforceBodyLimit(result, bodyExceeded.get()))
                 }
             } catch (e: BodyTooLargeException) {
                 // 2.5: streamed body exceeded the cap mid-read.
@@ -275,6 +279,7 @@ private fun HttpExchange.requestToLightningServer(
     requestIdHeader: String?,
     engine: JdkEngine,
     maxBody: Long,
+    bodyExceeded: AtomicBoolean,
 ): Pair<HttpRequest<PathSpec>, Execution.ID> {
     val method = this.requestMethod
     val uri = this.requestURI
@@ -296,14 +301,22 @@ private fun HttpExchange.requestToLightningServer(
     } ?: this.remoteAddress?.address?.hostAddress ?: ""
 
     val contentTypeHeader = headers.contentType
-    val contentLength = headers.contentLength ?: -1L
-    val body = if (this.requestBody != null) {
+    val contentLength = headers.contentLength
+    // A request the headers show to have no body gets a null one. The JDK server speaks HTTP/1.1
+    // only, so the headers settle whether a body is coming.
+    val hasBody = hasRequestBody(contentLength, this.requestHeaders["Transfer-Encoding"].orEmpty())
+    val body = if (hasBody && this.requestBody != null) {
         val src = this.requestBody
         TypedData.sink(
             contentTypeHeader ?: headers.contentType ?: MediaType.Application.OctetStream,
             contentLength
         ) { out ->
-            copyLimited(src, maxBody) { b, off, len -> out.write(b, off, len) }
+            try {
+                copyLimited(src, maxBody) { b, off, len -> out.write(b, off, len) }
+            } catch (e: BodyTooLargeException) {
+                bodyExceeded.set(true)
+                throw e
+            }
         }
     } else null
 
