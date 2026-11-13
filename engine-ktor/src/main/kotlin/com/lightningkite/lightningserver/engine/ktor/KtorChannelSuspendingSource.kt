@@ -33,6 +33,11 @@ internal class KtorChannelSuspendingSource(
 ) : AbstractSuspendingSource() {
     private var readSoFar = 0L
 
+    /** The body went over [maxBody]. The response is a 413 whatever the handler made of that. */
+    @Volatile
+    var exceeded: Boolean = false
+        private set
+
     @OptIn(InternalAPI::class)
     override suspend fun fill(into: Buffer): Long {
         // Suspend until at least one byte is buffered. Returns false once the channel is closed and drained.
@@ -45,7 +50,10 @@ internal class KtorChannelSuspendingSource(
         // truncation check rather than reporting a silent clean EOF.
         if (moved <= 0L) return endOfStream()
         readSoFar += moved
-        if (readSoFar > maxBody) throw BodyTooLargeException()
+        if (readSoFar > maxBody) {
+            exceeded = true
+            throw BodyTooLargeException()
+        }
         return moved
     }
 
@@ -66,6 +74,15 @@ internal class KtorChannelSuspendingSource(
     }
 
     override fun release(cause: Throwable?) {
+        // Over the limit, the cancel has to wait. Cancelling fails the server's own body parser with
+        // this cause, and Ktor's CIO engine answers that failure itself with a 400, which can reach
+        // the client ahead of the 413. The engine calls cancelRemaining() once it has responded.
+        if (exceeded) return
         channel.cancel(cause)
+    }
+
+    /** Stops reading a body that went over the limit. Call after the response has been sent. */
+    fun cancelRemaining() {
+        if (exceeded) channel.cancel(BodyTooLargeException())
     }
 }

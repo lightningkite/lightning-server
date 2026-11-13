@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.engine.ktor
 
 import com.lightningkite.lightningserver.HttpMethod
+import com.lightningkite.lightningserver.engine.local.hasRequestBody
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.logger
@@ -15,6 +16,7 @@ import io.ktor.server.application.*
 import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.util.*
+import io.ktor.utils.io.ByteReadChannel
 import io.ktor.websocket.*
 
 /**
@@ -29,13 +31,28 @@ internal fun ContentType.adapt(): MediaType =
 internal fun Headers.adapt(): HttpHeaders = HttpHeaders(flattenEntries())
 
 /**
+ * The channel carrying this request's body, or null if the headers rule a body out.
+ *
+ * HTTP/1.x frames a body in exactly two ways, a positive `Content-Length` or chunked encoding, so
+ * there the headers settle it (see [hasRequestBody]). Later versions may also end a body simply by
+ * ending the stream, with neither header, so only a declared length of zero rules one out. Such a
+ * request is given its channel, which may turn out to hold nothing: whoever reads a body treats an
+ * empty one as no body.
+ */
+internal suspend fun ApplicationCall.requestBodyChannelOrNull(declaredLength: Long?): ByteReadChannel? {
+    val mayEndWithStream = declaredLength == null && !request.httpVersion.startsWith("HTTP/1")
+    val hasBody = mayEndWithStream || hasRequestBody(declaredLength, request.headers.getAll("Transfer-Encoding").orEmpty())
+    return if (hasBody) receiveChannel() else null
+}
+
+/**
  * Converts a Ktor ApplicationCall to a Lightning Server HttpRequest.
  *
  * Extracts the real client IP from the configured proxy header if available.
  * Falls back to the origin remote address if the header is not present.
  */
 context(server: EngineBase)
-internal suspend fun ApplicationCall.adaptHttpRequest(maxBody: Long): Pair<HttpRequest<PathSpec>, Execution.ID> {
+internal suspend fun ApplicationCall.adaptHttpRequest(bodySource: KtorChannelSuspendingSource?): Pair<HttpRequest<PathSpec>, Execution.ID> {
     val adaptedHeaders = request.headers.adapt()
     val identity = adaptedHeaders.requestIdentity(ktorRunConfig().requestIdHeader) {
         server.logger.warn { "Request ID header for proxy '${ktorRunConfig().requestIdHeader}' was missing from the request." }
@@ -53,17 +70,15 @@ internal suspend fun ApplicationCall.adaptHttpRequest(maxBody: Long): Pair<HttpR
                     server.logger.warn { "Real IP address header for proxy '$header' was missing from request [${identity.requestId}}]." }
             }
         } ?: request.origin.remoteAddress,
-        body = run {
+        body = bodySource?.let { bodySource ->
             // TODO: Add MultiPart support
             // Cooperative, non-blocking body read: back the body with Ktor's suspending ByteReadChannel so consuming
             // it yields the event loop instead of blocking it (the original receiveStream()+runBlocking path could
             // deadlock the event loop on slow/segmented bodies). maxBody is enforced during the suspending read.
-            val declaredLength = request.contentLength()
             TypedData.suspendingSource(
-                // declaredLength lets the source reject a body that ends before its declared Content-Length (A1).
-                source = KtorChannelSuspendingSource(receiveChannel(), maxBody, declaredLength),
+                source = bodySource,
                 mediaType = request.contentType().adapt(),
-                size = declaredLength,
+                size = request.contentLength(),
             )
         },
     )

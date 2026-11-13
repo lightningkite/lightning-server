@@ -3,8 +3,12 @@ package com.lightningkite.lightningserver.serialization
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.services.data.AbstractSuspendingSource
 import com.lightningkite.services.data.MediaType
+import com.lightningkite.services.data.SuspendingSource
 import com.lightningkite.services.data.TypedData
+import com.lightningkite.services.data.request
+import kotlinx.io.Buffer
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.serializer
 
@@ -137,6 +141,39 @@ public val defaultEncoder: Pair<MediaType, MediaTypeEncoder>
 context(serverRuntime: ServerRuntime)
 public val MediaType.decoder: MediaTypeDecoder?
     get() = serverRuntime.server.mediaTypeDecoders[withoutParameters]?.firstOrNull { it.accepts(this.parameters) }
+
+/**
+ * This body, or null if there is nothing in it.
+ *
+ * HTTP draws no line between a request with no body and a request with an empty one, and an engine
+ * cannot always tell which it has before the body is read: a chunked body, or one that ends along
+ * with its HTTP/2 stream, may turn out to hold nothing. [HttpRequest.body] is null only when the
+ * engine could rule a body out from the headers, so code that treats "no body" as a case of its own
+ * should go through this rather than check for null alone.
+ *
+ * A body whose size is not known is read until its first byte arrives or it ends. The body returned
+ * takes the place of this one, which must not be read afterwards.
+ */
+public suspend fun TypedData.takeUnlessEmpty(): TypedData? {
+    data.size?.let { size ->
+        if (size > 0L) return this
+        close()
+        return null
+    }
+    val source = data.suspendingSource()
+    val head = Buffer()
+    if (!source.request(head, 1)) return null
+    return TypedData.suspendingSource(PrefixedSource(head, source), mediaType)
+}
+
+/** The bytes of [head], then whatever is left of [rest]. */
+private class PrefixedSource(private val head: Buffer, private val rest: SuspendingSource) : AbstractSuspendingSource() {
+    override suspend fun fill(into: Buffer): Long = if (head.exhausted()) rest.read(into) else head.transferTo(into)
+    override fun release(cause: Throwable?) {
+        head.clear()
+        rest.cancel(cause)
+    }
+}
 
 /**
  * Parses this TypedData into a Kotlin object using the appropriate decoder.

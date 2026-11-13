@@ -142,10 +142,10 @@ Surprises:
 |---|---|---|---|
 | `ping` | Duration? (ISO-8601) | `PT30S` | server ping period; `null` disables. Ktor `pingPeriodMillis` (`KtorEngine.kt:124`) |
 | `pongTimeout` | Duration | `PT15S` | wait for ping send + pong before closing. Ktor `timeoutMillis` (`:125`) |
-| `maxFrameSize` | DataSize? (bytes number) | `16777216` | max frame; `null` = unbounded. Ktor (`:127`); Netty handshaker, clamped to `Int.MAX_VALUE` (`NettyEngine.kt:524`) |
+| `maxFrameSize` | DataSize? (bytes number) | `16777216` | max frame; `null` = unbounded. Ktor (`:127`); Netty handshaker, clamped to `Int.MAX_VALUE` (`NettyEngine.kt:301`) |
 
 Surprises:
-- **Netty reads only `maxFrameSize`**; `ping`/`pongTimeout` are not read in `engine-netty/src/main`. JDK engine has no WebSockets (501). Ktor uses all three.
+- Ktor and Netty use all three. On Netty, `ping` is sent on a fixed period and a socket that has sent nothing (pongs included) for `ping` + `pongTimeout` is closed. That check is suspended while the server itself has stopped reading the socket because the handler is behind (`webSocketOversizePolicy` `SUSPEND`). A socket whose peer has stopped reading, so that nothing queued for it moves for two such windows, is closed regardless. With `ping` set to `null` a WebSocket falls back to `reliability.idleTimeout`. Netty also applies `maxFrameSize` to a message reassembled from fragments, and, with `webSocketCompression` on, to what one compressed frame may inflate to (1009 close above it). JDK engine has no WebSockets (501).
 - Optional: omitting the key silently applies defaults.
 
 ```json
@@ -174,7 +174,7 @@ Surprises:
 ### forceWebSocketPubSub
 
 - `LocalEngine.kt:59-64`. `ServerSetting.Direct<Boolean>`, `optional = true`, default `false`. Local engines only.
-- When `true`, handlers implementing `DirectExecutableWebSocketHandler` still go through pub/sub (mimics serverless). Read in `KtorEngine.kt:222`; engine-netty has no reference (unverified: NettyEngine may ignore it).
+- When `true`, handlers implementing `DirectExecutableWebSocketHandler` still go through pub/sub (mimics serverless). Read by both `KtorEngine` and `NettyEngine`.
 
 ```json
 { "forceWebSocketPubSub": false }
@@ -182,7 +182,7 @@ Surprises:
 
 ### nettyRunConfig
 
-- `engine-netty/.../NettyRuntimeSettings.kt:57-61`. `ServerSetting.Direct<NettyRuntimeSettings>`, required, registered by `NettyEngine` (`NettyEngine.kt:104`).
+- `engine-netty/.../NettyRuntimeSettings.kt:57-61`. `ServerSetting.Direct<NettyRuntimeSettings>`, required, registered by `NettyEngine` (`NettyEngine.kt:118`).
 - Kotlin: `@Serializable data class NettyRuntimeSettings` (`:38-52`).
 
 | field | type | default | meaning |
@@ -191,17 +191,15 @@ Surprises:
 | `port` | Int | `8080` | bind port |
 | `realIpHeader` | String? | `null` | header to read client IP from (trusted blindly: only set behind a proxy) |
 | `requestIdHeader` | String? | `null` | request-id header from a trusted proxy (must be UUIDv7); `null` = always generate |
-| `workerThreads` | Int? | `null` | worker event-loop threads; `null`/0 = Netty default (`NettyEngine.kt:183`); no validation of negatives |
-| `maxAggregatedContentLength` | DataSize | `16777216` | HTTP aggregator body cap; clamped to `0..Int.MAX_VALUE`, warns above (`:216-220`) |
-| `webSocketCompression` | Boolean | `false` | per-message deflate |
-| `backlog` | DataSize | `4096` | `SO_BACKLOG` via `.bytes.toInt()` (a count, typed as DataSize) |
+| `workerThreads` | Int? | `null` | I/O event-loop threads; `null`/0 = Netty default; no validation of negatives. Handlers run on `Dispatchers.Default`, not on these threads |
+| `webSocketCompression` | Boolean | `false` | per-message deflate; a frame may inflate to at most `webSocketSettings.maxFrameSize` |
+| `backlog` | Int | `4096` | `SO_BACKLOG`: pending connections in the accept queue |
 | `recvBufBytes` | DataSize? | `null` | `SO_RCVBUF`; null = OS default |
 | `sendBufBytes` | DataSize? | `null` | `SO_SNDBUF` |
-| `autoRead` | Boolean | `true` | channel auto-read |
-| `reliability` | EngineReliabilitySettings | defaults | `maxBodySize`, `workerThreads` ignored here |
+| `reliability` | EngineReliabilitySettings | defaults | `workerThreads` ignored here |
 
 ```json
-{ "nettyRunConfig": { "host": "0.0.0.0", "port": 8080, "maxAggregatedContentLength": 16777216, "backlog": 4096, "reliability": { "idleTimeout": "PT2M" } } }
+{ "nettyRunConfig": { "host": "0.0.0.0", "port": 8080, "backlog": 4096, "reliability": { "maxBodySize": 16777216, "idleTimeout": "PT2M" } } }
 ```
 
 ### ktorRunConfig
@@ -239,8 +237,8 @@ The underlying Ktor engine factory (Netty/CIO/...) is chosen in code via `start(
 
 | field (`reliability.`) | type | default | meaning |
 |---|---|---|---|
-| `maxBodySize` | DataSize | `16777216` | 413 above this; **Ktor and JDK only**; Netty ignores it (uses `maxAggregatedContentLength`) |
-| `idleTimeout` | Duration | `PT2M` | idle keep-alive close; **Netty only** (`NettyEngine.kt:251`, truncated to whole seconds) |
+| `maxBodySize` | DataSize | `16777216` | 413 above this; all three engines |
+| `idleTimeout` | Duration | `PT2M` | idle keep-alive close; **Netty only**. Not applied while a handler is working on a request it has whole (its own timeout applies then). WebSockets use it only when `webSocketSettings.ping` is `null` |
 | `shutdownDrainTimeout` | Duration | `PT25S` | graceful shutdown wait; all three |
 | `webSocketInboundBuffer` | Int | `256` | inbound frame channel capacity, `coerceAtLeast(1)` (`LocalEngine.kt:300`) |
 | `webSocketOversizePolicy` | enum | `CLOSE` | overflow behavior |
@@ -382,6 +380,5 @@ These came from reading the code.  None were reproduced.
 - **Typo'd keys and fields:** `ignoreUnknownKeys` silently ignores them, and the default is used instead.
 - **Stale `wsUrl`:** `wsUrl` is only derived when it's omitted.  Suggested files write it out explicitly, so changing `publicUrl` alone leaves `wsUrl` pointing at the old host.
 - **`general.debug` KDoc:** it claims `debug` affects CORS, but the code only uses it to add stack traces to 500 responses.  The `telemetry` KDoc is also stale: it describes a null default and `OpenTelemetrySettings`.
-- **Netty WebSockets:** Netty ignores `webSocketSettings.ping` and `pongTimeout`, and appears to ignore `forceWebSocketPubSub`.
 - **CORS preflight:** a preflight from a disallowed origin returns 204 even with `forbidOnMatchFail=true` (`CorsInterceptor.kt:108-110`, which has a TODO).  `*example.com` (no dot) matches `evilexample.com`.  `allowCredentials` with `["*"]` isn't rejected.
 - **Apple OAuth:** `OauthProviderInfo.settings` / `SettingInfo.apple` is never read.  The app must call `toOauthProviderCredentials()` itself, though `docs-guide/drafts/oauth.md:106` says the conversion is automatic.

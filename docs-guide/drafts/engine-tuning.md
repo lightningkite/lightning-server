@@ -26,7 +26,7 @@ import com.lightningkite.services.kfile.KFile
 | Engine | Module | `start()` signature | WebSockets | Native transport |
 |---|---|---|---|---|
 | `KtorEngine` | `engine-ktor` | `start(factory)` e.g. `start(Netty)` | Yes | Via Ktor engine factory |
-| `NettyEngine` | `engine-netty` | `start()` | Yes | epoll (Linux) / kqueue (macOS) |
+| `NettyEngine` | `engine-netty` | `start()` | Yes | epoll (Linux) / kqueue (macOS) if you add Netty's native transport artifact; otherwise NIO |
 | `JdkEngine` | `engine-jdk-server` | `start()` | **No** | NIO (JDK `HttpServer`) |
 
 **`KtorEngine`** is the recommended starting point.  It wraps Ktor's server framework, which supports multiple transport back-ends via a factory pattern — `Netty`, `CIO`, and `Jetty` from the Ktor ecosystem.  Using `start(io.ktor.server.netty.Netty)` gives you Ktor's Netty integration (HTTP/1.1 + HTTP/2 + WebSockets) with a minimum of setup.
@@ -103,11 +103,11 @@ All three engines embed `EngineReliabilitySettings` under the `reliability` key.
     "host": "0.0.0.0",
     "port": 8080,
     "reliability": {
-      "maxBodySize": "16MiB",
-      "shutdownDrainTimeout": "25s",
+      "maxBodySize": 16777216,
+      "shutdownDrainTimeout": "PT25S",
       "webSocketInboundBuffer": 256,
       "webSocketOversizePolicy": "CLOSE",
-      "scheduleLockTtl": "1h"
+      "scheduleLockTtl": "PT1H"
     }
   }
 }
@@ -116,19 +116,17 @@ All three engines embed `EngineReliabilitySettings` under the `reliability` key.
 ### `maxBodySize` — Request Body Cap
 
 **Default: 16 MiB**  
-**Applies to: Ktor, JDK** (Netty uses `maxAggregatedContentLength` instead — see below)
+**Applies to: Ktor, Netty, JDK**
 
 Requests whose declared `Content-Length` exceeds this cap are rejected with `413 Payload Too Large` before the body is read.  Streamed bodies that grow past the cap mid-read are also rejected.
 
 This is your primary defense against clients that try to exhaust your server's memory by sending enormous uploads.
 
 ```json
-{ "reliability": { "maxBodySize": "64MiB" } }
+{ "reliability": { "maxBodySize": 67108864 } }
 ```
 
-Use a `DataSize` string: `"16MiB"`, `"512KiB"`, `"1GiB"`, etc.
-
-> **Netty note:** Netty's HTTP aggregator enforces body size via its own `maxAggregatedContentLength` field on `NettyRuntimeSettings`, not via `reliability.maxBodySize`.  Set both if you use `NettyEngine`.
+The value is a plain number of bytes: `16777216` is 16 MiB, `524288` is 512 KiB, `1073741824` is 1 GiB. Durations elsewhere in these settings are ISO-8601 strings, such as `"PT60S"` or `"PT1H"`.
 
 ### `idleTimeout` — Idle Connection Reaping
 
@@ -137,8 +135,10 @@ Use a `DataSize` string: `"16MiB"`, `"512KiB"`, `"1GiB"`, etc.
 
 How long an idle keep-alive connection may sit with no read/write activity before it is closed.  Without this, a slow trickle of idle connections can exhaust file descriptors.
 
+The clock does not run against a connection while a handler is working on a request it has received in full: that quiet is the server's, and the handler's own timeout bounds it.  It does run while the server waits on the client, whether for more of an upload or for the client to read the response.
+
 ```json
-{ "nettyRunConfig": { "reliability": { "idleTimeout": "60s" } } }
+{ "nettyRunConfig": { "reliability": { "idleTimeout": "PT60S" } } }
 ```
 
 ### `shutdownDrainTimeout` — Graceful Shutdown
@@ -158,7 +158,7 @@ No explicit shutdown code is needed in your `main()`.  The shutdown hook is regi
 In container environments set this to slightly less than your orchestrator's termination grace period — for Kubernetes the default `terminationGracePeriodSeconds` is 30, so 25 seconds leaves 5 seconds for the JVM to finish cleanly.
 
 ```json
-{ "reliability": { "shutdownDrainTimeout": "20s" } }
+{ "reliability": { "shutdownDrainTimeout": "PT20S" } }
 ```
 
 ### `webSocketInboundBuffer` — WebSocket Backpressure
@@ -212,7 +212,7 @@ Lightning Server uses a distributed lock (backed by your configured cache) to en
 If a scheduled task runs longer than `scheduleLockTtl`, another instance may start the same tick concurrently once the lock expires.  Keep individual ticks shorter than this value, or raise it for long-running tasks:
 
 ```json
-{ "reliability": { "scheduleLockTtl": "4h" } }
+{ "reliability": { "scheduleLockTtl": "PT4H" } }
 ```
 
 ## Per-Request Timeout
@@ -238,37 +238,33 @@ Set the handler timeout based on what your handler actually needs, rather than r
 
 | Field                        | Default | Purpose |
 |------------------------------|---|---|
-| `workerThreads`              | `null` (Netty default: 2× CPUs) | Worker event-loop thread count. |
-| `maxAggregatedContentLength` | `16 MiB` | Netty's HTTP aggregator body cap (instead of `reliability.maxBodySize`). |
+| `workerThreads`              | `null` (Netty default: 2× CPUs) | I/O event-loop thread count. Handlers run on `Dispatchers.Default`, not on these threads. |
 | `webSocketCompression`       | `false` | Enable per-message deflate WebSocket compression. |
 | `backlog`                    | `4096` | TCP `SO_BACKLOG` — accept queue depth. |
 | `recvBufBytes`               | `null` (system default) | TCP `SO_RCVBUF` receive buffer size. |
 | `sendBufBytes`               | `null` (system default) | TCP `SO_SNDBUF` send buffer size. |
-| `autoRead`                   | `true` | Set to `false` to enable manual flow control via Netty. |
 
 ```json
 {
   "nettyRunConfig": {
     "host": "0.0.0.0",
     "port": 8080,
-    "maxAggregatedContentLength": "32MiB",
     "webSocketCompression": true,
     "workerThreads": 8,
     "reliability": {
-      "idleTimeout": "60s",
-      "shutdownDrainTimeout": "20s"
+      "maxBodySize": 33554432,
+      "idleTimeout": "PT60S",
+      "shutdownDrainTimeout": "PT20S"
     }
   }
 }
 ```
 
-> `reliability.maxBodySize` is **ignored** by `NettyEngine` — use `maxAggregatedContentLength` for the body cap.
-
 ## Which Knob Applies to Which Engine
 
 | Knob | Ktor | Netty | JDK |
 |---|---|---|---|
-| `maxBodySize` (reliability) | Yes | **No** — use `maxAggregatedContentLength` | Yes |
+| `maxBodySize` (reliability) | Yes | Yes | Yes |
 | `idleTimeout` (reliability) | No | Yes | No |
 | `shutdownDrainTimeout` (reliability) | Yes | Yes | Yes |
 | `webSocketInboundBuffer` (reliability) | Yes | Yes | No (no WS) |
@@ -276,7 +272,6 @@ Set the handler timeout based on what your handler actually needs, rather than r
 | `workerThreads` (reliability) | No | No | Yes |
 | `scheduleLockTtl` (reliability) | Yes | Yes | Yes |
 | `workerThreads` (Netty-level) | — | Yes | — |
-| `maxAggregatedContentLength` (Netty-level) | — | Yes | — |
 | Per-handler `HttpHandler.timeout` | Yes | Yes | Yes |
 
 ## What's Next

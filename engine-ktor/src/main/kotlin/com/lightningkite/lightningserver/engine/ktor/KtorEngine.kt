@@ -2,10 +2,9 @@
 
 package com.lightningkite.lightningserver.engine.ktor
 
-import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerSetting
-import com.lightningkite.lightningserver.engine.local.BodyTooLargeException
+import com.lightningkite.lightningserver.engine.local.enforceBodyLimit
 import com.lightningkite.lightningserver.engine.local.EngineReliabilitySettings
 import com.lightningkite.lightningserver.engine.local.LocalEngine
 import com.lightningkite.lightningserver.engine.local.WsOversizePolicy
@@ -141,64 +140,70 @@ public class KtorEngine(
                         call.respondText("Payload Too Large", status = HttpStatusCode.PayloadTooLarge)
                         return@handle
                     }
-                    val (request, executionId) = call.adaptHttpRequest(maxBody)
+                    // A request the headers show to have no body gets a null one.
+                    // declaredLength lets the source reject a body that ends before its declared Content-Length (A1).
+                    val bodySource = call.requestBodyChannelOrNull(declaredLength)
+                        ?.let { KtorChannelSuspendingSource(it, maxBody, declaredLength) }
+                    val (request, executionId) = call.adaptHttpRequest(bodySource)
                     // Request timeout is enforced centrally in ServerRuntime.handle (per-handler HttpHandler.timeout).
-                    val result: HttpResponse = try {
-                        this@KtorEngine.handleRoot(request, executionId)
-                    } catch (_: BodyTooLargeException) {
-                        // 2.5: streamed body exceeded the cap mid-read.
-                        HttpResponse.plainText("Payload Too Large", HttpStatus.PayloadTooLarge)
-                    }
+                    val handled: HttpResponse = this@KtorEngine.handleRoot(request, executionId)
+                    // 2.5: a body that passed the cap mid-read is a 413, whatever the handler made of it.
+                    val result = enforceBodyLimit(handled, bodySource?.exceeded == true)
 
-                    for (header in result.headers.normalizedEntries) {
-                        for (value in header.value) {
-                            call.response.header(header.key, value.toHttpString())
-                        }
-                    }
-                    val code = HttpStatusCode.fromValue(result.status.code)
-                    val type = result.body?.mediaType?.toString()?.let { ContentType.parse(it) }
-
-                    val body = result.body?.data
-                    if (body == null) {
-                        val contentType = call.response.headers[HttpHeaders.ContentType]
-                        val contentLength = call.response.headers[HttpHeaders.ContentLength]
-                        if (contentType != null && contentLength != null) {
-                            call.response.call.respondOutputStream(
-                                ContentType.parse(contentType),
-                                HttpStatusCode.NoContent,
-                                contentLength.toLong()
-                            ) { close() }
-                        } else
-                            call.respondText("", type, code) { }
-                    } else if (disableResponseStreaming(request))
-                        call.respondBytes(body.bytes(), type, code)
-                    else
-                        when (body) {
-                            is Data.Bytes -> call.respondBytes(body.data, type, code)
-                            is Data.Text -> call.respondText(body.data, type, code)
-                            is Data.Sink -> call.respondBytesWriter(contentType = type, status = code) {
-                                // emit is a blocking producer — run it on the IO pool (via Ktor's blocking asSink
-                                // bridge) so it streams to the channel without ever stalling the event-loop thread.
-                                val channel = this
-                                withContext(Dispatchers.IO) { channel.asSink().buffered().use { body.emit(it) } }
+                    try {
+                        for (header in result.headers.normalizedEntries) {
+                            for (value in header.value) {
+                                call.response.header(header.key, value.toHttpString())
                             }
+                        }
+                        val code = HttpStatusCode.fromValue(result.status.code)
+                        val type = result.body?.mediaType?.toString()?.let { ContentType.parse(it) }
 
-                            is Data.Source -> call.respondBytesWriter(contentType = type, status = code) {
-                                // Blocking streaming source: copy it to the channel on the IO pool (no full buffering).
-                                val channel = this
-                                withContext(Dispatchers.IO) {
-                                    channel.asSink().buffered().use { sink -> body.source.use { sink.transferFrom(it) } }
+                        val body = result.body?.data
+                        if (body == null) {
+                            val contentType = call.response.headers[HttpHeaders.ContentType]
+                            val contentLength = call.response.headers[HttpHeaders.ContentLength]
+                            if (contentType != null && contentLength != null) {
+                                call.response.call.respondOutputStream(
+                                    ContentType.parse(contentType),
+                                    HttpStatusCode.NoContent,
+                                    contentLength.toLong()
+                                ) { close() }
+                            } else
+                                call.respondText("", type, code) { }
+                        } else if (disableResponseStreaming(request))
+                            call.respondBytes(body.bytes(), type, code)
+                        else
+                            when (body) {
+                                is Data.Bytes -> call.respondBytes(body.data, type, code)
+                                is Data.Text -> call.respondText(body.data, type, code)
+                                is Data.Sink -> call.respondBytesWriter(contentType = type, status = code) {
+                                    // emit is a blocking producer — run it on the IO pool (via Ktor's blocking asSink
+                                    // bridge) so it streams to the channel without ever stalling the event-loop thread.
+                                    val channel = this
+                                    withContext(Dispatchers.IO) { channel.asSink().buffered().use { body.emit(it) } }
+                                }
+
+                                is Data.Source -> call.respondBytesWriter(contentType = type, status = code) {
+                                    // Blocking streaming source: copy it to the channel on the IO pool (no full buffering).
+                                    val channel = this
+                                    withContext(Dispatchers.IO) {
+                                        channel.asSink().buffered().use { sink -> body.source.use { sink.transferFrom(it) } }
+                                    }
+                                }
+
+                                is Data.SuspendingSource, is Data.SuspendingSink -> call.respondBytesWriter(contentType = type, status = code) {
+                                    // Fully cooperative: stream the body into the ByteWriteChannel via a SuspendingSink so
+                                    // response writes suspend for backpressure instead of blocking the event loop.
+                                    // use() is what turns a mid-body failure into a cancelled channel — without it the
+                                    // engine would frame a half-written body as a complete response.
+                                    KtorChannelSuspendingSink(this).use { body.writeSuspending(it) }
                                 }
                             }
-
-                            is Data.SuspendingSource, is Data.SuspendingSink -> call.respondBytesWriter(contentType = type, status = code) {
-                                // Fully cooperative: stream the body into the ByteWriteChannel via a SuspendingSink so
-                                // response writes suspend for backpressure instead of blocking the event loop.
-                                // use() is what turns a mid-body failure into a cancelled channel — without it the
-                                // engine would frame a half-written body as a complete response.
-                                KtorChannelSuspendingSink(this).use { body.writeSuspending(it) }
-                            }
-                        }
+                    } finally {
+                        // Only now is it safe to stop reading an over-limit body; see cancelRemaining().
+                        bodySource?.cancelRemaining()
+                    }
                 }
             }
             webSocket("{...}") {

@@ -75,7 +75,7 @@ object Server : ServerBuilder() {
 
     val api = path.path("api").path("users").post bind HttpHandler { request ->
         // Automatically decode based on Content-Type
-        val user = request.body!!.parse(User.serializer())
+        val user = request.body?.parse(User.serializer())
 
         // Process user...
 

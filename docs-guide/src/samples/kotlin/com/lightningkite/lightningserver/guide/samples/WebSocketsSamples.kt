@@ -82,7 +82,7 @@ object BroadcastServer : ServerBuilder() {
 
     // POST /announce — HTTP endpoint that publishes to the topic
     val announce = path.path("announce").post bind HttpHandler { request ->
-        val message = request.body!!.text()
+        val message = request.body?.text() ?: ""
         // send() on a topic pushes to all subscribed WebSocket connections.
         announcementTopic.send(message)
         HttpResponse.plainText("Announced: $message")

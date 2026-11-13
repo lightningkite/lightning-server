@@ -100,7 +100,8 @@ public interface ApiHttpHandler<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT
             HttpMethod.GET, HttpMethod.HEAD -> request.queryParameters(inputType)
             else ->
                 if (inputType == Unit.serializer()) Unit as INPUT
-                else request.body.let {
+                // An empty body is no body: engines cannot always tell the two apart up front.
+                else request.body?.takeUnlessEmpty().let {
                     if (it == null) {
                         if (inputType.descriptor.isNullable) null as INPUT
                         else throw BadRequestException("No request body provided")

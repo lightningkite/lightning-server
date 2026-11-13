@@ -3,68 +3,74 @@
 package com.lightningkite.lightningserver.engine.netty
 
 import com.lightningkite.lightningserver.EngineApi
-import com.lightningkite.lightningserver.HttpMethod
-import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.InternalLightningServerApi
-import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.definition.ServerDefinition
+import com.lightningkite.lightningserver.engine.local.EngineReliabilitySettings
 import com.lightningkite.lightningserver.engine.local.LocalEngine
-import com.lightningkite.lightningserver.engine.local.LocalWebSocketConnection
-import com.lightningkite.lightningserver.engine.local.WsOversizePolicy
-import com.lightningkite.lightningserver.engine.local.forceWebSocketPubSub
-import com.lightningkite.lightningserver.http.*
-import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpRequest
-import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.pathing.*
-import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.settings.ServerSettings
-import com.lightningkite.lightningserver.websockets.*
-import com.lightningkite.services.data.*
-import com.lightningkite.services.data.DataSize.Companion.bytes
+import com.lightningkite.lightningserver.websockets.WebSocketClose
+import com.lightningkite.lightningserver.websockets.WebSocketSettings
+import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionRequest
+import com.lightningkite.lightningserver.websockets.webSocketSettings
 import com.lightningkite.services.data.DataSize.Companion.kibibytes
+import com.lightningkite.services.pubsub.PubSubChannel
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.netty.bootstrap.ServerBootstrap
-import io.netty.buffer.*
 import io.netty.channel.*
 import io.netty.channel.epoll.*
 import io.netty.channel.group.ChannelGroup
+import io.netty.channel.group.ChannelMatcher
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.channel.kqueue.*
-import io.netty.channel.nio.NioEventLoopGroup
+import io.netty.channel.nio.NioIoHandler
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.NioServerSocketChannel
-import io.netty.handler.codec.http.*
-import io.netty.handler.codec.http.HttpHeaderNames.*
-import io.netty.handler.codec.http.websocketx.*
+import io.netty.handler.codec.http.HttpServerCodec
 import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler
-import io.netty.handler.stream.ChunkedWriteHandler
-import io.netty.handler.timeout.IdleStateEvent
+import io.netty.handler.flow.FlowControlHandler
 import io.netty.handler.timeout.IdleStateHandler
-import io.netty.util.AttributeKey
 import io.netty.util.concurrent.GlobalEventExecutor
 import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.SendChannel
-import kotlinx.serialization.KSerializer
 import java.net.InetSocketAddress
-import java.net.URI
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.TimeUnit
 import kotlin.time.Clock
-import com.lightningkite.lightningserver.http.HttpHeaders as LsHttpHeaders
-import com.lightningkite.lightningserver.websockets.WebSocketFrame as LkWebSocketFrame
-import io.netty.handler.codec.http.HttpHeaders as NettyHttpHeaders
+import kotlin.time.TimeSource
+import kotlinx.coroutines.channels.Channel as CoroutineChannel
+
+// Names of the pipeline's handlers that are looked up again after they are added.
+internal const val IDLE_HANDLER = "idle"
+internal const val FLOW_HANDLER = "flow"
+internal const val HTTP_HANDLER = "http"
+internal const val WS_AGGREGATOR = "ws-aggregator"
+internal const val WS_HANDLER = "ws"
+
+/** Number of threads accepting connections. One is the norm: accepting is cheap. */
+private const val BOSS_THREADS = 1
+
+/**
+ * How long shutdown waits for connections to finish closing even when its drain window is spent,
+ * so the disconnects that closing raises are queued before shutdown moves on.
+ */
+private const val MIN_CLOSE_WAIT_MILLIS = 1_000L
 
 /**
  * A Lightning Server engine implementation using Netty's high-performance asynchronous I/O framework.
  *
- * This engine provides production-grade HTTP and WebSocket support with native transport optimizations:
- * - **Linux**: Uses epoll for optimal performance
- * - **macOS/BSD**: Uses kqueue for optimal performance
- * - **Other platforms**: Falls back to NIO
+ * **Transports:** epoll on Linux and kqueue on macOS/BSD are used when their native libraries are on
+ * the classpath; otherwise the engine runs on NIO. This module ships only the transport *classes*, so
+ * an application that wants a native transport adds the matching artifact itself, for example
+ * `io.netty:netty-transport-native-epoll` with the `linux-x86_64` classifier. The transport in use is
+ * logged at startup.
  *
  * **Features:**
  * - Full HTTP/1.1 support with keep-alive
- * - WebSocket support with pub/sub subscriptions
+ * - Streamed request and response bodies: neither is held in memory whole unless the handler asks
+ *   for the bytes. Request size is capped by [EngineReliabilitySettings.maxBodySize].
+ * - WebSocket support with pub/sub subscriptions, fragmented messages, and a proper close handshake
+ * - Server-side WebSocket pings (see [WebSocketSettings])
  * - Optional WebSocket compression (per-message deflate)
  * - Configurable worker thread pool
  * - Graceful shutdown support
@@ -73,11 +79,15 @@ import io.netty.handler.codec.http.HttpHeaders as NettyHttpHeaders
  * - Per-request timeout (cooperative, default 30 seconds) and graceful SIGTERM drain
  *
  * **Performance characteristics:**
- * - Uses pooled byte buffer allocation for memory efficiency
  * - TCP_NODELAY enabled (disables Nagle's algorithm)
  * - SO_KEEPALIVE enabled for connection health checks
  * - Configurable buffer sizes and backlog
- * - Write buffer water marks: 32 KiB low, 64 KiB high
+ * - Write buffer water marks: 32 KiB low, 64 KiB high. A WebSocket `send` suspends while the
+ *   connection is above the high mark, so a slow client slows its sender instead of growing a buffer.
+ *
+ * **Threading:** Netty's event loops only move bytes. Handlers, tasks and schedules run on
+ * [Dispatchers.Default], so a handler that blocks ties up one of those threads but never stops other
+ * connections from being read, written, or pinged.
  *
  * **Usage:**
  * ```kotlin
@@ -88,6 +98,9 @@ import io.netty.handler.codec.http.HttpHeaders as NettyHttpHeaders
  *
  * @param server The server definition to run
  * @param clock The clock to use for timing operations (defaults to System clock)
+ * @param disableResponseStreaming Return true for a request whose response must be sent in one piece
+ *      with a known `Content-Length` instead of streamed. Useful for clients, such as memory-limited
+ *      IoT devices, that cannot handle a chunked response.
  *
  * @see NettyRuntimeSettings for configuration options
  * @see KtorEngine for an alternative production engine
@@ -95,6 +108,7 @@ import io.netty.handler.codec.http.HttpHeaders as NettyHttpHeaders
 public class NettyEngine(
     server: ServerDefinition,
     override val clock: Clock = Clock.System,
+    internal val disableResponseStreaming: (HttpRequest<*>) -> Boolean = { false },
 ) : LocalEngine(server) {
 
     public companion object {
@@ -114,25 +128,15 @@ public class NettyEngine(
     public var boundAddress: InetSocketAddress? = null
 
     private val supervisorJob = SupervisorJob()
-    override lateinit var scope: CoroutineScope
-
-    private lateinit var HANDSHAKER_KEY: AttributeKey<WebSocketServerHandshaker>
-    private lateinit var MID_KEY: AttributeKey<WebSocketConnection<PathSpec, Any?>>
-    private lateinit var HANDLER_KEY: AttributeKey<WebSocketHandler<PathSpec, Any?>>
-    private lateinit var DIRECT_CHANNEL_KEY: AttributeKey<SendChannel<LkWebSocketFrame>>
-
-    /** A pub/sub socket's own scope, holding its subscription collectors. Cancelled once it disconnects. */
-    private lateinit var SOCKET_SCOPE_KEY: AttributeKey<CoroutineScope>
 
     /**
-     * Latch marking that a channel's disconnect phase has already been raised.
-     *
-     * A client close arrives as a `CloseWebSocketFrame`, which disconnects and then calls
-     * `ctx.close()` — which fires `channelInactive`, whose job is also to disconnect. Nothing clears
-     * the socket's channel attributes in between, so without this latch the ordinary client-initiated
-     * close runs the handler's disconnect twice.
+     * Where handlers, tasks and schedules run. Deliberately not the Netty worker group: application
+     * code may block, and an event loop that is blocked stops serving every connection assigned to it.
      */
-    private lateinit var DISCONNECTED_KEY: AttributeKey<AtomicBoolean>
+    override val scope: CoroutineScope = CoroutineScope(Dispatchers.Default + supervisorJob)
+
+    @Volatile
+    private var started = false
 
     /**
      * Every accepted connection, so shutdown can close them itself rather than hoping they happen to
@@ -146,6 +150,41 @@ public class NettyEngine(
      */
     private val openChannels: ChannelGroup = DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
 
+    /** The listening socket, so shutdown can stop accepting before it drains. */
+    @Volatile
+    private var serverChannel: Channel? = null
+
+    /**
+     * Set once shutdown begins. From then on no connection is accepted, no response offers
+     * keep-alive, and every connection closes once its current response is out.
+     */
+    @Volatile
+    internal var draining: Boolean = false
+        private set
+
+    /**
+     * HTTP handlers still running, so shutdown can wait for them. Their coroutines run on [scope],
+     * not on the event loops, so shutting the loops down does not wait for them.
+     */
+    internal val inFlight: MutableSet<Job> = ConcurrentHashMap.newKeySet()
+
+    /**
+     * Every pub/sub socket that has not yet disconnected, so shutdown can raise the disconnects
+     * itself (see [shutdown]).
+     */
+    internal val pubSubSessions: MutableSet<PubSubSession> = ConcurrentHashMap.newKeySet()
+
+    // LocalEngine keeps these protected. The connection handlers are classes of their own, and
+    // reach them through here.
+    internal val handlerScope: CoroutineScope get() = scope
+    internal val disconnectScope: CoroutineScope get() = cleanupScope
+
+    internal fun <T> inboundChannel(reliability: EngineReliabilitySettings): CoroutineChannel<T> =
+        newWebSocketInboundChannel(reliability)
+
+    internal fun subscriptionChannel(request: WebSocketSubscriptionRequest<*, Any?>): PubSubChannel<Any?> =
+        pubSubChannel(request)
+
     /**
      * Starts the Netty HTTP server.
      *
@@ -153,15 +192,10 @@ public class NettyEngine(
      * 1. Ensures settings are ready and validated
      * 2. Runs any startup tasks defined in the server
      * 3. Starts the schedule coordinator
-     * 4. Creates boss and worker event loop groups (with native transport if available)
-     * 5. Configures the server bootstrap with performance optimizations
+     * 4. Creates boss and worker event loop groups (with a native transport if available)
+     * 5. Configures the server bootstrap
      * 6. Binds to the configured host and port
      * 7. Blocks indefinitely until the server shuts down
-     *
-     * **Transport selection:**
-     * - Prefers epoll on Linux for best performance
-     * - Falls back to kqueue on macOS/BSD
-     * - Uses NIO as final fallback
      *
      * **Thread configuration:**
      * - Boss group: 1 thread (handles accept operations)
@@ -175,91 +209,25 @@ public class NettyEngine(
 
         val cfg = nettyRunConfig()
 
-        val useEpoll = Epoll.isAvailable()
-        val useKQueue = KQueue.isAvailable()
-        val boss: EventLoopGroup
-        val worker: EventLoopGroup
-        val channelClass: Class<out ServerChannel>
-        val workerThreads = cfg.workerThreads ?: 0
-        when {
-            useEpoll -> {
-                boss = EpollEventLoopGroup(1)
-                worker = EpollEventLoopGroup(workerThreads)
-                channelClass = EpollServerSocketChannel::class.java
-            }
-
-            useKQueue -> {
-                boss = KQueueEventLoopGroup(1)
-                worker = KQueueEventLoopGroup(workerThreads)
-                channelClass = KQueueServerSocketChannel::class.java
-            }
-
-            else -> {
-                boss = NioEventLoopGroup(1)
-                worker = NioEventLoopGroup(workerThreads)
-                channelClass = NioServerSocketChannel::class.java
-            }
+        val (transport, ioHandlerFactory, channelClass) = when {
+            Epoll.isAvailable() -> Triple("epoll", EpollIoHandler.newFactory(), EpollServerSocketChannel::class.java)
+            KQueue.isAvailable() -> Triple("kqueue", KQueueIoHandler.newFactory(), KQueueServerSocketChannel::class.java)
+            else -> Triple("nio", NioIoHandler.newFactory(), NioServerSocketChannel::class.java)
         }
-        bossGroup = boss
-        workerGroup = worker
-        scope = CoroutineScope(worker.asCoroutineDispatcher() + supervisorJob)
-        HANDSHAKER_KEY = AttributeKey.valueOf("HANDSHAKER")
-        MID_KEY = AttributeKey.valueOf("MID")
-        HANDLER_KEY = AttributeKey.valueOf("SOCKET_HANDLER")
-        DIRECT_CHANNEL_KEY = AttributeKey.valueOf("DIRECT_CHANNEL")
-        SOCKET_SCOPE_KEY = AttributeKey.valueOf("SOCKET_SCOPE")
-        DISCONNECTED_KEY = AttributeKey.valueOf("SOCKET_DISCONNECTED")
+        bossGroup = MultiThreadIoEventLoopGroup(BOSS_THREADS, ioHandlerFactory)
+        workerGroup = MultiThreadIoEventLoopGroup(cfg.workerThreads ?: 0, ioHandlerFactory)
+        started = true
 
-        runBlocking { runStartupTasks() }
-        startSchedules(cfg.reliability.scheduleLockTtl)
-
-        val maxContentLength = cfg.maxAggregatedContentLength.bytes.coerceIn(0, Int.MAX_VALUE.toLong()).toInt()
-        if (cfg.maxAggregatedContentLength.bytes > Int.MAX_VALUE.toLong())
-            logger.warn {
-                "maxAggregatedContentLength: ${
-                    cfg.maxAggregatedContentLength.gibibytes.times(100).toInt().div(100.0)
-                } GiB is greater than the max supported size of ${
-                    Int.MAX_VALUE.bytes.gibibytes.times(100).toInt().div(100.0)
-                } GiB. Using max value instead."
-            }
-
-        val b = ServerBootstrap()
-        b.group(boss, worker)
-            .channel(channelClass)
-            .option(ChannelOption.SO_BACKLOG, cfg.backlog.bytes.toInt())
-            .option(ChannelOption.SO_REUSEADDR, true)
-            .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
-            .childOption(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
-            .childOption(ChannelOption.TCP_NODELAY, true)
-            .childOption(ChannelOption.SO_KEEPALIVE, true)
-            .childOption(
-                ChannelOption.WRITE_BUFFER_WATER_MARK,
-                WriteBufferWaterMark(32.kibibytes.bytes.toInt(), 64.kibibytes.bytes.toInt())
-            )
-            .childHandler(object : ChannelInitializer<SocketChannel>() {
-                override fun initChannel(ch: SocketChannel) {
-                    openChannels.add(ch)
-                    ch.config().isAutoRead = cfg.autoRead
-                    val p = ch.pipeline()
-                    p.addLast(HttpServerCodec())
-                    p.addLast(HttpServerExpectContinueHandler())
-                    p.addLast(HttpObjectAggregator(maxContentLength))
-                    p.addLast(ChunkedWriteHandler())
-                    if (cfg.webSocketCompression) p.addLast(WebSocketServerCompressionHandler())
-                    // 2.3: idle-connection timeout (Netty-only). Closes connections with no read/write
-                    // activity within reliability.idleTimeout.
-                    p.addLast(IdleStateHandler(0, 0, cfg.reliability.idleTimeout.inWholeSeconds.coerceIn(0, Int.MAX_VALUE.toLong()).toInt()))
-                    p.addLast(NettyServerHandler(cfg))
-                }
-            })
-
-        if (cfg.recvBufBytes != null) b.childOption(ChannelOption.SO_RCVBUF, cfg.recvBufBytes.bytes.toInt())
-        if (cfg.sendBufBytes != null) b.childOption(ChannelOption.SO_SNDBUF, cfg.sendBufBytes.bytes.toInt())
-
-        val ch = b.bind(cfg.host, cfg.port).sync().channel()
+        val ch = try {
+            bind(cfg, channelClass)
+        } catch (e: Throwable) {
+            // Startup tasks, schedules and the event loops are all running by now; leave nothing behind.
+            shutdown()
+            throw e
+        }
         val local = ch.localAddress() as? InetSocketAddress
-        this@NettyEngine.boundAddress = local
-        logger.info { "NettyEngine started on http://${cfg.host}:${local?.port ?: cfg.port}" }
+        boundAddress = local
+        logger.info { "NettyEngine started on http://${cfg.host}:${local?.port ?: cfg.port} ($transport transport)" }
         // 2.4: graceful shutdown on SIGTERM/SIGINT — drain in-flight requests then disconnect services.
         registerShutdownHook { shutdown() }
         ch.closeFuture().addListener { _ ->
@@ -268,556 +236,139 @@ public class NettyEngine(
 
     }
 
+    /** Runs the startup tasks and schedules, then opens the listening socket. */
+    private fun bind(cfg: NettyRuntimeSettings, channelClass: Class<out ServerChannel>): Channel {
+        runBlocking { runStartupTasks() }
+        startSchedules(cfg.reliability.scheduleLockTtl)
+
+        val maxBody = cfg.reliability.maxBodySize.bytes
+        val maxMessage = webSocketMaxMessageSize()
+
+        val b = ServerBootstrap()
+        b.group(bossGroup, workerGroup)
+            .channel(channelClass)
+            .option(ChannelOption.SO_BACKLOG, cfg.backlog)
+            .option(ChannelOption.SO_REUSEADDR, true)
+            .childOption(ChannelOption.TCP_NODELAY, true)
+            .childOption(ChannelOption.SO_KEEPALIVE, true)
+            .childOption(
+                ChannelOption.WRITE_BUFFER_WATER_MARK,
+                WriteBufferWaterMark(32.kibibytes.bytes.toInt(), 64.kibibytes.bytes.toInt())
+            )
+            .childHandler(object : ChannelInitializer<SocketChannel>() {
+                override fun initChannel(ch: SocketChannel) {
+                    // Accepted in the moment before the listening socket closed.
+                    if (draining) {
+                        ch.close()
+                        return
+                    }
+                    openChannels.add(ch)
+                    val p = ch.pipeline()
+                    p.addLast(HttpServerCodec())
+                    p.addLast(BodyLimitExpectContinueHandler(maxBody))
+                    // Bounds what one compressed frame may inflate to. Without it a small frame can
+                    // decompress to gigabytes before any size check sees it.
+                    if (cfg.webSocketCompression) p.addLast(WebSocketServerCompressionHandler(maxMessage))
+                    // 2.3: idle-connection timeout (Netty-only). Closes connections with no read/write
+                    // activity within reliability.idleTimeout. A WebSocket with pings enabled swaps this
+                    // for a ping-based liveness check when it upgrades.
+                    p.addLast(
+                        IDLE_HANDLER,
+                        IdleStateHandler(0, 0, cfg.reliability.idleTimeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+                    )
+                    // The decoder passes on everything it finds in a read, wanted or not. This holds
+                    // those messages back while the HTTP handler has reading switched off, which is
+                    // what lets a slow consumer of a request body hold the client back instead of
+                    // buffering the upload, and keeps a second request waiting for the first's response.
+                    p.addLast(FLOW_HANDLER, FlowControlHandler())
+                    p.addLast(HTTP_HANDLER, HttpChannelHandler(this@NettyEngine, cfg, maxBody))
+                }
+            })
+
+        if (cfg.recvBufBytes != null) b.childOption(ChannelOption.SO_RCVBUF, cfg.recvBufBytes.bytes.toInt())
+        if (cfg.sendBufBytes != null) b.childOption(ChannelOption.SO_SNDBUF, cfg.sendBufBytes.bytes.toInt())
+
+        val ch = b.bind(cfg.host, cfg.port).sync().channel()
+        serverChannel = ch
+        return ch
+    }
+
+    /**
+     * The largest WebSocket message accepted, whole or reassembled from fragments, and the most one
+     * compressed frame may inflate to. From [WebSocketSettings.maxFrameSize], clamped to what a
+     * Netty buffer can hold.
+     */
+    internal fun webSocketMaxMessageSize(): Int =
+        webSocketSettings().maxFrameSize?.bytes?.coerceAtMost(Int.MAX_VALUE.toLong())?.toInt() ?: Int.MAX_VALUE
+
     /**
      * Initiates a graceful shutdown of the Netty server.
      *
-     * Cancels schedules, stops accepting connections and drains in-flight requests by gracefully
-     * shutting down the boss/worker event loop groups (bounded by
-     * [EngineReliabilitySettings.shutdownDrainTimeout]), disconnects all services, then cancels the
-     * engine scope. Idempotent — safe to call from both the SIGTERM hook and the channel close
-     * listener.
+     * Within [EngineReliabilitySettings.shutdownDrainTimeout]:
+     * 1. Stops accepting connections, and closes the ones that are between requests.
+     * 2. Waits for the HTTP handlers still running. Their responses go out with `Connection: close`,
+     *    and each connection closes once its response has been written.
+     * 3. Tells pub/sub WebSockets the server is going away, then closes every connection still open.
+     * 4. Shuts down the event loop groups.
+     *
+     * [gracefulShutdown] then waits for the socket disconnects this raised, disconnects all services,
+     * and cancels the engine scope. Idempotent: safe to call from both the SIGTERM hook and the
+     * channel close listener.
      */
     public fun shutdown() {
-        val drain = if (::scope.isInitialized) nettyRunConfig().reliability.shutdownDrainTimeout else null
-        if (drain == null) {
-            // Never started; nothing to drain.
-            return
-        }
+        // Never started; nothing to drain.
+        if (!started) return
+        val drain = nettyRunConfig().reliability.shutdownDrainTimeout
         gracefulShutdown(drain) { timeout ->
-            // shutdownGracefully drains in-flight work over its quiet/timeout window. We do NOT block
-            // (.sync()) here: this drain may run on a Netty event-loop thread (via the channel
-            // close-future listener), and waiting for the worker group to terminate from one of its
-            // own threads would deadlock. The graceful window bounds the drain.
+            // Nothing here waits on the event loops' own futures: this may run on the boss loop (via
+            // the server channel's close listener), and waiting for a group to terminate from one of
+            // its own threads would deadlock. Handler jobs run on Dispatchers.Default and the channel
+            // group's futures belong to GlobalEventExecutor, so waiting on those is safe.
             try {
-                val quietMillis = 0L
-                val timeoutMillis = timeout.inWholeMilliseconds.coerceAtLeast(quietMillis)
-                // Close accepted connections first, and wait for it. Closing a socket is what raises
-                // its disconnect phase, so this has to finish before gracefulShutdown moves on to
-                // draining that work — otherwise the disconnects are still being queued when it looks
-                // for them and finds nothing. Bounded by the same drain window; awaiting the group's
-                // own future is safe from an event-loop thread because it belongs to
-                // GlobalEventExecutor, not to the loops being shut down.
-                openChannels.forEach { emitDisconnect(it, WebSocketClose.GOING_AWAY) }
-                openChannels.close().await(timeoutMillis, java.util.concurrent.TimeUnit.MILLISECONDS)
-                if (::bossGroup.isInitialized) {
-                    bossGroup.shutdownGracefully(quietMillis, timeoutMillis, java.util.concurrent.TimeUnit.MILLISECONDS)
-                }
-                if (::workerGroup.isInitialized) {
-                    workerGroup.shutdownGracefully(quietMillis, timeoutMillis, java.util.concurrent.TimeUnit.MILLISECONDS)
-                }
-            } catch (_: Throwable) {
-            }
-        }
-    }
+                val deadline = TimeSource.Monotonic.markNow() + timeout
+                fun remainingMillis() = (-deadline.elapsedNow()).inWholeMilliseconds.coerceAtLeast(0)
 
-    private fun WebSocketClose.adapt(): CloseWebSocketFrame = CloseWebSocketFrame(code.code.toInt(), truncatedMessage)
-
-    /**
-     * Raises a pub/sub socket's disconnect phase, at most once per channel.
-     *
-     * Every route that ends a socket funnels through here — a client close frame, the channel going
-     * inactive, the server shutting down — because all three can fire for the same socket and only
-     * the first of them is the socket's actual disconnect.
-     *
-     * Runs on [cleanupScope] rather than [scope]: this is normally called *because* something is
-     * tearing the socket down, and at shutdown that same teardown cancels [scope], so a disconnect
-     * launched there would never run. It also deliberately does not dispatch onto the channel's event
-     * loop the way the message paths do — ordering does not matter for a one-shot terminal phase, and
-     * a shutting-down event loop rejects new tasks, which would drop the very cleanup being
-     * guaranteed here.
-     */
-    private fun emitDisconnect(channel: Channel, reason: WebSocketClose) {
-        if (channel.attr(DISCONNECTED_KEY).get()?.compareAndSet(false, true) != true) return
-        val mid = channel.attr(MID_KEY).get() ?: return
-        val handler = channel.attr(HANDLER_KEY).get() ?: return
-        cleanupScope.launch {
-            try {
-                // Guarantees mid gets closed even if the handler's own disconnect() throws.
-                handler.disconnectAndCloseAsRoot(mid, reason)
-            } catch (e: Exception) {
-                logger.error(e) { "disconnect handling failed" }
-            } finally {
-                channel.attr(SOCKET_SCOPE_KEY).get()?.cancel()
-            }
-        }
-    }
-
-    private inner class NettyServerHandler(val cfg: NettyRuntimeSettings) : SimpleChannelInboundHandler<Any>() {
-        override fun channelRead0(ctx: ChannelHandlerContext, msg: Any) {
-            when (msg) {
-                is FullHttpRequest -> {
-                    val connection = msg.headers()[CONNECTION]?.lowercase() ?: ""
-                    val upgrade = msg.headers()[UPGRADE]?.lowercase() ?: ""
-                    if (connection.contains("upgrade") && upgrade == "websocket") {  // Is it a webSocket?
-                        scope.launch(ctx.executor().asCoroutineDispatcher()) {
-                            handleWebSocketStartup(ctx, msg)
-                        }
-                    } else {
-                        val (request, executionId) = msg.toLightningHttpRequest(ctx, cfg)
-                        scope.launch(ctx.executor().asCoroutineDispatcher()) {
-                            try {
-                                try {
-                                    // Request timeout is enforced centrally in ServerRuntime.handle (per-handler HttpHandler.timeout).
-                                    val result: HttpResponse = this@NettyEngine.handleRoot(request, executionId)
-                                    val nettyRes = result.toNettyResponse(msg.protocolVersion())
-                                    val keepAlive = HttpUtil.isKeepAlive(msg)
-                                    if (keepAlive) {
-                                        nettyRes.headers()[CONNECTION] = HttpHeaderValues.KEEP_ALIVE
-                                        ctx.writeAndFlush(nettyRes)
-                                    } else {
-                                        ctx.writeAndFlush(nettyRes).addListener(ChannelFutureListener.CLOSE)
-                                    }
-                                } finally {
-                                    request.body?.close()
-                                }
-                            } catch (e: Throwable) {
-                                logger.error(e) { "Netty error!" }
-                                try {
-                                    val body = "Internal Server Error"
-                                    val res = DefaultFullHttpResponse(
-                                        msg.protocolVersion(),
-                                        HttpResponseStatus.INTERNAL_SERVER_ERROR,
-                                        Unpooled.wrappedBuffer(body.toByteArray())
-                                    )
-                                    res.headers()[CONTENT_TYPE] = "text/plain; charset=utf-8"
-                                    res.headers()[CONTENT_LENGTH] = body.toByteArray().size.toString()
-                                    val keepAlive = HttpUtil.isKeepAlive(msg)
-                                    if (keepAlive) {
-                                        res.headers()[CONNECTION] = HttpHeaderValues.KEEP_ALIVE
-                                        ctx.writeAndFlush(res)
-                                    } else {
-                                        ctx.writeAndFlush(res).addListener(ChannelFutureListener.CLOSE)
-                                    }
-                                } catch (_: Throwable) {
-                                }
-                            }
-                        }
-                    }
-                }
-
-                is TextWebSocketFrame -> {
-                    val directChannel = ctx.channel().attr(DIRECT_CHANNEL_KEY).get()
-                    val m = LkWebSocketFrame(msg.text())
-                    if (directChannel != null) {
-                        deliverDirect(ctx, directChannel, m)
-                    } else {
-                        // Standard pub/sub mode
-                        val mid = ctx.channel().attr(MID_KEY).get() ?: return
-                        val handler = ctx.channel().attr(HANDLER_KEY).get() ?: return
-                        scope.launch(ctx.executor().asCoroutineDispatcher()) {
-                            try {
-                                handler.messageFromClientAsRoot(mid, m)
-                            } catch (e: Exception) {
-                                // Route through the normal disconnect lifecycle rather than a bare
-                                // close, so the handler's own cleanup still runs.
-                                emitDisconnect(ctx.channel(), WebSocketClose.exceptional(e))
-                                currentCoroutineContext().ensureActive()
-                            }
-                        }
-                    }
-                }
-
-                is BinaryWebSocketFrame -> {
-                    val directChannel = ctx.channel().attr(DIRECT_CHANNEL_KEY).get()
-                    val bytes = ByteBufUtil.getBytes(msg.content())
-                    val m = LkWebSocketFrame(bytes)
-                    if (directChannel != null) {
-                        deliverDirect(ctx, directChannel, m)
-                    } else {
-                        // Standard pub/sub mode
-                        val mid = ctx.channel().attr(MID_KEY).get() ?: return
-                        val handler = ctx.channel().attr(HANDLER_KEY).get() ?: return
-                        scope.launch(ctx.executor().asCoroutineDispatcher()) {
-                            try {
-                                handler.messageFromClientAsRoot(mid, m)
-                            } catch (e: Exception) {
-                                // Route through the normal disconnect lifecycle rather than a bare
-                                // close, so the handler's own cleanup still runs.
-                                emitDisconnect(ctx.channel(), WebSocketClose.exceptional(e))
-                                currentCoroutineContext().ensureActive()
-                            }
-                        }
-                    }
-                }
-
-                is CloseWebSocketFrame -> {
-                    val directChannel = ctx.channel().attr(DIRECT_CHANNEL_KEY).get()
-                    if (directChannel != null) {
-                        // Direct mode - close the channel
-                        directChannel.close()
-                    } else {
-                        // Standard pub/sub mode
-                        emitDisconnect(ctx.channel(), WebSocketClose.NORMAL)
-                    }
-                    ctx.close()
-                }
-
-                is PingWebSocketFrame -> ctx.writeAndFlush(PongWebSocketFrame(msg.content().retain()))
-                is PongWebSocketFrame -> { /* ignore */
-                }
-
-                else -> { /* ignore */
-                }
-            }
-        }
-
-        /**
-         * 2.10: delivers an inbound WebSocket frame to the direct handler's bounded channel,
-         * applying [EngineReliabilitySettings.webSocketOversizePolicy] on overflow. For
-         * [WsOversizePolicy.CLOSE] a full buffer means the peer is outrunning the handler, so the
-         * socket is closed with code 1009 (message too big). DROP_OLDEST and SUSPEND are handled by
-         * the channel's own BufferOverflow policy via a (possibly suspending) send.
-         */
-        private fun deliverDirect(
-            ctx: ChannelHandlerContext,
-            directChannel: SendChannel<LkWebSocketFrame>,
-            frame: LkWebSocketFrame,
-        ) {
-            if (cfg.reliability.webSocketOversizePolicy == WsOversizePolicy.CLOSE) {
-                val result = directChannel.trySend(frame)
-                if (result.isFailure && !result.isClosed) {
-                    ctx.writeAndFlush(
-                        CloseWebSocketFrame(WebSocketClose.Code.TOO_BIG.code.toInt(), "WebSocket inbound buffer overflow")
-                    ).addListener(ChannelFutureListener.CLOSE)
-                }
-            } else {
-                scope.launch(ctx.executor().asCoroutineDispatcher()) {
+                draining = true
+                serverChannel?.close()
+                for (channel in openChannels) {
+                    val handler = channel.pipeline().get(HttpChannelHandler::class.java) ?: continue
                     try {
-                        directChannel.send(frame)
-                    } catch (_: Exception) {
-                        // Channel closed
+                        channel.eventLoop().execute { handler.closeIfIdle(channel) }
+                    } catch (_: RejectedExecutionException) {
+                        // The loop is already going, and the connection with it.
                     }
                 }
-            }
-        }
 
-        private suspend fun handleWebSocketStartup(ctx: ChannelHandlerContext, req: FullHttpRequest) {
-            val wsRequest = try {
-                req.toLightningWebSocketConnectRequest(ctx, cfg)
+                // Each handler queues its response before it finishes, so once these are done every
+                // response is on its way.
+                runBlocking {
+                    withTimeoutOrNull(remainingMillis()) {
+                        while (true) {
+                            val pending = inFlight.toList()
+                            if (pending.isEmpty()) break
+                            pending.joinAll()
+                        }
+                    }
+                }
+                // Then give those responses time to leave: their connections close once written.
+                openChannels.newCloseFuture(ChannelMatcher { it.pipeline().get(HttpChannelHandler::class.java) != null })
+                    .await(remainingMillis(), TimeUnit.MILLISECONDS)
+
+                // Close what is left (WebSockets, and anything that outlasted the window), and wait
+                // for it. Closing a socket is what raises its disconnect phase, so this has to finish
+                // before gracefulShutdown moves on to draining that work, otherwise the disconnects
+                // are still being queued when it looks for them and finds nothing. Allowed a moment
+                // even when the window is spent, for the same reason.
+                pubSubSessions.toList().forEach { it.disconnect(WebSocketClose.GOING_AWAY) }
+                openChannels.close().await(remainingMillis().coerceAtLeast(MIN_CLOSE_WAIT_MILLIS), TimeUnit.MILLISECONDS)
+
+                // Both groups exist by the time `started` is set. No quiet period: everything is closed.
+                val groupTimeoutMillis = remainingMillis()
+                bossGroup.shutdownGracefully(0, groupTimeoutMillis, TimeUnit.MILLISECONDS)
+                workerGroup.shutdownGracefully(0, groupTimeoutMillis, TimeUnit.MILLISECONDS)
             } catch (e: Throwable) {
-                logger.error(e) { "" }
-                val res = DefaultFullHttpResponse(req.protocolVersion(), HttpResponseStatus.INTERNAL_SERVER_ERROR)
-                ctx.writeAndFlush(res).addListener(ChannelFutureListener.CLOSE)
-                return
+                logger.warn(e) { "Error while closing connections during shutdown." }
             }
-            val match = this@NettyEngine.server.endpoints.match(
-                this@NettyEngine.externalSerialization.stringArrayFormat,
-                wsRequest.path.pathSegments
-            ) { it.webSocket }
-                ?: run {
-                    val exception = NotFoundException("No webSocket at '${wsRequest.path}'")
-                    logger.error(exception) { "" }
-                    val res = DefaultFullHttpResponse(req.protocolVersion(), HttpResponseStatus.NOT_FOUND)
-                    ctx.writeAndFlush(res).addListener(ChannelFutureListener.CLOSE)
-                    return
-                }
-
-            val socketHandler = this@NettyEngine.server.interceptIncomingSocket(match.value)
-
-            val host = req.headers()[HOST] ?: "localhost"
-            // Netty's own default payload limit is 64 KiB; honour the configured one so both engines
-            // bound this peer-driven allocation the same way.
-            val wsFactory = WebSocketServerHandshakerFactory(
-                "ws://$host${URI(req.uri()).path}",
-                null,
-                true,
-                webSocketSettings().maxFrameSize?.bytes?.coerceAtMost(Int.MAX_VALUE.toLong())?.toInt()
-                    ?: Int.MAX_VALUE,
-            )
-            val handshaker = wsFactory.newHandshaker(req)
-            if (handshaker == null) {
-                WebSocketServerHandshakerFactory.sendUnsupportedVersionResponse(ctx.channel())
-                return
-            }
-            ctx.channel().attr(HANDSHAKER_KEY).set(handshaker)
-
-            // Check for direct execution capability - bypasses pub/sub overhead
-            if (socketHandler is DirectExecutableWebSocketHandler<*, *> && !forceWebSocketPubSub()) {
-                @Suppress("UNCHECKED_CAST")
-                val directHandler = socketHandler as DirectExecutableWebSocketHandler<PathSpec, Any?>
-
-                // 2.10: bounded inbound channel with backpressure instead of Channel.UNLIMITED.
-                val incomingChannel = newWebSocketInboundChannel<LkWebSocketFrame>(cfg.reliability)
-                ctx.channel().attr(DIRECT_CHANNEL_KEY).set(incomingChannel)
-
-                // Complete handshake and then run direct handler
-                handshaker.handshake(ctx.channel(), req).addListener {
-                    scope.launch {
-                        try {
-                            directHandler.handleDirectAsRoot(
-                                request = wsRequest,
-                                incoming = incomingChannel,
-                                send = { frame ->
-                                    when (frame) {
-                                        is LkWebSocketFrame.Binary -> ctx.writeAndFlush(
-                                            BinaryWebSocketFrame(Unpooled.wrappedBuffer(frame.content))
-                                        )
-
-                                        is LkWebSocketFrame.Text -> ctx.writeAndFlush(TextWebSocketFrame(frame.content))
-                                    }
-                                },
-                                close = { reason ->
-                                    ctx.writeAndFlush(reason.adapt())
-                                        .addListener(ChannelFutureListener.CLOSE)
-                                }
-                            )
-                        } catch (e: Throwable) {
-                            logger.error(e) { "Direct WebSocket handler failed" }
-                            ctx.close()
-                        }
-                    }
-                }
-            } else {
-                // Standard pub/sub-based implementation
-                @Suppress("UNCHECKED_CAST")
-                socketHandler as WebSocketHandler<PathSpec, Any?>
-
-                val startingState = try {
-                    socketHandler.willConnectAsRoot(wsRequest)
-                } catch (e: HttpStatusException) {
-                    logger.debug(e) { "WebSocket willConnect rejected" }
-                    val res = DefaultFullHttpResponse(req.protocolVersion(), HttpResponseStatus.valueOf(e.status.code))
-                    ctx.writeAndFlush(res).addListener(ChannelFutureListener.CLOSE)
-                    return
-                } catch (e: Throwable) {
-                    logger.error(e) { "" }
-                    val res = DefaultFullHttpResponse(req.protocolVersion(), HttpResponseStatus.INTERNAL_SERVER_ERROR)
-                    ctx.writeAndFlush(res).addListener(ChannelFutureListener.CLOSE)
-                    return
-                }
-
-                // A child of the engine's scope, so shutdown also stops it.
-                val socketScope = CoroutineScope(scope.coroutineContext + SupervisorJob(scope.coroutineContext.job) + Dispatchers.IO)
-                ctx.channel().attr(SOCKET_SCOPE_KEY).set(socketScope)
-                val mid = object : LocalWebSocketConnection<PathSpec, Any?>(
-                    startingState = startingState,
-                    request = wsRequest,
-                    handler = socketHandler,
-                    scope = socketScope,
-                    pubSub = { this@NettyEngine.pubSubChannel(it) }
-                ) {
-                    context(server: ServerRuntime)
-                    override suspend fun send(frame: LkWebSocketFrame) {
-                        when (frame) {
-                            is LkWebSocketFrame.Binary -> ctx.writeAndFlush(
-                                BinaryWebSocketFrame(
-                                    Unpooled.wrappedBuffer(
-                                        frame.content
-                                    )
-                                )
-                            )
-
-                            is LkWebSocketFrame.Text -> ctx.writeAndFlush(TextWebSocketFrame(frame.content))
-                        }
-                    }
-
-                    context(server: ServerRuntime)
-                    override suspend fun close(reason: WebSocketClose) {
-                        val hs = ctx.channel().attr(HANDSHAKER_KEY).get()
-                        if (hs != null) {
-                            ctx.writeAndFlush(reason.adapt())
-                                .addListener(ChannelFutureListener.CLOSE)
-                        } else {
-                            ctx.close()
-                        }
-                    }
-                }
-
-                ctx.channel().attr(MID_KEY).set(mid)
-                ctx.channel().attr(DISCONNECTED_KEY).set(AtomicBoolean(false))
-                ctx.channel().attr(HANDLER_KEY).set(socketHandler)
-
-                handshaker.handshake(ctx.channel(), req).addListener {
-                    scope.launch {
-                        try {
-                            socketHandler.didConnectAsRoot(mid)
-                        } catch (_: Throwable) {
-                        }
-                    }
-                }
-            }
-        }
-
-
-        override fun userEventTriggered(ctx: ChannelHandlerContext, evt: Any) {
-            if (evt is IdleStateEvent) {
-                ctx.close()
-            } else {
-                super.userEventTriggered(ctx, evt)
-            }
-        }
-
-        override fun channelInactive(ctx: ChannelHandlerContext) {
-            val directChannel = ctx.channel().attr(DIRECT_CHANNEL_KEY).get()
-            if (directChannel != null) {
-                // Direct mode - close the channel
-                directChannel.close()
-            } else {
-                // Standard pub/sub mode. A channel going inactive without a close frame is the client
-                // vanishing or the server going down, not an error — and it is a no-op when the close
-                // frame already ran disconnect for this socket.
-                emitDisconnect(ctx.channel(), WebSocketClose.GOING_AWAY)
-            }
-            super.channelInactive(ctx)
-        }
-
-        override fun exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable) {
-            try {
-                ctx.close()
-            } catch (_: Throwable) {
-            }
-        }
-
-        private fun FullHttpRequest.toLightningHttpRequest(
-            ctx: ChannelHandlerContext,
-            cfg: NettyRuntimeSettings,
-        ): Pair<HttpRequest<PathSpec>, Execution.ID> {
-
-            val parts = QueryStringDecoder(this.uri())
-            val headers = (this.headers() as NettyHttpHeaders).toLightningHeaders()
-            val contentTypeHeader = headers.contentType
-
-            val body = if (this.content().isReadable) {
-                val bytes = ByteArray(this.content().readableBytes())
-                this.content().getBytes(this.content().readerIndex(), bytes)
-                TypedData(
-                    data = Data.Bytes(bytes),
-                    mediaType = contentTypeHeader ?: MediaType.Application.OctetStream,
-                )
-            } else null
-            val identity = headers.requestIdentity(cfg.requestIdHeader) {
-                logger.warn { "Request ID header for proxy '${cfg.requestIdHeader}' was missing from the request." }
-            }
-
-            val hostHeader = this.headers()[HOST] ?: ""
-            val domain = hostHeader.substringBefore(":")
-            val sourceIp = cfg.realIpHeader?.let { header ->
-                this.headers()[header].also { realIp ->
-                    if (realIp == null)
-                        logger.warn { "Real IP address header for proxy '$header' was missing from request [${identity.requestId}}]." }
-                }
-            } ?: ((ctx.channel().remoteAddress() as? InetSocketAddress)?.address?.hostAddress ?: "")
-
-
-            val adapted = HttpRequest(
-                path = RawHttpEndpoint(parts.path(), HttpMethod(this.method().name())),
-                queryParameters = QueryParameters(
-                    parts.parameters().flatMap { (key, values) -> values.map { key to it } }),
-                headers = headers,
-                domain = domain.ifEmpty { (ctx.channel().localAddress() as? InetSocketAddress)?.hostString.orEmpty() },
-                protocol = "http",
-                sourceIp = sourceIp,
-                upstreamRequestId = identity.upstreamRequestId,
-                body = body,
-            )
-            return adapted to identity.requestId
-        }
-
-        private fun FullHttpRequest.toLightningWebSocketConnectRequest(
-            ctx: ChannelHandlerContext,
-            cfg: NettyRuntimeSettings,
-        ): WebSocketConnectRequest<PathSpec> {
-            val parts = QueryStringDecoder(this.uri())
-            val headers = (this.headers() as NettyHttpHeaders).toLightningHeaders()
-            val hostHeader = this.headers()[HOST] ?: ""
-            val domain = hostHeader.substringBefore(":")
-            val identity = headers.requestIdentity(cfg.requestIdHeader) {
-                logger.warn { "Request ID header for proxy '${cfg.requestIdHeader}' was missing from the request." }
-            }
-            val sourceIp = cfg.realIpHeader?.let { header ->
-                this.headers()[header].also { realIp ->
-                    if (realIp == null)
-                        logger.warn { "Real IP address header for proxy '$header' was missing from request [${identity.requestId}}]" }
-                }
-            } ?: ((ctx.channel().remoteAddress() as? InetSocketAddress)?.address?.hostAddress ?: "")
-
-            return WebSocketConnectRequest(
-                path = RawWebSocketPath(parts.path()),
-                socketId = identity.requestId,
-                queryParameters = QueryParameters(
-                    parts.parameters().flatMap { (key, values) -> values.map { key to it } }),
-                headers = headers,
-                domain = domain.ifEmpty { (ctx.channel().localAddress() as? InetSocketAddress)?.hostString.orEmpty() },
-                protocol = "http",
-                sourceIp = sourceIp,
-                upstreamRequestId = identity.upstreamRequestId,
-            )
-        }
-
-        private suspend fun HttpResponse.toNettyResponse(version: HttpVersion): FullHttpResponse {
-            val contentBuf = this.body?.data?.bytes()
-                ?.let { Unpooled.wrappedBuffer(it) }
-                ?: Unpooled.EMPTY_BUFFER
-
-            val res = DefaultFullHttpResponse(version, HttpResponseStatus.valueOf(this.status.code), contentBuf)
-
-            for ((key, values) in this.headers.normalizedEntries) {
-                for (value in values) {
-                    res.headers().add(key, value.toHttpString())
-                }
-            }
-            this.body?.mediaType?.let { mt ->
-                res.headers()[CONTENT_TYPE] = mt.toString()
-            }
-            // Always advertise the body length, including 0 for bodyless responses (redirects, etc.).
-            // Without a Content-Length (or 0) a keep-alive HTTP/1.1 client cannot tell the response is
-            // complete and stalls until the idle timeout closes the connection — a cross-engine
-            // conformance defect caught by EngineHttpConformanceSuite.trailing_slash_redirects_307.
-            res.headers()[CONTENT_LENGTH] = contentBuf.readableBytes().toString()
-
-            return res
-        }
-
-        private fun NettyHttpHeaders.toLightningHeaders(): LsHttpHeaders =
-            HttpHeaders(this@toLightningHeaders.entries().map { Pair(it.key, it.value) })
-
-    }
-
-
-    @JvmInline
-    private value class TypeRetriever(val retriever: (KSerializer<*>) -> Any?) {
-        @Suppress("UNCHECKED_CAST")
-        operator fun <T> invoke(serializer: KSerializer<T>): T = retriever(serializer) as T
-
-        companion object {
-            fun of(retriever: (KSerializer<Nothing>) -> Nothing): TypeRetriever {
-                @Suppress("UNCHECKED_CAST")
-                return TypeRetriever(retriever as (KSerializer<*>) -> Any?)
-            }
-
-            fun literal(value: Any?) = TypeRetriever { value }
         }
     }
 }
-
-/*
- * TODO: API Recommendations
- *
- * 1. Consider extracting magic numbers to named constants:
- *    - Idle timeout (120 seconds, line 156)
- *    - Write buffer water marks (32 KiB / 64 KiB, line 145)
- *    - Boss thread count (1, line 96/102/108)
- *
- * 2. The toLightningHeaders() function splits comma-separated headers, but some headers (like Set-Cookie)
- *    shouldn't be split. Consider header-specific handling.
- *
- * 3. Consider adding metrics/telemetry for:
- *    - Active connection count
- *    - Request throughput
- *    - WebSocket connection count
- *    - Event loop queue depth
- *
- * 4. The toNettyResponse() function loads the entire response body into memory (line 489).
- *    Consider streaming support for large responses.
- *
- * 5. Consider making the idle timeout configurable via NettyRuntimeSettings instead of hardcoding to 120 seconds.
- *
- * 6. The error handling for WebSocket operations catches and ignores Throwables silently (line 387, 413).
- *    Consider adding logging or metrics for these failures.
- *
- * 7. Consider documenting the thread safety characteristics of currentState in LocalWebSocketConnection,
- *    as modifications are not synchronized.
- *
- * 8. The TypeRetriever class at the end appears unused in this file. Consider removing if not referenced elsewhere.
- */
-
