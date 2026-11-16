@@ -775,16 +775,6 @@ rm -rf aws/ awscliv2.zip
     /** The `server` blocks for [domain]: an HTTP-to-HTTPS redirect and the TLS proxy to the app. */
     @Language("TEXT")
     private fun nginxServers(domain: String, includeUpgrade: Boolean): String = $$"""
-# Drop requests for any other host name or a bare IP
-server {
-    listen 80 default_server;
-    listen [::]:80 default_server;
-    listen 443 ssl default_server;
-    listen [::]:443 ssl default_server;
-    ssl_reject_handshake on;
-    return 444;
-}
-
 # HTTP: redirect to HTTPS (nginx-module-acme answers ACME challenges before this)
 server {
     listen 80;
@@ -900,6 +890,16 @@ acme_issuer letsencrypt {
     uri https://acme-v02.api.letsencrypt.org/directory;
     state_path /var/cache/nginx/acme-letsencrypt;
     accept_terms_of_service;
+}
+
+# Drop requests for any other host name or a bare IP. nginx allows only one default_server per port.
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+    ssl_reject_handshake on;
+    return 444;
 }
 $${nginxServers(domain, wsDomain == domain)}
 $${if (wsDomain != domain) nginxServers(wsDomain, true) else ""}
