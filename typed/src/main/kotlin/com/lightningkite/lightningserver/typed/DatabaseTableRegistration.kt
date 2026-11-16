@@ -2,6 +2,8 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.definition.*
+import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.typed.sdk.deepEquals
 import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.services.data.toSealedMap
 import com.lightningkite.services.database.Database
@@ -34,18 +36,6 @@ public class DatabaseTableRegistry private constructor(
 ): Map<String, DatabaseTableRegistration<*>> by registry {
     public constructor() : this(HashMap())
     public constructor(start: DatabaseTableRegistry) : this(HashMap(start.registry))
-
-    private fun KSerializer<*>.deepEquals(other: KSerializer<*>): Boolean {
-        if (this.descriptor != other.descriptor) return false
-
-        val myTypes = this.typeParametersSerializersOrNull()
-        val otherTypes = other.typeParametersSerializersOrNull()
-
-        if (myTypes == null && otherTypes == null) return true
-        if (myTypes?.size != otherTypes?.size) return false
-
-        return myTypes.orEmpty().zip(otherTypes.orEmpty()).all { (a, b) -> a.deepEquals(b) }
-    }
 
     private fun KSerializer<*>.typeName(): String {
         val types = typeParametersSerializersOrNull()

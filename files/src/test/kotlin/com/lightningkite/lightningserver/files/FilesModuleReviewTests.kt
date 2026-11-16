@@ -22,7 +22,7 @@ class FilesModuleReviewTests {
         val files = setting("files", ExternalFileSystem.Settings())
         val database = setting("database", Database.Settings())
         val served = path.path("files") include FileSystemEndpoints(files)
-        val uploadEarly = path.path("upload") include UploadEarlyEndpoint(
+        val uploadEarly = path.path("upload") include GlobalUploadEndpoints(
             files = files,
             database = database,
             fileScanner = { listOf() }

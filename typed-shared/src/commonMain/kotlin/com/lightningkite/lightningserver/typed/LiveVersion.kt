@@ -15,7 +15,7 @@ import kotlin.reflect.KClass
  *     suspend fun getUser(id: String): User
  * }
  *
- * class LiveUserApi(val fetcher: Fetcher) : UserApi {
+ * class LiveUserApi(val fetcher: Fetcher, val basePath: String) : UserApi {
  *     override suspend fun getUser(id: String): User = fetcher(...)
  * }
  * ```

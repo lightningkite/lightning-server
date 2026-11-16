@@ -64,8 +64,6 @@ object Server : ServerBuilder() {
     val second = path.path("m2") module SecondModule.withSdkInfo("CustomEndpoints", "custom")
     val third = path.path("third") module ThirdModule.withSdkInfo("OtherEndpoints", "other")
 
-    val predefined = path.path("predefined") module preDefinedModule.withSdkInfo("PredefinedEndpoints")
-
     val inline = path.path("inline") include Inlined
 }
 
@@ -173,13 +171,3 @@ object Inlined : ServerBuilder() {
         implementation = { _: Unit -> 42 }
     )
 }
-
-val preDefinedModule = object : ServerBuilder() {
-    val endpoints = path.path("foo").post bind ApiHttpHandler(
-        summary = "Pre-Defined Endpoint",
-        description = "This is an endpoint included through a pre-build definition",
-        auth = User.require(RequiredScope("pre:defined")) or User.require(RequiredScope("foo")) or AuthRequirement.IsSuperUser,
-        implementation = { input: Int -> input * 2 }
-    )
-}.build()
-

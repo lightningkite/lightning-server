@@ -1,4 +1,3 @@
-import com.lightningkite.deployhelpers.lkLibrary
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
@@ -15,14 +14,14 @@ dependencies {
     api(project(":auth"))
     api(project(":typed-shared"))
     implementation(project(":ratelimit"))
-    api(libs.services.database)
-    api(libs.services.cache)
-    api(libs.services.http.client)
+    api(sa.database)
+    api(sa.cache)
+    api(sa.http.client)
     api(libs.kotlin.reflect)
-    ksp(libs.services.database.processor)
+    ksp(sa.database.processor)
     // The test source set declares its own models, and the processor no longer
     // covers test sources via the main `ksp` configuration.
-    kspTest(libs.services.database.processor)
+    kspTest(sa.database.processor)
 
     testImplementation(libs.kotlin.test.junit)
     testImplementation(libs.openTelemetry.sdk.testing)
@@ -43,12 +42,8 @@ kotlin {
     }
 }
 
-lkLibrary(
-    "lightningkite",
-    "lightning-server",
-    mavenAutomaticRelease = project.findProperty("mavenAutomaticRelease") as? Boolean ?: false
-) {
-    description.set("A set of tools for typing, documenting, and requiring authentication in endpoints.")
+mavenPublishing {
+    pom { description.set("A set of tools for typing, documenting, and requiring authentication in endpoints.") }
 }
 
 // Wire the docs-guide compiled samples into Dokka so @sample references resolve.

@@ -126,9 +126,9 @@ When a `ServerFile` is serialized out to a client, its URL is automatically sign
 file stays private as long as you only serialize references to it for people you want to be able to read it. Do not
 build a public file-sharing feature on top of this behavior by accident.
 
-## The `UploadEarlyEndpoint` (recommended upload flow)
+## The `GlobalUploadEndpoints` (recommended upload flow)
 
-`UploadEarlyEndpoint` is an opinionated group of endpoints for the common "upload now, reference later" pattern. It
+`GlobalUploadEndpoints` is an opinionated group of endpoints for the common "upload now, reference later" pattern. It
 lets a client upload a file before the request that actually uses it, without turning your file system into an open
 file-sharing service.
 
@@ -177,15 +177,15 @@ Verifying up front also makes the subsequent request faster, since the scan has 
 
 With an empty scanner list, uploads go straight to the ready location and are certified as already scanned.
 
-### ⚠️ Only one `UploadEarlyEndpoint` per server
+### ⚠️ Only one `GlobalUploadEndpoints` per server
 
-`UploadEarlyEndpoint` registers a **contextual serializer for `ServerFile`** (via its `externalSerialization`) so
-that upload tokens can be decoded as `ServerFile` values. If you instantiate `UploadEarlyEndpoint` more than once
+`GlobalUploadEndpoints` registers a **contextual serializer for `ServerFile`** (via its `externalSerialization`) so
+that upload tokens can be decoded as `ServerFile` values. If you instantiate `GlobalUploadEndpoints` more than once
 (for example, a separate instance created only for a test), the multiple instances register **conflicting
 `ServerFile` serializers**. This does not fail at compile time — it surfaces at runtime as serialization errors,
 typically appearing as `500 Internal Server Error` responses.
 
-**Instantiate `UploadEarlyEndpoint` exactly once in your server definition and reference that single instance
+**Instantiate `GlobalUploadEndpoints` exactly once in your server definition and reference that single instance
 everywhere, including from tests.**
 
 ## Available Backends

@@ -4,7 +4,6 @@ import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.Engine
-import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.runtime.test.testBlocking
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
@@ -57,7 +56,7 @@ class UploadEarlyScanningTest {
     object Server : ServerBuilder() {
         val files = setting("files", ExternalFileSystem.Settings())
         val database = setting("database", Database.Settings())
-        val uploadEarly = path.path("upload") include UploadEarlyEndpoint(
+        val uploadEarly = path.path("upload") include GlobalUploadEndpoints(
             files = files,
             database = database,
             fileScanner = Runtime { listOf(ControlledScanner(contextOf<Engine>())) },
@@ -82,7 +81,7 @@ class UploadEarlyScanningTest {
             prepare.uploadUrl.contains("upload-jail"),
             "Upload should be directed at the jail: ${prepare.uploadUrl}"
         )
-        assertIs<UploadToken.Unscanned>(uploadEarly.tokens().parseOrNull(prepare.futureCallToken))
+        assertIs<UploadToken.Unscanned>(uploadEarly.tokens().parseOrNull(prepare.token.raw))
     }
 
     /**
@@ -95,11 +94,11 @@ class UploadEarlyScanningTest {
         database set Database.Settings()
     }) {
         val prepare = uploadEarly.endpoint.test(null, Unit)
-        val key = uploadEarly.tokens().parseOrNull(prepare.futureCallToken)!!.key
+        val key = uploadEarly.tokens().parseOrNull(prepare.token.raw)!!.key
         files().jailed(key).put(TypedData.text("hello", MediaType.Text.Plain))
 
         assertFailsWith<IllegalArgumentException> {
-            decode(uploadEarly.serializer(), prepare.futureCallToken)
+            decode(uploadEarly.serializer(), prepare.token.raw)
         }
     }
 
@@ -109,17 +108,17 @@ class UploadEarlyScanningTest {
         database set Database.Settings()
     }) {
         val prepare = uploadEarly.endpoint.test(null, Unit)
-        val key = uploadEarly.tokens().parseOrNull(prepare.futureCallToken)!!.key
+        val key = uploadEarly.tokens().parseOrNull(prepare.token.raw)!!.key
         files().jailed(key).put(TypedData.text("hello", MediaType.Text.Plain))
 
-        val verified = uploadEarly.verify.test(null, prepare.futureCallToken)
+        val verified = uploadEarly.verify.test(null, prepare.token)
 
-        val promoted = assertIs<UploadToken.Scanned>(uploadEarly.tokens().parseOrNull(verified)).key
+        val promoted = assertIs<UploadToken.Scanned>(uploadEarly.tokens().parseOrNull(verified.location)).key
         assertNotEquals(key, promoted, "Promotion must not reuse the client's jail key")
         assertEquals("hello", files().promoted(promoted).get()!!.text())
         assertEquals(
             files().promoted(promoted).serverFile.location,
-            decode(uploadEarly.serializer(), verified).location
+            decode(uploadEarly.serializer(), verified.location).location
         )
     }
 
@@ -133,10 +132,10 @@ class UploadEarlyScanningTest {
         database set Database.Settings()
     }) {
         val prepare = uploadEarly.endpoint.test(null, Unit)
-        val key = uploadEarly.tokens().parseOrNull(prepare.futureCallToken)!!.key
+        val key = uploadEarly.tokens().parseOrNull(prepare.token.raw)!!.key
         files().jailed(key).put(TypedData.text("hello", MediaType.Text.Plain))
 
-        uploadEarly.verify.test(null, prepare.futureCallToken)
+        uploadEarly.verify.test(null, prepare.token)
 
         val scanned = ScanControl.scanned.single().path.toString()
         assertTrue(scanned.contains("uploaded"), "Scanner should see the promoted copy, got: $scanned")
@@ -157,7 +156,7 @@ class UploadEarlyScanningTest {
         database set Database.Settings()
     }) {
         val prepare = uploadEarly.endpoint.test(null, Unit)
-        val key = uploadEarly.tokens().parseOrNull(prepare.futureCallToken)!!.key
+        val key = uploadEarly.tokens().parseOrNull(prepare.token.raw)!!.key
         val jailed = files().jailed(key)
         jailed.put(TypedData.text("benign", MediaType.Text.Plain))
 
@@ -165,15 +164,15 @@ class UploadEarlyScanningTest {
         // rewrite the jail at any moment - including mid-scan.
         ScanControl.behavior = { jailed.put(TypedData.text("malicious", MediaType.Text.Plain)) }
 
-        val verified = uploadEarly.verify.test(null, prepare.futureCallToken)
-        val promoted = uploadEarly.tokens().parseOrNull(verified)!!.key
+        val verified = uploadEarly.verify.test(null, prepare.token)
+        val promoted = uploadEarly.tokens().parseOrNull(verified.location)!!.key
 
         assertEquals(
             "benign",
             files().promoted(promoted).get()!!.text(),
             "The promoted file must be the bytes that were scanned"
         )
-        assertEquals("benign", decode(uploadEarly.serializer(), verified).externalFile.get()!!.text())
+        assertEquals("benign", decode(uploadEarly.serializer(), verified.location).externalFile.get()!!.text())
         assertEquals("malicious", jailed.get()!!.text(), "The mid-scan swap must actually have landed")
     }
 
@@ -184,10 +183,10 @@ class UploadEarlyScanningTest {
     }) {
         ScanControl.behavior = { throw FileScanException("infected") }
         val prepare = uploadEarly.endpoint.test(null, Unit)
-        val key = uploadEarly.tokens().parseOrNull(prepare.futureCallToken)!!.key
+        val key = uploadEarly.tokens().parseOrNull(prepare.token.raw)!!.key
         files().jailed(key).put(TypedData.text("malicious", MediaType.Text.Plain))
 
-        assertFailsWith<BadRequestException> { uploadEarly.verify.test(null, prepare.futureCallToken) }
+        assertFailsWith<BadRequestException> { uploadEarly.verify.test(null, prepare.token) }
 
         assertEquals(
             emptyList(),
@@ -208,12 +207,12 @@ class UploadEarlyScanningTest {
         database set Database.Settings()
     }) {
         val prepare = uploadEarly.endpoint.test(null, Unit)
-        val key = uploadEarly.tokens().parseOrNull(prepare.futureCallToken)!!.key
+        val key = uploadEarly.tokens().parseOrNull(prepare.token.raw)!!.key
         files().jailed(key).put(TypedData.text("benign", MediaType.Text.Plain))
-        val first = uploadEarly.tokens().parseOrNull(uploadEarly.verify.test(null, prepare.futureCallToken))!!.key
+        val first = uploadEarly.tokens().parseOrNull(uploadEarly.verify.test(null, prepare.token).location)!!.key
 
         files().jailed(key).put(TypedData.text("second", MediaType.Text.Plain))
-        val second = uploadEarly.tokens().parseOrNull(uploadEarly.verify.test(null, prepare.futureCallToken))!!.key
+        val second = uploadEarly.tokens().parseOrNull(uploadEarly.verify.test(null, prepare.token).location)!!.key
 
         assertNotEquals(first, second, "Each verify must promote to its own file")
         assertEquals("benign", files().promoted(first).get()!!.text())
@@ -230,13 +229,13 @@ class UploadEarlyScanningTest {
         database set Database.Settings()
     }) {
         val prepare = uploadEarly.endpoint.test(null, Unit)
-        val key = uploadEarly.tokens().parseOrNull(prepare.futureCallToken)!!.key
+        val key = uploadEarly.tokens().parseOrNull(prepare.token.raw)!!.key
         files().jailed(key).put(TypedData.text("benign", MediaType.Text.Plain))
-        val certified = uploadEarly.tokens().parseOrNull(uploadEarly.verify.test(null, prepare.futureCallToken))!!.key
+        val certified = uploadEarly.tokens().parseOrNull(uploadEarly.verify.test(null, prepare.token).location)!!.key
 
         ScanControl.behavior = { throw FileScanException("infected") }
         files().jailed(key).put(TypedData.text("malicious", MediaType.Text.Plain))
-        assertFailsWith<BadRequestException> { uploadEarly.verify.test(null, prepare.futureCallToken) }
+        assertFailsWith<BadRequestException> { uploadEarly.verify.test(null, prepare.token) }
 
         assertEquals("benign", files().promoted(certified).get()!!.text(), "The certified file must survive")
     }
@@ -248,11 +247,11 @@ class UploadEarlyScanningTest {
         database set Database.Settings()
     }) {
         val prepare = uploadEarly.endpoint.test(null, Unit)
-        val key = uploadEarly.tokens().parseOrNull(prepare.futureCallToken)!!.key
+        val key = uploadEarly.tokens().parseOrNull(prepare.token.raw)!!.key
         files().jailed(key).put(TypedData.text("hello", MediaType.Text.Plain))
-        val verified = uploadEarly.verify.test(null, prepare.futureCallToken)
+        val verified = uploadEarly.verify.test(null, prepare.token)
 
-        assertEquals(verified, uploadEarly.verify.test(null, verified))
+        assertEquals(verified, uploadEarly.verify.test(null, UnverifiedUploadToken(verified.location)))
         assertEquals(1, ScanControl.scanned.size, "Re-verifying must not scan again")
     }
 
@@ -262,8 +261,8 @@ class UploadEarlyScanningTest {
         database set Database.Settings()
     }) {
         val prepare = uploadEarly.endpoint.test(null, Unit)
-        val key = uploadEarly.tokens().parseOrNull(prepare.futureCallToken)!!.key
-        val forged = prepare.futureCallToken.replace(key, "someone-elses.file")
+        val key = uploadEarly.tokens().parseOrNull(prepare.token.raw)!!.key
+        val forged = UnverifiedUploadToken(prepare.token.raw.replace(key, "someone-elses.file"))
         assertFailsWith<IllegalArgumentException> { uploadEarly.verify.test(null, forged) }
     }
 }
@@ -281,7 +280,7 @@ class UploadEarlyUnsignedFileSystemTest {
     object Server : ServerBuilder() {
         val files = setting("files", ExternalFileSystem.Settings())
         val database = setting("database", Database.Settings())
-        val uploadEarly = path.path("upload") include UploadEarlyEndpoint(
+        val uploadEarly = path.path("upload") include GlobalUploadEndpoints(
             files = files,
             database = database,
             fileScanner = Runtime { listOf(ControlledScanner(contextOf<Engine>())) },

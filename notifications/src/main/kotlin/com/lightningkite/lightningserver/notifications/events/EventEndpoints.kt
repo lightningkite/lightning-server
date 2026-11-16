@@ -3,8 +3,8 @@ package com.lightningkite.lightningserver.notifications.events
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.post
-import com.lightningkite.lightningserver.notifications.events.EventRegistry.Companion.events
 import com.lightningkite.lightningserver.notifications.query
+import com.lightningkite.lightningserver.notifications.events.EventRegistry.Companion.events
 import com.lightningkite.lightningserver.notifications.withPermissions
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime

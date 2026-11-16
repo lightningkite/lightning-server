@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.notifications.subscriptions
 
-import com.lightningkite.lightningserver.definition.StartupTask
 import com.lightningkite.lightningserver.definition.builder.MapRegistry
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.notifications.*
@@ -103,11 +102,13 @@ public class NonCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UI
         return interested(event)
     }
 
-    private val verify = path.path("verify") bind StartupTask {
-        val registry = serverRuntime.server.events
-        require(eventListeners.keys.containsAll(registry.keys)) {
-            val missing = registry.keys - eventListeners.keys
-            "Subscriptions are missing for (${missing.size}) event definitions: $missing"
+    init {
+        buildCheck { definition ->
+            val registry = definition.events
+            require(eventListeners.keys.containsAll(registry.keys)) {
+                val missing = registry.keys - eventListeners.keys
+                "Subscriptions are missing for (${missing.size}) event definitions: $missing"
+            }
         }
     }
 }

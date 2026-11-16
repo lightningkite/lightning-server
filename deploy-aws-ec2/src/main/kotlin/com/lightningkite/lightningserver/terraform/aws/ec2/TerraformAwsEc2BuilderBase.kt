@@ -266,7 +266,6 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
     public open val maxBodySize: DataSize get() = 10.mebibytes
 
     /** IP Stack Configuration. */
-    public open val enableIPv4: Boolean get() = true
     public open val enableIPv6: Boolean get() = true
 
     // === Logging Configuration ===
@@ -444,8 +443,6 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
     protected open fun validateConfiguration() {}
 
     override fun prepareForWrite() {
-        if (!enableIPv6 && !enableIPv4) throw IllegalStateException("At least one IP stack must be enabled.")
-
         if (projectPrefix.any { !it.isLetterOrDigit() && !(it == '-' || it == '_') })
             throw IllegalArgumentException("The projectPrefix has illegal characters in it. It can only contain: Letters, Digits, '-', and '_'.")
 

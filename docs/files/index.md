@@ -2,7 +2,8 @@
 
 This package provides primitives and endpoints for working with user-provided files.
 
-- files-shared: Common models used across platforms (UploadForNextRequest, UploadInformation).
+- files-shared: Common models and the client interface used across platforms (UploadTarget, UnverifiedUpload,
+  ClientFileUploadEndpoints).
 - files: JVM server endpoints and helpers for serving files and implementing the early-upload workflow.
 
 Contents

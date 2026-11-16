@@ -1,4 +1,3 @@
-import com.lightningkite.deployhelpers.lkLibrary
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
@@ -14,8 +13,8 @@ dependencies {
         exclude("software.amazon.awssdk:netty-nio-client")
         exclude("software.amazon.awssdk:apache-client")
     }
-    api(libs.services.aws.client) { excludeNetty() }
-    api(libs.services.cache.dynamodb) { excludeNetty() }
+    api(sa.aws.client) { excludeNetty() }
+    api(sa.cache.dynamodb) { excludeNetty() }
     api(libs.aws.s3) { excludeNetty() }
     api(libs.aws.lambda) { excludeNetty() }
     api(libs.aws.apiGateway) { excludeNetty() }
@@ -38,10 +37,6 @@ kotlin {
     }
 }
 
-lkLibrary(
-    "lightningkite",
-    "lightning-server",
-    mavenAutomaticRelease = project.findProperty("mavenAutomaticRelease") as? Boolean ?: false
-) {
-    description.set("An engine implementation and deployment tools for deploying a Lightning Server project in AWS Lambda.")
+mavenPublishing {
+    pom { description.set("An engine implementation and deployment tools for deploying a Lightning Server project in AWS Lambda.") }
 }

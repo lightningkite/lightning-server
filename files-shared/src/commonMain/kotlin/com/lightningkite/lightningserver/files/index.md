@@ -4,13 +4,13 @@ This shared module provides simple models used by the files module and any clien
 
 Files
 
-- models.kt — UploadForNextRequest and UploadInformation used to power the early-upload flow.
-- ClientUploadEarlyEndpoints.kt — The client interface for the early-upload endpoints.
-- LiveClientModelRestEndpoints.kt — LiveClientUploadEarlyEndpoints, the Fetcher-backed implementation of that
-  interface.
+- models.kt — UploadTarget and UnverifiedUpload, which clients use in the upload flow, plus the deprecated
+  UploadInformation.
+- ClientFileUploadEndpoints.kt — ClientFileUploadEndpoints, the client interface for the upload endpoints, and
+  LiveClientFileUploadEndpoints, its Fetcher-backed implementation.
 
 Overview
 
-- UploadForNextRequest is stored server-side to track single-use prepared uploads and cleanup.
-- UploadInformation is returned to clients when initiating an early upload; it contains the presigned PUT URL and a
-  token that can be sent later as a ServerFile in an API call.
+- UploadTarget is returned to clients when starting an upload; it contains the presigned PUT URL and an
+  UnverifiedUpload token. Verifying that token returns a ServerFile to send in a later API call.
+- The server-side tracking model, UploadForNextRequest, lives in the files module and never reaches clients.

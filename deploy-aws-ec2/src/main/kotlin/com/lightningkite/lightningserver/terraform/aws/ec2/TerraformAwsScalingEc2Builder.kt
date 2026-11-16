@@ -261,21 +261,19 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
             }
 
             // ALB ingress (public) + egress to instances.
-            if (enableIPv4) {
-                "resource.aws_vpc_security_group_ingress_rule.alb_https" {
-                    "security_group_id" - expression("aws_security_group.alb.id")
-                    "ip_protocol" - "tcp"
-                    "from_port" - 443
-                    "to_port" - 443
-                    "cidr_ipv4" - "0.0.0.0/0"
-                }
-                "resource.aws_vpc_security_group_ingress_rule.alb_http" {
-                    "security_group_id" - expression("aws_security_group.alb.id")
-                    "ip_protocol" - "tcp"
-                    "from_port" - 80
-                    "to_port" - 80
-                    "cidr_ipv4" - "0.0.0.0/0"
-                }
+            "resource.aws_vpc_security_group_ingress_rule.alb_https" {
+                "security_group_id" - expression("aws_security_group.alb.id")
+                "ip_protocol" - "tcp"
+                "from_port" - 443
+                "to_port" - 443
+                "cidr_ipv4" - "0.0.0.0/0"
+            }
+            "resource.aws_vpc_security_group_ingress_rule.alb_http" {
+                "security_group_id" - expression("aws_security_group.alb.id")
+                "ip_protocol" - "tcp"
+                "from_port" - 80
+                "to_port" - 80
+                "cidr_ipv4" - "0.0.0.0/0"
             }
             if (enableIPv6) {
                 "resource.aws_vpc_security_group_ingress_rule.alb_https_v6" {
@@ -1471,16 +1469,14 @@ log "      image is rebuilt. Treat this as a stopgap, not the patch of record."
     }
 
     private fun TerraformJsonObject.emitAliasRecords(recordName: String, suffix: String = "") {
-        if (enableIPv4) {
-            "resource.aws_route53_record.alias_a$suffix" {
-                "zone_id" - domainZoneId
-                "name" - recordName
-                "type" - "A"
-                "alias" {
-                    "name" - expression("aws_lb.app.dns_name")
-                    "zone_id" - expression("aws_lb.app.zone_id")
-                    "evaluate_target_health" - true
-                }
+        "resource.aws_route53_record.alias_a$suffix" {
+            "zone_id" - domainZoneId
+            "name" - recordName
+            "type" - "A"
+            "alias" {
+                "name" - expression("aws_lb.app.dns_name")
+                "zone_id" - expression("aws_lb.app.zone_id")
+                "evaluate_target_health" - true
             }
         }
         if (enableIPv6) {

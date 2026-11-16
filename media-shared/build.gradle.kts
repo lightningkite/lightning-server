@@ -1,4 +1,3 @@
-import com.lightningkite.deployhelpers.lkLibrary
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -22,7 +21,7 @@ kotlin {
     applyDefaultHierarchyTemplate()
     android {
         namespace = "com.lightningkite.lightningserver.media.shared"
-        compileSdk = 36
+        compileSdk = 37
         minSdk = 21
         enableCoreLibraryDesugaring = true
         withHostTest {}
@@ -50,9 +49,9 @@ kotlin {
         val commonMain = getByName("commonMain") {
             dependencies {
                 api(project(":files-shared"))
-                api(libs.services.data)
-                api(libs.services.database.shared)
-                api(libs.services.files)
+                api(sa.data)
+                api(sa.database.shared)
+                api(sa.files)
             }
             kotlin {
                 srcDir(file("build/generated/ksp/common/commonMain/kotlin"))
@@ -73,7 +72,7 @@ kotlin {
 
 dependencies {
     configurations.filter { it.name.startsWith("ksp") && it.name != "ksp" }.forEach {
-        add(it.name, libs.services.database.processor)
+        add(it.name, sa.database.processor)
     }
 }
 
@@ -81,10 +80,10 @@ dependencies {
     coreLibraryDesugaring(libs.androidDesugaring)
 }
 
-lkLibrary(
-    "lightningkite",
-    "lightning-server",
-    mavenAutomaticRelease = project.findProperty("mavenAutomaticRelease") as? Boolean ?: false
-) {
-    description.set("A set of classes shared between the server and client for handling images.")
+mavenPublishing {
+    pom { description.set("A set of classes shared between the server and client for handling images.") }
 }
+// commonMain compiles the database processor's shared output (written by kspCommonMainKotlinMetadata alone) as plain
+// source, so every other KSP run and compile must wait for it.
+tasks.matching { (it.name.startsWith("ksp") || it.name.startsWith("compile")) && it.name != "kspCommonMainKotlinMetadata" }
+    .configureEach { dependsOn("kspCommonMainKotlinMetadata") }

@@ -1,4 +1,3 @@
-import com.lightningkite.deployhelpers.lkLibrary
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
@@ -25,10 +24,6 @@ kotlin {
     }
 }
 
-lkLibrary(
-    "lightningkite",
-    "lightning-server",
-    mavenAutomaticRelease = project.findProperty("mavenAutomaticRelease") as? Boolean ?: false
-) {
-    description.set("A set of tools and endpoints for user authentication using WebAuthn (passkeys).")
+mavenPublishing {
+    pom { description.set("A set of tools and endpoints for user authentication using WebAuthn (passkeys).") }
 }

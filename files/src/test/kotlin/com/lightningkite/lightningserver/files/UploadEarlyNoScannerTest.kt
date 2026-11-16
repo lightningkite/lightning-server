@@ -27,7 +27,7 @@ class UploadEarlyNoScannerTest {
     object Server : ServerBuilder() {
         val files = setting("files", ExternalFileSystem.Settings())
         val database = setting("database", Database.Settings())
-        val uploadEarly = path.path("upload") include UploadEarlyEndpoint(
+        val uploadEarly = path.path("upload") include GlobalUploadEndpoints(
             files = files,
             database = database,
             fileScanner = { listOf() },
@@ -46,7 +46,7 @@ class UploadEarlyNoScannerTest {
         val prepare = uploadEarly.endpoint.test(null, Unit)
         assertTrue(prepare.uploadUrl.contains("uploaded"), "Upload should target ready: ${prepare.uploadUrl}")
         assertFalse(prepare.uploadUrl.contains("upload-jail"), "Nothing to jail when nothing scans")
-        assertIs<UploadToken.Scanned>(uploadEarly.tokens().parseOrNull(prepare.futureCallToken))
+        assertIs<UploadToken.Scanned>(uploadEarly.tokens().parseOrNull(prepare.token.raw))
     }
 
     /** With nothing to scan there is nothing for verify to do, so a client may call it or not. */
@@ -56,7 +56,7 @@ class UploadEarlyNoScannerTest {
         database set Database.Settings()
     }) {
         val prepare = uploadEarly.endpoint.test(null, Unit)
-        assertEquals(prepare.futureCallToken, uploadEarly.verify.test(null, prepare.futureCallToken))
+        assertEquals(prepare.token.raw, uploadEarly.verify.test(null, prepare.token).location)
     }
 
     @Test
@@ -65,12 +65,12 @@ class UploadEarlyNoScannerTest {
         database set Database.Settings()
     }) {
         val prepare = uploadEarly.endpoint.test(null, Unit)
-        val key = uploadEarly.tokens().parseOrNull(prepare.futureCallToken)!!.key
+        val key = uploadEarly.tokens().parseOrNull(prepare.token.raw)!!.key
         files().root.then("uploaded").then(key).put(TypedData.text("hello", MediaType.Text.Plain))
 
         val ser = uploadEarly.serializer()
         val resolved = Json { serializersModule = serializersModuleOf(ser) }
-            .decodeFromJsonElement(ser, JsonPrimitive(prepare.futureCallToken))
+            .decodeFromJsonElement(ser, JsonPrimitive(prepare.token.raw))
         assertEquals("hello", resolved.externalFile.get()!!.text())
     }
 }

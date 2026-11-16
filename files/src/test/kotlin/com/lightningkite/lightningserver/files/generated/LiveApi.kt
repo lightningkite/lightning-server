@@ -12,7 +12,7 @@ class LiveApi(val fetcher: Fetcher) : Api {
 	override fun withMetadata(block: suspend RequestMetadata.() -> Unit): LiveApi =
 		LiveApi(fetcher.withMetadata(block))
 
-	override val uploadEarlyEndpoint = com.lightningkite.lightningserver.files.LiveClientUploadEarlyEndpoints(fetcher, "upload", )
+	override val globalUpload = com.lightningkite.lightningserver.files.LiveClientFileUploadEndpoints(fetcher, "upload", )
 
 	override val module = com.lightningkite.lightningserver.typed.LiveClientModelRestEndpoints(fetcher, "module/rest", com.lightningkite.lightningserver.files.UploadEarlySdkTests.Model.serializer(), kotlin.uuid.Uuid.serializer())
 }

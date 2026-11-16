@@ -4,7 +4,6 @@ import com.lightningkite.services.database.optics.*
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.auth.id
 import com.lightningkite.lightningserver.auth.subscope
-import com.lightningkite.lightningserver.definition.StartupTask
 import com.lightningkite.lightningserver.definition.builder.MapRegistry
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.get
@@ -124,7 +123,7 @@ public class FrequencyCustomizableSubscriptions<USER : HasId<UID>, UID : Compara
     }
 
     @Suppress("UNCHECKED_CAST")
-    context(_: ServerRuntime)
+    context(runtime: ServerRuntime)
     override suspend fun <T : HasId<ID>, ID : Comparable<ID>> subscribed(event: Event<T, ID>): List<ScheduledSendMethods<UID>> =
         try {
             val subscriptions = getSubscribers(event.type)
@@ -144,12 +143,14 @@ public class FrequencyCustomizableSubscriptions<USER : HasId<UID>, UID : Compara
             emptyList()
         }
 
-    private val verify = path.path("verify") bind StartupTask {
-        val registry = serverRuntime.server.events
+    init {
+        buildCheck { definition ->
+            val registry = definition.events
 
-        require(eventListeners.keys.containsAll(registry.keys)) {
-            val missing = registry.keys - eventListeners.keys
-            "Subscriptions are missing for (${missing.size}) event definitions: $missing"
+            require(eventListeners.keys.containsAll(registry.keys)) {
+                val missing = registry.keys - eventListeners.keys
+                "Subscriptions are missing for (${missing.size}) event definitions: $missing"
+            }
         }
     }
 

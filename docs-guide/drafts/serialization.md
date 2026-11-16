@@ -150,7 +150,7 @@ object Server : ServerBuilder() {
 
 When your server includes sub-builders (via `include`), their `externalSerialization`
 and `internalSerialization` are merged with the root at `build()` time.
-`UploadEarlyEndpoint` (see [ServerFile](#serverfile-serialization) below) uses this
+`GlobalUploadEndpoints` (see [ServerFile](#serverfile-serialization) below) uses this
 mechanism to inject the `ExternalServerFileSerializer` contextual entry.
 
 ## Polymorphic and Sealed Types
@@ -252,7 +252,7 @@ defers to whatever serializer is registered in the current `SerializersModule` f
 `ServerFile::class`.  On the client side (where no contextual override is present),
 `DirectServerFileSerializer` kicks in — it reads and writes the raw URL string unchanged.
 
-**On the server side**, `UploadEarlyEndpoint` overrides `externalSerialization` to
+**On the server side**, `GlobalUploadEndpoints` overrides `externalSerialization` to
 inject `ExternalServerFileSerializer` as the contextual entry:
 
 ```kotlin
@@ -264,7 +264,7 @@ override val externalSerialization: Runtime<SerializersModule> = Runtime.Cached 
 }
 ```
 
-This means **any endpoint that shares a ServerBuilder tree with an `UploadEarlyEndpoint`
+This means **any endpoint that shares a ServerBuilder tree with an `GlobalUploadEndpoints`
 gets the secure serializer automatically**.  You do not register it manually.
 
 ### What ExternalServerFileSerializer Does
@@ -299,16 +299,16 @@ recommended in production.
    request body.  `ExternalServerFileSerializer.deserialize` validates the token and
    resolves it to the final internal URL.
 
-> **Gotcha: one `UploadEarlyEndpoint` per server tree.** If you declare multiple
+> **Gotcha: one `GlobalUploadEndpoints` per server tree.** If you declare multiple
 > instances in the same `ServerBuilder` tree they will both try to register a
 > contextual serializer for `ServerFile`, which causes a
-> `ConflictingSerializerException` at startup.  Declare it once and share the
+> `ConflictingSerializerException` at startup. Declare it once and share the
 > reference.
 
 ## What's Next
 
 - **Files** — how to declare `ExternalFileSystem.Settings()`, wire a file system backend,
-  and configure `UploadEarlyEndpoint` for your server (see the files draft chapter).
+  and configure `GlobalUploadEndpoints` for your server (see the files draft chapter).
 - **Typed Endpoints** — typed endpoints call `registerBasicMediaTypeCoders()` and use
   `parse`/`toTypedData` automatically; you usually only need to read this chapter when
   working with raw `HttpHandler`s or custom wire formats.

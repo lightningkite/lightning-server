@@ -32,3 +32,4 @@ site
 .claude/worktrees
 
 secrets.properties
+/typed/src/test/kotlin/com/lightningkite/lightningserver/typed/sdk/generated

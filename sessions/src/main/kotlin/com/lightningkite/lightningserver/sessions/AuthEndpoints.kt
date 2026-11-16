@@ -161,6 +161,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             inputType = Unit.serializer(),
             outputType = AuthRequirements.serializer(),
             summary = "Authentication Requirements",
+            functionName = "authRequirements",
             description = "Returns a required strength and a list of proof options for the user to use in re-authenticating.",
             errorCases = listOf(),
             implementation = { _: Unit ->
@@ -213,6 +214,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             inputType = LogInRequest.serializer(),
             outputType = IdAndAuthMethods.serializer(principal.idSerializer),
             summary = "Log In With Limitations",
+            functionName = "logInV2",
             description = "Attempt to log in as a ${principal.name} using various proofs.",
             errorCases = errors,
             implementation = { input: LogInRequest ->

@@ -1,4 +1,3 @@
-import com.lightningkite.deployhelpers.lkLibrary
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
@@ -11,7 +10,7 @@ plugins {
 
 dependencies {
     api(project(":sessions"))
-    api(libs.services.sms)
+    api(sa.sms)
 
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)
@@ -25,10 +24,6 @@ kotlin {
     }
 }
 
-lkLibrary(
-    "lightningkite",
-    "lightning-server",
-    mavenAutomaticRelease = project.findProperty("mavenAutomaticRelease") as? Boolean ?: false
-) {
-    description.set("A set of tools and endpoints for user authentication using sms.")
+mavenPublishing {
+    pom { description.set("A set of tools and endpoints for user authentication using sms.") }
 }

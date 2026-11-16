@@ -22,10 +22,10 @@ dependencies {
     implementation(project(":typed"))
     implementation(project(":auth"))
     implementation(project(":engine-local"))
-    implementation(libs.services.database.jsonfile)
-    implementation(libs.services.database)
-    implementation(libs.services.cache)
-    ksp(libs.services.database.processor)
+    implementation(sa.database.jsonfile)
+    implementation(sa.database)
+    implementation(sa.cache)
+    ksp(sa.database.processor)
 
     // kotlin.test.junit is promoted to implementation so @Test is available in src/samples/kotlin
     // (the drift-checked sample source), letting guide examples show complete annotated test classes.

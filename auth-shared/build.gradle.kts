@@ -1,4 +1,3 @@
-import com.lightningkite.deployhelpers.lkLibrary
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -21,7 +20,7 @@ kotlin {
     applyDefaultHierarchyTemplate()
     android {
         namespace = "com.lightningkite.lightningserver.auth.shared"
-        compileSdk = 36
+        compileSdk = 37
         minSdk = 21
         enableCoreLibraryDesugaring = true
         withHostTest {}
@@ -67,10 +66,6 @@ dependencies {
     coreLibraryDesugaring(libs.androidDesugaring)
 }
 
-lkLibrary(
-    "lightningkite",
-    "lightning-server",
-    mavenAutomaticRelease = project.findProperty("mavenAutomaticRelease") as? Boolean ?: false
-) {
-    description.set("Models used in request authentication.")
+mavenPublishing {
+    pom { description.set("Models used in request authentication.") }
 }

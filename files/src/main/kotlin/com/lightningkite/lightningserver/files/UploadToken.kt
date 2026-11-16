@@ -9,7 +9,7 @@ import kotlin.time.Duration
 import kotlin.time.Instant
 
 /**
- * A reference to a file uploaded through [UploadEarlyEndpoint].
+ * A reference to a file uploaded through [GlobalUploadEndpoints].
  *
  * Which variant a token carries is the whole of the upload flow's safety: only [Scanned] names a file
  * that may be used, and only the verify endpoint mints one.
@@ -36,14 +36,14 @@ public sealed interface UploadToken {
 }
 
 /**
- * Mints and checks the tokens [UploadEarlyEndpoint] hands to clients.
+ * Mints and checks the tokens [GlobalUploadEndpoints] hands to clients.
  *
  * A token is `<prefix><key>?useUntil=<epoch millis>&token=<signature>`, signed with a key derived from
  * the server's secret basis. Clients treat it as opaque; the signature is what stops one from naming a
  * file it was not given, or from promoting its own upload to [UploadToken.Scanned].
  *
  * @param signer Signs and verifies tokens. Derive it from the secret basis rather than supplying a
- * bare key - see [UploadEarlyEndpoint].
+ * bare key - see [GlobalUploadEndpoints].
  * @param clock Source of truth for expiration checks.
  */
 public class UploadTokens(

@@ -572,6 +572,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             inputType = SubSessionRequest.serializer(),
             outputType = String.serializer(),
             summary = "Create Sub Session",
+            functionName = "subsession",
             description = "Creates a session with more limited authorization",
             implementation = { request: SubSessionRequest ->
                 val sessionUuid = this.auth.sessionId?.let(Uuid::parse) ?: throw UnauthorizedException()
@@ -617,6 +618,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     public val sessionTerminate: ApiHttpHandler<PathSpec0, SUBJECT, Unit, Unit> =
         path.path("terminate").post bind explicitApiHttpHandler(
             summary = "Terminate Current Session",
+            functionName = "terminateSession",
             auth = principal.require(scopes = setOf(Scopes.terminate)),
             inputType = Unit.serializer(),
             outputType = Unit.serializer(),

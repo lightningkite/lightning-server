@@ -86,7 +86,7 @@ modules.  These are what you reference in your dependency blocks.
 
 | Module | Type | What it provides |
 |---|---|---|
-| `files` | JVM | `UploadEarlyEndpoint`, signed-URL generation, multi-backend file storage |
+| `files` | JVM | `GlobalUploadEndpoints`, signed-URL generation, multi-backend file storage |
 | `files-shared` | KMP | `ServerFile`, `ServerFileWithMetadata` types |
 | `media` | JVM | Image processing (resize, crop, convert) via Scrimage |
 | `media-shared` | KMP | Media operation types |

@@ -1,9 +1,7 @@
-import com.lightningkite.deployhelpers.lkLibrary
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
-    alias(libs.plugins.ksp)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.androidKmpLibrary)
     alias(libs.plugins.dokka)
@@ -22,7 +20,7 @@ kotlin {
     applyDefaultHierarchyTemplate()
     android {
         namespace = "com.lightningkite.lightningserver.files.shared"
-        compileSdk = 36
+        compileSdk = 37
         minSdk = 21
         enableCoreLibraryDesugaring = true
         withHostTest {}
@@ -51,19 +49,13 @@ kotlin {
             dependencies {
                 api(project(":typed-shared"))
                 api(libs.kotlinx.datetime)
-                api(libs.services.files.client)
-                api(libs.services.database.shared)
-            }
-            kotlin {
-                srcDir(file("build/generated/ksp/common/commonMain/kotlin"))
+                api(sa.files.client)
+                api(sa.database.shared)
             }
         }
         val commonTest = getByName("commonTest") {
             dependencies {
                 implementation(libs.kotlin.test)
-            }
-            kotlin {
-                srcDir(file("build/generated/ksp/common/commonTest/kotlin"))
             }
         }
         val jvmMain = getByName("jvmMain") {}
@@ -72,19 +64,9 @@ kotlin {
 }
 
 dependencies {
-    configurations.filter { it.name.startsWith("ksp") && it.name != "ksp" }.forEach {
-        add(it.name, libs.services.database.processor)
-    }
-}
-
-dependencies {
     coreLibraryDesugaring(libs.androidDesugaring)
 }
 
-lkLibrary(
-    "lightningkite",
-    "lightning-server",
-    mavenAutomaticRelease = project.findProperty("mavenAutomaticRelease") as? Boolean ?: false
-) {
-    description.set("A set of models shared between the server and client for managing PublicFileSystem files.")
+mavenPublishing {
+    pom { description.set("A set of models shared between the server and client for managing PublicFileSystem files.") }
 }

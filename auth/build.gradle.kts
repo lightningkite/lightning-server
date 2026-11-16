@@ -1,4 +1,3 @@
-import com.lightningkite.deployhelpers.lkLibrary
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
@@ -12,7 +11,7 @@ plugins {
 dependencies {
     api(project(":auth-shared"))
     api(project(":core"))
-    api(libs.services.database)
+    api(sa.database)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)
 }
@@ -25,10 +24,6 @@ kotlin {
     }
 }
 
-lkLibrary(
-    "lightningkite",
-    "lightning-server",
-    mavenAutomaticRelease = project.findProperty("mavenAutomaticRelease") as? Boolean ?: false
-) {
-    description.set("Tools for defining and validating authentication in requests.")
+mavenPublishing {
+    pom { description.set("Tools for defining and validating authentication in requests.") }
 }

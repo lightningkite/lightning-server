@@ -1,4 +1,3 @@
-import com.lightningkite.deployhelpers.lkLibrary
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
@@ -11,9 +10,9 @@ plugins {
 
 dependencies {
     api(project(":core"))
-    api(libs.services.cache)
+    api(sa.cache)
     testImplementation(project(":engine-local"))
-    testImplementation(libs.services.cache.test)
+    testImplementation(sa.cache.test)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)
 }
@@ -26,10 +25,6 @@ kotlin {
     }
 }
 
-lkLibrary(
-    "lightningkite",
-    "lightning-server",
-    mavenAutomaticRelease = project.findProperty("mavenAutomaticRelease") as? Boolean ?: false
-) {
-    description.set("Request rate limiting for Lightning Server")
+mavenPublishing {
+    pom { description.set("Request rate limiting for Lightning Server") }
 }

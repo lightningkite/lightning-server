@@ -1,29 +1,30 @@
 package com.lightningkite.lightningserver.files
 
-import com.lightningkite.services.data.Queryable
-import com.lightningkite.services.database.HasId
 import com.lightningkite.services.files.ServerFile
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlin.time.Instant
-import kotlin.uuid.Uuid
+import kotlin.jvm.JvmInline
 
 /**
- * Record for tracking a prepared upload and guarding against reuse.
- * Stored in the database to enable cleanup and single-use semantics.
+ * Where to upload a new file, returned by `getFileUploadUrl`.
  *
- * **Do not expose this table through a REST or model endpoint.** Between preparation and verification
- * [file] names a file in the upload jail, which has not been scanned. Serializing one hands a client a
- * signed URL that [com.lightningkite.services.files.ExternalServerFileSerializer] will accept straight
- * back as a usable `ServerFile`, bypassing scanning entirely.
+ * PUT the file's bytes to [uploadUrl], then pass [token] to `verifyUpload`.
  */
-@Queryable
-public data class UploadForNextRequest(
-    override val _id: Uuid = Uuid.random(),
-    /** The file location (as a ServerFile URL) associated with this prepared upload. */
-    val file: ServerFile,
-    /** Expiration time after which the upload is considered invalid/garbage. */
-    val expires: Instant,
-) : HasId<Uuid>
+@Serializable
+public data class UploadTarget(
+    val uploadUrl: String,
+    // Claude: keeps the wire format of UploadInformation, so old clients and other SDKs decode it unchanged
+    @SerialName("futureCallToken") val token: UnverifiedUploadToken,
+)
+
+/**
+ * A file the client has been told to upload, which a later request can't use yet.
+ *
+ * Pass it to `verifyUpload` to get a [ServerFile] that requests can use.
+ */
+@Serializable
+@JvmInline
+public value class UnverifiedUploadToken(public val raw: String)
 
 /**
  * Information returned to a client when initiating an early upload.
@@ -32,12 +33,9 @@ public data class UploadForNextRequest(
  * - [futureCallToken]: A token that can be serialized/deserialized as a ServerFile in a later request.
  *   Typically time-limited; clients should use it promptly.
  */
+@Deprecated("Use UploadTarget, which types its token.", ReplaceWith("UploadTarget"))
 @Serializable
 public data class UploadInformation(
     val uploadUrl: String,
     val futureCallToken: String,
 )
-
-/*
-TODO(API): Consider a stronger type than raw String for futureCallToken to avoid confusion and accidental misuse.
-*/
