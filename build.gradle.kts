@@ -105,16 +105,17 @@ subprojects {
         }
 
         // `lk` compares a fresh dump with the last release's to choose the next version, so no dumps are committed or checked.
+        // Opt-in experimental and internal declarations stay out of the dump, so changing them isn't a major.
         plugins.withId("org.jetbrains.kotlin.jvm") {
             extensions.configure<KotlinJvmProjectExtension> {
                 @OptIn(ExperimentalAbiValidation::class)
-                abiValidation()
+                abiValidation { filters { exclude.annotatedWith.addAll("com.lightningkite.services.data.ExperimentalLightningServer", "com.lightningkite.lightningserver.InternalLightningServerApi") } }
             }
         }
         plugins.withId("org.jetbrains.kotlin.multiplatform") {
             extensions.configure<KotlinMultiplatformExtension> {
                 @OptIn(ExperimentalAbiValidation::class)
-                abiValidation()
+                abiValidation { filters { exclude.annotatedWith.addAll("com.lightningkite.services.data.ExperimentalLightningServer", "com.lightningkite.lightningserver.InternalLightningServerApi") } }
             }
         }
         tasks.matching { it.name == "checkKotlinAbi" }.configureEach { enabled = false }
