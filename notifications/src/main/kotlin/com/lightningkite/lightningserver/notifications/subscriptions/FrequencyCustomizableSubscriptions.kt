@@ -68,12 +68,12 @@ public class FrequencyCustomizableSubscriptions<USER : HasId<UID>, UID : Compara
         KotlinLogging.logger("com.lightningkite.lightningserver.notifications.subscriptions.FrequencyCustomizableSubscriptions")
 
     public data class Subscriptions<UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>>(
-        val eventType: EventDefinition<T, *>,
+        val eventType: EventDefinition<*, T, *>,
         val defaultEmail: Frequency? = Frequency.immediately(),
         val defaultSms: Frequency? = Frequency.immediately(),
         val defaultPush: Frequency? = Frequency.immediately(),
         val defaultInApp: Frequency? = Frequency.immediately(),
-        val interested: suspend context(ServerRuntime) (Event<T, ID>) -> Set<UID>,
+        val interested: suspend context(ServerRuntime) (Event<*, T, ID>) -> Set<UID>,
     ) {
         public fun toSendMethods(user: UID): NotificationSendMethods<UID> = NotificationSendMethods(
             UserEventType(user, eventType.name),
@@ -102,12 +102,12 @@ public class FrequencyCustomizableSubscriptions<USER : HasId<UID>, UID : Compara
      * @param interested Function that returns the set of user IDs interested in the event
      */
     public fun <T : HasId<ID>, ID : Comparable<ID>> setSubscribers(
-        type: EventDefinition<T, ID>,
+        type: EventDefinition<*, T, ID>,
         defaultEmail: Frequency? = this.defaultEmail,
         defaultSms: Frequency? = this.defaultSms,
         defaultPush: Frequency? = this.defaultPush,
         defaultInApp: Frequency? = this.defaultInApp,
-        interested: suspend context(ServerRuntime) (Event<T, ID>) -> Set<UID>,
+        interested: suspend context(ServerRuntime) (Event<*, T, ID>) -> Set<UID>,
     ) {
         eventListeners.register(
             type.name,
@@ -117,14 +117,14 @@ public class FrequencyCustomizableSubscriptions<USER : HasId<UID>, UID : Compara
 
     @Suppress("UNCHECKED_CAST")
     context(_: ServerRuntime) // making this runtime-only so that we're guaranteed to have registered subscribers already
-    public fun <T : HasId<ID>, ID : Comparable<ID>> getSubscribers(type: EventDefinition<T, ID>): Subscriptions<UID, T, ID> {
+    public fun <T : HasId<ID>, ID : Comparable<ID>> getSubscribers(type: EventDefinition<*, T, ID>): Subscriptions<UID, T, ID> {
         return eventListeners[type.name]?.let { it as Subscriptions<UID, T, ID> }
             ?: throw IllegalStateException("No subscribers registered for event type $type")
     }
 
     @Suppress("UNCHECKED_CAST")
     context(runtime: ServerRuntime)
-    override suspend fun <T : HasId<ID>, ID : Comparable<ID>> subscribed(event: Event<T, ID>): List<ScheduledSendMethods<UID>> =
+    override suspend fun <T : HasId<ID>, ID : Comparable<ID>> subscribed(event: Event<*, T, ID>): List<ScheduledSendMethods<UID>> =
         try {
             val subscriptions = getSubscribers(event.type)
 
@@ -263,13 +263,13 @@ public class FrequencyCustomizableSubscriptions<USER : HasId<UID>, UID : Compara
  * @param defaultInApp Default in-app notification delivery frequency
  * @param generator Function that returns the set of user IDs to notify
  */
-context(handler: NotificationEndpoints<USER, UID, *, *, FrequencyCustomizableSubscriptions<USER, UID>>)
-public fun <USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>> EventDefinition<T, ID>.subscribed(
+context(handler: NotificationEndpoints<*, USER, UID, *, *, FrequencyCustomizableSubscriptions<USER, UID>>)
+public fun <USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>> EventDefinition<*, T, ID>.subscribed(
     defaultEmail: Frequency? = handler.subscriptions.defaultEmail,
     defaultSms: Frequency? = handler.subscriptions.defaultSms,
     defaultPush: Frequency? = handler.subscriptions.defaultPush,
     defaultInApp: Frequency? = handler.subscriptions.defaultInApp,
-    generator: suspend context(ServerRuntime) (Event<T, ID>) -> Set<UID>,
+    generator: suspend context(ServerRuntime) (Event<*, T, ID>) -> Set<UID>,
 ) {
     handler.subscriptions.setSubscribers(this, defaultEmail, defaultSms, defaultPush, defaultInApp, generator)
 }

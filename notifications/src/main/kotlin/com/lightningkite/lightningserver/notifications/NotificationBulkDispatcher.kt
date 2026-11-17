@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.notifications
 
 import com.lightningkite.services.database.optics.*
 import com.lightningkite.lightningserver.NotFoundException
+import com.lightningkite.lightningserver.notifications.events.EventTypeLike
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.data.Schedule
 import com.lightningkite.lightningserver.definition.*
@@ -54,19 +55,20 @@ import kotlin.uuid.Uuid
  * - To control bulking and formatting of notifications, override the appropriate `make{method}Notifications` function. These take in a user and the list of
  *   scheduled notifications, and returns the formatted and bulked list of method-specific send formats.
  */
-public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Comparable<UID>, CONTENT>(
-    public val info: ModelInfo<*, Notification<UID, CONTENT>, Uuid>,
+public abstract class NotificationBulkDispatcher<E : EventTypeLike, USER : HasId<UID>, UID : Comparable<UID>, CONTENT>(
+    public val info: ModelInfo<*, Notification<E, UID, CONTENT>, Uuid>,
     public val cache: Runtime<Cache>,
     database: Runtime<Database>,
     public val users: ModelInfo<*, USER, UID>,
+    public val eventSerializer: KSerializer<E>,
     public val contentSerializer: KSerializer<CONTENT>,
     public val email: (Runtime<EmailService>)? = null,
     public val sms: (Runtime<SMS>)? = null,
     public val push: (Runtime<NotificationService>)? = null,
     public val refreshSchedule: Schedule = Schedule.Frequency(1.minutes),
     public val timeout: Duration = 5.minutes,
-    webSocketKey: Field<Notification<UID, CONTENT>, *>? = info.serializer.fieldInApp,
-) : ServerBuilder(), NotificationEndpoints.Dispatcher<UID, CONTENT> {
+    webSocketKey: Field<Notification<E, UID, CONTENT>, *>? = info.serializer.fieldInApp,
+) : ServerBuilder(), NotificationEndpoints.Dispatcher<E, UID, CONTENT> {
     init {
         sdkSettings.defaultInfo = SdkModule.Info("NotificationsApi")
     }
@@ -109,7 +111,7 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
      * Additional condition to apply when querying for notifications to send.
      * Override this to add custom filtering logic (e.g., only send notifications for active users).
      */
-    protected open val additionalSendCondition: Condition<Notification<UID, CONTENT>>? = null
+    protected open val additionalSendCondition: Condition<Notification<E, UID, CONTENT>>? = null
 
     /**
      * Generates a list of [Email] to be sent to the user based on the provided notifications.
@@ -123,7 +125,7 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
     context(runtime: ServerRuntime)
     public abstract suspend fun makeEmailNotifications(
         user: USER,
-        notifications: List<Notification<UID, CONTENT>>,
+        notifications: List<Notification<E, UID, CONTENT>>,
     ): List<Email>
 
     /**
@@ -138,7 +140,7 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
     context(runtime: ServerRuntime)
     public abstract suspend fun makeSmsNotifications(
         user: USER,
-        notifications: List<Notification<UID, CONTENT>>,
+        notifications: List<Notification<E, UID, CONTENT>>,
     ): List<String>
 
     /**
@@ -153,14 +155,14 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
     context(runtime: ServerRuntime)
     public abstract suspend fun makePushNotifications(
         user: USER,
-        notifications: List<Notification<UID, CONTENT>>,
+        notifications: List<Notification<E, UID, CONTENT>>,
     ): List<NotificationData>
 
 
     private fun SendInfo?.needsSending(at: Instant) = this != null && !sent && sendAt <= at
 
     context(runtime: ServerRuntime)
-    override suspend fun dispatch(notifications: List<Notification<UID, CONTENT>>) {
+    override suspend fun dispatch(notifications: List<Notification<E, UID, CONTENT>>) {
         val now = now()
 
         info.table().insert(notifications)
@@ -179,7 +181,7 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
      * REST and WebSocket endpoints for managing notifications.
      * Mounted at `/rest`. Provides CRUD operations and real-time updates for notifications.
      */
-    public val rest: ModelRestEndpointsAndUpdatesWebSocket<*, Notification<UID, CONTENT>, Uuid> =
+    public val rest: ModelRestEndpointsAndUpdatesWebSocket<*, Notification<E, UID, CONTENT>, Uuid> =
         path.path("rest") include ModelRestEndpointsAndUpdatesWebSocket(info, webSocketKey)
 
     //_____Refreshing and sending notifications_____
@@ -197,7 +199,7 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
     private val sendLogger = KotlinLogging.logger("${logger.name}.send")
 
     context(runtime: ServerRuntime)
-    private suspend fun sendEmailNotifications(user: USER, notifications: List<Notification<UID, CONTENT>>) {
+    private suspend fun sendEmailNotifications(user: USER, notifications: List<Notification<E, UID, CONTENT>>) {
         if (email == null) {
             sendLogger.debug { "No EmailService settings provided, skipping emails" }
             return
@@ -212,7 +214,7 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
     }
 
     context(runtime: ServerRuntime)
-    private suspend fun sendSmsNotifications(user: USER, notifications: List<Notification<UID, CONTENT>>) {
+    private suspend fun sendSmsNotifications(user: USER, notifications: List<Notification<E, UID, CONTENT>>) {
         if (sms == null) {
             sendLogger.debug { "No SMS settings provided, skipping SMS" }
             return
@@ -229,7 +231,7 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
     }
 
     context(runtime: ServerRuntime)
-    private suspend fun sendPushNotifications(user: USER, notifications: List<Notification<UID, CONTENT>>) {
+    private suspend fun sendPushNotifications(user: USER, notifications: List<Notification<E, UID, CONTENT>>) {
         if (push == null) {
             sendLogger.debug { "No NotificationService settings provided, skipping push notifications" }
             return
@@ -275,9 +277,9 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
      * @property notifications The notifications to send
      */
     @Serializable
-    public data class NotificationPager<USER : HasId<UID>, UID : Comparable<UID>, CONTENT>(
+    public data class NotificationPager<E : EventTypeLike, USER : HasId<UID>, UID : Comparable<UID>, CONTENT>(
         val users: Map<UID, USER>,
-        val notifications: List<Notification<UID, CONTENT>>,
+        val notifications: List<Notification<E, UID, CONTENT>>,
     )
 
     /**
@@ -288,9 +290,10 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
      * If the task times out before all notifications are sent, it automatically relaunches
      * with the remaining notifications.
      */
-    public val sendNotifications: Task<NotificationPager<USER, UID, CONTENT>> =
+    public val sendNotifications: Task<NotificationPager<E, USER, UID, CONTENT>> =
         path.path("send-notifs") bind Task(
             NotificationPager.serializer(
+                eventSerializer,
                 users.serializer,
                 users.idSerializer,
                 contentSerializer
@@ -383,7 +386,7 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
      * @param notifications The notifications to send
      */
     context(_: ServerRuntime)
-    public suspend fun sendNotifications(notifications: List<Notification<UID, CONTENT>>) {
+    public suspend fun sendNotifications(notifications: List<Notification<E, UID, CONTENT>>) {
         val users = users.table()
             .getMany(notifications.map { it.user })
             .associateBy { it._id }

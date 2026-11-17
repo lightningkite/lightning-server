@@ -1,6 +1,7 @@
 // by Claude
 package com.lightningkite.lightningserver.notifications.subscriptions
 
+import com.lightningkite.lightningserver.notifications.events.EventType
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.notifications.*
 import com.lightningkite.lightningserver.notifications.events.Event
@@ -48,7 +49,7 @@ class NonCustomizableSubscriptionsTest {
             sms = Server.sms
         )
 
-        val handler = path include NotificationEndpoints(
+        val handler = path include NotificationEndpoints.WithStandardEventTypes(
             Server.userInfo,
             Dispatcher,
             NonCustomizableSubscriptions()

@@ -61,7 +61,7 @@ Format & send (email, SMS, push, in-app)
 
 ## Key Concepts
 
-- **Events are type-safe**: An `EventDefinition<T, ID>` names an event about subjects of type `T`, and an `Event<T, ID>`
+- **Events are type-safe**: An `EventDefinition<E, T, ID>` names an event (of event type `E`, `EventType` by default, or your own enum implementing `EventTypeLike`) about subjects of type `T`, and an `Event<E, T, ID>`
   carries the subject itself
 - **Subscriptions determine audience**: Three providers offer different customization levels
 - **Content is user-specific**: Generate per-user content with access to the subject entity

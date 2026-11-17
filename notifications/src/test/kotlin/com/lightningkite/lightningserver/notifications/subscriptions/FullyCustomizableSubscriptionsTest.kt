@@ -53,7 +53,7 @@ class FullyCustomizableSubscriptionsTest {
             suppressRejectedAuthenticationWarnings = true
         )
 
-        val handler = path include NotificationEndpoints(
+        val handler = path include NotificationEndpoints.WithStandardEventTypes(
             Server.userInfo,
             Dispatcher,
             subs,
@@ -108,7 +108,7 @@ class FullyCustomizableSubscriptionsTest {
                 val user = TestUser(name = "NewUser")
                 execute { Server.userInfo.table().insertOne(user) }
 
-                val eventType = Notifications.modelCreated.event.untyped
+                val eventType = Notifications.modelCreated.event.type
                 val subscriptionId = UserEventType(user._id, eventType.name)
                 val subscription = execute { Notifications.subs.info.table().get(subscriptionId) }
 
@@ -129,7 +129,7 @@ class FullyCustomizableSubscriptionsTest {
                 val user = TestUser(name = "ToBeDeleted")
                 execute { Server.userInfo.table().insertOne(user) }
 
-                val eventType = Notifications.modelCreated.event.untyped
+                val eventType = Notifications.modelCreated.event.type
                 val subscriptionId = UserEventType(user._id, eventType.name)
                 assertNotNull(execute { Notifications.subs.info.table().get(subscriptionId) })
 
@@ -271,7 +271,7 @@ class FullyCustomizableSubscriptionsTest {
                     Server.userInfo.table().insertOne(user2)
                 }
 
-                val eventType = Notifications.modelCreated.event.untyped
+                val eventType = Notifications.modelCreated.event.type
 
                 val sub1 = execute {
                     Notifications.subs.info.table()
@@ -304,7 +304,7 @@ class FullyCustomizableSubscriptionsTest {
                     Server.userInfo.table().insertOne(user2)
                 }
 
-                val eventType = Notifications.modelCreated.event.untyped
+                val eventType = Notifications.modelCreated.event.type
 
                 execute { Server.userInfo.table().deleteOneById(user1._id) }
 
@@ -337,7 +337,7 @@ class FullyCustomizableSubscriptionsTest {
                 execute { Server.userInfo.table().insertOne(user) }
 
                 val eventDef = Notifications.modelCreated.event
-                val subscriptionId = UserEventType(user._id, eventDef.untyped.name)
+                val subscriptionId = UserEventType(user._id, eventDef.type.name)
 
                 val existing = execute { Notifications.subs.info.table().get(subscriptionId) }
                 assertNotNull(existing)

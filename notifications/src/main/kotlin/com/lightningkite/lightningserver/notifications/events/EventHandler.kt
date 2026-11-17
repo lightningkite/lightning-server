@@ -18,9 +18,9 @@ import kotlin.time.Duration.Companion.minutes
  * Implementations define how events are processed, typically by determining
  * which users should be notified and generating notification content.
  */
-public interface EventHandler {
+public interface EventHandler<E : EventTypeLike> {
     context(runtime: ServerRuntime)
-    public suspend fun <T : HasId<ID>, ID : Comparable<ID>> handle(event: Event<T, ID>)
+    public suspend fun <T : HasId<ID>, ID : Comparable<ID>> handle(event: Event<E, T, ID>)
 }
 
 /**
@@ -65,8 +65,8 @@ public interface EventHandler {
  * @property name Convenience accessor for the event type name
  * @property task The task endpoint for asynchronous event processing
  */
-public class EventLauncher<H : EventHandler, T : HasId<ID>, ID : Comparable<ID>> internal constructor(
-    public val event: EventDefinition<T, ID>,
+public class EventLauncher<E : EventTypeLike, H : EventHandler<E>, T : HasId<ID>, ID : Comparable<ID>> internal constructor(
+    public val event: EventDefinition<E, T, ID>,
     public val handler: H,
     timeout: Duration = 5.minutes,
 ) : ServerBuilder() {
@@ -130,23 +130,38 @@ public class EventLauncher<H : EventHandler, T : HasId<ID>, ID : Comparable<ID>>
 @Suppress("DSL_MARKER_APPLIED_TO_WRONG_TARGET")
 @LightningServerDsl
 context(builder: ServerBuilder)
-public fun <HANDLER : EventHandler, T : HasId<ID>, ID : Comparable<ID>> HANDLER.event(
+public fun <HANDLER : EventHandler<EventType>, T : HasId<ID>, ID : Comparable<ID>> HANDLER.event(
     name: String,
     info: ModelInfo<*, T, ID>,
     tags: Set<String> = emptySet(),
     timeout: Duration = 5.minutes,
-    additionalSetup: HANDLER.(EventDefinition<T, ID>) -> Unit,
-): EventLauncher<HANDLER, T, ID> {
-    val type = EventDefinition(name, tags, info)
+    additionalSetup: HANDLER.(EventDefinition<EventType, T, ID>) -> Unit,
+): EventLauncher<EventType, HANDLER, T, ID> = event(EventType(EventType.Name(name), tags), info, timeout, additionalSetup)
 
-    builder.eventsRegistry.register(type)
+/**
+ * Same as the string overload, but with an application-defined event type such as an enum.
+ *
+ * @param type The event type value; its [EventTypeLike.eventName] must be unique
+ */
+@Suppress("DSL_MARKER_APPLIED_TO_WRONG_TARGET")
+@LightningServerDsl
+context(builder: ServerBuilder)
+public fun <E : EventTypeLike, HANDLER : EventHandler<E>, T : HasId<ID>, ID : Comparable<ID>> HANDLER.event(
+    type: E,
+    info: ModelInfo<*, T, ID>,
+    timeout: Duration = 5.minutes,
+    additionalSetup: HANDLER.(EventDefinition<E, T, ID>) -> Unit,
+): EventLauncher<E, HANDLER, T, ID> {
+    val definition = EventDefinition(type, info)
 
-    additionalSetup(type)
+    builder.eventsRegistry.register(definition)
 
-    val launcher = EventLauncher(type, this, timeout)
+    additionalSetup(definition)
+
+    val launcher = EventLauncher(definition, this, timeout)
 
     with(builder) {
-        path.path("events").path(type.name.raw.kabobCase()) include launcher
+        path.path("events").path(definition.name.raw.kabobCase()) include launcher
     }
 
     return launcher

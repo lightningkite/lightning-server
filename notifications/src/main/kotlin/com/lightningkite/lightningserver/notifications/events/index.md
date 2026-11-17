@@ -6,7 +6,7 @@ Server-side implementation for type-safe event handling in the notification syst
 
 ### Event.kt
 
-- **EventDefinition**: A type-safe event type, pairing an `EventType` with the model information for its subject
+- **EventDefinition**: A type-safe event definition, pairing an event type `E : EventTypeLike` (`EventType` by default) with the model information for its subject
 - **Event**: A type-safe event occurrence carrying the full subject entity, not just its ID. Converts to an untyped
   `EventData` for storage
 

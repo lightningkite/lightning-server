@@ -1,6 +1,7 @@
 // by Claude
 package com.lightningkite.lightningserver.notifications
 
+import com.lightningkite.lightningserver.notifications.events.EventType
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.require
 import com.lightningkite.lightningserver.definition.Runtime
@@ -75,19 +76,20 @@ class TestClock : Clock {
  * Creates a standard test dispatcher for String content type.
  */
 abstract class TestDispatcherBase(
-    info: ModelInfo<*, Notification<Uuid, String>, Uuid>,
+    info: ModelInfo<*, Notification<EventType, Uuid, String>, Uuid>,
     cache: Runtime<Cache>,
     database: Runtime<Database>,
     users: ModelInfo<*, TestUser, Uuid>,
     email: Runtime<EmailService>? = null,
     sms: Runtime<SMS>? = null,
-) : NotificationBulkDispatcher<TestUser, Uuid, String>(
+) : NotificationBulkDispatcher<EventType, TestUser, Uuid, String>(
     info = info,
     cache = cache,
     database = database,
     users = users,
     email = email,
     sms = sms,
+    eventSerializer = EventType.serializer(),
     contentSerializer = String.serializer()
 ) {
     context(server: ServerRuntime)
@@ -106,7 +108,7 @@ abstract class TestDispatcherBase(
     context(runtime: ServerRuntime)
     override suspend fun makeEmailNotifications(
         user: TestUser,
-        notifications: List<Notification<Uuid, String>>,
+        notifications: List<Notification<EventType, Uuid, String>>,
     ): List<Email> = notifications.map {
         Email(
             subject = it.content,
@@ -118,12 +120,12 @@ abstract class TestDispatcherBase(
     context(runtime: ServerRuntime)
     override suspend fun makeSmsNotifications(
         user: TestUser,
-        notifications: List<Notification<Uuid, String>>,
+        notifications: List<Notification<EventType, Uuid, String>>,
     ): List<String> = notifications.map { it.content }
 
     context(runtime: ServerRuntime)
     override suspend fun makePushNotifications(
         user: TestUser,
-        notifications: List<Notification<Uuid, String>>,
+        notifications: List<Notification<EventType, Uuid, String>>,
     ): List<NotificationData> = emptyList()
 }

@@ -127,7 +127,7 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
      * @property subscription Function that generates the default subscription for a user (or null to skip)
      */
     public data class DefaultSubscription<USER : HasId<UID>, UID : Comparable<UID>, T : HasId<*>>(
-        val eventType: EventDefinition<T, *>,
+        val eventType: EventDefinition<*, T, *>,
         val behavior: DefaultSubscriptionUpdateBehavior = DefaultSubscriptionUpdateBehavior.UpdateReadPermissions,
         val subscription: suspend context(ServerRuntime) (USER) -> FullEventSubscription<T>?,
     )
@@ -173,7 +173,7 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
      */
     @Suppress("UNCHECKED_CAST")
     public fun <T : HasId<*>> getDefaultSubscription(
-        type: EventDefinition<T, *>,
+        type: EventDefinition<*, T, *>,
     ): (suspend context(ServerRuntime) (USER) -> FullEventSubscription<T>?)? =
         defaultSubscriptions[type.name]?.let { (it as DefaultSubscription<USER, UID, T>).subscription }
 
@@ -189,7 +189,7 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
      * @param subscription Function that generates the subscription for a user
      */
     public fun <T : HasId<*>> setDefaultSubscription(
-        type: EventDefinition<T, *>,
+        type: EventDefinition<*, T, *>,
         behavior: DefaultSubscriptionUpdateBehavior = DefaultSubscriptionUpdateBehavior.UpdateReadPermissions,
         subscription: suspend context(ServerRuntime) (USER) -> FullEventSubscription<T>?,
     ) {
@@ -197,7 +197,7 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
     }
 
     context(runtime: ServerRuntime)
-    override suspend fun <T : HasId<ID>, ID : Comparable<ID>> subscribed(event: Event<T, ID>): List<ScheduledSendMethods<UID>> =
+    override suspend fun <T : HasId<ID>, ID : Comparable<ID>> subscribed(event: Event<*, T, ID>): List<ScheduledSendMethods<UID>> =
         info
             .table()
             .find(self._id.event eq event.type.name)
@@ -359,7 +359,7 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
     }
 
     context(_: ServerRuntime)
-    private suspend fun <T : HasId<*>, AUTH : HasId<*>?> EventDefinition<T, *>.readPermissions(
+    private suspend fun <T : HasId<*>, AUTH : HasId<*>?> EventDefinition<*, T, *>.readPermissions(
         auth: Authentication<AUTH & Any>?,
     ): Condition<T> =
         when (val result = info.auth.check(auth)) {
@@ -384,7 +384,7 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
         }
 
     context(server: ServerRuntime)
-    private suspend fun <T : HasId<*>, AUTH : HasId<*>?> EventDefinition<T, *>.serializedReadPermissions(
+    private suspend fun <T : HasId<*>, AUTH : HasId<*>?> EventDefinition<*, T, *>.serializedReadPermissions(
         auth: Authentication<AUTH & Any>?,
     ): String =
         server.internalSerialization.json.encodeToString(
@@ -442,8 +442,8 @@ public data class FullEventSubscription<T>(
  * @param behavior How to handle updates when user permissions change
  * @param subscription Function that generates the subscription for a user (or null to skip)
  */
-context(handler: NotificationEndpoints<USER, UID, *, *, FullyCustomizableSubscriptions<USER, UID>>)
-public fun <USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>> EventDefinition<T, ID>.defaultSubscription(
+context(handler: NotificationEndpoints<*, USER, UID, *, *, FullyCustomizableSubscriptions<USER, UID>>)
+public fun <USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>> EventDefinition<*, T, ID>.defaultSubscription(
     behavior: DefaultSubscriptionUpdateBehavior = DefaultSubscriptionUpdateBehavior.UpdateReadPermissions,
     subscription: suspend context(ServerRuntime) (USER) -> FullEventSubscription<T>?,
 ) {

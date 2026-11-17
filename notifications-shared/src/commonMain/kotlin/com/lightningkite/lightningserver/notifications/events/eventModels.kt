@@ -9,9 +9,22 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
- * Represents a type of event that can occur in the system.
+ * Anything that can serve as the type of a notification event, such as an application enum.
  *
- * Events are identified by a unique name and can have associated tags for categorization.
+ * [EventType] is the standard implementation.  The name is called [eventName] so that enums,
+ * which already have a `name: String`, can implement this.
+ *
+ * @property eventName The unique identifier for this event type; used in subscription keys and URLs
+ * @property tags Optional set of tags for categorizing or filtering events
+ */
+public interface EventTypeLike {
+    public val eventName: EventType.Name
+    public val tags: Set<String> get() = emptySet()
+}
+
+/**
+ * The standard [EventTypeLike]: a unique name with optional tags for categorization.
+ *
  * Equality is based solely on the name - two EventTypes with the same name are considered equal
  * even if their tags differ.
  *
@@ -21,8 +34,10 @@ import kotlin.uuid.Uuid
 @Queryable
 public data class EventType(
     val name: Name,
-    val tags: Set<String> = emptySet(),
-) {
+    override val tags: Set<String> = emptySet(),
+) : EventTypeLike {
+    override val eventName: Name get() = name
+
     @Queryable
     @JvmInline
     public value class Name(override val raw: String) : TypedId<String, Name> {
@@ -45,10 +60,10 @@ public data class EventType(
  * @property subject JSON-serialized ID of the subject entity this event relates to
  */
 @Queryable
-public data class EventData(
+public data class EventData<E : EventTypeLike>(
     override val _id: Uuid,
     val timestamp: Instant,
-    val type: EventType,
+    val type: E,
     val subject: IdJsonEncoded,
 ) : HasId<Uuid> {
     @Serializable

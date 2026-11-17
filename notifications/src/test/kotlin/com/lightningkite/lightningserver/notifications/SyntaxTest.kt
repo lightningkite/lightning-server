@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.notifications
 
+import com.lightningkite.lightningserver.notifications.events.EventType
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.require
 import com.lightningkite.lightningserver.definition.Runtime
@@ -71,13 +72,14 @@ class SyntaxTest {
     }
 
     private object Notifications : ServerBuilder() {
-        object Dispatcher : NotificationBulkDispatcher<User, Uuid, String>(
+        object Dispatcher : NotificationBulkDispatcher<EventType, User, Uuid, String>(
             info = Server.database.testModelInfo(),
             cache = Server.cache,
             database = Server.database,
             users = Server.userInfo,
             sms = Server.sms,
             email = Server.email,
+            eventSerializer = EventType.serializer(),
             contentSerializer = String.serializer(),
         ) {
             context(server: ServerRuntime)
@@ -93,7 +95,7 @@ class SyntaxTest {
             context(runtime: ServerRuntime)
             override suspend fun makeEmailNotifications(
                 user: User,
-                notifications: List<Notification<Uuid, String>>,
+                notifications: List<Notification<EventType, Uuid, String>>,
             ): List<Email> = notifications.map {
                 Email(
                     subject = it.content,
@@ -105,17 +107,17 @@ class SyntaxTest {
             context(runtime: ServerRuntime)
             override suspend fun makeSmsNotifications(
                 user: User,
-                notifications: List<Notification<Uuid, String>>,
+                notifications: List<Notification<EventType, Uuid, String>>,
             ): List<String> = notifications.map { it.content }
 
             context(runtime: ServerRuntime)
             override suspend fun makePushNotifications(
                 user: User,
-                notifications: List<Notification<Uuid, String>>,
+                notifications: List<Notification<EventType, Uuid, String>>,
             ): List<NotificationData> = emptyList()
         }
 
-        val handler = path include NotificationEndpoints(
+        val handler = path include NotificationEndpoints.WithStandardEventTypes(
             Server.userInfo,
             Dispatcher,
             FrequencyCustomizableSubscriptions(

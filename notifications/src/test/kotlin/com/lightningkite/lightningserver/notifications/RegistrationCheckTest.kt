@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.notifications
 
+import com.lightningkite.lightningserver.notifications.events.EventType
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.notifications.events.event
 import com.lightningkite.lightningserver.notifications.subscriptions.NonCustomizableSubscriptions
@@ -21,7 +22,7 @@ class RegistrationCheckTest {
         val userInfo = database.testModelInfo<TestUser, Uuid>()
         val modelInfo = database.testModelInfo<TestModel, Uuid>()
 
-        val handler = path.path("notifications") include NotificationEndpoints(
+        val handler = path.path("notifications") include NotificationEndpoints.WithStandardEventTypes(
             userInfo,
             object : TestDispatcherBase(
                 info = database.testModelInfo(),

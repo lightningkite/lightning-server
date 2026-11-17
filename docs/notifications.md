@@ -62,7 +62,7 @@ object Dispatcher : NotificationBulkDispatcher<User, Uuid, NotificationContent>(
 
 ```kotlin
 object Notifications : ServerBuilder() {
-    val handler = path include NotificationEndpoints(
+    val handler = path include NotificationEndpoints.WithStandardEventTypes(
         users = Server.userInfo,
         dispatcher = Dispatcher,
         subscriptions = FrequencyCustomizableSubscriptions(

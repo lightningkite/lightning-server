@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.notifications
 
 import com.lightningkite.lightningserver.notifications.events.EventData
+import com.lightningkite.lightningserver.notifications.events.EventTypeLike
 import com.lightningkite.services.data.*
 import com.lightningkite.services.database.HasId
 import kotlinx.datetime.*
@@ -164,6 +165,7 @@ public data class SendInfo(
  *
  * The database indexes on [user] and [sendAt] to efficiently query pending notifications.
  *
+ * @param E The event type; [com.lightningkite.lightningserver.notifications.events.EventType] unless the application supplies its own
  * @param UID The type of user identifier
  * @param CONTENT The type of notification content (application-specific)
  * @property _id Unique identifier for this notification
@@ -178,9 +180,9 @@ public data class SendInfo(
  * @property inApp In-app notification delivery info, or null if in-app is disabled
  */
 @Queryable
-public data class Notification<UID, CONTENT>(
+public data class Notification<E : EventTypeLike, UID, CONTENT>(
     override val _id: Uuid = Uuid.random(),
-    val event: EventData,
+    val event: EventData<E>,
     @Index val user: UID,
     val content: CONTENT,
     val createdAt: Instant,

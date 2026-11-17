@@ -1,6 +1,7 @@
 // by Claude
 package com.lightningkite.lightningserver.notifications
 
+import com.lightningkite.lightningserver.notifications.events.EventType
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.notifications.events.UserEventType
 import com.lightningkite.lightningserver.notifications.events.event
@@ -52,7 +53,7 @@ class NotificationFlowTest {
             sms = NonCustomServer.sms
         )
 
-        val handler = path include NotificationEndpoints(
+        val handler = path include NotificationEndpoints.WithStandardEventTypes(
             NonCustomServer.userInfo,
             Dispatcher,
             NonCustomizableSubscriptions()
@@ -140,7 +141,7 @@ class NotificationFlowTest {
             info = FreqCustomServer.database.testModelInfo()
         )
 
-        val handler = path include NotificationEndpoints(
+        val handler = path include NotificationEndpoints.WithStandardEventTypes(
             FreqCustomServer.userInfo,
             Dispatcher,
             subs
@@ -262,7 +263,7 @@ class NotificationFlowTest {
             suppressRejectedAuthenticationWarnings = true
         )
 
-        val handler = path include NotificationEndpoints(
+        val handler = path include NotificationEndpoints.WithStandardEventTypes(
             FullCustomServer.userInfo,
             Dispatcher,
             subs,
@@ -391,7 +392,7 @@ class NotificationFlowTest {
             sms = TimeTravelServer.sms
         )
 
-        val handler = path include NotificationEndpoints(
+        val handler = path include NotificationEndpoints.WithStandardEventTypes(
             TimeTravelServer.userInfo,
             Dispatcher,
             NonCustomizableSubscriptions()

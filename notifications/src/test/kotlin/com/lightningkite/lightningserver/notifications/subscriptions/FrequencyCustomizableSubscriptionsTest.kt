@@ -51,7 +51,7 @@ class FrequencyCustomizableSubscriptionsTest {
             info = Server.database.testModelInfo()
         )
 
-        val handler = path include NotificationEndpoints(
+        val handler = path include NotificationEndpoints.WithStandardEventTypes(
             Server.userInfo,
             Dispatcher,
             subs
