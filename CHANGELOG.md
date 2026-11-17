@@ -16,6 +16,8 @@ Each release groups entries under:
 
 ### API
 
+- Added a `schedules` parameter to `KtorEngine.start` (default `true`) and `KtorEngine.runWithoutHttp()`, which runs startup and scheduled tasks without serving HTTP. Together they split a deployment into request instances and one background instance.
+- Added `LocalEngine.onShutdown(action)`. Graceful shutdown runs the actions before disconnecting services, alongside in-flight schedule ticks and within the same drain timeout, so background work the engine doesn't manage can unwind while its services are still connected.
 - Added `BuildCheck` and `ServerBuilder.buildCheck { }`: a check that runs once the whole server is built and receives the root `ServerDefinition`, even when registered in a module. Modules' checks run first. It has no runtime and is not kept on the definition. Throw from it to fail the build.
 - **Behavior:** the notification registration checks (every event has content and subscriptions) are now build checks, so a missing registration fails `build()` instead of server startup. The `/verify` startup tasks they replaced are gone.
 - **Breaking:** removed `PathSpec0.include(ServerDefinition)`, the SDK's `PathSpec0.module(SdkModule<ServerDefinition>)` and `ServerDefinition.withSdkInfo`. Include the `ServerBuilder` instead.
