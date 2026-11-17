@@ -333,23 +333,28 @@ public class KtorEngine(
      * This method:
      * 1. Ensures settings are ready and validated
      * 2. Runs any startup tasks defined in the server
-     * 3. Starts the schedule coordinator
+     * 3. Starts the schedule coordinator, unless [schedules] is `false`
      * 4. Starts the HTTP server and blocks until shutdown
      *
      * @param TEngine The type of Ktor engine
      * @param TConfiguration The type of engine configuration
      * @param factory The Ktor engine factory (e.g., Netty, CIO, Jetty)
+     * @param schedules Whether this instance runs scheduled tasks. Pass `false` when a separate instance
+     *   started with [runWithoutHttp] runs them.
      *
      * Example:
      * ```kotlin
      * engine.start(Netty)
      * ```
      */
-    public fun <TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.Configuration> start(factory: ApplicationEngineFactory<TEngine, TConfiguration>) {
+    public fun <TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.Configuration> start(
+        factory: ApplicationEngineFactory<TEngine, TConfiguration>,
+        schedules: Boolean = true,
+    ) {
         this.settings.ready()
         runBlocking { runStartupTasks() }
         val reliability = ktorRunConfig().reliability
-        startSchedules(reliability.scheduleLockTtl)
+        if (schedules) startSchedules(reliability.scheduleLockTtl)
         val drainMillis = reliability.shutdownDrainTimeout.inWholeMilliseconds
         val server = embeddedServer(
             factory = factory,
@@ -366,6 +371,21 @@ public class KtorEngine(
             }
         }
         server.start(wait = true)
+    }
+
+    /**
+     * Runs the startup tasks and the scheduled tasks without serving HTTP, and blocks until shutdown.
+     *
+     * For a background instance next to request instances started with `start(factory, schedules = false)`.
+     * Shutdown cancels the schedules and disconnects services, as it does for [start].
+     */
+    public fun runWithoutHttp() {
+        this.settings.ready()
+        runBlocking { runStartupTasks() }
+        val reliability = ktorRunConfig().reliability
+        startSchedules(reliability.scheduleLockTtl)
+        registerShutdownHook { gracefulShutdown(reliability.shutdownDrainTimeout) {} }
+        runBlocking { awaitCancellation() }
     }
 
 }

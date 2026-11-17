@@ -25,6 +25,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.datetime.*
 import java.net.NetworkInterface
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
@@ -143,6 +144,19 @@ public abstract class LocalEngine(server: ServerDefinition) : EngineBase(server)
 
     /** Guards [gracefulShutdown] so it runs at most once even if invoked from both a hook and an engine stop. */
     private val shutdownStarted = AtomicBoolean(false)
+
+    private val shutdownActions = CopyOnWriteArrayList<suspend () -> Unit>()
+
+    /**
+     * Registers [action] to run when this engine shuts down gracefully, before it disconnects services.
+     *
+     * Use it to stop background work the engine doesn't know about, such as a job queue's polling loop, so the
+     * work can unwind while the services it uses are still connected. Actions run concurrently with in-flight
+     * schedule ticks and share their drain timeout; an action still running after it is abandoned.
+     */
+    public fun onShutdown(action: suspend () -> Unit) {
+        shutdownActions.add(action)
+    }
 
     /**
      * Gets a PubSub channel for a WebSocket subscription message.
@@ -314,11 +328,12 @@ public abstract class LocalEngine(server: ServerDefinition) : EngineBase(server)
      *    [EngineReliabilitySettings.shutdownDrainTimeout]) for in-flight requests to finish. Each
      *    engine supplies its own drain because the mechanism is engine-specific (Netty event-loop
      *    shutdown, JDK `HttpServer.stop`, Ktor `ApplicationEngine.stop`).
-     * 3. Drains [cleanupScope] — the socket disconnects this shutdown just raised — so they complete
+     * 3. Runs the [onShutdown] actions while in-flight schedule ticks unwind.
+     * 4. Drains [cleanupScope] — the socket disconnects this shutdown just raised — so they complete
      *    while the services they depend on are still connected.
-     * 4. Disconnects every service goal (mirrors the AWS adapter's connect/disconnect loop) so
+     * 5. Disconnects every service goal (mirrors the AWS adapter's connect/disconnect loop) so
      *    pooled connections are released cleanly.
-     * 5. Cancels the engine [scope], then [cleanupScope].
+     * 6. Cancels the engine [scope], then [cleanupScope].
      *
      * Idempotent: only the first invocation runs; subsequent calls return immediately.
      *
@@ -345,7 +360,19 @@ public abstract class LocalEngine(server: ServerDefinition) : EngineBase(server)
             // Give in-flight schedule ticks a bounded chance to unwind and release their locks WHILE the
             // services they depend on are still connected. A tick longer than the window is abandoned — a
             // bounded shutdown grace period cannot guarantee completion of arbitrarily long tasks.
-            withTimeoutOrNull(drainTimeout) { cancelledScheduleJobs.joinAll() }
+            withTimeoutOrNull(drainTimeout) {
+                for (action in shutdownActions) {
+                    launch {
+                        try {
+                            action()
+                        } catch (e: Exception) {
+                            if (e is CancellationException) throw e
+                            logger.warn(e) { "Error in a shutdown action." }
+                        }
+                    }
+                }
+                cancelledScheduleJobs.joinAll()
+            }
             // Socket disconnects raised by this shutdown run in cleanupScope. Let them finish here,
             // while the services they write to are still connected. Bounded by the same drain window:
             // a handler that outlasts it is abandoned, same as an over-long schedule tick.
