@@ -65,6 +65,21 @@ class SignerTest {
 
         assertTrue(signature.isNotEmpty())
         assertTrue(signer.verifyBlocking(data, signature))
+        assertFalse(signer.verifyBlocking("Other data".encodeToByteArray(), signature))
+    }
+
+    @Test
+    fun `suspend and blocking overloads verify each other's signatures`() = runBlocking {
+        val key = CryptographyProvider.Default.get(HMAC).keyGenerator(SHA256).generateKey()
+        val signer = Signer.HMAC(key, "HS256")
+
+        val data = "Interop bytes".encodeToByteArray()
+        assertTrue(signer.verifyBlocking(data, signer.sign(data)))
+        assertTrue(signer.verify(data, signer.signBlocking(data)))
+
+        val message = "Interop string"
+        assertTrue(signer.verifyBlocking(message, signer.sign(message)))
+        assertTrue(signer.verify(message, signer.signBlocking(message)))
     }
 
     @Test
