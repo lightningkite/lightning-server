@@ -130,9 +130,10 @@ instance in place.
   script changes (its content hash drives the Image Builder component version) or when
   `baseImageSalt` is bumped. The base AMI is pinned, so a new release never forces a re-bake on its
   own; only a `baseImageSalt` bump (or a `distro` change) moves the base to the latest release.
-- **Health check = liveness, autodetected:** the ALB target health check defaults to the server's
+- **Health check = liveness:** the ALB target health check defaults to the
   `/meta/online` liveness endpoint, not the deep `/meta/health`, so a slow downstream service can't 
-   make the ALB drain the whole fleet. Override `healthCheckPath` if needed.
+   make the ALB drain the whole fleet. The path is not detected from the server: override
+   `healthCheckPath` if your liveness endpoint lives elsewhere.
 - **Rolling, validated deploys:** on a JAR/settings change, `redeploy-fleet.sh` updates the fleet
   in batches of `redeployBatchSize` (default 1). It suspends the ASG processes that would fight it
   (`HealthCheck`/`ReplaceUnhealthy` so it can't kill a drained instance, plus
@@ -192,7 +193,7 @@ object MyScaledDeployment : TerraformAwsScalingEc2Builder<Server>(Server) {
     override val minSize = 2
     override val maxSize = 8
     override val desiredCapacity = 2
-    // healthCheckPath autodetects /meta/online; override only if your liveness path differs.
+    // healthCheckPath defaults to /meta/online; override it if your liveness path differs.
     override val scalingRequestsPerTarget = 400   // optional: scale on requests/instance too
 
     override fun Server.settings() {

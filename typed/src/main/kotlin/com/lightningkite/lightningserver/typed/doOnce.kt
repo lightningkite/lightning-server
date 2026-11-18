@@ -7,7 +7,6 @@ import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.database.*
 import com.lightningkite.services.database.optics.*
-import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
@@ -22,6 +21,12 @@ public data class ActionHasOccurred(
 
 private val actionHasOccurredTable = DatabaseTableDefinition<ActionHasOccurred>()
 
+/**
+ * Runs [action] unless it has already completed under [key], recording completion in [database].
+ *
+ * If [action] throws, the error is recorded, the key is released so a later call retries, and the
+ * exception propagates, so a failed [startupOnce] fails startup and a failed [predeployOnce] fails the deploy.
+ * */
 context(runtime: ServerRuntime)
 public suspend fun doOnce(
     key: String,
@@ -54,8 +59,6 @@ public suspend fun doOnce(
             }
         )
     } catch (e: Exception) {
-        KotlinLogging.logger("com.lightningkite.lightningserver.typed.doOnce")
-            .error(e) { "doOnce($key) failed to complete" }
         table.updateOneById(
             key,
             Modification {
@@ -63,6 +66,7 @@ public suspend fun doOnce(
                 (it.started assign null)
             }
         )
+        throw e
     }
 }
 
@@ -99,7 +103,7 @@ public fun startupOnce(
     }
 
 /**
- * Creates a [StartupTask] that calls [doOnce] with its bound path as its key.
+ * Creates a [PreDeployTask] that calls [doOnce] with its bound path as its key.
  * */
 public fun predeployOnce(
     database: Runtime<Database>,

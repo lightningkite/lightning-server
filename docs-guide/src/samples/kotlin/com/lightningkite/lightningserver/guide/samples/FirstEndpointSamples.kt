@@ -60,7 +60,7 @@ data class EchoResponse(val echo: String, val length: Int)
 object EchoServer : ServerBuilder() {
     init { registerBasicMediaTypeCoders() }
 
-    // POST /echo — accepts typed JSON, returns typed JSON
+    // POST /echo
     val echo = path.path("echo").post bind ApiHttpHandler(
         summary = "Echo a message",
         description = "Returns the message back with its character count.",
@@ -77,8 +77,6 @@ object EchoServer : ServerBuilder() {
 
 // region echo-server-test
 fun echoServerTest() = EchoServer.testBlocking(settings = {}) {
-    // ApiHttpHandler.test() accepts null auth for noAuth endpoints and
-    // returns the typed output directly — no JSON manipulation needed.
     val result = EchoServer.echo.test(null, EchoRequest("ping"))
     check(result.echo == "ping")
     check(result.length == 4)

@@ -490,7 +490,8 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
                             Condition.Or(
                                 self.email.notNull.shouldBeSentNow(lastRun, now),
                                 self.sms.notNull.shouldBeSentNow(lastRun, now),
-                                self.push.notNull.shouldBeSentNow(lastRun, now)
+                                self.push.notNull.shouldBeSentNow(lastRun, now),
+                                self.inApp.notNull.shouldBeSentNow(lastRun, now),
                             )
                         ),
                         orderBy = sort(self) {

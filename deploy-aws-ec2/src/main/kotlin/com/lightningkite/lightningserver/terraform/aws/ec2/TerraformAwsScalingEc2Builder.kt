@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.terraform.aws.ec2
 
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.engine.local.engineCache
 import com.lightningkite.services.Untested
 import com.lightningkite.services.terraform.*
 import com.lightningkite.services.terraform.TerraformJsonObject.Companion.expression
@@ -210,19 +211,15 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
     }
 
     override fun validateConfiguration() {
-        // The fleet relies on the shared cache to ensure scheduled tasks run once across all
+        // The fleet relies on the engine cache's locks to ensure scheduled tasks run once across all
         // instances. A per-instance RAM cache would run every schedule on every instance.
-        val cacheJson = settings["cache"]
-        val url = when (cacheJson) {
-            is JsonPrimitive -> cacheJson.contentOrNull
-            is JsonObject -> (cacheJson["url"] as? JsonPrimitive)?.contentOrNull
-            else -> null
-        }?.trim()?.lowercase()
-        if (url != null && (url.isEmpty() || url == "ram" || url.startsWith("ram://"))) {
+        val url = Json.decodeFromJsonElement(engineCache.serializer, settings.getValue(engineCache.name)).url
+        val scheme = url.substringBefore("://")
+        if (scheme == "ram" || scheme == "ram-unsafe") {
             throw IllegalStateException(
-                "TerraformAwsScalingEc2Builder requires a distributed cache (e.g. redis://, " +
+                "TerraformAwsScalingEc2Builder requires a distributed cache in `${engineCache.name}` (e.g. redis://, " +
                         "memcached://, dynamodb://) so scheduled tasks coordinate across the fleet, " +
-                        "but the configured cache is '$url'. A per-instance RAM cache would run every " +
+                        "but it is '$url'. A per-instance RAM cache would run every " +
                         "scheduled task on every instance."
             )
         }

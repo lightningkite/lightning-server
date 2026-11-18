@@ -49,7 +49,8 @@ class SignerTest {
         val signature = signer.sign(message)
 
         assertTrue(signature.isNotEmpty())
-        // Verify returns true when the bytes match (signature is base64 encoded)
+        assertTrue(signer.verify(message, signature))
+        assertFalse(signer.verify("Other message", signature))
     }
 
     @Test
@@ -77,6 +78,8 @@ class SignerTest {
         val signature = signer.signBlocking(message)
 
         assertTrue(signature.isNotEmpty())
+        assertTrue(signer.verifyBlocking(message, signature))
+        assertFalse(signer.verifyBlocking("Other message", signature))
     }
 
     // ========== ECDSA Signer Tests ==========

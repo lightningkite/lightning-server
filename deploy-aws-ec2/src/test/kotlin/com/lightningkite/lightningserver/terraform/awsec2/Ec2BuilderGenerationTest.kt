@@ -46,12 +46,11 @@ class Ec2BuilderGenerationTest {
     private val tmpRoot = File("build/test-terraform")
 
     /** Fulfills the non-optional global settings so [prepareForWrite] passes without real services. */
-    private fun TerraformAwsEc2BuilderBase<*>.fulfillGlobals(cacheUrl: String? = "redis://cache:6379") {
+    private fun TerraformAwsEc2BuilderBase<*>.fulfillGlobals(engineCacheUrl: String = "ram") {
         fulfillSetting(secretBasis.name, Json.encodeToJsonElement(secretBasis.serializer, secretBasis.default))
         fulfillSetting(loggingSettings.name, Json.encodeToJsonElement(loggingSettings.serializer, loggingSettings.default))
         fulfillSetting(telemetrySettings.name, JsonNull)
-        if (cacheUrl != null) fulfillSetting("cache", JsonPrimitive(cacheUrl))
-        fulfillSetting(engineCache.name, Json.encodeToJsonElement(Cache.Settings()))
+        fulfillSetting(engineCache.name, Json.encodeToJsonElement(Cache.Settings(engineCacheUrl)))
         fulfillSetting(enginePubSub.name, Json.encodeToJsonElement(PubSub.Settings()))
     }
 
@@ -67,11 +66,11 @@ class Ec2BuilderGenerationTest {
         override val instanceArchitecture = CPUArchitecture.Arm
         override val applicationVpc = AwsVpc.Default
         override val terraformRoot = File(tmpRoot, "single")
-        override fun TestServer.settings() = fulfillGlobals(cacheUrl = null)
+        override fun TestServer.settings() = fulfillGlobals()
     }
 
     inner class ScalingDeployment(
-        private val cacheUrl: String? = "redis://cache:6379",
+        private val engineCacheUrl: String = "redis://cache:6379",
     ) : TerraformAwsScalingEc2Builder<TestServer>(TestServer) {
         override val storageBucket = "test-tf-state"
         override val region: Region = Region.US_WEST_2
@@ -88,7 +87,7 @@ class Ec2BuilderGenerationTest {
             natGateway = AwsVpc.NatGateway.Single,
         )
         override val terraformRoot = File(tmpRoot, "scaling")
-        override fun TestServer.settings() = fulfillGlobals(cacheUrl)
+        override fun TestServer.settings() = fulfillGlobals(engineCacheUrl)
     }
 
     inner class OnlineScalingDeployment : TerraformAwsScalingEc2Builder<OnlineServer>(OnlineServer) {
@@ -109,7 +108,7 @@ class Ec2BuilderGenerationTest {
         override val scalingRequestsPerTarget = 300
         override val maxInstanceLifetimeSeconds = 604800
         override val terraformRoot = File(tmpRoot, "online")
-        override fun OnlineServer.settings() = fulfillGlobals()
+        override fun OnlineServer.settings() = fulfillGlobals("redis://cache:6379")
     }
 
     inner class SwapSingleDeployment : TerraformAwsSingleEc2Builder<TestServer>(TestServer) {
@@ -126,7 +125,7 @@ class Ec2BuilderGenerationTest {
         override val swapSize: DataSize? = 2.gibibytes
         override val swapSwappiness = 30
         override val terraformRoot = File(tmpRoot, "swap-single")
-        override fun TestServer.settings() = fulfillGlobals(cacheUrl = null)
+        override fun TestServer.settings() = fulfillGlobals()
     }
 
     inner class SwapScalingDeployment : TerraformAwsScalingEc2Builder<TestServer>(TestServer) {
@@ -270,7 +269,7 @@ class Ec2BuilderGenerationTest {
     @Test
     fun scalingRejectsRamCache() {
         val ex = assertFailsWith<IllegalStateException> {
-            ScalingDeployment(cacheUrl = "ram").write()
+            ScalingDeployment(engineCacheUrl = "ram").write()
         }
         assertTrue(ex.message!!.contains("distributed cache"), "Unexpected message: ${ex.message}")
     }
@@ -367,7 +366,7 @@ class Ec2BuilderGenerationTest {
                 override val volumeSizeGiB = 8
                 override val swapSize: DataSize? = 16.gibibytes
                 override val terraformRoot = File(tmpRoot, "swap-too-big")
-                override fun TestServer.settings() = fulfillGlobals(cacheUrl = null)
+                override fun TestServer.settings() = fulfillGlobals()
             }.write()
         }
         assertContains(ex.message!!, "does not fit")
@@ -394,7 +393,7 @@ class Ec2BuilderGenerationTest {
         override val instanceArchitecture = CPUArchitecture.Arm
         override val applicationVpc = AwsVpc.Default
         override val terraformRoot = File(tmpRoot, "configured-$name")
-        override fun TestServer.settings() = fulfillGlobals(cacheUrl = null)
+        override fun TestServer.settings() = fulfillGlobals()
 
         init {
             configFiles.forEach { (fileName, content) -> instanceFilesRaw[fileName to FileType.Config] = content }
@@ -578,7 +577,7 @@ class Ec2BuilderGenerationTest {
         override val instanceArchitecture = CPUArchitecture.Arm
         override val applicationVpc = AwsVpc.Default
         override val terraformRoot = File(tmpRoot, "distro-$name")
-        override fun TestServer.settings() = fulfillGlobals(cacheUrl = null)
+        override fun TestServer.settings() = fulfillGlobals()
     }
 
     inner class AmazonLinuxScalingDeployment : TerraformAwsScalingEc2Builder<TestServer>(TestServer) {

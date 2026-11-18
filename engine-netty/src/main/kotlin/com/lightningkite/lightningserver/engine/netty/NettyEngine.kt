@@ -43,11 +43,13 @@ import io.netty.handler.timeout.IdleStateEvent
 import io.netty.handler.timeout.IdleStateHandler
 import io.netty.util.AttributeKey
 import io.netty.util.concurrent.GlobalEventExecutor
+import io.netty.util.concurrent.ScheduledFuture
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.serialization.KSerializer
 import java.net.InetSocketAddress
 import java.net.URI
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Clock
 import com.lightningkite.lightningserver.http.HttpHeaders as LsHttpHeaders
@@ -343,6 +345,37 @@ public class NettyEngine(
     }
 
     private inner class NettyServerHandler(val cfg: NettyRuntimeSettings) : SimpleChannelInboundHandler<Any>() {
+        // Touched only on the channel's event loop, as are the reads and the scheduled tasks below.
+        private var nextPing: ScheduledFuture<*>? = null
+        private var pongDeadline: ScheduledFuture<*>? = null
+
+        /**
+         * Pings as Ktor's pinger does: one ping at a time, [WebSocketSettings.ping] after the last pong,
+         * and the socket is closed if that ping is not both sent and answered within
+         * [WebSocketSettings.pongTimeout].  The deadline starts before the write, so a peer that has
+         * stopped reading (and so never lets the ping out) is caught too.
+         */
+        private fun schedulePing(ctx: ChannelHandlerContext) {
+            val settings = webSocketSettings()
+            val period = settings.ping ?: return
+            nextPing = ctx.executor().schedule({
+                pongDeadline = ctx.executor().schedule(
+                    { closeForPingTimeout(ctx) },
+                    settings.pongTimeout.inWholeMilliseconds,
+                    TimeUnit.MILLISECONDS,
+                )
+                ctx.writeAndFlush(PingWebSocketFrame())
+            }, period.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+        }
+
+        private fun closeForPingTimeout(ctx: ChannelHandlerContext) {
+            val reason = WebSocketClose(WebSocketClose.Code.INTERNAL_ERROR, "Ping timeout")
+            emitDisconnect(ctx.channel(), reason)
+            // Closed without waiting for the close frame to go out: a peer that stopped reading never lets it.
+            ctx.writeAndFlush(reason.adapt())
+            ctx.close()
+        }
+
         override fun channelRead0(ctx: ChannelHandlerContext, msg: Any) {
             when (msg) {
                 is FullHttpRequest -> {
@@ -453,7 +486,11 @@ public class NettyEngine(
                 }
 
                 is PingWebSocketFrame -> ctx.writeAndFlush(PongWebSocketFrame(msg.content().retain()))
-                is PongWebSocketFrame -> { /* ignore */
+                is PongWebSocketFrame -> {
+                    val deadline = pongDeadline ?: return // unsolicited
+                    deadline.cancel(false)
+                    pongDeadline = null
+                    schedulePing(ctx)
                 }
 
                 else -> { /* ignore */
@@ -542,6 +579,7 @@ public class NettyEngine(
 
                 // Complete handshake and then run direct handler
                 handshaker.handshake(ctx.channel(), req).addListener {
+                    if (it.isSuccess) schedulePing(ctx)
                     scope.launch {
                         try {
                             directHandler.handleDirectAsRoot(
@@ -628,6 +666,7 @@ public class NettyEngine(
                 ctx.channel().attr(HANDLER_KEY).set(socketHandler)
 
                 handshaker.handshake(ctx.channel(), req).addListener {
+                    if (it.isSuccess) schedulePing(ctx)
                     scope.launch {
                         try {
                             socketHandler.didConnectAsRoot(mid)
@@ -648,6 +687,8 @@ public class NettyEngine(
         }
 
         override fun channelInactive(ctx: ChannelHandlerContext) {
+            nextPing?.cancel(false)
+            pongDeadline?.cancel(false)
             val directChannel = ctx.channel().attr(DIRECT_CHANNEL_KEY).get()
             if (directChannel != null) {
                 // Direct mode - close the channel
@@ -692,7 +733,7 @@ public class NettyEngine(
             val hostHeader = this.headers()[HOST] ?: ""
             val domain = hostHeader.substringBefore(":")
             val sourceIp = cfg.realIpHeader?.let { header ->
-                this.headers()[header].also { realIp ->
+                proxiedSourceIp(this.headers().getAll(header)).also { realIp ->
                     if (realIp == null)
                         logger.warn { "Real IP address header for proxy '$header' was missing from request [${identity.requestId}}]." }
                 }
@@ -725,7 +766,7 @@ public class NettyEngine(
                 logger.warn { "Request ID header for proxy '${cfg.requestIdHeader}' was missing from the request." }
             }
             val sourceIp = cfg.realIpHeader?.let { header ->
-                this.headers()[header].also { realIp ->
+                proxiedSourceIp(this.headers().getAll(header)).also { realIp ->
                     if (realIp == null)
                         logger.warn { "Real IP address header for proxy '$header' was missing from request [${identity.requestId}}]" }
                 }

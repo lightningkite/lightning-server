@@ -21,10 +21,12 @@ public value class LongBits(public val long: Long) : Iterable<Int> {
     /**
      * Creates a LongBits from an iterable of indices.
      *
-     * @param iterable Indices to set (0-63). Values outside this range are ignored.
+     * @param iterable Indices to set (0-63).
+     * @throws IllegalArgumentException if an index is outside 0-63
      */
     public constructor(iterable: Iterable<Int>) : this(
         iterable.fold(0x0L) { acc, index ->
+            require(index in 0..<Long.SIZE_BITS) { "LongBits holds indices 0-63, got $index" }
             acc or (1L shl index)
         }
     )
@@ -44,6 +46,8 @@ public value class LongBits(public val long: Long) : Iterable<Int> {
      * @return The index of the lowest set bit >= index, or -1 if none found
      */
     public fun lowestIncluding(index: Int): Int {
+        // Shifts take their count mod 64, so `ushr 64` would be `ushr 0`.
+        if (index >= Long.SIZE_BITS) return -1
         var result = index
         var current = long ushr index
         while (current != 0L) {
@@ -78,14 +82,12 @@ public value class LongBits(public val long: Long) : Iterable<Int> {
 
             override fun next(): Int {
                 while (num != 0L) {
-                    if (num % 2L == 1L) {
-                        num = num shr 1
-                        return index++
-                    }
-                    num = num shr 1
+                    val on = num and 1L != 0L
+                    num = num ushr 1
                     index++
+                    if (on) return index - 1
                 }
-                return -1
+                throw NoSuchElementException()
             }
         }
     }
@@ -93,10 +95,11 @@ public value class LongBits(public val long: Long) : Iterable<Int> {
     /**
      * Checks if the given index's bit is set.
      *
-     * @param index The bit index to check (0-63)
-     * @return true if the bit is set, false otherwise
+     * @param index The bit index to check
+     * @return true if the bit is set; false for any index outside 0-63
      */
-    public operator fun contains(index: Int): Boolean = (long and (1L shl index)) != 0L
+    public operator fun contains(index: Int): Boolean =
+        index in 0..<Long.SIZE_BITS && (long and (1L shl index)) != 0L
 
     /**
      * Returns a compact string representation using ranges where possible.
@@ -110,7 +113,8 @@ public value class LongBits(public val long: Long) : Iterable<Int> {
         var wasOn = false
         var start = -1
         var needsComma = false
-        for (i in 0..<64) {
+        // Runs to 64 (never set) so a run ending at bit 63 is closed and written.
+        for (i in 0..64) {
             val on = contains(i)
             if (on && !wasOn) {
                 start = i

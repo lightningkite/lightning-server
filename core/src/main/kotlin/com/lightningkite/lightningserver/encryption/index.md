@@ -127,6 +127,6 @@ val isValid = password.checkAgainstHash(stored.passwordHash)
 
 ## See Also
 
-- [Full Encryption Documentation](../../../../../../../../docs/encryption.md)
-- [Authentication Documentation](../../../../../../../../docs/authentication.md)
-- [Settings Documentation](../../../../../../../../docs/settings.md)
+- [Full Encryption Documentation](https://github.com/lightningkite/lightning-server/blob/master/docs-guide/guide/encryption.md)
+- [Authentication Documentation](https://github.com/lightningkite/lightning-server/blob/master/docs-guide/guide/auth.md)
+- [Settings Documentation](https://github.com/lightningkite/lightning-server/blob/master/docs-guide/guide/settings.md)

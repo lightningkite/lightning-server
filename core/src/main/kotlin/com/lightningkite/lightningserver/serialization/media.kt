@@ -201,7 +201,7 @@ public fun <T> HttpRequest<*>.queryParameters(serializer: KSerializer<T>): T {
     try {
         @Suppress("UNCHECKED_CAST")
         if (serializer == Unit.serializer()) return Unit as T
-        return server.internalSerialization.formDataFormat.decodeFromMap(
+        return server.externalSerialization.formDataFormat.decodeFromMap(
             serializer,
             queryParameters.groupBy { it.first }.mapValues { it.value.joinToString(",") { it.second } }
         )

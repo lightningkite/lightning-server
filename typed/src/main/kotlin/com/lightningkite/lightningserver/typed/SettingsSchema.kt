@@ -2,6 +2,9 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.runtime.Engine
+import com.lightningkite.lightningserver.settings.ServerSettings
+import com.lightningkite.lightningserver.typed.sdk.SDK
 import com.lightningkite.lightningserver.typed.jsonschema.JsonSchemaType
 import com.lightningkite.lightningserver.typed.jsonschema.schema
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -19,11 +22,24 @@ import kotlinx.serialization.modules.SerializersModule
 
 private val logger = KotlinLogging.logger("com.lightningkite.lightningserver.typed.SettingsSchema")
 
+@Deprecated(
+    "Covers only this builder's settings plus the framework's, not the engine's own (engine-cache, ktorRunConfig, ...), " +
+        "which additionalProperties: false then flags.  Use the settings of the engine that loads the file.",
+    ReplaceWith("KtorEngine(build()).settings.settingsSchemaJson(module)", "com.lightningkite.lightningserver.engine.ktor.KtorEngine"),
+)
+public fun ServerBuilder.settingsSchemaJson(module: SerializersModule): JsonObject =
+    SDK.withDefaultRuntime(this) { contextOf<Engine>().settings.settingsSchemaJson(module) }
+
 /**
- * Generates a JSON Schema (draft 2019-09) describing a server's `settings.json` file.
+ * Generates a JSON Schema (draft 2019-09) describing the `settings.json` file that [com.lightningkite.lightningserver.settings.loadFromFile] reads for these
+ * settings.
  *
  * Editors and CI can use the schema to validate `settings.json`, catching typo'd keys that the loader's
  * `ignoreUnknownKeys = true` would otherwise silently swallow.
+ *
+ * Call it on the settings of the engine that will load the file (`KtorEngine(built).settings`), since each engine adds
+ * its own keys (`secretBasis`, `general`, `engine-cache`, ...).  Settings redirected with `bind` are left out, as the
+ * loader leaves them out of the file.
  *
  * The root object is hand-built: it has one property per [ServerSetting.name], marks non-optional settings as
  * `required`, sets `additionalProperties: false` so unexpected keys are flagged, and permits the optional `defaults`
@@ -36,13 +52,13 @@ private val logger = KotlinLogging.logger("com.lightningkite.lightningserver.typ
  *               to resolve contextual serializers in setting types.
  * @return The full JSON Schema as a [JsonObject].
  */
-public fun ServerBuilder.settingsSchemaJson(module: SerializersModule): JsonObject {
+public fun ServerSettings.settingsSchemaJson(module: SerializersModule): JsonObject {
     val json = Json {
         serializersModule = module
         prettyPrint = true
         encodeDefaults = true
     }
-    val settings: List<ServerSetting<*, *>> = build().settings.distinctBy { it.name }.sortedBy { it.name }
+    val settings: List<ServerSetting<*, *>> = (settings - overrides.keys).sortedBy { it.name }
 
     val definitions = LinkedHashMap<String, JsonSchemaType>()
     val propertySchemas = LinkedHashMap<String, JsonObject>()

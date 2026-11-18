@@ -12,9 +12,9 @@ import com.lightningkite.lightningserver.settings.*
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.services.data.*
 import com.lightningkite.services.database.*
-import kotlinx.coroutines.*
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.serializer
+import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.*
 // endregion auth-imports
 
@@ -24,12 +24,11 @@ data class UserProfile(
     override val _id: Uuid = Uuid.random(),
     val name: String,
     val email: String,
+    val isAdmin: Boolean = false,
 ) : HasId<Uuid>
 // endregion user-model
 
 // region user-auth
-// PrincipalType lives separately from the model so UserProfile can reside in a
-// shared/models module that carries no server dependencies.
 object UserAuth : PrincipalType<UserProfile, Uuid> {
     override val idSerializer: KSerializer<Uuid> = Uuid.serializer()
     override val subjectSerializer: KSerializer<UserProfile> = UserProfile.serializer()
@@ -44,61 +43,88 @@ object UserAuth : PrincipalType<UserProfile, Uuid> {
 // region auth-server
 object UserProfileServer : ServerBuilder() {
     val database = setting("database", Database.Settings())
-
-    // registerTable defines the table, registers it, and creates its once-per-deploy prepare task.
-    // Access it at runtime by invoking it: userProfiles().
     val userProfiles = database.registerTable<UserProfile>("UserProfile")
 
     init {
-        // register() makes this principal type discoverable when deserializing tokens.
         register(UserAuth)
-        // registerBasicMediaTypeCoders() enables JSON serialization of HTTP request/response bodies,
-        // including error responses. Required when testing via HttpHandler.test() (the full HTTP pipeline).
         registerBasicMediaTypeCoders()
     }
 
-    // GET /profile — requires a UserProfile authentication token
     val getProfile = path.path("profile").get bind ApiHttpHandler(
         summary = "Get current user profile",
-        // UserAuth.require() returns an AuthRequirement that accepts only tokens issued for UserProfile.
-        // Compare to noAuth (AuthRequirement.None) used in earlier chapters.
         auth = UserAuth.require(),
-        successCode = HttpStatus.OK,
-        errorCases = emptyList(),
-        implementation = { _: Unit ->
-            // Inside an authenticated handler, `auth` is Authentication<UserProfile>.
-            // auth.id gives the Uuid; auth.fetch() loads the full UserProfile from the database.
-            auth.fetch()
-        }
+        implementation = { _: Unit -> auth.fetch() }
     )
 }
 // endregion auth-server
 
+object AuthRequirementSamples : ServerBuilder() {
+    // region optional-auth
+    val greeting = path.path("greeting").get bind ApiHttpHandler(
+        summary = "Greet the caller",
+        auth = UserAuth.require() or noAuth,
+        implementation = { _: Unit ->
+            val user = authOrNull?.fetch()
+            if (user == null) "Hello, guest" else "Hello, ${user.name}"
+        }
+    )
+    // endregion optional-auth
+
+    // region requirement-options
+    val readReports = UserAuth.require(scope = RequiredScope("reports:read"))
+    val recentlySignedIn = UserAuth.require(maxAge = 10.minutes)
+    val adminOnly = UserAuth.require { it.fetch().isAdmin }
+    // endregion requirement-options
+
+    init {
+        // region super-user
+        AuthRequirement.isSuperUser = UserAuth.require { it.fetch().isAdmin }
+        // endregion super-user
+    }
+}
+
+// region auth-cache-key
+object IsAdmin : AuthCacheKey<UserProfile, Boolean> {
+    override val id = "user-is-admin"
+    override val serializer = Boolean.serializer()
+    override val expireAfter = 5.minutes
+
+    context(server: ServerRuntime)
+    override suspend fun calculate(input: Authentication<UserProfile>): Boolean =
+        input.fetch().isAdmin
+}
+
+context(server: ServerRuntime)
+suspend fun canSeeAuditLog(auth: Authentication<UserProfile>): Boolean = auth.get(IsAdmin)
+// endregion auth-cache-key
+
 // region auth-test
 fun authTest() = UserProfileServer.testBlocking(settings = { database set Database.Settings("ram") }) {
-    // Seed a user directly into the database
-    val alice = UserProfileServer.userProfiles()
-        .insertOne(UserProfile(name = "Alice", email = "alice@example.com"))
+    val alice = userProfiles().insertOne(UserProfile(name = "Alice", email = "alice@example.com"))
 
-    // testAuth() creates an Authentication<UserProfile> for use in tests.
-    val aliceAuth = UserAuth.testAuth(alice)
-
-    // Pass the auth token as the first argument to the typed .test() call.
-    val profile = UserProfileServer.getProfile.test(aliceAuth, Unit)
-    check(profile.name == "Alice")
-    check(profile.email == "alice@example.com")
+    val profile = getProfile.test(UserAuth.testAuth(alice), Unit)
     check(profile._id == alice._id)
 }
 // endregion auth-test
 
 // region auth-rejection-test
 fun authRejectionTest() = UserProfileServer.testBlocking(settings = { database set Database.Settings("ram") }) {
-    // Drive the endpoint as an HttpHandler (not ApiHttpHandler.test()) so the full
-    // auth-checking pipeline runs. The framework serializes the rejection into an HTTP
-    // response; inspect .status.code on the returned HttpResponse.
-    // Note: the framework throws ForbiddenException (403) when no credentials are
-    // supplied, which is distinct from an invalid token (401).
-    val response = UserProfileServer.getProfile.test()
+    val response = getProfile.test()
     check(response.status.code == 403)
 }
 // endregion auth-rejection-test
+
+fun authRequirementTest() = UserProfileServer.testBlocking(settings = { database set Database.Settings("ram") }) {
+    val alice = userProfiles().insertOne(UserProfile(name = "Alice", email = "alice@example.com"))
+    val admin = userProfiles().insertOne(UserProfile(name = "Root", email = "root@example.com", isAdmin = true))
+    execute {
+        check(!AuthRequirementSamples.adminOnly.accepts(UserAuth.testAuth(alice)))
+        check(AuthRequirementSamples.adminOnly.accepts(UserAuth.testAuth(admin)))
+        check(!AuthRequirementSamples.readReports.accepts(UserAuth.testAuth(alice, scopes = setOf(GrantedScope("posts")))))
+        check(AuthRequirementSamples.readReports.accepts(UserAuth.testAuth(alice, scopes = setOf(GrantedScope("reports")))))
+        check(!AuthRequirementSamples.recentlySignedIn.accepts(UserAuth.testAuth(alice, issuedAt = now() - 11.minutes)))
+        check(AuthRequirementSamples.recentlySignedIn.accepts(UserAuth.testAuth(alice)))
+        check(canSeeAuditLog(UserAuth.testAuth(admin)))
+        check(!canSeeAuditLog(UserAuth.testAuth(alice)))
+    }
+}

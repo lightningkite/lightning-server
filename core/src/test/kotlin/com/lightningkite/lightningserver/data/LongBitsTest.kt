@@ -62,6 +62,14 @@ class LongBitsTest {
     }
 
     @Test
+    fun lowestAfterLastBitIsNone() {
+        val bits = LongBits(listOf(0, 63))
+        assertEquals(63, bits.lowestAfter(62))
+        assertEquals(-1, bits.lowestAfter(63))
+        assertEquals(-1, bits.lowestIncluding(64))
+    }
+
+    @Test
     fun testContains() {
         val bits = LongBits(listOf(0, 31, 62))
         assertTrue(0 in bits)
@@ -114,6 +122,27 @@ class LongBitsTest {
         }
         assertEquals(0, bits.lowestIncluding(0))
         assertEquals(62, bits.lowestIncluding(62))
+    }
+
+    @Test
+    fun indexOutsideRangeIsRejected() {
+        assertFailsWith<IllegalArgumentException> { LongBits(listOf(64)) }
+        assertFailsWith<IllegalArgumentException> { LongBits(listOf(-1)) }
+    }
+
+    @Test
+    fun containsOutsideRangeIsFalse() {
+        val bits = LongBits(listOf(0))
+        assertFalse(64 in bits)
+        assertFalse(-64 in bits)
+    }
+
+    @Test
+    fun iteratesAndPrintsBit63() {
+        val bits = LongBits(listOf(1, 62, 63))
+        assertEquals(listOf(1, 62, 63), bits.toList())
+        assertEquals("1,62-63", bits.toString())
+        assertEquals("0-63", LongBits(0..63).toString())
     }
 
     // ========== Additional tests (by Claude) ==========

@@ -9,10 +9,10 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 
 public val AnnotationValidators.Companion.StandardWithInternalModule: Runtime<AnnotationValidators>
-    get() = Runtime { AnnotationValidators(engine.externalSerialization.serializersModule) }
+    get() = Runtime { AnnotationValidators(engine.internalSerialization.serializersModule) }
 
 public val AnnotationValidators.Companion.StandardWithExternalModule: Runtime<AnnotationValidators>
-    get() = Runtime { AnnotationValidators(engine.internalSerialization.serializersModule) }
+    get() = Runtime { AnnotationValidators(engine.externalSerialization.serializersModule) }
 
 public val Engine.validators: AnnotationValidators get() = server.annotationValidators()
 

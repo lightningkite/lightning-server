@@ -5,139 +5,144 @@ import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.test.*
-import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
+import com.lightningkite.lightningserver.serialization.*
 import com.lightningkite.lightningserver.typed.*
-import kotlinx.coroutines.*
+import com.lightningkite.services.data.*
 import kotlinx.serialization.*
 // endregion typed-imports
 
-// region divide-types
+// region typed-minimal
 @Serializable
-data class DivideRequest(val numerator: Double, val denominator: Double)
+data class DivisionInput(val numerator: Double, val denominator: Double)
 
 @Serializable
-data class DivideResponse(val result: Double)
-// endregion divide-types
+data class DivisionResult(val quotient: Double)
 
-// region divide-server
-object DivideServer : ServerBuilder() {
+object TypedDivideServer : ServerBuilder() {
     init { registerBasicMediaTypeCoders() }
 
-    // POST /divide — divides two numbers; declares two error cases
+    // POST /divide
     val divide = path.path("divide").post bind ApiHttpHandler(
         summary = "Divide two numbers",
-        description = "Returns the quotient. Rejects non-finite inputs and division by zero.",
+        description = "Returns numerator / denominator.",
         auth = noAuth,
-        successCode = HttpStatus.OK,
         errorCases = listOf(
-            // errorCases appear in the generated OpenAPI spec and SDK.
-            // They do NOT enforce anything at runtime — your implementation must throw.
             LSError(http = 400, detail = "division-by-zero", message = "Denominator must not be zero"),
-            LSError(http = 400, detail = "infinite-input", message = "Inputs must be finite numbers")
         ),
-        implementation = { input: DivideRequest ->
-            if (!input.numerator.isFinite() || !input.denominator.isFinite())
-                throw BadRequestException(
-                    detail = "infinite-input",
-                    message = "Inputs must be finite numbers"
-                )
+        implementation = { input: DivisionInput ->
             if (input.denominator == 0.0)
-                throw BadRequestException(
-                    detail = "division-by-zero",
-                    message = "Denominator must not be zero"
-                )
-            DivideResponse(result = input.numerator / input.denominator)
+                throw BadRequestException(detail = "division-by-zero", message = "Denominator must not be zero")
+            DivisionResult(input.numerator / input.denominator)
         }
     )
 }
-// endregion divide-server
+// endregion typed-minimal
 
-// region divide-success-test
-fun divideSuccessTest() = DivideServer.testBlocking(settings = {}) {
-    val result = DivideServer.divide.test(null, DivideRequest(10.0, 4.0))
-    check(result.result == 2.5)
+// region typed-minimal-test
+fun typedMinimalTest() = TypedDivideServer.testBlocking(settings = {}) {
+    check(TypedDivideServer.divide.test(null, DivisionInput(10.0, 4.0)).quotient == 2.5)
 }
-// endregion divide-success-test
+// endregion typed-minimal-test
 
-// region divide-error-test
-fun divideErrorTest() = DivideServer.testBlocking(settings = {}) {
-    // When an ApiHttpHandler implementation throws an HttpStatusException,
-    // the typed .test() extension propagates it directly as a Kotlin exception.
-    // Catch HttpStatusException and inspect .status.code and .detail to verify
-    // the right error fired.
-    try {
-        DivideServer.divide.test(null, DivideRequest(1.0, 0.0))
-        error("Expected an exception")
-    } catch (e: HttpStatusException) {
-        check(e.status.code == 400)
-        check(e.detail == "division-by-zero")
-    }
-}
-// endregion divide-error-test
-
-// region success-code-types
+// region typed-catalog
 @Serializable
-data class NoteRequest(val text: String)
+data class CatalogItem(val id: Int, val name: String)
 
 @Serializable
-data class NoteResponse(val id: String, val text: String)
-// endregion success-code-types
+data class CatalogSearch(val text: String = "", val limit: Int = 10)
 
-// region success-code-server
-object NoteServer : ServerBuilder() {
+@Serializable
+data class NewCatalogItem(val name: String)
+
+object TypedCatalogServer : ServerBuilder() {
     init { registerBasicMediaTypeCoders() }
 
-    // POST /notes — uses HttpStatus.Created (201) instead of the default 200
-    val create = path.path("notes").post bind ApiHttpHandler(
-        summary = "Create a note",
-        description = "Stores a new note and returns it with an assigned id.",
+    private val products = listOf(CatalogItem(1, "Lamp"), CatalogItem(2, "Desk lamp"), CatalogItem(3, "Chair"))
+
+    // GET /products?text=lamp&limit=5 — a GET's input comes from the query string
+    val search = path.path("products").get bind ApiHttpHandler(
+        summary = "Search products",
         auth = noAuth,
-        // successCode defaults to HttpStatus.OK (200); override for creation endpoints.
+        implementation = { input: CatalogSearch ->
+            products.filter { it.name.contains(input.text, ignoreCase = true) }.take(input.limit)
+        }
+    )
+
+    // GET /products/{id}
+    val product = path.path("products").arg<Int>("id").get bind ApiHttpHandler(
+        summary = "Get product",
+        auth = noAuth,
+        errorCases = listOf(LSError(http = 404, detail = "product-not-found", message = "No product with that id")),
+        implementation = { _: Unit ->
+            products.find { it.id == route.arg1 }
+                ?: throw NotFoundException(detail = "product-not-found", message = "No product with that id")
+        }
+    )
+
+    // POST /products
+    val create = path.path("products").post bind ApiHttpHandler(
+        summary = "Create product",
+        auth = noAuth,
         successCode = HttpStatus.Created,
-        errorCases = emptyList(),
-        implementation = { input: NoteRequest ->
-            NoteResponse(id = "note-1", text = input.text)
-        }
+        implementation = { input: NewCatalogItem -> CatalogItem(id = 4, name = input.name) }
+    )
+
+    // GET /products/{id}/name — calls another endpoint, with its validation, auth, and error handling
+    val productName = path.path("products").arg<Int>("id").path("name").get bind ApiHttpHandler(
+        summary = "Get product name",
+        auth = noAuth,
+        implementation = { _: Unit -> product(request, route.arg1, Unit).name }
     )
 }
-// endregion success-code-server
+// endregion typed-catalog
 
-// region success-code-test
-fun successCodeTest() = NoteServer.testBlocking(settings = {}) {
-    // ApiHttpHandler.test() returns the typed output directly.
-    // The HTTP status code is used by real clients; in unit tests confirm
-    // the response fields instead of the status.
-    val result = NoteServer.create.test(null, NoteRequest("hello"))
-    check(result.text == "hello")
-    check(result.id.isNotEmpty())
+// region typed-catalog-test
+fun typedCatalogTest() = TypedCatalogServer.testBlocking(settings = {}) {
+    // Typed calls: path arguments first, then auth (null for noAuth), then input.
+    check(TypedCatalogServer.search.test(null, CatalogSearch(text = "lamp")).size == 2)
+    check(TypedCatalogServer.product.test(3, null, Unit).name == "Chair")
+    check(TypedCatalogServer.productName.test(1, null, Unit) == "Lamp")
+
+    // HTTP calls: what a client sees, including the status and the encoded body.
+    val found = TypedCatalogServer.search.test(queryParameters = QueryParameters.parse("text=desk"))
+    check(found.body?.text() == """[{"id":2,"name":"Desk lamp"}]""")
+
+    val created = TypedCatalogServer.create.test(body = TypedData.text("""{"name":"Stool"}""", MediaType.Application.Json))
+    check(created.status == HttpStatus.Created)
 }
-// endregion success-code-test
+// endregion typed-catalog-test
 
-// region examples-field
-object ExamplesServer : ServerBuilder() {
+// region typed-error-test
+fun typedErrorTest() = TypedCatalogServer.testBlocking(settings = {}) {
+    try {
+        TypedCatalogServer.product.test(99, null, Unit)
+        error("Expected NotFoundException")
+    } catch (e: HttpStatusException) {
+        check(e.status == HttpStatus.NotFound)
+        check(e.detail == "product-not-found")
+    }
+
+    check(TypedCatalogServer.product.test(99).status == HttpStatus.NotFound)
+}
+// endregion typed-error-test
+
+// region typed-examples
+object TypedExamplesServer : ServerBuilder() {
     init { registerBasicMediaTypeCoders() }
 
-    // ApiHttpHandler.Example values are documentation only — they appear in the generated
-    // OpenAPI spec and SDK but are NOT run or asserted automatically.
-    // Write a real test alongside any example you provide.
-    val echo = path.path("echo").post bind ApiHttpHandler(
-        summary = "Echo",
-        description = "Returns the input unchanged.",
+    val divide = path.path("divide").post bind ApiHttpHandler(
+        summary = "Divide two numbers",
         auth = noAuth,
-        successCode = HttpStatus.OK,
-        errorCases = emptyList(),
         examples = listOf(
             ApiHttpHandler.Example(
-                input = EchoRequest("hello"),
-                output = EchoResponse(echo = "hello", length = 5),
-                name = "Basic echo",
-                notes = "Showing roundtrip for a short string."
+                input = DivisionInput(10.0, 4.0),
+                output = DivisionResult(2.5),
+                name = "Fractional result",
             )
         ),
-        implementation = { input: EchoRequest ->
-            EchoResponse(echo = input.message, length = input.message.length)
-        }
+        implementation = { input: DivisionInput -> DivisionResult(input.numerator / input.denominator) }
     )
 }
-// endregion examples-field
+// endregion typed-examples

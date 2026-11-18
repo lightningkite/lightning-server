@@ -72,12 +72,10 @@ public data class CronPattern(
     }
 
     /**
-     * Returns a cron-style string representation.
+     * Returns the pattern in Quartz / AWS EventBridge cron syntax, without the trailing year field.
      *
-     * Format: `minute hour day-of-month month day-of-week`
-     *
-     * Note: Uses `?` as a placeholder where appropriate for day fields,
-     * following standard cron conventions where day-of-month and day-of-week are mutually exclusive.
+     * Format: `minute hour day-of-month month day-of-week`, where day-of-week counts Sunday as 1
+     * through Saturday as 7, and `?` fills whichever day field is unused.
      */
     override fun toString(): String = buildString {
         append(minutes.takeUnless { it == allMinutes }?.toString() ?: "*")
@@ -197,7 +195,8 @@ public data class CronDayOfWeek(
     }
 
     override fun toString(): String = buildString {
-        append(day.isoDayNumber)
+        val quartzDayNumber = if (day == DayOfWeek.SUNDAY) 1 else day.isoDayNumber + 1
+        append(quartzDayNumber)
         if (last) append('L')
         else recurrence?.let {
             append('#')

@@ -29,7 +29,7 @@ import kotlin.time.Clock
  *
  * @property host The host address to bind to (defaults to "0.0.0.0" for all interfaces)
  * @property port The port number to listen on (defaults to 8080)
- * @property realIpHeader Optional header name to extract the real client IP from (useful behind proxies)
+ * @property realIpHeader Header a trusted reverse proxy stamps with the client IP, such as `X-Forwarded-For`; the right-most entry is used (see [proxiedSourceIp]). Only set it when every request arrives through that proxy.
  * @property requestIdHeader Optional header name carrying a request ID stamped by a **trusted**
  *   reverse proxy, adopted as the authoritative request ID. Leave null (the default) to always
  *   generate one; a client-supplied ID is never trusted. The proxy must stamp version 7 UUIDs
@@ -289,7 +289,7 @@ private fun HttpExchange.requestToLightningServer(
         }
     }
     val sourceIp = realIpHeader?.let { header ->
-        this.requestHeaders.getFirst(header).also { realIp ->
+        proxiedSourceIp(this.requestHeaders[header].orEmpty()).also { realIp ->
             if (realIp == null)
                 engine.logger.warn { "Real IP address header for proxy '$header' was missing from request [${identity.requestId}}]." }
         }

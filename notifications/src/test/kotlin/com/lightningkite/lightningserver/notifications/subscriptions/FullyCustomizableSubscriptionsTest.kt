@@ -16,6 +16,7 @@ import com.lightningkite.services.sms.SMS
 import com.lightningkite.services.sms.TestSMS
 import kotlinx.coroutines.runBlocking
 import kotlin.test.*
+import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.Uuid
 
 /**
@@ -92,6 +93,50 @@ class FullyCustomizableSubscriptionsTest {
             }
             notif.content { event ->
                 { user -> "Deleted: ${event.subject.name}" }
+            }
+        }
+
+        val modelArchived = handler.event("Model Archived", Server.modelInfo) { notif ->
+            notif.defaultSubscription(
+                behavior = DefaultSubscriptionUpdateBehavior.UpdateRetainingUserChanges
+            ) { user ->
+                FullEventSubscription(
+                    filter = Condition.Always,
+                    email = null,
+                    push = null,
+                    sms = null,
+                    inApp = if (user.name == "Hourly") Frequency.delayed(1.hours) else null
+                )
+            }
+            notif.content { event ->
+                { user -> "Archived: ${event.subject.name}" }
+            }
+        }
+    }
+
+    @Test
+    fun `default subscription keeps its inApp frequency`() {
+        Server.test(settings = { context ->
+            sms setStatic TestSMS("sms", context)
+            email setStatic TestEmailService("email", context)
+        }) {
+            runBlocking {
+                val user = TestUser(name = "NoInApp")
+                val subscriptionId = UserEventType(user._id, Notifications.modelArchived.event.name)
+
+                val created = execute {
+                    Server.userInfo.table().insertOne(user)
+                    Notifications.subs.info.table().get(subscriptionId)
+                }
+                assertNotNull(created)
+                assertNull(created.inApp)
+
+                val afterDefaultChanged = execute {
+                    Server.userInfo.table().replaceOneById(user._id, user.copy(name = "Hourly"))
+                    Notifications.subs.info.table().get(subscriptionId)
+                }
+                assertNotNull(afterDefaultChanged)
+                assertEquals(Frequency.delayed(1.hours), afterDefaultChanged.inApp)
             }
         }
     }

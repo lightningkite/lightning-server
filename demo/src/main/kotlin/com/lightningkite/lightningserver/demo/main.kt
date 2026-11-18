@@ -6,13 +6,11 @@ import com.lightningkite.lightningserver.engine.ktor.KtorEngine
 import com.lightningkite.lightningserver.engine.netty.NettyEngine
 import com.lightningkite.lightningserver.settings.loadFromFile
 import com.lightningkite.lightningserver.typed.contract.ApiAllowlist
-import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.typed.LightningServerKSchema
 import com.lightningkite.lightningserver.typed.contract.apiBaselineJson
 import com.lightningkite.lightningserver.typed.contract.diffApiContract
 import com.lightningkite.lightningserver.typed.kschema.lightningServerKSchemaFromDefaultRuntime
 import com.lightningkite.lightningserver.typed.sdk.FetcherSdk
-import com.lightningkite.lightningserver.typed.sdk.SDK
 import com.lightningkite.lightningserver.typed.sdk.SDK.writeUsingDefaultSettings
 import com.lightningkite.lightningserver.typed.settingsSchemaJson
 import com.lightningkite.services.kfile.KFile
@@ -121,10 +119,9 @@ fun apiCheck(baseline: File = File("api-baseline.json"), strict: Boolean = false
 /** Exports the JSON Schema for settings.json so editors and CI can validate the file. */
 fun settingsSchema(output: File = File("settings.schema.json")) {
     println("Writing settings schema to ${output.absolutePath}")
-    // Resolve the serializers module offline (default settings, no port, no service connections), then JSONify.
-    val schema = SDK.withDefaultRuntime(Server) {
-        Server.settingsSchemaJson(contextOf<Engine>().internalSerializersModule)
-    }
+    // The engine `serve` uses, so its own settings are in the schema; it isn't started.
+    val engine = KtorEngine(Server.build())
+    val schema = engine.settings.settingsSchemaJson(engine.internalSerializersModule)
     output.writeText(Json { prettyPrint = true }.encodeToString(JsonObject.serializer(), schema))
     println("Finished")
 }

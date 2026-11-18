@@ -5,6 +5,8 @@ import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.serialization.toTypedData
+import com.lightningkite.services.data.MediaType
+import com.lightningkite.services.data.TypedData
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -20,15 +22,15 @@ import kotlin.time.Duration.Companion.seconds
  *
  * Example custom exception handler:
  * ```kotlin
- * object CustomExceptionHandler : ExceptionHttpHandler {
+ * object CustomExceptionHandler : HttpExceptionHandler {
  *     context(server: ServerRuntime)
- *     override suspend fun handle(request: HttpRequest<PathSpec>, exception: Exception): HttpResponse {
+ *     override suspend fun handle(request: HttpRequest<*>, exception: Exception): HttpResponse {
  *         return when (exception) {
  *             is ValidationException -> HttpResponse(
  *                 status = HttpStatus.BadRequest,
  *                 body = TypedData.json(mapOf("errors" to exception.errors))
  *             )
- *             else -> ExceptionHttpHandler.Default.handle(request, exception)
+ *             else -> HttpExceptionHandler.Default.handle(request, exception)
  *         }
  *     }
  * }
@@ -80,7 +82,11 @@ public interface HttpExceptionHandler {
             return HttpResponse(
                 status = HttpStatus(lsError.http),
                 headers = (exception as? HttpStatusException)?.headers ?: HttpHeaders.EMPTY,
-                body = lsError.toTypedData(request.headers.accept)
+                body =
+                    // Claude: the error must reach the client with its real status even if no media coders are registered.
+                    if (server.server.mediaTypeEncoders.isEmpty())
+                        TypedData.text(listOfNotNull(lsError.message, lsError.stackTrace).joinToString("\n\n"), MediaType.Text.Plain)
+                    else lsError.toTypedData(request.headers.accept)
             )
         }
     }

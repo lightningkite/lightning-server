@@ -103,4 +103,4 @@ Type-safe, serializable cache with optional expiration.
 
 ## Related Documentation
 
-See [Data Utilities](../../../../../../../../docs/data-utilities.md) for usage examples and best practices.
+See [Data Utilities](https://github.com/lightningkite/lightning-server/blob/master/docs-guide/guide/architecture.md) for usage examples and best practices.

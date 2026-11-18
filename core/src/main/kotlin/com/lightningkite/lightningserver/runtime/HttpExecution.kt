@@ -242,7 +242,9 @@ private suspend fun errorResponse(request: HttpRequest<*>, e: Exception, trace: 
     var errorName = e::class.simpleName
     val response = try {
         instrument("exceptionHandler") { runtime.server.exceptionHandler.handle(request, e) }
-    } catch (_: Exception) {
+    } catch (handlerFailure: Exception) {
+        runtime.logger.error(handlerFailure) { "The exception handler failed while handling $e" }
+        runtime.reportException(handlerFailure)
         errorName = "unhandled_exception"
         HttpResponse(status = HttpStatus.InternalServerError)
     }
@@ -305,7 +307,4 @@ private suspend fun <PATH : PathSpec> ServerRuntime.routeHttpRequest(req: HttpRe
  *
  * 3. Trailing slash redirect uses PathSegments.toString() which may not preserve query parameters
  *    or fragments. Verify this behavior and document it.
- *
- * 4. The exception handler itself can throw exceptions, but those are caught and return a generic
- *    500 with no logging. The error is silently swallowed.
  */

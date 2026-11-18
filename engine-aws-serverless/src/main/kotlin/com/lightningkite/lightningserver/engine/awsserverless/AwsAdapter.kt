@@ -69,7 +69,7 @@ public open class AwsAdapter(server: ServerDefinition) : EngineBase(server), Req
     @OptIn(InternalLightningServerApi::class)
     protected open fun loadSettings() {
         fun loadSettings(bytes: ByteArray) {
-            val decryptedBytes = System.getenv("LIGHTNING_SERVER_SETTINGS_DECRYPTION")
+            val decryptedBytes = getenv("LIGHTNING_SERVER_SETTINGS_DECRYPTION")
                 ?.takeIf { it.isNotBlank() }
                 ?.let { sha256Password ->
                     OpenSsl.decryptAesCbcPkcs5Sha256(bytes, sha256Password.toByteArray())
@@ -98,25 +98,21 @@ public open class AwsAdapter(server: ServerDefinition) : EngineBase(server), Req
             Core.getGlobalContext().register(this)
         }
         logger.info { "Loading settings..." }
-        System.getenv("LIGHTNING_SERVER_SETTINGS_SECRET_ID")?.let { secretId ->
-            SecretsManagerClient.create().getSecretValue {
-                it.secretId(secretId)
-            }.secretString().let { loadSettings(it.toByteArray()) }
-        }
-        val root = File(System.getenv("LAMBDA_TASK_ROOT"))
-        root.resolve("settings.json").takeIf { it.exists() }?.let {
-            it.readBytes().let { loadSettings(it) }
-        } ?: root.resolve("settings.enc").takeIf { it.exists() }?.let {
-            it.readBytes().let { loadSettings(it) }
-        } ?: run {
-            S3Client.create().getObject {
-                it.bucket(System.getenv("LIGHTNING_SERVER_SETTINGS_BUCKET")!!)
-                it.key(System.getenv("LIGHTNING_SERVER_SETTINGS_FILE")!!)
-            }.use {
-                it.readBytes().let { loadSettings(it) }
-            }
-        }
+        val root by lazy { File(getenv("LAMBDA_TASK_ROOT")!!) }
+        val bytes = getenv("LIGHTNING_SERVER_SETTINGS_SECRET_ID")?.let { readSettingsSecret(it).toByteArray() }
+            ?: root.resolve("settings.json").takeIf { it.exists() }?.readBytes()
+            ?: root.resolve("settings.enc").takeIf { it.exists() }?.readBytes()
+            ?: S3Client.create().getObject {
+                it.bucket(getenv("LIGHTNING_SERVER_SETTINGS_BUCKET")!!)
+                it.key(getenv("LIGHTNING_SERVER_SETTINGS_FILE")!!)
+            }.use { it.readBytes() }
+        loadSettings(bytes)
     }
+
+    protected open fun getenv(name: String): String? = System.getenv(name)
+
+    protected open fun readSettingsSecret(secretId: String): String =
+        SecretsManagerClient.create().getSecretValue { it.secretId(secretId) }.secretString()
 
     protected open val region: Region by lazy { Region.of(System.getenv("AWS_REGION")) }
 

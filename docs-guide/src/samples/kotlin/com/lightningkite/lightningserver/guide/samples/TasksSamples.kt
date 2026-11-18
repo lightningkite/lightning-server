@@ -5,61 +5,79 @@ import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.runtime.test.*
+import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.services.cache.*
-import kotlin.test.*
-import kotlinx.coroutines.*
+import com.lightningkite.services.database.*
 import kotlinx.serialization.Serializable
+import kotlin.test.*
 import kotlin.time.Duration.Companion.minutes
 // endregion tasks-imports
 
-// region task-server
+// region tasks-server
 @Serializable
-data class WelcomeEmailInput(val address: String, val name: String)
+data class WelcomeEmail(val address: String, val name: String)
 
-object TaskServer : ServerBuilder() {
-
+object TasksServer : ServerBuilder() {
     val cache = setting("cache", Cache.Settings())
 
-    // Declare a task on any path. The path acts as a unique identifier — it does not
-    // correspond to an HTTP route. A Task executes its body when launched.
-    //
-    // Use Task { input: TYPE -> ... } (reified) when the input type is known at the call
-    // site. The serializer is derived automatically. The handler runs with a ServerRuntime
-    // in context, so it has access to settings, services, and other tasks.
-    val sendWelcomeEmail = path.path("tasks").path("send-welcome-email") bind Task { input: WelcomeEmailInput ->
-        println("Sending welcome email to ${input.address} (name=${input.name})")
-        // Record the work in cache so tests can observe the effect.
-        cache().set("last-welcome-email", input.address, 5.minutes)
+    val sendWelcomeEmail = path.path("tasks").path("send-welcome-email") bind Task { input: WelcomeEmail ->
+        // Stand-in for sending the email.
+        cache().set("welcomed:${input.address}", input.name)
     }
 
-    // HTTP endpoint that launches the task.
-    // launch() submits the task to the engine. In tests the engine executes it
-    // synchronously (inline). In production, the engine may queue it via pub/sub
-    // for background processing.
-    val register = path.path("register").post bind HttpHandler { _ ->
-        // In real code you'd parse the request body here and pass it to launch().
-        // See the "task-test" region for how to call launch() directly in a test.
-        sendWelcomeEmail.launch(WelcomeEmailInput("example@example.com", "Example"))
-        HttpResponse.plainText("Registered!")
+    val register = path.path("register").arg<String>("email").post bind HttpHandler { request ->
+        sendWelcomeEmail.launch(WelcomeEmail(address = request.arg1, name = "New user"))
+        HttpResponse.plainText("Registered")
     }
 }
-// endregion task-server
+// endregion tasks-server
 
-// region task-test
-fun taskTest() = TaskServer.testBlocking(settings = {}) {
-    // Launch the task as the test's own work. TestRunner runs dispatched tasks inline, so
-    // the task body completes before launch() returns and the effect is immediately
-    // visible in the next line.
-    execute { TaskServer.sendWelcomeEmail.launch(WelcomeEmailInput("alice@example.com", "Alice")) }
+// region tasks-test
+fun tasksLaunchTest() = TasksServer.testBlocking(settings = {}) {
+    TasksServer.register.test("alice@example.com")
+    assertEquals("New user", TasksServer.cache().get<String>("welcomed:alice@example.com"))
 
-    val logged = TaskServer.cache().get<String>("last-welcome-email")
-    assertEquals("alice@example.com", logged)
+    // launch() needs a running execution; execute { } gives the test one.
+    execute { TasksServer.sendWelcomeEmail.launch(WelcomeEmail("bob@example.com", "Bob")) }
+    assertEquals("Bob", TasksServer.cache().get<String>("welcomed:bob@example.com"))
 }
-// endregion task-test
+// endregion tasks-test
 
-class TaskSamplesTest {
-    @Test
-    fun taskRuns() = taskTest()
+// region tasks-timeout
+val monthlyReport = Task(timeout = 30.minutes) { month: String ->
+    println("Building the report for $month")
 }
+// endregion tasks-timeout
+
+// region tasks-lifecycle
+@Serializable
+data class VisitCounter(override val _id: String, val value: Int) : HasId<String>
+
+object TasksLifecycleServer : ServerBuilder() {
+    val database = setting("database", Database.Settings())
+    val counters = database.registerTable<VisitCounter>("VisitCounter")
+
+    val seedCounters = path.path("predeploy").path("seed-counters") bind PreDeployTask(
+        dependencies = { listOf(counters.preDeployTask) },
+    ) {
+        if (counters().get("visits") == null) counters().insertOne(VisitCounter("visits", 0))
+    }
+
+    val logBoot = path.path("startup").path("log-boot") bind StartupTask {
+        println("Instance starting")
+    }
+}
+// endregion tasks-lifecycle
+
+// region tasks-lifecycle-test
+fun tasksLifecycleTest() = TasksLifecycleServer.testBlocking(settings = {}) {
+    executePreDeployTasks()
+    executePreDeployTasks()  // every deploy runs them again, so they must be safe to repeat
+    assertEquals(0, TasksLifecycleServer.counters().get("visits")?.value)
+
+    executeStartupTasks()
+}
+// endregion tasks-lifecycle-test
