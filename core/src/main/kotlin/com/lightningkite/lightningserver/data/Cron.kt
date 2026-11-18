@@ -27,10 +27,10 @@ import kotlinx.datetime.*
  * @property months Bit set of valid months (1-12)
  */
 public data class CronPattern(
-    val minutes: LongBits,
-    val hours: LongBits,
+    val minutes: LongBitIndices,
+    val hours: LongBitIndices,
     val days: CronDays,
-    val months: LongBits,
+    val months: LongBitIndices,
 ) {
     /**
      * Convenience constructor that accepts iterables of valid values.
@@ -47,18 +47,18 @@ public data class CronPattern(
         days: CronDays = CronDays.All,
         months: Iterable<Month> = everyMonth,
     ) : this(
-        minutes = LongBits(minutes),
-        hours = LongBits(hours),
+        minutes = LongBitIndices.from(minutes.iterator()),
+        hours = LongBitIndices.from(hours.iterator()),
         days = days,
-        months = months.map { it.number }.let(::LongBits),
+        months = LongBitIndices.from(months.map { it.number }.iterator()),
     ) {
-        if (this.minutes.long == 0L) throw IllegalArgumentException("No valid minutes provided")
-        if (this.hours.long == 0L) throw IllegalArgumentException("No valid hours provided")
+        if (this.minutes.isEmpty()) throw IllegalArgumentException("No valid minutes provided")
+        if (this.hours.isEmpty()) throw IllegalArgumentException("No valid hours provided")
         if (days is CronDays.DaysOfWeek && days.days.isEmpty())
             throw IllegalArgumentException("No valid days of week provided")
         else if (days is CronDays.DaysOfMonth && days.days.isEmpty())
             throw IllegalArgumentException("No valid days of month provided")
-        if (this.months.long == 0L) throw IllegalArgumentException("No valid months provided")
+        if (this.months.isEmpty()) throw IllegalArgumentException("No valid months provided")
     }
 
     public companion object {
@@ -66,9 +66,9 @@ public data class CronPattern(
         public val everyHour: Iterable<Int> = (0..<24)
         public val everyMonth: Iterable<Month> = Month.entries
 
-        private val allMinutes = LongBits(everyMinute)
-        private val allHours = LongBits(everyHour)
-        private val allMonths = LongBits(everyMonth.map { it.number })
+        private val allMinutes = LongBitIndices.from(everyMinute.iterator())
+        private val allHours = LongBitIndices.from(everyHour.iterator())
+        private val allMonths = LongBitIndices.from(everyMonth.map { it.number }.iterator())
     }
 
     /**
@@ -78,9 +78,9 @@ public data class CronPattern(
      * through Saturday as 7, and `?` fills whichever day field is unused.
      */
     override fun toString(): String = buildString {
-        append(minutes.takeUnless { it == allMinutes }?.toString() ?: "*")
+        append(minutes.takeUnless { it == allMinutes }?.toCronList() ?: "*")
         append(' ')
-        append(hours.takeUnless { it == allHours }?.toString() ?: "*")
+        append(hours.takeUnless { it == allHours }?.toCronList() ?: "*")
         append(' ')
         when (days) {
             CronDays.All -> append("*")
@@ -88,7 +88,7 @@ public data class CronPattern(
             is CronDays.DaysOfWeek -> append("?")
         }
         append(' ')
-        append(months.takeUnless { it == allMonths }?.toString() ?: "*")
+        append(months.takeUnless { it == allMonths }?.toCronList() ?: "*")
         append(' ')
         when (days) {
             CronDays.All -> append("?")
@@ -96,6 +96,17 @@ public data class CronPattern(
             is CronDays.DaysOfWeek -> append(days.days.joinToString(","))
         }
     }
+}
+
+/** Writes these values as a cron list, with consecutive values as a range: `0-2,5`. */
+private fun Iterable<Int>.toCronList(): String {
+    val runs = ArrayList<IntRange>()
+    for (value in this) {
+        val last = runs.lastOrNull()
+        if (last != null && last.last == value - 1) runs[runs.lastIndex] = last.first..value
+        else runs.add(value..value)
+    }
+    return runs.joinToString(",") { if (it.first == it.last) "${it.first}" else "${it.first}-${it.last}" }
 }
 
 /**
@@ -242,8 +253,8 @@ private fun LocalDateTime.makeValid(pattern: CronPattern): LocalDateTime {
     // We must advance to the next hour and reset the minute
 
     run {
-        val it = pattern.minutes.lowestAfter(minute)
-        if (it == -1) {
+        val it = pattern.minutes.firstOrNull { it > minute }
+        if (it == null) {
             minute = pattern.minutes.first()
             hour++
         } else {
@@ -282,8 +293,8 @@ private fun LocalDateTime.makeValid(pattern: CronPattern): LocalDateTime {
 
     while (true) {
         if (month.number !in pattern.months) {
-            val it = pattern.months.lowestAfter(month.number)
-            if (it != -1) {
+            val it = pattern.months.firstOrNull { it > month.number }
+            if (it != null) {
                 month = Month(it)
                 dayOfMonth = 1
             } else {

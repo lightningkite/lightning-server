@@ -339,7 +339,7 @@ Reference:
 | Type | Use |
 |---|---|
 | `Expiring<T>(value, expiresAt)` | A value with an optional expiry.  `Expiring(value, expireAfter = 5.minutes)` and `.expired` need an `Engine` in context for its clock |
-| `LongBits` | A compact set of small integers (0 to 63) in a `Long`: `contains`, `lowestAfter`, `plus`, `intersect`, `size` |
+| `IntBitIndices`, `LongBitIndices` | A `Set<Int>` of indices 0 to 31 or 0 to 63, stored as the bits of an `Int` or `Long` (in `core-shared`).  `IntBitIndices` can be stored and queried with `containsAll` / `containsAny` |
 | `CronPattern`, `CronDays`, `Schedule` | Schedule descriptions; `LocalDateTime + cronPattern` gives the next match.  See [Schedules](schedules.md) |
 | `File.toKFile()`, `KFile.toJavaFile()` | Convert between `java.io.File` and Service Abstractions' multiplatform `KFile` |
 

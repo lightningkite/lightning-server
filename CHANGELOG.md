@@ -43,8 +43,10 @@ Each release groups entries under:
 - **Breaking:** `RateLimitInterceptor` is now an `ExecutionInterceptor` plus an `HttpInterceptor`, and no longer a `WebSocketInterceptor`. It gains `exempt: List<HttpHandler<*>>` and `exemptSockets: List<WebSocketHandler<*, *>>`, placed before `requestLimits`, so a positional `requestLimits` lambda must now be passed by name or as a trailing lambda.
 - `OauthProviderCredentialsApple.toOauthProviderCredentials()` and `generateJwt()` need only an `Engine`, so Sign in with Apple credentials can be supplied from a `Runtime { }` lambda.
 - `OauthProofEndpoints` has a `property` parameter (default `"email"`), so a custom `makeProof` can prove another property, and login accepts it.
+- **Breaking:** `BitIndices` moved from `audit-shared` to `core-shared` (package `com.lightningkite.lightningserver.data`) and is now a sealed interface with two value classes: `IntBitIndices` (the old `BitIndices`, still queryable with `containsAll`/`containsAny`) and `LongBitIndices`. `bitIndicesOf` is now `intBitIndicesOf` / `longBitIndicesOf`, and `toArray()` is gone in favor of the standard `toIntArray()`. `FieldIdentifierSet.Segment` is `IntBitIndices`; the stored form is unchanged.
+- **Breaking:** removed `LongBits`; use `LongBitIndices`, which numbers bits from the most significant end and throws `IndexOutOfBoundsException` for an out-of-range index. `CronPattern`'s `minutes`, `hours` and `months` are now `LongBitIndices`.
 - Deprecated the `MetaEndpoints(packageName, database, cache)` constructor; use `MetaEndpoints(packageName, cache)`. The database was never used.
-- Added `HttpHeaders.proxiedSourceIp(header)`: the client IP a trusted proxy recorded, taken as the right-most entry of its forwarding header.
+- Added `HttpHeaders.getProxiedSourceIp(header)`: the client IP a trusted proxy recorded, taken as the right-most entry of its forwarding header.
 - `otelDatadog()` now extends `TerraformNeed<TelemetryBackend.Settings>`, so `telemetrySettings.otelDatadog()` compiles; it previously could not be called on the telemetry setting.
 - `AwsAdapter` gained `protected open fun getenv(name)` and `readSettingsSecret(secretId)`, to let tests replace the environment and Secrets Manager.
 - Added `ServerSettings.settingsSchemaJson(module)`, which covers the engine's and framework's keys and leaves out bound settings. `ServerBuilder.settingsSchemaJson` is deprecated.
@@ -97,7 +99,6 @@ Each release groups entries under:
 - Typed GET/HEAD input (`HttpRequest.queryParameters(serializer)`) is decoded with `externalSerialization`, like request bodies, instead of `internalSerialization`.
 - `QueryParameters.parse` URL-decodes keys and values, and `QueryParameters.toString` URL-encodes them, as their KDoc said. `/meta/bulk` sub-request query strings are now decoded. WebSocket connection rows stored by an older version whose query values contain a raw `+` or `%` decode differently.
 - With no media coders registered, `HttpExceptionHandler.Default` answers in plain text with the error's real status instead of a bare 500. An exception handler that throws is now logged and reported instead of being swallowed.
-- `LongBits`: `lowestAfter(63)` and `lowestIncluding(64+)` return -1 instead of wrapping to bit 0; `contains` is false outside 0-63; the iterable constructor rejects indices outside 0-63 instead of wrapping them; iterating or printing a set containing bit 63 no longer loops forever or drops it.
 
 ### Tests
 

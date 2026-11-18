@@ -160,6 +160,16 @@ class CronTest {
     }
 
     @Test
+    fun testToStringWritesConsecutiveValuesAsRanges() {
+        val pattern = CronPattern(
+            minutes = listOf(0, 1, 2, 5, 58, 59),
+            hours = listOf(9),
+            months = listOf(Month.JANUARY, Month.FEBRUARY, Month.MARCH, Month.DECEMBER),
+        )
+        assertEquals("0-2,5,58-59 9 * 1-3,12 ?", pattern.toString())
+    }
+
+    @Test
     fun testDayOfWeekRange() {
         val range = DayOfWeek.MONDAY..DayOfWeek.FRIDAY
         val list = range.toList()

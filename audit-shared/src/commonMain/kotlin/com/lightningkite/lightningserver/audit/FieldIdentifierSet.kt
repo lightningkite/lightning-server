@@ -8,6 +8,8 @@ import com.lightningkite.services.database.InlineProperty
 import com.lightningkite.services.database.optics.Field
 import com.lightningkite.services.database.andNotNull
 import com.lightningkite.services.database.orNotNull
+import com.lightningkite.lightningserver.data.IntBitIndices
+import com.lightningkite.lightningserver.data.mask
 import kotlinx.serialization.SerialName
 
 @Queryable
@@ -15,7 +17,7 @@ public data class FieldIdentifierSet(
     @SerialName("f0") public val fields0: Segment,
     @SerialName("f1") public val fields1: Segment,
 ) : Set<ModelFieldId> {
-    public typealias Segment = BitIndices
+    public typealias Segment = IntBitIndices
 
     public fun segment(index: Int): Segment = when (index) {
         0 -> fields0
