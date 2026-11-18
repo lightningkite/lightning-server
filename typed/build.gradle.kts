@@ -33,6 +33,7 @@ kotlin {
     compilerOptions {
         optIn.add("kotlin.time.ExperimentalTime")
         optIn.add("kotlin.uuid.ExperimentalUuidApi")
+        freeCompilerArgs.add("-Xreturn-value-checker=check")
     }
     sourceSets.main {
         kotlin.srcDir("build/generated/ksp/main/kotlin")

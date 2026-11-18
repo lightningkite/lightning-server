@@ -1,3 +1,5 @@
+@file:MustUseReturnValues
+
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.definition.Runtime
