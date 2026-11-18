@@ -42,7 +42,7 @@ public suspend fun doOnce(
     } else {
         val lock = table.updateOne(
             Condition<ActionHasOccurred> {
-                (it._id eq key) and (it.completed eq null) and (it.started eq null or (it.started.notNull lt (now() - timeout)))
+                it._id.eq(key) and it.completed.eq(null) and (it.started.eq(null) or it.started.notNull.lt(now() - timeout))
             },
             Modification { it.started assign now() }
         )

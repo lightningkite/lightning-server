@@ -44,7 +44,7 @@ Each release groups entries under:
 - `OauthProviderCredentialsApple.toOauthProviderCredentials()` and `generateJwt()` need only an `Engine`, so Sign in with Apple credentials can be supplied from a `Runtime { }` lambda.
 - `OauthProofEndpoints` has a `property` parameter (default `"email"`), so a custom `makeProof` can prove another property, and login accepts it.
 - Deprecated the `MetaEndpoints(packageName, database, cache)` constructor; use `MetaEndpoints(packageName, cache)`. The database was never used.
-- Added `proxiedSourceIp(headerLines)`: the client IP a trusted proxy recorded, taken as the right-most entry of its forwarding header.
+- Added `HttpHeaders.proxiedSourceIp(header)`: the client IP a trusted proxy recorded, taken as the right-most entry of its forwarding header.
 - `otelDatadog()` now extends `TerraformNeed<TelemetryBackend.Settings>`, so `telemetrySettings.otelDatadog()` compiles; it previously could not be called on the telemetry setting.
 - `AwsAdapter` gained `protected open fun getenv(name)` and `readSettingsSecret(secretId)`, to let tests replace the environment and Secrets Manager.
 - Added `ServerSettings.settingsSchemaJson(module)`, which covers the engine's and framework's keys and leaves out bound settings. `ServerBuilder.settingsSchemaJson` is deprecated.

@@ -48,7 +48,7 @@ internal suspend fun ApplicationCall.adaptHttpRequest(maxBody: Long): Pair<HttpR
         domain = request.origin.serverHost,
         protocol = request.origin.scheme,
         sourceIp = ktorRunConfig().realIpHeader?.let { header ->
-            proxiedSourceIp(request.headers.getAll(header).orEmpty()).also { realIp ->
+            adaptedHeaders.getProxiedSourceIp(header).also { realIp ->
                 if (realIp == null)
                     server.logger.warn { "Real IP address header for proxy '$header' was missing from request [${identity.requestId}}]." }
             }
@@ -101,7 +101,7 @@ internal fun ApplicationCall.adaptWebSocketConnectRequest(): WebSocketConnectReq
         domain = request.origin.serverHost,
         protocol = request.origin.scheme,
         sourceIp = runConfig.realIpHeader?.let { header ->
-            proxiedSourceIp(request.headers.getAll(header).orEmpty()).also { realIp ->
+            adaptedHeaders.getProxiedSourceIp(header).also { realIp ->
                 if (realIp == null)
                     engine.logger.warn { "Real IP address header for proxy '$header' was missing from request [${identity.requestId}}]." }
             }

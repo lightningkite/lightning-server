@@ -733,7 +733,7 @@ public class NettyEngine(
             val hostHeader = this.headers()[HOST] ?: ""
             val domain = hostHeader.substringBefore(":")
             val sourceIp = cfg.realIpHeader?.let { header ->
-                proxiedSourceIp(this.headers().getAll(header)).also { realIp ->
+                headers.getProxiedSourceIp(header).also { realIp ->
                     if (realIp == null)
                         logger.warn { "Real IP address header for proxy '$header' was missing from request [${identity.requestId}}]." }
                 }
@@ -766,7 +766,7 @@ public class NettyEngine(
                 logger.warn { "Request ID header for proxy '${cfg.requestIdHeader}' was missing from the request." }
             }
             val sourceIp = cfg.realIpHeader?.let { header ->
-                proxiedSourceIp(this.headers().getAll(header)).also { realIp ->
+                headers.getProxiedSourceIp(header).also { realIp ->
                     if (realIp == null)
                         logger.warn { "Real IP address header for proxy '$header' was missing from request [${identity.requestId}}]" }
                 }
