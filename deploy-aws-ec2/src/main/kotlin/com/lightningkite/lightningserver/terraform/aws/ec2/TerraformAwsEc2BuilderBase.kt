@@ -591,7 +591,7 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
                 "program" - listOf(
                     "bash",
                     "-c",
-                    $$"""f=$(ls "$${distributionZipPath ?: $$"${path.module}/../../build/distributions/server.zip"}" | head -1) && hash=$(sha256sum "$f" | cut -d' ' -f1) && printf '{"hash":"%s","path":"%s"}' "$hash" "$f"""",
+                    $$"""f=$(ls "$${distributionZipPath ?: $$"${path.module}/$$projectDirFromTerraform/build/distributions/server.zip"}" | head -1) && hash=$(sha256sum "$f" | cut -d' ' -f1) && printf '{"hash":"%s","path":"%s"}' "$hash" "$f"""",
                 )
             }
 

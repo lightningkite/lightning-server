@@ -12,6 +12,8 @@ import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.json.*
 import java.io.File
+import kotlin.io.path.Path
+import kotlin.io.path.invariantSeparatorsPathString
 import java.security.SecureRandom
 import kotlin.io.encoding.Base64
 
@@ -40,6 +42,17 @@ public abstract class BaseTerraformEmitter<S : ServerBuilder> : TerraformEmitter
 
     /** Directory where generated Terraform JSON files will be written. */
     public abstract val terraformRoot: File
+
+    /**
+     * The working directory, where the build output lives, as a path relative to [terraformRoot], such as `../..`.
+     *
+     * Generated Terraform reaches the build output through `${path.module}/$projectDirFromTerraform`, so it works
+     * at any depth of [terraformRoot].
+     */
+    protected val projectDirFromTerraform: String
+        get() = terraformRoot.toPath().toAbsolutePath().normalize()
+            .relativize(Path("").toAbsolutePath())
+            .invariantSeparatorsPathString
 
     /**
      * Extension function to configure server settings for deployment.

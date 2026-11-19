@@ -279,6 +279,15 @@ class Ec2BuilderGenerationTest {
     }
 
     @Test
+    fun buildOutputPathFollowsTerraformRootDepth() {
+        val d = ScalingDeployment()
+        d.write()
+        // Claude: terraformRoot is build/test-terraform/scaling, three levels below the working directory.
+        val deployment = File(d.terraformRoot, "deployment.tf.json").readText()
+        assertContains(deployment, $$"${path.module}/../../../build/distributions/server.zip")
+    }
+
+    @Test
     fun scalingRejectsRamCache() {
         val ex = assertFailsWith<IllegalStateException> {
             ScalingDeployment(cacheUrl = "ram").write()
