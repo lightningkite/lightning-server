@@ -21,6 +21,7 @@ import com.lightningkite.services.data.EmailAddress
 import com.lightningkite.services.data.toEmailAddress
 import com.lightningkite.services.pubsub.PubSub
 import com.lightningkite.services.terraform.AwsVpc
+import com.lightningkite.services.terraform.TerraformJsonObject
 import com.lightningkite.services.terraform.terraformJsonObject
 import kotlinx.serialization.json.*
 import software.amazon.awssdk.regions.Region
@@ -50,8 +51,7 @@ class Ec2BuilderGenerationTest {
         fulfillSetting(secretBasis.name, Json.encodeToJsonElement(secretBasis.serializer, secretBasis.default))
         fulfillSetting(loggingSettings.name, Json.encodeToJsonElement(loggingSettings.serializer, loggingSettings.default))
         fulfillSetting(telemetrySettings.name, JsonNull)
-        if (cacheUrl != null) fulfillSetting("cache", JsonPrimitive(cacheUrl))
-        fulfillSetting(engineCache.name, Json.encodeToJsonElement(Cache.Settings()))
+        fulfillSetting(engineCache.name, Json.encodeToJsonElement(cacheUrl?.let { Cache.Settings(it) } ?: Cache.Settings()))
         fulfillSetting(enginePubSub.name, Json.encodeToJsonElement(PubSub.Settings()))
     }
 
@@ -268,6 +268,17 @@ class Ec2BuilderGenerationTest {
     }
 
     @Test
+    fun launchTemplatePassesServerCommand() {
+        val d = ScalingDeployment()
+        d.write()
+        val userData = d.terraformRoot.findResource("aws_launch_template", "app")!!["user_data"]!!.jsonPrimitive.content
+        assertContains(userData, "server_command = \"serve\"")
+        val boot = File(d.terraformRoot, "boot.sh").readText()
+        assertContains(boot, "cat > /etc/lightning-server/command.env")
+        assertContains(boot, "SERVER_COMMAND=\"\${server_command}\"")
+    }
+
+    @Test
     fun scalingRejectsRamCache() {
         val ex = assertFailsWith<IllegalStateException> {
             ScalingDeployment(cacheUrl = "ram").write()
@@ -455,7 +466,9 @@ class Ec2BuilderGenerationTest {
         for (line in listOf(
             "User=lightning-server",
             "WorkingDirectory=/var/lib/single-test",
-            "ExecStart=/opt/single-test/server/bin/server serve",
+            "Environment=\"SERVER_COMMAND=serve\"",
+            "EnvironmentFile=-/etc/lightning-server/command.env",
+            "ExecStart=/opt/single-test/server/bin/server \$SERVER_COMMAND",
             "StateDirectory=single-test",
             "CacheDirectory=single-test",
             "LogsDirectory=single-test",
