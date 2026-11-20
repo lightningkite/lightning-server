@@ -22,6 +22,12 @@ public class S3EncryptedSecretSource(
     private val passwordFetcher: PasswordFetcher = PasswordFetcher(),
 ) : PopulatableSecretSource {
 
+    private companion object {
+        init {
+            quietAwsSdkLogging()
+        }
+    }
+
     private val client = S3Client.builder()
         .credentialsProvider(ProfileCredentialsProvider.create(profile))
         .region(region)
@@ -35,7 +41,6 @@ public class S3EncryptedSecretSource(
         try {
             file.writeBytes(client.getObjectAsBytes { it.bucket(bucket).key(key) }.asByteArray())
         } catch (e: NoSuchKeyException) {
-            // Claude: EncryptedFileSecretSource treats an existing file as one to decrypt, so a fresh source needs none.
             file.delete()
         }
         EncryptedFileSecretSource(file, name, passwordFetcher)
@@ -45,6 +50,6 @@ public class S3EncryptedSecretSource(
 
     override fun <T> set(need: TerraformNeed<T>, value: T) {
         local.set(need, value)
-        client.putObject({ it.bucket(bucket).key(key) }, RequestBody.fromFile(file))
+        client.putObject({ it.bucket(bucket).key(key).contentType("application/json") }, RequestBody.fromFile(file))
     }
 }
