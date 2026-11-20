@@ -293,7 +293,8 @@ SecureString parameter and never written to disk unencrypted after `terraform ap
 |---|---|---|
 | `EncryptedFileSecretSource` | `~/.lightningserver/<name>.json.enc` (AES-256, PBKDF2) | Local development, solo CI |
 | `EnvironmentSecretSource` | `LS_SECRET_<KEY>` env vars | Shared CI/CD pipelines |
-| `AwsSecretSource` | AWS Secrets Manager | Team environments (shared + auditable) |
+| `SecretsManagerSecretSource` | AWS Secrets Manager | Team environments (shared + auditable) |
+| `S3EncryptedSecretSource` | An encrypted file in S3 (AES-256, PBKDF2) | Team environments, far cheaper than Secrets Manager |
 | `ManySecretSources` | Tries sources in order | Flexible fallback chains |
 
 The concrete builders (`TerraformAwsServerlessBuilder`, `TerraformAwsEc2BuilderBase`)

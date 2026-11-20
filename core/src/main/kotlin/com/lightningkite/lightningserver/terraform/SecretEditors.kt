@@ -175,7 +175,7 @@ internal fun <T> TerraformNeed<T>.blankHint(): String = when {
  * Prints this need's instructions and reads one value for it from the terminal, retrying until the
  * input parses.
  *
- * @param destination Describes where the value is headed, e.g. "to be stored in AWS Secrets".
+ * @param destination Describes where the value is headed, e.g. "to be stored in AWS Secrets Manager".
  */
 internal fun <T> TerraformNeed<T>.readFromTerminal(destination: String): T {
     println("$name: $instructions")

@@ -74,7 +74,7 @@ object TestEc2Scaling : TerraformAwsScalingEc2Builder<Server>(Server) {
     override val swapSize: DataSize = 1.gibibytes
 
     override val secretsSource: SecretSource =
-        AwsSecretSource(profile = "lk", idPrefix = "ec2-scaling-demo", region = Region.US_WEST_2)
+        SecretsManagerSecretSource(profile = "lk", idPrefix = "ec2-scaling-demo", region = Region.US_WEST_2)
 
     override fun Server.settings() {
 //        database.awsDocumentDb(
@@ -221,7 +221,7 @@ object TestEc2Single : TerraformAwsSingleEc2Builder<Server>(Server) {
     override val distro: Distro = Distro.AmazonLinux2023
 
     override val secretsSource: SecretSource =
-        AwsSecretSource(profile = "lk", idPrefix = "ec2-demo", region = Region.US_WEST_2)
+        SecretsManagerSecretSource(profile = "lk", idPrefix = "ec2-demo", region = Region.US_WEST_2)
 
     override fun Server.settings() {
 //        database.awsDocumentDb(
