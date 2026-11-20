@@ -884,7 +884,7 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
             }
             "resource.null_resource.lambda_jar_source" {
                 "triggers" {
-                    "buildHash" - expression($$"""sha256(join("", [for f in fileset("${path.module}/$$projectDirFromTerraform/build/dist/lambda", "**") : filesha256("${path.module}/$$projectDirFromTerraform/build/dist/lambda/${f}")]))""")
+                    "buildHash" - expression($$"""sha256(join("", [for f in fileset("${path.module}/../../build/dist/lambda", "**") : filesha256("${path.module}/../../build/dist/lambda/${f}")]))""")
                     "settingsHash" - expression("sha256(jsonencode(local.settings_raw))")
                     "packageMarker" - expression("local_file.lambda_package_marker.id")
                     // This step is what copies the lambda files into the package, so editing one has
@@ -905,7 +905,7 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                     }, terraformJsonObject {
                         "command" - this@emit.expression(
                             $$"""
-                                local.is_windows ? "cp -r -force \"${path.module}/$$projectDirFromTerraform/build/dist/lambda/.\" \"${path.module}/build/lambda/\"" : "cp -rf \"${path.module}/$$projectDirFromTerraform/build/dist/lambda/.\" \"${path.module}/build/lambda/\""
+                                local.is_windows ? "cp -r -force \"${path.module}/../../build/dist/lambda/.\" \"${path.module}/build/lambda/\"" : "cp -rf \"${path.module}/../../build/dist/lambda/.\" \"${path.module}/build/lambda/\""
                             """.trimIndent()
                         )
                         "interpreter" - this@emit.expression("local.is_windows ? [\"PowerShell\", \"-Command\"] : []")

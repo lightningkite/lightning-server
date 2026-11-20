@@ -42,14 +42,6 @@ public abstract class BaseTerraformEmitter<S : ServerBuilder> : TerraformEmitter
     public abstract val terraformRoot: File
 
     /**
-     * The project directory, whose `build` folder holds the build output, as a path relative to [terraformRoot].
-     *
-     * Defaults to `../..`, for a [terraformRoot] two levels below the project such as `terraform/dev`. Override it
-     * for another depth, such as `../../..` for `terraform/flavorOne/dev`.
-     */
-    protected open val projectDirFromTerraform: String get() = "../.."
-
-    /**
      * Extension function to configure server settings for deployment.
      * This is where you specify database, cache, file storage, and other service settings.
      */
