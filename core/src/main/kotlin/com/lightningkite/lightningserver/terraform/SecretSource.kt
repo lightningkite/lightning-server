@@ -552,7 +552,7 @@ public class EncryptedFileSecretSource(
                     null
                 }
 
-                val password = passwordFetcher.read("Enter your secrets password for $file:") { pwd ->
+                val password = passwordFetcher.read("Enter your secrets password for $name:") { pwd ->
                     // Verify password by attempting decryption
                     if (format != null) {
                         // Version 2 format
@@ -601,7 +601,7 @@ public class EncryptedFileSecretSource(
             } else {
                 // Create new file with version 2 format
                 val password =
-                    passwordFetcher.read("Pick your secrets password for $file:") { /* no verification needed */ }
+                    passwordFetcher.read("Pick your secrets password for $name:") { /* no verification needed */ }
                 val newSalt = ByteArray(32).apply { SecureRandom.getInstanceStrong().nextBytes(this) }
                 this.salt = newSalt
                 this.encryptionKey = deriveKey(password, newSalt)

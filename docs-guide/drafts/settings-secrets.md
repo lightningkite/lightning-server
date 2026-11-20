@@ -235,6 +235,7 @@ SecretSource
 ├── EnvironmentSecretSource      reads LS_SECRET_{NAME} env vars
 ├── EncryptedFileSecretSource    reads from ~/.lightningserver/{name}.json.enc
 ├── AwsSecretSource              reads from AWS Secrets Manager (module: secret-source-aws)
+├── S3EncryptedSecretSource      an EncryptedFileSecretSource kept in S3 (module: secret-source-aws)
 └── ManySecretSources            tries sources in order, prompts and stores if missing
 ```
 
