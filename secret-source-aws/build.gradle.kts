@@ -13,6 +13,7 @@ dependencies {
         exclude("software.amazon.awssdk:apache-client")
     }
     api(libs.aws.secrets.manager) { excludeNetty() }
+    api(libs.aws.s3) { excludeNetty() }
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)
 }
@@ -26,5 +27,5 @@ kotlin {
 }
 
 mavenPublishing {
-    pom { description.set("An AWS Secrets implementation of SecretSource") }
+    pom { description.set("AWS Secrets Manager and S3 implementations of SecretSource") }
 }

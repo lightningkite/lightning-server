@@ -186,10 +186,10 @@ object Production : TerraformAwsServerlessDomainBuilder<ApiServer>(ApiServer) {
 
     // How credentials and secrets are retrieved/stored during deployment.
     // EncryptedFileSecretSource stores secrets in an AES-encrypted local file (good for solo
-    // development or CI); AwsSecretSource stores them in AWS Secrets Manager (better for teams —
+    // development or CI); SecretsManagerSecretSource stores them in AWS Secrets Manager (better for teams —
     // secrets are shared and auditable).
     override val secretsSource: SecretSource =
-        AwsSecretSource(profile = "my-aws-profile", idPrefix = "my-api", region = region)
+        SecretsManagerSecretSource(profile = "my-aws-profile", idPrefix = "my-api", region = region)
 
     // settings() is the heart of the deployment object.
     // Each call here corresponds to one service setting on ApiServer
@@ -314,7 +314,7 @@ Before the first deploy, set up credentials:
 `editVars()` opens an interactive terminal editor prompting for AWS credentials
 (access key or profile), MongoDB Atlas API keys, and any other variables declared
 with `byVariable()`.  Values are stored in the `EncryptedFileSecretSource` (or
-`AwsSecretSource`) so subsequent runs don't re-prompt.
+`SecretsManagerSecretSource`) so subsequent runs don't re-prompt.
 
 ### 4. Deploy
 

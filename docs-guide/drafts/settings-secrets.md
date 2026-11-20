@@ -234,7 +234,8 @@ The type hierarchy:
 SecretSource
 ├── EnvironmentSecretSource      reads LS_SECRET_{NAME} env vars
 ├── EncryptedFileSecretSource    reads from ~/.lightningserver/{name}.json.enc
-├── AwsSecretSource              reads from AWS Secrets Manager (module: secret-source-aws)
+├── SecretsManagerSecretSource   reads from AWS Secrets Manager (module: secret-source-aws)
+├── S3EncryptedSecretSource      an EncryptedFileSecretSource kept in S3 (module: secret-source-aws)
 └── ManySecretSources            tries sources in order, prompts and stores if missing
 ```
 
@@ -274,7 +275,7 @@ The file format uses PBKDF2-HMAC-SHA256 with 100,000 iterations and a random sal
 instead of baking it in — useful when multiple developers manage different deploy
 environments and you do not want to hard-code file paths in VCS.
 
-### AwsSecretSource (secret-source-aws module)
+### SecretsManagerSecretSource (secret-source-aws module)
 
 Add the module dependency:
 
@@ -283,17 +284,17 @@ Add the module dependency:
 implementation("com.lightningkite.lightningserver:secret-source-aws:<version>")
 ```
 
-Then construct `AwsSecretSource` with an AWS profile, a namespace prefix, and a region:
+Then construct `SecretsManagerSecretSource` with an AWS profile, a namespace prefix, and a region:
 
 ```kotlin
-// Illustrative — constructor signature matches AwsSecretSource.kt exactly.
-val awsSecrets = AwsSecretSource(
+// Illustrative — constructor signature matches SecretsManagerSecretSource.kt exactly.
+val awsSecrets = SecretsManagerSecretSource(
     profile = "my-aws-profile",
     idPrefix = "prod-api",            // secrets are stored as "prod-api/{name}"
     region = Region.US_EAST_1,
 )
 
-// Retrieve a value (returns null if not found, throws AwsSecretException on AWS errors).
+// Retrieve a value (returns null if not found, throws SecretsManagerSecretException on AWS errors).
 val dbPassword: String? = awsSecrets.getOrNull(dbPasswordNeed)
 
 // Store or update a value (creates if absent, updates if present).

@@ -62,7 +62,7 @@ object TestLambda : TerraformAwsServerlessDomainBuilder<Server>(Server) {
     override val debug: Boolean = true
 
     override val secretsSource: SecretSource =
-        AwsSecretSource(profile = "lk", idPrefix = "lightning-server-demo", region = Region.US_WEST_2)
+        SecretsManagerSecretSource(profile = "lk", idPrefix = "lightning-server-demo", region = Region.US_WEST_2)
 
     override val applicationVpc: AwsVpc = AwsVpc.None
 
