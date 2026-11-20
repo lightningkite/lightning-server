@@ -12,8 +12,6 @@ import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.json.*
 import java.io.File
-import kotlin.io.path.Path
-import kotlin.io.path.invariantSeparatorsPathString
 import java.security.SecureRandom
 import kotlin.io.encoding.Base64
 
@@ -44,15 +42,12 @@ public abstract class BaseTerraformEmitter<S : ServerBuilder> : TerraformEmitter
     public abstract val terraformRoot: File
 
     /**
-     * The working directory, where the build output lives, as a path relative to [terraformRoot], such as `../..`.
+     * The project directory, whose `build` folder holds the build output, as a path relative to [terraformRoot].
      *
-     * Generated Terraform reaches the build output through `${path.module}/$projectDirFromTerraform`, so it works
-     * at any depth of [terraformRoot].
+     * Defaults to `../..`, for a [terraformRoot] two levels below the project such as `terraform/dev`. Override it
+     * for another depth, such as `../../..` for `terraform/flavorOne/dev`.
      */
-    protected val projectDirFromTerraform: String
-        get() = terraformRoot.toPath().toAbsolutePath().normalize()
-            .relativize(Path("").toAbsolutePath())
-            .invariantSeparatorsPathString
+    protected open val projectDirFromTerraform: String get() = "../.."
 
     /**
      * Extension function to configure server settings for deployment.

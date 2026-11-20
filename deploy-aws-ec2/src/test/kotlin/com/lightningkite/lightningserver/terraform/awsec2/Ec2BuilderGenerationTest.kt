@@ -70,7 +70,7 @@ class Ec2BuilderGenerationTest {
         override fun TestServer.settings() = fulfillGlobals(cacheUrl = null)
     }
 
-    inner class ScalingDeployment(
+    open inner class ScalingDeployment(
         private val cacheUrl: String? = "redis://cache:6379",
     ) : TerraformAwsScalingEc2Builder<TestServer>(TestServer) {
         override val storageBucket = "test-tf-state"
@@ -279,10 +279,19 @@ class Ec2BuilderGenerationTest {
     }
 
     @Test
-    fun buildOutputPathFollowsTerraformRootDepth() {
+    fun buildOutputPathDefaultsToTwoLevelsUp() {
         val d = ScalingDeployment()
         d.write()
-        // Claude: terraformRoot is build/test-terraform/scaling, three levels below the working directory.
+        val deployment = File(d.terraformRoot, "deployment.tf.json").readText()
+        assertContains(deployment, $$"${path.module}/../../build/distributions/server.zip")
+    }
+
+    @Test
+    fun buildOutputPathFollowsProjectDirFromTerraform() {
+        val d = object : ScalingDeployment() {
+            override val projectDirFromTerraform = "../../.."
+        }
+        d.write()
         val deployment = File(d.terraformRoot, "deployment.tf.json").readText()
         assertContains(deployment, $$"${path.module}/../../../build/distributions/server.zip")
     }

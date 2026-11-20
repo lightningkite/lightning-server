@@ -16,7 +16,7 @@ Each release groups entries under:
 
 ### API
 
-- **Behavior:** the EC2 and serverless Terraform builders now find the build output relative to `terraformRoot` instead of assuming it sits two levels below the project, so `terraformRoot` can be overridden to any depth, such as `terraform/picme/staging`.
+- Added `projectDirFromTerraform` to the Terraform builders: the project directory relative to `terraformRoot`, defaulting to `../..` as before. Override it when `terraformRoot` sits at another depth, such as `../../..` for `terraform/picme/staging`.
 - Added a `schedules` parameter to `KtorEngine.start`, defaulting to `true`. Pass `false` when another instance runs the scheduled tasks.
 - **Behavior:** the EC2 builders' systemd unit now reads its command from `SERVER_COMMAND`, defaulting to `serverCommand`. The scaling builder sets it at boot from the launch template's user data. Regenerating changes the image and launch template, so an apply re-bakes the AMI and refreshes the fleet.
 - **Behavior:** `TerraformAwsScalingEc2Builder` now requires a distributed `engineCache`, the cache the schedule locks use, instead of checking the application's `cache`. A deployment with a RAM `engineCache` now fails to generate, and a RAM `cache` is allowed.
