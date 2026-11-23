@@ -1,47 +1,25 @@
-# Model REST Endpoints (Auto-CRUD)
+# Model REST endpoints
 
-`ModelRestEndpoints` is Lightning Server's flagship Django-like feature: given a
-database model and a permissions policy, it auto-generates a full suite of typed
-CRUD, query, and aggregation endpoints — complete with OpenAPI documentation and
-SDK generation — without writing a single handler by hand.
+`ModelRestEndpoints` generates a typed CRUD, query, and aggregation API for a model from one `modelInfo`
+declaration.  The endpoints enforce the model's [permissions](permissions.md), show up in the API docs, and get
+client functions in the [generated SDKs](client-sdks.md).
 
-## Before You Begin
-
-> **KSP plugin required.**  `@Queryable` is processed at build time.
-> Add these two lines to your module's `build.gradle.kts`:
->
-> ```kotlin
-> // build.gradle.kts
-> plugins {
->     alias(libs.plugins.ksp)
-> }
-> dependencies {
->     ksp(libs.services.database.processor)
-> }
-> ```
-
-## Imports
-
-All examples in this chapter use the following imports:
+## Minimal example
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/ModelRestSamples.kt#mr-imports -->
 ```kotlin
 import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.builder.*
+import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.runtime.test.*
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.*
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.services.data.*
 import com.lightningkite.services.database.*
-import kotlinx.serialization.*
 import kotlin.uuid.*
 ```
-
-## Defining a Model
-
-A model must implement `HasId<ID>` and carry two annotations:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/ModelRestSamples.kt#mr-model -->
 ```kotlin
@@ -54,21 +32,6 @@ data class Post(
 ) : HasId<Uuid>
 ```
 
-- **`HasId<Uuid>`** — declares the primary-key type.  Any `Comparable` type works:
-  `Uuid`, `String`, `Int`, `Long`.
-- **`@Queryable`** — makes the class `@Serializable` (every field must be
-  serializable) and KSP generates `Post.title`, `Post.author`,
-  etc. — the typed handles used by `Condition {}` and `Modification {}` queries.
-  See [Database & the Query DSL](database.md) for how these work.
-- **Default `_id`** — defaulting to `Uuid.random()` means callers can omit the ID;
-  the framework assigns one automatically on insert.
-
-## Wiring Up ModelRestEndpoints
-
-`modelInfo` is the bridge between your model, your database setting, and your
-permissions policy.  It is declared as a property on your `ServerBuilder`, and
-then passed to `ModelRestEndpoints`:
-
 <!-- sample: com/lightningkite/lightningserver/guide/samples/ModelRestSamples.kt#mr-server -->
 ```kotlin
 object PostRestServer : ServerBuilder() {
@@ -76,323 +39,237 @@ object PostRestServer : ServerBuilder() {
 
     val database = setting("database", Database.Settings())
 
-    // modelInfo<USER, Model, ID>:
-    //   USER = HasId<*>? — the noAuth "user" type (no authenticated caller)
-    //   Model = Post, the document type stored in the database
-    //   ID = Uuid, the primary-key type
     val postInfo = database.modelInfo<HasId<*>?, Post, Uuid>(
         auth = noAuth,
         tableName = "Post",
-        permissions = { ModelPermissions.allowAll() }
+        permissions = { ModelPermissions.allowAll() },
     )
 
-    // include mounts all generated endpoints under /posts
     val posts = path.path("posts") include ModelRestEndpoints(postInfo)
 }
 ```
 
-Key points:
+!!! warning
+    `noAuth` with `ModelPermissions.allowAll()` lets anyone on the internet read and rewrite the table.  It keeps
+    this example short; real models require auth and narrow permissions, as shown in [Permissions](permissions.md).
 
-- **`modelInfo<USER, Model, ID>`** — the three type parameters must be explicit
-  when using `noAuth` so the compiler knows which table type to bind to.  With
-  an authenticated `PrincipalType`, they are usually inferred.
-- **`auth`** — an `AuthRequirement<USER>`.  `noAuth` means no credential is
-  required.  Replace with `UserAuth.require()` (see the _Auth-Required Setup_
-  section below) to lock down the endpoints.
-- **`permissions`** — a suspend lambda returning `ModelPermissions<T>`.  The
-  lambda runs inside each request; `auth` (and `authOrNull` for optional auth)
-  are available as properties on the receiver.  `ModelPermissions.allowAll()`
-  is the simplest policy — it permits every operation for every caller.
-- **`include` vs `module`** — `include` mounts the endpoints; `module` (from
-  `com.lightningkite.lightningserver.typed`) does the same but also registers
-  SDK metadata so the generated client SDK gets a named interface class
-  (e.g. `PostRestEndpoints`).  For most guide examples `include` is sufficient.
-- **Accessing endpoints** — the return value of `include` is the
-  `ModelRestEndpoints` instance itself.  Store it (`val posts = ...`) so you
-  can reference `posts.insert`, `posts.detail`, etc. from tests or other
-  endpoints.
+`modelInfo` registers the table (as [`registerTable`](database.md) does) and binds it to an auth requirement and a
+permissions function.  Its type arguments are the user type, the model, and the id type; with a typed auth
+requirement such as `UserAuth.require()`, you can usually let them be inferred.  `tableName` is required and is the
+collection name in the database.
 
-## Generated Routes
+## Calling the endpoints
 
-`ModelRestEndpoints` mounts on the path you choose and generates these routes:
-
-| Property | Method | Sub-path | Input | Output |
-|---|---|---|---|---|
-| `permissions` | GET | `/_permissions_` | — | `ModelPermissions<T>` |
-| `list` | GET | `/` | `Query<T>` (query param) | `List<T>` |
-| `query` | POST | `/query` | `Query<T>` | `List<T>` |
-| `queryPartial` | POST | `/query-partial` | `QueryPartial<T>` | `List<Partial<T>>` |
-| `textQuery` | POST | `/text-query` | `TextIndexQuery<T>` | `List<ScoredResult<T>>` |
-| `detail` | GET | `/{id}` | — | `T` |
-| `insert` | POST | `/` | `T` | `T` |
-| `insertBulk` | POST | `/bulk` | `List<T>` | `List<T>` |
-| `upsert` | POST | `/{id}` | `T` | `T` |
-| `replace` | PUT | `/{id}` | `T` | `T` |
-| `bulkReplace` | PUT | `/bulk` | `List<T>` | `List<T>` |
-| `modify` | PATCH | `/{id}` | `Modification<T>` | `T` |
-| `modifyWithDiff` | PATCH | `/{id}/delta` | `Modification<T>` | `EntryChange<T>` |
-| `modifySimple` | PATCH | `/{id}/simplified` | `Partial<T>` | `T` |
-| `bulkModify` | PATCH | `/bulk` | `MassModification<T>` | `Int` |
-| `deleteItem` | DELETE | `/{id}` | — | — |
-| `bulkDelete` | POST | `/bulk-delete` | `Condition<T>` | `Int` |
-| `count` | POST | `/count` | `Condition<T>` | `Int` |
-| `groupCount` | POST | `/group-count` | `GroupCountQuery<T>` | `Map<String, Int>` |
-| `groupCount2` | POST | `/group-count-2` | `GroupCountQuery<T>` | `Map<String, Int>` |
-| `aggregate` | POST | `/aggregate` | `AggregateQuery<T>` | `Double?` |
-| `groupAggregate` | POST | `/group-aggregate` | `GroupAggregateQuery<T>` | `Map<String, Double?>` |
-| `groupAggregate2` | POST | `/group-aggregate-2` | `GroupAggregateQuery<T>` | `Map<String, Double?>` |
-
-All sub-paths are relative to the path you pass to `include` (or `module`).  If
-you mount at `/posts`, the detail endpoint is `GET /posts/{id}`.
-
-`groupCount2` and `groupAggregate2` JSON-encode the group key instead of calling
-`.toString()` on it — important when the key is not a plain string.
-
-### Understanding the Input Types
-
-**`Query<T>`** — packages a `condition`, `orderBy` list, `skip`, and `limit` into
-one object.  `list` accepts it via query parameters (limited to simple
-conditions); `query` accepts it as a POST body (full condition DSL supported).
-
-**`Modification<T>`** — a serialisable field-level update built with the
-`Modification { }` builder.  `modify` applies it to one document by ID;
-`bulkModify` wraps it in `MassModification<T>` (condition + modification) and
-applies it to many documents at once.
-
-**`Partial<T>`** — a sparse object where only the provided fields are present.
-`modifySimple` converts it to a `Modification<T>` internally, making it easy for
-clients that want to send only the changed fields.
-
-**`EntryChange<T>`** — holds `old: T?` and `new: T?`; `modifyWithDiff` returns
-both values so callers can inspect before and after.
-
-## Testing the Generated Endpoints
-
-> To wrap these examples in a test class, annotate your test methods with
-> `@Test` — see [Testing Your Server](testing.md) for the full pattern.
+Each generated endpoint is a property on the `ModelRestEndpoints`, so tests (and other server code) call them
+directly:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/ModelRestSamples.kt#mr-test -->
 ```kotlin
 fun modelRestTest() = PostRestServer.testBlocking(settings = { database set Database.Settings("ram") }) {
-    // Insert a post — returns the stored copy
-    val post = PostRestServer.posts.insert.test(null, Post(title = "Hello", author = "alice", body = "First post"))
-    check(post.title == "Hello")
+    val posts = PostRestServer.posts
 
-    // Retrieve by ID: first argument is the path arg (ID), second is auth, third is the body
-    val fetched = PostRestServer.posts.detail.test(post._id, null, Unit)
-    check(fetched._id == post._id)
-    check(fetched.title == "Hello")
+    val post = posts.insert.test(null, Post(title = "Hello", author = "alice", body = "First post"))
 
-    // List uses a Query; Condition.Always matches every document
-    val all = PostRestServer.posts.list.test(null, Query(Condition.Always))
-    check(all.size == 1)
+    val fetched = posts.detail.test(post._id, null, Unit)
+    val page = posts.query.test(null, Query(Post.author eq "alice", limit = 20))
+    val modified = posts.modify.test(post._id, null, Modification { it.title assign "Updated" })
+    posts.deleteItem.test(post._id, null, Unit)
+    val remaining = posts.count.test(null, Condition.Always)
 
-    // Modify: apply a field-level update and receive the new document
-    val modified = PostRestServer.posts.modify.test(
-        post._id, null,
-        Modification { it.title assign "Updated Title" }
-    )
-    check(modified.title == "Updated Title")
-    check(modified.author == "alice")  // unchanged
-
-    // Delete by ID
-    PostRestServer.posts.deleteItem.test(post._id, null, Unit)
-
-    // Count confirms the document is gone
-    val remaining = PostRestServer.posts.count.test(null, Condition.Always)
+    check(fetched == post)
+    check(page == listOf(post))
+    check(modified.title == "Updated" && modified.body == "First post")
     check(remaining == 0)
 }
 ```
 
-### How `.test()` arguments map to endpoints
+For endpoints with an `{id}` in the path, `test` takes the id first, then the auth (`null` here), then the body.
+See [Testing](testing.md).
 
-- **Path-arg endpoints** (`detail`, `modify`, `replace`, `upsert`, `deleteItem`,
-  `modifyWithDiff`, `modifySimple`) — the first argument is the ID (path
-  parameter), the second is the auth token (`null` for `noAuth`), the third is
-  the request body.
-- **No-path-arg endpoints** (`insert`, `list`, `query`, `count`, `bulkDelete`,
-  etc.) — the first argument is the auth token, the second is the request body.
+## Generated routes
 
-## Permissions in Depth
+Paths are relative to where you mount the endpoints (`/posts` above).
 
-### The ModelPermissions Data Class
+| Property | Method and path | Body | Returns |
+|---|---|---|---|
+| `list` | `GET /` | `Query<T>` as query parameters | `List<T>` |
+| `query` | `POST /query` | `Query<T>` | `List<T>` |
+| `queryPartial` | `POST /query-partial` | `QueryPartial<T>` | `List<Partial<T>>` |
+| `textQuery` | `POST /text-query` | `TextIndexQuery<T>` | `List<ScoredResult<T>>` |
+| `detail` | `GET /{id}` | | `T` |
+| `insert` | `POST /` | `T` | `T` |
+| `insertBulk` | `POST /bulk` | `List<T>` | `List<T>` |
+| `upsert` | `POST /{id}` | `T` | `T` |
+| `replace` | `PUT /{id}` | `T` | `T` |
+| `bulkReplace` | `PUT /bulk` | `List<T>` | `List<T>` |
+| `modify` | `PATCH /{id}` | `Modification<T>` | `T` |
+| `modifyWithDiff` | `PATCH /{id}/delta` | `Modification<T>` | `EntryChange<T>` |
+| `modifySimple` | `PATCH /{id}/simplified` | `Partial<T>` (only the fields to set) | `T` |
+| `bulkModify` | `PATCH /bulk` | `MassModification<T>` (condition + modification) | `Int` changed |
+| `deleteItem` | `DELETE /{id}` | | `Unit` |
+| `bulkDelete` | `POST /bulk-delete` | `Condition<T>` | `Int` deleted |
+| `count` | `POST /count` | `Condition<T>` | `Int` |
+| `groupCount` | `POST /group-count` | `GroupCountQuery<T>` | `Map<String, Int>` |
+| `aggregate` | `POST /aggregate` | `AggregateQuery<T>` | `Double?` |
+| `groupAggregate` | `POST /group-aggregate` | `GroupAggregateQuery<T>` | `Map<String, Double?>` |
+| `groupCount2`, `groupAggregate2` | `POST /group-count-2`, `/group-aggregate-2` | as above | group keys JSON-encoded instead of `toString()` |
+| `permissions` | `GET /_permissions_` | | the caller's `ModelPermissions<T>` |
+| `default` | `GET /_default_` | | a default `T` to start a create form from |
 
-`ModelPermissions<T>` is a data class with six fields — all default to
-`Condition.Never`, making the constructor **whitelist by default**:
+Conditions, modifications, and queries travel as JSON, so clients can ask any question the
+[query DSL](database.md#conditions) can express; permissions decide what the answer contains.  `queryPartial`
+always includes `_id` in the returned fields.
 
-```kotlin
-// Illustrative — not drift-checked.
-ModelPermissions(
-    create = Condition<T>,             // which items the user may insert (post-insert check)
-    read = Condition<T>,               // which items the user may read
-    readMask = Mask<T>,                // field-level read masking (default: no masking)
-    update = Condition<T>,             // which items the user may modify
-    updateRestrictions = UpdateRestrictions<T>,  // which fields may be modified
-    delete = Condition<T>,             // which items the user may delete
-)
+## Conditions and modifications as JSON
+
+Clients that aren't using a generated SDK send conditions and modifications as nested single-key objects.  A field
+name wraps a condition or modification on that field; an operator name holds its argument.  Field names are serial
+names, and values use the model's own JSON encoding.  These examples use the `Note` model from
+[Database](database.md).
+
+Views at least 10, tagged `home`, title not containing "draft" (for `query`, `count`, `bulk-delete`, ...):
+
+```json
+{"And": [
+  {"views": {"GreaterThanOrEqual": 10}},
+  {"tags": {"CollectionAnyElements": {"Equal": "home"}}},
+  {"Not": {"title": {"StringContains": {"value": "draft", "ignoreCase": true}}}}
+]}
 ```
 
-Forgetting a field defaults it to `Condition.Never` — a safe failure mode that
-blocks access rather than accidentally opening it.
+A nullable field is stepped into with `IfNotNull`, which is false when the value is null:
 
-**Shorthand constructors:**
-
-```kotlin
-// Illustrative — not drift-checked.
-// read + manage (create/update/delete use the same condition)
-ModelPermissions(read = everyone, manage = admin)
-
-// all operations use the same condition
-ModelPermissions(all = admin)
-
-// full whitelist — only for trusted internal callers
-ModelPermissions.allowAll<Post>()
+```json
+{"archivedAt": {"IfNotNull": {"LessThan": "2026-01-01T00:00:00Z"}}}
 ```
 
-### Auth-Required Setup
+Set the title, add one view, and remove the `home` tag (the body of `PATCH /{id}`, or the `modification` in
+`bulkModify`'s `{"condition": ..., "modification": ...}`):
 
-Replace `noAuth` with `UserAuth.require()` to lock down the endpoints.  The
-`permissions` lambda then receives an `AuthAccess<UserProfile>` receiver, giving
-access to `auth.fetch()` for the full user object:
+```json
+{"Chain": [
+  {"title": {"Assign": "Groceries"}},
+  {"views": {"Increment": 1}},
+  {"tags": {"SetRemoveInstances": ["home"]}}
+]}
+```
 
+| Condition | Argument |
+|---|---|
+| `Always`, `Never` | `true` |
+| `And`, `Or` | array of conditions |
+| `Not` | a condition |
+| `Equal`, `NotEqual` | a value (`null` allowed) |
+| `Inside`, `NotInside` | array of values |
+| `GreaterThan`, `GreaterThanOrEqual`, `LessThan`, `LessThanOrEqual` | a value |
+| `StringContains` | `{"value": "...", "ignoreCase": true}` |
+| `CollectionAnyElements`, `CollectionAllElements` | a condition on the element (lists and sets) |
+| `IfNotNull` | a condition on the non-null value |
+
+| Modification | Argument |
+|---|---|
+| `Assign` | a value |
+| `Chain` | array of modifications, applied in order |
+| `Increment`, `Multiply` | a number |
+| `CoerceAtLeast`, `CoerceAtMost` | a value |
+| `SetAppend`, `ListAppend` | array of items to add |
+| `SetRemoveInstances`, `ListRemoveInstances` | array of items to remove |
+| `SetRemove`, `ListRemove` | a condition; removes matching elements |
+| `IfNotNull` | a modification on the non-null value |
+
+## Errors
+
+| Situation | Response |
+|---|---|
+| No row with that id, or the caller can't read it | 404 |
+| An update or delete the caller isn't allowed to make | 404 (the row doesn't match the permitted condition) |
+| An insert the caller isn't allowed to make | 403 "Value was not posted as requested." |
+| A unique index would be violated | 400, detail `unique` |
+| `text-query` on a model without `@TextIndex` | 400, detail `no-text-index` |
+
+`insertBulk` silently drops the items the caller may not create and returns only the ones it inserted.
+
+## Custom endpoints next to generated ones
+
+Write your own endpoint against `info.table(this)`, which applies the same permissions for the current caller:
+
+<!-- sample: com/lightningkite/lightningserver/guide/samples/ModelRestSamples.kt#mr-custom -->
 ```kotlin
-// Illustrative — not drift-checked.
-// Requires UserAuth and UserProfile from the Authentication chapter.
-object AuthPostServer : ServerBuilder() {
+object PostStatsServer : ServerBuilder() {
+    init { registerBasicMediaTypeCoders() }
+
     val database = setting("database", Database.Settings())
 
-    val postInfo = database.modelInfo<UserProfile, Post, Uuid>(
-        auth = UserAuth.require(),
+    val postInfo = database.modelInfo<HasId<*>?, Post, Uuid>(
+        auth = noAuth,
         tableName = "Post",
-        permissions = {
-            val user = auth.fetch()
-            ModelPermissions(
-                create = Condition { it.author eq user.email },
-                read = Condition.Always,
-                update = Condition { it.author eq user.email },
-                delete = Condition { it.author eq user.email },
-            )
-        }
+        permissions = { ModelPermissions(read = Condition.Always, manage = Condition.Never) },
     )
 
     val posts = path.path("posts") include ModelRestEndpoints(postInfo)
+
+    val postsPerAuthor = path.path("post-stats").get bind ApiHttpHandler(
+        summary = "Count posts per author",
+        auth = postInfo.auth,
+        implementation = { _: Unit ->
+            postInfo.table(this).groupCount(groupBy = Post.author)
+        }
+    )
 }
 ```
 
-`auth.fetch()` loads the full `UserProfile` from the database; the result is
-cached on the `Authentication` object for the lifetime of the request, so
-repeated calls within one request are free.
+The ways to get a table from a model info:
 
-### Optional Auth
+| Call | Permissions | [Signals](advanced-database.md#signals-and-interceptors) | Auditing |
+|---|---|---|---|
+| `info.table(this)` / `info.table(auth)` in a handler | the caller's | yes | yes |
+| `info.table()` | none (system access) | yes | yes |
+| `info.baseTable()` | none | no | yes |
+| `info.dangerouslyDirectTable()` (opt-in `@UnauditedDatabaseAccess`) | none | no | no |
 
-Allow unauthenticated callers for reads while requiring a session for writes:
+Use `info.table()` for background jobs and server-internal logic; never return its results to a caller unfiltered.
 
-```kotlin
-// Illustrative — not drift-checked.
-val postInfo = database.modelInfo<UserProfile, Post, Uuid>(
-    auth = UserAuth.require() or AuthRequirement.None,
-    tableName = "Post",
-    permissions = {
-        val user = authOrNull?.fetch()
-        ModelPermissions(
-            create = if (user != null) Condition { it.author eq user.email } else Condition.Never,
-            read = Condition.Always,
-            update = if (user != null) Condition { it.author eq user.email } else Condition.Never,
-            delete = if (user != null) Condition { it.author eq user.email } else Condition.Never,
-        )
-    }
-)
-```
+## Including vs. `module`
 
-`authOrNull` is non-null only when a valid token was presented.  Use
-`authOrNull?.fetch()` instead of `auth.fetch()` — calling the latter when no
-token is present throws a `NullPointerException`.
-
-### Read Masking
-
-`readMask` hides or replaces field values before the document is returned to the
-client:
+`include` mounts the endpoints.  `module` (from `com.lightningkite.lightningserver.typed.sdk`) does the same and also
+gives the group its own interface in generated SDKs (`PostRestEndpoints`, from the table name):
 
 ```kotlin
-// Illustrative — not drift-checked.
-val postInfo = database.modelInfo<UserProfile, Post, Uuid>(
-    auth = UserAuth.require() or AuthRequirement.None,
-    tableName = "Post",
-    permissions = {
-        val user = authOrNull?.fetch()
-        val self: Condition<Post> = Condition { it.author eq (user?.email ?: "") }
-        ModelPermissions(
-            read = Condition.Always,
-            readMask = mask {
-                // Replace body with "" unless the caller is the author
-                it.body.mask(value = "", unless = self)
-            },
-            manage = Condition.Never,
-        )
-    }
-)
+val posts = path.path("posts") module ModelRestEndpoints(postInfo)
 ```
 
-`mask { }` builds a `Mask<T>`.  The `Optic<T, V>.mask(value, unless)`
-extension sets the field to `value` whenever the `unless` condition is false.
+## Auth scopes
 
-### Update Restrictions
+`modelInfo` narrows its `auth` to a subscope, by default the lowercased table name, and each endpoint narrows it
+again by operation.  A token granted `post` can use every Post endpoint; one granted `post:read` only the reading
+ones.  Tokens with the root scope (the default) pass everything.  Pass `subscope = null` to skip the table level.
 
-`updateRestrictions` prevents certain fields from being modified regardless of
-the `update` condition:
-
-```kotlin
-// Illustrative — not drift-checked.
-ModelPermissions(
-    create = Condition.Always,
-    read = Condition.Always,
-    update = Condition.Always,
-    delete = Condition.Always,
-    updateRestrictions = updateRestrictions {
-        it._id.cannotBeModified()       // primary key is immutable
-        it.author.cannotBeModified()    // author cannot be changed after creation
-    }
-)
-```
-
-`updateRestrictions { }` is in **blacklist mode** by default — every field is
-modifiable unless explicitly restricted.
-
-## Auth Scopes
-
-`ModelInfo.Scopes` maps endpoint categories to auth subscopes, allowing session
-tokens to be restricted to a subset of operations:
-
-| Scope | Endpoints |
+| Scope (`ModelInfo.Scopes`) | Endpoints |
 |---|---|
-| `ModelInfo.Scopes.read` | `list`, `query`, `queryPartial`, `textQuery`, `detail`, `count`, `groupCount`, `groupCount2`, `aggregate`, `groupAggregate`, `groupAggregate2`, `permissions` |
-| `ModelInfo.Scopes.create` | `insert`, `insertBulk` |
-| `ModelInfo.Scopes.create` + `update` | `upsert` |
-| `ModelInfo.Scopes.update` | `replace`, `bulkReplace`, `modify`, `modifyWithDiff`, `modifySimple`, `bulkModify` |
-| `ModelInfo.Scopes.delete` | `deleteItem`, `bulkDelete` |
+| `read` | `list`, `query`, `queryPartial`, `textQuery`, `detail`, `count`, the group/aggregate endpoints, `permissions`, `default` |
+| `create` | `insert`, `insertBulk` |
+| `create` and `update` | `upsert` |
+| `update` | `replace`, `bulkReplace`, `modify`, `modifyWithDiff`, `modifySimple`, `bulkModify` |
+| `delete` | `deleteItem`, `bulkDelete` |
 
-See [Proof & Session Authentication](proof-session.md) for how to issue
-read-only or restricted tokens.
+See [Proof & session authentication](proof-session.md) for issuing scoped tokens.
 
-## SDK and Documentation
+## `modelInfo` parameters
 
-Every endpoint created by `ModelRestEndpoints` is a typed `ApiHttpHandler`.
-When you use `module` (rather than bare `include`), the group participates in
-`FetcherSdk` and `TypescriptFetcherSdk` generation, and the generated client
-gets a named interface class (e.g. `PostRestEndpoints`).
+| Parameter | Purpose |
+|---|---|
+| `auth` | who may call at all, e.g. `UserAuth.require()` or `UserAuth.require() or AuthRequirement.None` |
+| `tableName` | collection name; required |
+| `subscope` | scope prefix for the endpoints (default: lowercased table name) |
+| `permissions` | `suspend AuthAccess<USER>.() -> ModelPermissions<T>`, run per request; see [Permissions](permissions.md) |
+| `signals` | wraps the table for every access; see [Advanced database](advanced-database.md#signals-and-interceptors) |
+| `systemAccess` | wraps only `info.table()` |
+| `prePermissionsForUser`, `postPermissionsForUser` | wrap a caller's table outside / inside the permission layer |
+| `log` | the auditing decorator |
 
-The live docs at `/meta/docs` display all model endpoints with their
-input/output schemas, and `/meta/openapi` exports a full OpenAPI 3.0 spec.
-See [Typed Endpoints, Errors & SDK Generation](typed-endpoints.md) for details.
+## Next
 
-## What's Next
-
-- **Realtime updates** — push insert/update/delete deltas to subscribed clients
-  via WebSocket: see the Realtime Model Sync chapter.
-- **Typed endpoints** — understand how `ApiHttpHandler` metadata (summaries,
-  error cases, examples) flows into the generated SDK:
-  [Typed Endpoints, Errors & SDK Generation](typed-endpoints.md).
-- **Database DSL** — `Condition {}` and `Modification {}` reference:
-  [Database & the Query DSL](database.md).
-- **Authentication** — setting up `PrincipalType` and `UserAuth.require()`:
-  [Authentication & Sessions](auth.md).
+- [Permissions](permissions.md): row rules, field masks, and update restrictions.
+- [Realtime model updates](model-realtime.md): add a live-query websocket to these endpoints.
+- [Client SDKs](client-sdks.md): calling the generated endpoints from Kotlin and TypeScript.
+- [Bulk endpoints](bulk-endpoints.md): batching many calls into one request.

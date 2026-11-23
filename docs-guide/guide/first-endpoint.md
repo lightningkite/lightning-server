@@ -1,13 +1,8 @@
-# Your First Endpoint
+# Your first endpoint
 
-Lightning Server is a Kotlin server framework that lets you define endpoints,
-route handlers, and typed APIs with minimal boilerplate.  This chapter walks
-you from an empty server definition to a tested, typed API endpoint.
+From an empty server to a tested, typed JSON endpoint.  Assumes the Gradle setup from [Setup](setup.md).
 
 ## Imports
-
-All examples in this chapter use the following imports.  Copy them to the top
-of your file:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/FirstEndpointSamples.kt#imports -->
 ```kotlin
@@ -23,11 +18,7 @@ import kotlinx.coroutines.*
 import kotlinx.serialization.*
 ```
 
-## The ServerBuilder
-
-Everything in Lightning Server starts with a `ServerBuilder`.  You extend it
-as an `object` — not a class — because every endpoint is a singleton that the
-framework discovers at build time.
+## A plain endpoint
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/FirstEndpointSamples.kt#hello-server -->
 ```kotlin
@@ -40,14 +31,8 @@ object HelloServer : ServerBuilder() {
 }
 ```
 
-`path` is a special property provided by `ServerBuilder` that represents the
-root URL of this object.  Calling `.get` on a path produces a route spec;
-`bind` (a `ServerBuilder` member, no import needed) attaches your handler to
-it.
-
-To exercise this endpoint call `SERVER.test {}`:
-
-> To wrap these examples in a test class, annotate your test methods with `@Test` — see [Testing Your Server](testing.md) for the complete `@Test` + `testBlocking` pattern.
+A server is an `object` extending `ServerBuilder`.  `path` is its root; `.get` picks the method, and `bind` attaches
+the handler.  Keep each endpoint in a `val` so tests and other code can refer to it.
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/FirstEndpointSamples.kt#hello-server-test -->
 ```kotlin
@@ -57,20 +42,11 @@ fun helloServerTest() = HelloServer.testBlocking(settings = {}) {
 }
 ```
 
-`testBlocking {}` spins up an ephemeral in-memory runtime, initialises all
-settings with their defaults, and then runs your block.  Inside the block every
-`HttpHandler` gains a `.test()` extension that fires a request and returns the
-response — no network, no server process.
+`testBlocking` builds an in-memory runtime with default settings and runs the suspending block, blocking the
+thread until it finishes, which is what a JUnit `@Test` method wants.  Inside it, `handler.test()` calls the
+endpoint directly: no port, no HTTP client.  See [Testing](testing.md).
 
-`testBlocking {}` takes a **suspend** action, so the `.test()` calls on handlers
-(which are themselves suspend) work directly with no `runBlocking` wrapper.  It
-blocks the calling thread until the action completes, which is what an ordinary
-`@Test` method wants.  See [Testing Your Server](testing.md) for the full story.
-
-## Path Parameters
-
-Add dynamic segments with `.arg<T>("name")`.  The parsed value lands in
-`request.path.arg1` (and `.arg2`, `.arg3` for subsequent arguments):
+## Path parameters
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/FirstEndpointSamples.kt#greet-server -->
 ```kotlin
@@ -84,7 +60,8 @@ object GreetServer : ServerBuilder() {
 }
 ```
 
-Pass the path argument value to `.test()`:
+`.arg<T>("name")` adds a typed segment; its parsed value is `request.path.arg1` (then `arg2`, `arg3`).  In tests,
+pass the values to `.test()`:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/FirstEndpointSamples.kt#greet-server-test -->
 ```kotlin
@@ -94,16 +71,12 @@ fun greetServerTest() = GreetServer.testBlocking(settings = {}) {
 }
 ```
 
-The framework handles URL encoding and decoding automatically; the string
-`"World"` is inserted into the path without escaping.
+More path shapes, query parameters, and sub-servers are in [Routing](routing.md).
 
-## Typed Endpoints
+## A typed endpoint
 
-`ApiHttpHandler` adds automatic JSON serialisation, input validation, OpenAPI
-documentation, and SDK generation on top of any endpoint.  It is the
-recommended choice for production APIs.
-
-Declare your input and output as plain `@Serializable` data classes:
+`ApiHttpHandler` takes and returns `@Serializable` types.  It is what you use for real APIs: it parses and
+validates input, serializes output, documents itself in OpenAPI, and appears in generated client SDKs.
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/FirstEndpointSamples.kt#echo-types -->
 ```kotlin
@@ -114,14 +87,12 @@ data class EchoRequest(val message: String)
 data class EchoResponse(val echo: String, val length: Int)
 ```
 
-Then bind the endpoint with `ApiHttpHandler`:
-
 <!-- sample: com/lightningkite/lightningserver/guide/samples/FirstEndpointSamples.kt#echo-server -->
 ```kotlin
 object EchoServer : ServerBuilder() {
     init { registerBasicMediaTypeCoders() }
 
-    // POST /echo — accepts typed JSON, returns typed JSON
+    // POST /echo
     val echo = path.path("echo").post bind ApiHttpHandler(
         summary = "Echo a message",
         description = "Returns the message back with its character count.",
@@ -136,39 +107,26 @@ object EchoServer : ServerBuilder() {
 }
 ```
 
-`ApiHttpHandler` infers `INPUT` and `OUTPUT` from the lambda's type annotation
-and resolves their serialisers automatically.  `noAuth` marks the endpoint as
-publicly accessible; the `implementation` lambda receives the deserialised
-input and must return the output — serialisation and HTTP status are handled
-for you.  The lambda body has access to a `ServerRuntime` context for calling
-services (database, cache, etc.); neither is used in this minimal example.
+- `registerBasicMediaTypeCoders()` registers JSON, form, and Kotlin-bytes bodies.  Without it the server can't read
+  or write `EchoRequest`.
+- `auth = noAuth` makes the endpoint public.  Use `UserAuth.require()` to demand a signed-in user (see
+  [Authentication](auth.md)).
+- The input and output types come from the lambda's parameter and return type.
 
-In tests, `ApiHttpHandler.test()` accepts the input object directly and
-returns the typed output — no JSON round-trip or `body.contains()` needed:
+A typed endpoint's `.test()` takes the authentication (here `null`) and the input, and returns the output:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/FirstEndpointSamples.kt#echo-server-test -->
 ```kotlin
 fun echoServerTest() = EchoServer.testBlocking(settings = {}) {
-    // ApiHttpHandler.test() accepts null auth for noAuth endpoints and
-    // returns the typed output directly — no JSON manipulation needed.
     val result = EchoServer.echo.test(null, EchoRequest("ping"))
     check(result.echo == "ping")
     check(result.length == 4)
 }
 ```
 
-The first argument to `.test()` is `null` because `noAuth` means there is no
-session object.  For authenticated endpoints you pass an
-`Authentication<YourUser>` value instead.
+## Next
 
-## What's Next
-
-- **Authenticated endpoints** — swap `noAuth` for `YourUser.require()`
-  to require a valid session token.
-- **Database access** — define a `setting("database", Database.Settings())`
-  and query it with the type-safe condition/modification DSL inside any handler.
-- **Error cases** — document expected failures with the `errorCases` parameter
-  on `ApiHttpHandler`; the framework maps them to HTTP status codes and
-  auto-generates client-side exception types.
-- **SDK generation** — run `./gradlew :demo:run --args="sdk"` to emit a
-  TypeScript or Kotlin client from your typed endpoint definitions.
+- [Running](running.md): serve `HelloServer` on a port
+- [Typed endpoints](typed-endpoints.md): error cases, status codes, examples
+- [Database](database.md): store and query models
+- [Client SDKs](client-sdks.md): generate a Kotlin or TypeScript client from these endpoints

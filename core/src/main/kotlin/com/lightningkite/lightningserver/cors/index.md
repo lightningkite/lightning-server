@@ -107,9 +107,9 @@ Run tests with:
 
 ## Related Documentation
 
-- [CORS Documentation](../../../../../../../../docs/cors.md) - Complete guide to using CORS
-- [Endpoints Documentation](../../../../../../../../docs/endpoints.md) - HTTP endpoint definition
-- [WebSockets Documentation](../../../../../../../../docs/websockets.md) - WebSocket configuration
+- [CORS Documentation](https://github.com/lightningkite/lightning-server/blob/master/docs-guide/guide/cors-interceptors.md) - Complete guide to using CORS
+- [Endpoints Documentation](https://github.com/lightningkite/lightning-server/blob/master/docs-guide/guide/routing.md) - HTTP endpoint definition
+- [WebSockets Documentation](https://github.com/lightningkite/lightning-server/blob/master/docs-guide/guide/websockets.md) - WebSocket configuration
 
 ## Common Issues
 

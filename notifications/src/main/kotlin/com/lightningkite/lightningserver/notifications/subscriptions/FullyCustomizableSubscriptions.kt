@@ -159,7 +159,8 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
                 readPermissions = readPermissions(principal, user),
                 email = it.email,
                 sms = it.sms,
-                push = it.push
+                push = it.push,
+                inApp = it.inApp,
             )
         }
 
@@ -299,6 +300,7 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
                         email = keepUserChanges { it.email },
                         sms = keepUserChanges { it.sms },
                         push = keepUserChanges { it.push },
+                        inApp = keepUserChanges { it.inApp },
                     )
 
                     if (updated == stored) continue

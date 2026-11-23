@@ -1,289 +1,293 @@
 # WebSockets
 
-WebSocket endpoints in Lightning Server use the same path-builder syntax as
-HTTP endpoints.  The framework manages the connection lifecycle, subscription
-routing, and per-connection state; your code supplies four lifecycle callbacks.
+Bind a `WebSocketHandler` to a path to accept socket connections.  The handler is a set of lifecycle callbacks plus a
+serializable per-connection state, so the same code runs on a single process and on serverless engines where every
+frame may reach a different instance.  Broadcasts go through typed pub/sub topics.
 
-## Imports
-
-All examples in this chapter use the following imports:
-
-<!-- sample: com/lightningkite/lightningserver/guide/samples/WebSocketsSamples.kt#websockets-imports -->
+<!-- sample: com/lightningkite/lightningserver/guide/samples/WebSocketsSamples.kt#ws-echo -->
 ```kotlin
-import com.lightningkite.lightningserver.*
-import com.lightningkite.lightningserver.definition.builder.*
-import com.lightningkite.lightningserver.http.*
-import com.lightningkite.lightningserver.runtime.*
-import com.lightningkite.lightningserver.runtime.test.*
-import com.lightningkite.lightningserver.websockets.*
-import kotlin.test.*
-import kotlinx.coroutines.*
-import kotlinx.serialization.builtins.serializer
-```
-
-`com.lightningkite.lightningserver.runtime.*` is required for
-`WebSocketTopic.send(value)` and related runtime extensions.
-`com.lightningkite.lightningserver.websockets.*` brings in `WebSocketHandler`,
-`WebSocketFrame`, `WebSocketConnection`, and the `send(String)` / `send(ByteArray)`
-convenience extensions on connections.
-
-## Defining a WebSocket Endpoint
-
-Use `path.… bind WebSocketHandler(…)` to register a WebSocket handler on a
-path.  `WebSocketHandler` is a factory function that accepts four named
-callbacks:
-
-<!-- sample: com/lightningkite/lightningserver/guide/samples/WebSocketsSamples.kt#echo-ws-server -->
-```kotlin
-object EchoWsServer : ServerBuilder() {
-
-    // ws:// /echo — echoes every text frame back to the client with a prefix
-    //
-    // WebSocketHandler takes four lifecycle callbacks:
-    //   willConnect  — called BEFORE the connection is established; returns STORAGE
-    //   didConnect   — called AFTER the connection is established
-    //   messageFromClient — called for each incoming frame from the client
-    //   disconnect   — called when the connection closes
-    //
-    // STORAGE is the per-connection state. Here it is Unit — the echo handler
-    // needs no per-connection data. For stateful handlers (e.g. tracking a username
-    // or a room), use a data class.
+object WsEchoServer : ServerBuilder() {
+    // ws://.../echo
     val echo = path.path("echo") bind WebSocketHandler(
-        storageSerializer = Unit.serializer(),
         willConnect = { Unit },
-        didConnect = {
-            // Send a greeting frame as soon as the client connects.
-            send("Echo server ready")
-        },
-        messageFromClient = { frame ->
-            // `frame` is a WebSocketFrame — either Text or Binary.
-            // WebSocketFrame.text is a convenience property that returns the string
-            // content for text frames (hex for binary).
-            send("Echo: ${frame.text}")
-        },
-        disconnect = { /* no cleanup needed */ }
+        didConnect = { send("Echo server ready") },
+        messageFromClient = { frame -> send("Echo: ${frame.text}") },
     )
 }
 ```
 
-The four callbacks and their contexts:
-
-| Callback | Context receiver | Called when |
-|---|---|---|
-| `willConnect` | `ServerRuntime` | Client initiates a connection (before it is accepted) |
-| `didConnect` | `WebSocketConnection<PATH, STORAGE>` | Connection is established |
-| `messageFromClient` | `WebSocketConnection<PATH, STORAGE>` | Client sends a frame |
-| `disconnect` | `WebSocketConnection<PATH, STORAGE>` | Client disconnects or `close()` is called |
-
-`willConnect` returns the initial **STORAGE** value.  The STORAGE type is
-the per-connection state — a data class, a session ID string, a database row,
-anything you need.  It is accessible as `currentState` inside `didConnect`,
-`messageFromClient`, and `disconnect`.
-
-Inside any callback that receives `WebSocketConnection` as context:
-
-- `send(frame)` / `send(text: String)` / `send(bytes: ByteArray)` — send a
-  frame to this client.
-- `close(reason)` — close the connection programmatically.
-- `currentState` — the current STORAGE value.
-- `updateStateImmediately { old -> new }` — atomically update the state.
-
-## Testing a WebSocket Endpoint
-
-`WebSocketHandler.test()` is available inside a `testBlocking {}` block.  It runs
-`willConnect` and `didConnect` synchronously, returns a `TestWebSocket`, and
-gives you `send()` and `onMessageSent` to drive the conversation:
-
-<!-- sample: com/lightningkite/lightningserver/guide/samples/WebSocketsSamples.kt#echo-ws-test -->
+<!-- sample: com/lightningkite/lightningserver/guide/samples/WebSocketsSamples.kt#ws-echo-test -->
 ```kotlin
-fun echoWsTest() = EchoWsServer.testBlocking(settings = {}) {
-    // .test() on a WebSocketHandler returns a TestWebSocket.
-    // The connection is fully established (willConnect + didConnect already ran).
+fun wsEchoTest() = WsEchoServer.testBlocking(settings = {}) {
     val received = mutableListOf<String>()
-
-    val ws = EchoWsServer.echo.test()
-
-    // Capture frames the server sends back via onMessageSent.
+    val ws = WsEchoServer.echo.test()
     ws.onMessageSent = { frame -> received.add(frame.text) }
 
-    // The didConnect greeting arrives before test() returns, so it's already in
-    // the received list if the handler sent it synchronously. In this case the
-    // greeting was sent in didConnect which ran before test() returned.
-    // We reset and only check the echo:
-    received.clear()
-
-    // Send a text frame to the server.
     ws.send(WebSocketFrame("hello"))
-
-    // The server's messageFromClient ran synchronously; received now holds the reply.
-    check(received.size == 1) { "Expected 1 reply, got ${received.size}" }
-    check(received[0] == "Echo: hello") { "Unexpected reply: ${received[0]}" }
-
+    check(received == listOf("Echo: hello"))
     ws.close()
 }
 ```
 
-The `TestWebSocket` API:
+Imports used in this chapter:
 
-- `ws.send(frame)` — deliver a frame to the server's `messageFromClient`
-- `ws.onMessageSent = { frame -> … }` — callback invoked when the server calls
-  `send()` on the connection
-- `ws.close()` — trigger `disconnect` and clean up subscriptions
-- `ws.currentState` — the current STORAGE value for this connection
-
-In the test runtime, all callbacks (including `messageFromClient`) execute
-synchronously before `ws.send()` returns.  There is no async delivery; checking
-`received` immediately after `ws.send(…)` is safe.
-
-## Topics: Server-to-Client Push
-
-A **topic** is a named pub/sub channel.  Declare it on any path, then
-subscribe connections to it in `didConnect`.  Any code with a `ServerRuntime`
-in context — an HTTP endpoint, a scheduled task, another WebSocket handler —
-can publish to a topic to push messages to all subscribed connections:
-
-<!-- sample: com/lightningkite/lightningserver/guide/samples/WebSocketsSamples.kt#pubsub-ws-server -->
+<!-- sample: com/lightningkite/lightningserver/guide/samples/WebSocketsSamples.kt#websockets-imports -->
 ```kotlin
-object BroadcastServer : ServerBuilder() {
+import com.lightningkite.lightningserver.*
+import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.definition.builder.*
+import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.runtime.*
+import com.lightningkite.lightningserver.runtime.test.*
+import com.lightningkite.lightningserver.serialization.*
+import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.lightningserver.websockets.*
+import com.lightningkite.services.pubsub.PubSub
+import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.*
+import kotlinx.serialization.builtins.serializer
+```
 
-    // A topic is a named pub/sub channel. Declare it on any PathSpec in your ServerBuilder.
-    // Any number of WebSocket connections can subscribe to the same topic.
-    // The server (or any HTTP endpoint) can publish to the topic to push messages to all subscribers.
-    val announcementTopic = path.path("announce-topic").topic(String.serializer())
+## Lifecycle
 
-    // POST /announce — HTTP endpoint that publishes to the topic
-    val announce = path.path("announce").post bind HttpHandler { request ->
-        val message = request.body!!.text()
-        // send() on a topic pushes to all subscribed WebSocket connections.
-        announcementTopic.send(message)
-        HttpResponse.plainText("Announced: $message")
-    }
+| Callback | Receiver / context | Runs when |
+|---|---|---|
+| `willConnect(request)` | `ServerRuntime` receiver | A client asks to connect.  Returns the connection's initial state; throwing rejects the connection |
+| `didConnect` | the connection, with a `ServerRuntime` in context | The connection is open |
+| `messageFromClient(frame)` | the connection | A frame arrives (`WebSocketFrame.Text` or `.Binary`; `frame.text` gives a string either way) |
+| `topicHandlers { }` | the connection | A message arrives on a subscribed topic |
+| `disconnect(reason)` | the connection | The socket closed, from either side |
 
-    // ws:// /listen — clients subscribe to the announcement topic and receive pushes
-    val listen = path.path("listen") bind WebSocketHandler(
-        storageSerializer = Unit.serializer(),
-        willConnect = { Unit },
-        didConnect = {
-            // subscribe() registers this connection to receive messages from the topic.
-            // The topicHandlers block below decides what to do when a message arrives.
-            subscribe(announcementTopic)
+Inside the connection callbacks:
+
+- `currentState` is the state `willConnect` returned.  Change it with `updateStateImmediately { old -> new }`, or
+  `queueStateUpdate { }` to write it once the callback finishes.
+- `send(text)`, `send(bytes)`, `send(frame)` send to this client.
+- `subscribe(topic, pathArgs...)` / `unsubscribe(...)` join and leave topics.
+- `close(reason)` closes the socket, with a `WebSocketClose` such as `WebSocketClose.NORMAL` or
+  `WebSocketClose(WebSocketClose.Code.VIOLATED_POLICY, "Not allowed")`.
+- `request` is the original `WebSocketConnectRequest`: path arguments, query parameters, headers.
+
+Each phase is its own execution (on AWS, its own Lambda invocation), sharing only the connection's `socketId` and its
+state.  Keep anything a later phase needs in the state, not in a local variable or an in-memory map.  The state's type
+must be `@Serializable` for the same reason.
+
+## Topics and per-connection state
+
+A topic is a typed channel declared on a path.  Connections subscribe to it; anything with a `ServerRuntime` (an HTTP
+handler, a task, another socket) publishes to it, and every subscriber's handler runs.  A topic with path arguments is
+one channel per value, here one per room:
+
+<!-- sample: com/lightningkite/lightningserver/guide/samples/WebSocketsSamples.kt#ws-chat -->
+```kotlin
+@Serializable
+data class ChatMember(val room: String, val name: String)
+
+object WsChatServer : ServerBuilder() {
+    // One channel per room id.
+    val roomTopic = path.path("room-topic").arg<String>("room").topic(String.serializer())
+
+    // ws://.../rooms/{room}?name=...
+    val room = path.path("rooms").arg<String>("room") bind WebSocketHandler(
+        willConnect = { request ->
+            val name = request.queryParameters["name"] ?: throw BadRequestException("Missing name")
+            ChatMember(room = request.path.arg1, name = name)
+        },
+        didConnect = { subscribe(roomTopic, currentState.room) },
+        messageFromClient = { frame ->
+            roomTopic.send(currentState.room, "${currentState.name}: ${frame.text}")
         },
         topicHandlers = {
-            // Bind a handler for each topic this connection subscribes to.
-            // `message.value` is the typed payload published to the topic.
-            announcementTopic bind { message ->
-                send(message.value)
-            }
+            roomTopic bind { message -> send(message.value) }
         },
-        disconnect = { /* unsubscription is automatic on close */ }
+    )
+
+    // POST /rooms/{room}/announce — any code with a ServerRuntime can publish
+    val announce = path.path("rooms").arg<String>("room").path("announce").post bind HttpHandler { request ->
+        roomTopic.send(request.path.arg1, "Announcement: ${request.body?.text()}")
+        HttpResponse()
+    }
+}
+```
+
+<!-- sample: com/lightningkite/lightningserver/guide/samples/WebSocketsSamples.kt#ws-chat-test -->
+```kotlin
+fun wsChatTest() = WsChatServer.testBlocking(settings = {}) {
+    val lobby = mutableListOf<String>()
+    val other = mutableListOf<String>()
+    val ann = WsChatServer.room.test("lobby", queryParameters = QueryParameters.parse("name=Ann"))
+    val bob = WsChatServer.room.test("lobby", queryParameters = QueryParameters.parse("name=Bob"))
+    val cy = WsChatServer.room.test("garden", queryParameters = QueryParameters.parse("name=Cy"))
+    bob.onMessageSent = { lobby.add(it.text) }
+    cy.onMessageSent = { other.add(it.text) }
+
+    ann.send(WebSocketFrame("hi"))
+    check(lobby == listOf("Ann: hi"))
+    check(other.isEmpty())
+
+    // Publishing needs a ServerRuntime, which execute { } provides in a test.
+    execute { WsChatServer.roomTopic.send("garden", "Watering at noon") }
+    check(other == listOf("Watering at noon"))
+
+    ann.close()
+    bob.close()
+    cy.close()
+}
+```
+
+The test runner delivers frames and topic messages synchronously, so checks right after `send` are safe.  Pass path
+arguments to `.test()` first, then `queryParameters`, `headers`, and so on.
+
+Subscriptions end when the socket closes.
+
+## Typed sockets
+
+`ApiWebSocketHandler` (in `typed`) decodes each frame into an input type, encodes what you `send` from an output type,
+checks an auth requirement on connect, and appears in generated SDKs:
+
+<!-- sample: com/lightningkite/lightningserver/guide/samples/WebSocketsSamples.kt#ws-typed -->
+```kotlin
+@Serializable
+data class PriceRequest(val symbol: String)
+
+@Serializable
+data class PriceUpdate(val symbol: String, val cents: Long)
+
+object WsPriceServer : ServerBuilder() {
+    init { registerBasicMediaTypeCoders() }
+
+    val prices = path.path("prices") bind ApiWebSocketHandler(
+        summary = "Prices",
+        description = "Send a symbol; receive its price.",
+        auth = noAuth,
+        willConnectType = { _ -> Unit },
+        messageFromClientType = { request: PriceRequest ->
+            send(PriceUpdate(request.symbol, cents = 12_345))
+        },
     )
 }
 ```
 
-The test publishes directly to the topic (no HTTP round-trip needed) and
-confirms both connections receive the frame. Sending needs a `ServerRuntime`, so
-the test does it inside `execute { }`:
-
-<!-- sample: com/lightningkite/lightningserver/guide/samples/WebSocketsSamples.kt#pubsub-ws-test -->
+<!-- sample: com/lightningkite/lightningserver/guide/samples/WebSocketsSamples.kt#ws-typed-test -->
 ```kotlin
-fun broadcastWsTest() = BroadcastServer.testBlocking(settings = {}) {
+fun wsTypedTest() = WsPriceServer.testBlocking(settings = {}) {
     val received = mutableListOf<String>()
+    val ws = WsPriceServer.prices.test()
+    ws.onMessageSent = { received.add(it.text) }
 
-    // Connect two clients.
-    val ws1 = BroadcastServer.listen.test()
-    val ws2 = BroadcastServer.listen.test()
-    ws1.onMessageSent = { received.add("ws1:${it.text}") }
-    ws2.onMessageSent = { received.add("ws2:${it.text}") }
-
-    // Publish as the test's own work. sendWebSocketSubscriptionMessage is dispatched
-    // synchronously in the test runtime, so both connections receive the frame
-    // before the next line executes.
-    execute { BroadcastServer.announcementTopic.send("hello everyone") }
-
-    check(received.contains("ws1:hello everyone"))
-    check(received.contains("ws2:hello everyone"))
-
-    ws1.close()
-    ws2.close()
+    ws.send(WebSocketFrame("""{"symbol":"LK"}"""))
+    check(received == listOf("""{"symbol":"LK","cents":12345}"""))
+    ws.close()
 }
 ```
 
-Topic key points:
+- The callbacks are `willConnectType`, `didConnectType`, `messageFromClientType`, `topicHandlersType`, and
+  `disconnectType`.  `willConnectType` receives an access object (`access.request`, `access.authOrNull`); the others can
+  call `auth()` for the caller.
+- The format is the client's `Accept` or `Content-Type` header, or the `Accept` / `Content-Type` query parameter, since
+  browsers can't set headers on sockets.  It defaults to JSON.
+- A blank text frame is a keep-alive: the server answers with `" "` instead of decoding it.
+- A frame that doesn't decode closes the socket as a bad request.
 
-- Topics are **typed**: `path.topic(String.serializer())` creates a
-  `WebSocketTopic<PATH, String>`.  The `send(value)` and `bind { message ->
-  message.value }` calls are type-safe.
-- Topics are **scoped to paths**: the path determines the subscription key.
-  Two topics at different paths are distinct even if they have the same message
-  type.
-- **Topics with path arguments** (e.g. `path.path("room").arg<String>("id")
-  .topic(Message.serializer())`) let you scope subscriptions per-resource —
-  each room ID is a separate channel.  The `subscribe(topic, path1)` extension
-  passes the argument; `topic.send(path1, value)` targets a specific channel.
+`ModelRestUpdatesWebSocket` builds on this to stream database changes; see [Model realtime](model-realtime.md).
 
-## Connection State (STORAGE)
+## Authentication
 
-`willConnect` returns the initial STORAGE value.  Use it to capture
-anything the connection needs for the lifetime of the session — a session ID,
-an authenticated user ID, a room name extracted from query parameters:
+Browsers can't set an `Authorization` header on a WebSocket, so the session manager also reads the token from an
+`Authorization` or `jwt` query parameter (`wss://api.example.com/rooms/lobby?jwt=...`) and from an `Authorization`
+cookie.  Prefer the header where the client can set one: URLs end up in logs.  See [Authentication](auth.md).
 
+## Multiplexing
+
+`MultiplexWebSocketHandler` lets a client open many logical sockets over one connection:
+
+<!-- sample: com/lightningkite/lightningserver/guide/samples/WebSocketsSamples.kt#ws-multiplex -->
 ```kotlin
-// Illustrative.
-val chat = path.path("chat") bind WebSocketHandler(
-    storageSerializer = String.serializer(),  // STORAGE is a username String
-    willConnect = { request ->
-        // request is WebSocketConnectRequest; read query params, headers, etc.
-        request.queryParameters["username"] ?: "anonymous"
-    },
-    didConnect = {
-        // currentState is the username returned by willConnect
-        send("Welcome, $currentState!")
-    },
-    messageFromClient = { frame ->
-        chatTopic.send("$currentState: ${frame.text}")
-    },
-    disconnect = {}
-)
+object WsAppServer : ServerBuilder() {
+    val chat = path.path("chat") include WsChatServer
+
+    // One physical socket that carries many logical ones.
+    val multiplex = path.path("multiplex") bind MultiplexWebSocketHandler()
+}
 ```
 
-`updateStateImmediately { old -> new }` atomically replaces the state.
-`queueStateUpdate { old -> new }` schedules an update to run after the current
-callback completes — useful for high-frequency writes where strict ordering
-within a single callback isn't required.
+Every frame on it is a JSON `MultiplexMessage`:
 
-## WebSocket Paths with Arguments
-
-WebSocket handlers support path arguments using the same syntax as HTTP
-endpoints:
-
-```kotlin
-// Illustrative.
-// ws:// /rooms/{roomId}
-val room = path.path("rooms").arg<String>("roomId") bind WebSocketHandler(
-    storageSerializer = String.serializer(),
-    willConnect = { request ->
-        // Access the first path argument via request.path.arg1
-        request.path.arg1
-    },
-    didConnect = {
-        // currentState is the roomId
-        subscribe(roomTopic, currentState)
-    },
-    // …
-)
+```json
+{ "channel": "c1", "path": "/chat/rooms/lobby", "queryParams": { "name": ["Ann"] }, "start": true }
+{ "channel": "c1", "data": "hi" }
+{ "channel": "c1", "end": true }
 ```
 
-The `.test()` extension for handlers with path arguments takes the argument as
-its first parameter:
+`start` opens a virtual socket on `path` (any socket endpoint on the server; the server echoes the `start` back once it
+is open), `data` carries a frame in either direction, and `end` closes it.  A failure comes back as an `end` message
+with an `error`.  Query parameters of the physical socket apply to every virtual one.  Virtual sockets run the normal
+lifecycle; `WebSocketInterceptor`s wrap only the physical socket, while `ExecutionInterceptor`s (access logs, auditing)
+see every virtual phase.
 
+## Coroutine-style handlers
+
+When a socket reads more naturally as a loop than as callbacks, extend `CoroutineWebSocketHandler` and `include` it.  It
+runs `handle` as one coroutine per connection, with frames as a `Flow`:
+
+<!-- sample: com/lightningkite/lightningserver/guide/samples/WebSocketsSamples.kt#ws-coroutine -->
 ```kotlin
-// Illustrative.
-val ws = MyServer.room.test("lobby")  // path1 = "lobby"
+object WsCoroutineServer : ServerBuilder() {
+    val pubsub = setting("pubsub", PubSub.Settings())
+
+    // ws://.../count
+    val counter = path.path("count") include object : CoroutineWebSocketHandler() {
+        override val pubSub = this@WsCoroutineServer.pubsub
+
+        context(serverRuntime: ServerRuntime)
+        override suspend fun handle(
+            request: WebSocketConnectRequest<PathSpec0>,
+            waitForFullConnect: suspend () -> Unit,
+            incoming: Flow<WebSocketFrame>,
+            send: suspend (WebSocketFrame) -> Unit,
+        ) {
+            waitForFullConnect()
+            var count = 0
+            incoming.collect { frame ->
+                count++
+                send(WebSocketFrame("$count: ${frame.text}"))
+            }
+        }
+    }
+}
 ```
 
-> The code above is illustrative and verified against the `WebSocketHandler`
-> builder signature in `core/src/main/kotlin/.../websockets/WebSocketHandler.kt`
-> and `TestRunner.ext.kt`.  Path-argument WebSocket examples cannot be added
-> as drift-checked regions here because the sample `ServerBuilder` objects for
-> this chapter do not declare rooms — the pattern is identical to the echo and
-> broadcast examples above.
+Call `waitForFullConnect()` before sending.  On local engines `handle` runs directly against the socket; on serverless
+engines it runs as a task and frames travel through the given `PubSub`, so that must be a shared backend (such as
+Redis) in production.
+
+## Settings
+
+| Setting | Default | Purpose |
+|---|---|---|
+| `webSocketSettings.ping` | 30 seconds | How often the server pings each socket; `null` disables pings |
+| `webSocketSettings.pongTimeout` | 15 seconds | How long a ping may go unanswered before the socket is closed |
+| `webSocketSettings.maxFrameSize` | 16 MiB | Largest frame in either direction; `null` is unbounded |
+| `engine-pubSub` | `local` | Pub/sub backend for topic delivery on local engines.  Use a shared one (`redis://...`) when running several instances |
+| `forceWebSocketPubSub` | `false` | Route sockets through pub/sub on local engines too, to exercise the serverless path |
+
+The ping defaults are stricter than the engines' own: without pings, a client that stops reading holds buffers forever.
+
+## Engines
+
+The lifecycle above is the same everywhere; the machinery differs.
+
+- **Local engines** (Ktor, Netty, JDK) keep sockets in process.  Topic messages go through `engine-pubSub`, so several
+  instances need a shared backend.
+- **AWS (API Gateway + Lambda)** stores each connection's state and subscriptions in DynamoDB, and each phase may run on
+  a different Lambda.  That is why the state is serializable and cross-connection messages use topics.
+
+See [Engines](engines.md).
+
+## Next
+
+- [Model realtime](model-realtime.md): live database queries over a socket.
+- [Pub/sub](pubsub.md): the pub/sub service behind topics.
+- [CORS and interceptors](cors-interceptors.md): `WebSocketInterceptor` and origin checks.
+- [Client SDKs](client-sdks.md): typed sockets as `ClientWebSocket` in Kotlin clients.

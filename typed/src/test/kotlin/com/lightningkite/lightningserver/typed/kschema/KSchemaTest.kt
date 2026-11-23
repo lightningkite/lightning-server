@@ -33,7 +33,6 @@ class KSchemaTest {
         )
         val meta = path.path("meta") include MetaEndpoints(
             packageName = "com.lightningkite.lightningserver.typed.kschema",
-            database = database,
             cache = cache
         )
     }

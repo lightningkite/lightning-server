@@ -87,4 +87,4 @@ object Server : ServerBuilder() {
 
 ## Related Documentation
 
-See [Serialization](../../../../../../../../docs/serialization.md) for comprehensive usage guide and examples.
+See [Serialization](https://github.com/lightningkite/lightning-server/blob/master/docs-guide/guide/serialization.md) for comprehensive usage guide and examples.

@@ -223,7 +223,7 @@ object Server : ServerBuilder() {
         }
     }
 
-    val meta = path.path("meta") module MetaEndpoints("com.lightningkite.lightningserver.demo", database, cache)
+    val meta = path.path("meta") module MetaEndpoints("com.lightningkite.lightningserver.demo", cache)
 
     val pins = PinHandler(cache, "pins")
     val proofPhone = path.path("proof").path("phone") module SmsProofEndpoints(pins, sms)

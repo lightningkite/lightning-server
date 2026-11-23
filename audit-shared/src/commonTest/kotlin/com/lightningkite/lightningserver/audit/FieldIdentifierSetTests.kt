@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.audit
 
+import com.lightningkite.lightningserver.data.*
 import com.lightningkite.services.data.Unsafe
 import com.lightningkite.services.data.UuidV7
 import com.lightningkite.services.database.Condition
@@ -24,8 +25,8 @@ class FieldIdentifierSetTests {
     fun `an index lands in the segment and position the layout promises`() {
         for (index in 0 until FieldIdentifierSet.CAPACITY) {
             val indices = fieldIds(index)
-            val s = index / BitIndices.CAPACITY
-            assertEquals(bitIndicesOf(index % BitIndices.CAPACITY), indices.segment(s), "index $index landed wrong")
+            val s = index / IntBitIndices.CAPACITY
+            assertEquals(intBitIndicesOf(index % IntBitIndices.CAPACITY), indices.segment(s), "index $index landed wrong")
             for (other in 0 until FieldIdentifierSet.SEGMENTS) {
                 if (other != s) assertTrue(indices.segment(other).isEmpty(), "index $index leaked into segment $other")
             }
@@ -171,11 +172,11 @@ class FieldIdentifierSetTests {
     @Test
     fun `the top bit of a segment produces the mask and segment the layout promises`() {
         assertEquals(
-            Condition.OnField(FieldIdentifierSet.fields1, Condition.OnField(BitIndices.mask, Condition.IntBitsAnySet(1 shl 31))),
+            Condition.OnField(FieldIdentifierSet.fields1, Condition.OnField(IntBitIndices.mask, Condition.IntBitsAnySet(1 shl 31))),
             Condition<FieldIdentifierSet> { it.containsAny(fieldIds(32)) },
         )
         assertEquals(
-            Condition.OnField(FieldIdentifierSet.fields0, Condition.OnField(BitIndices.mask, Condition.IntBitsSet(1 shl 31))),
+            Condition.OnField(FieldIdentifierSet.fields0, Condition.OnField(IntBitIndices.mask, Condition.IntBitsSet(1 shl 31))),
             Condition<FieldIdentifierSet> { it.containsAll(fieldIds(0)) },
         )
     }

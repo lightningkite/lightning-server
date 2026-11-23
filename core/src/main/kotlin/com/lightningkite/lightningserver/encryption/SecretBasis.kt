@@ -6,6 +6,7 @@ import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.algorithms.*
 import dev.whyoleg.cryptography.materials.EncodingFormat
 import dev.whyoleg.cryptography.operations.SecretDerivation
+import dev.whyoleg.cryptography.random.CryptographyRandom
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.*
@@ -43,8 +44,8 @@ public data class SecretBasis(public val string: String) {
         /** The byte length of the secret key (64 bytes) */
         public const val BYTES: Int = BITS / 8
 
-        /** Expected character count for Base64-encoded representation */
-        public const val BASE64_CHARS: Int = 66
+        /** Character count of [BYTES] encoded as Base64 */
+        public const val BASE64_CHARS: Int = 88
     }
 
     /**
@@ -53,26 +54,25 @@ public data class SecretBasis(public val string: String) {
      * This constructor generates a new random 512-bit key suitable for use as
      * a master secret. The generated key is immediately Base64-encoded for storage.
      */
-    public constructor() : this(
-        CryptographyProvider.Default.get(HMAC)
-            .keyGenerator(SHA512)
-            .generateKeyBlocking()
-            .encodeToByteArrayBlocking(HMAC.Key.Format.RAW)
-            .let(Base64::encode)
-    )
+    public constructor() : this(Base64.encode(CryptographyRandom.nextBytes(BYTES)))
 
     /**
      * The raw byte array representation of this SecretBasis.
      *
-     * Decodes the Base64 string and extracts exactly [BYTES] (64) bytes.
+     * Decodes the Base64 string and keeps its first [BYTES] (64) bytes.
      * This property is not serialized and is recalculated on deserialization.
      */
     @Transient
-    public val bytes: ByteArray = Base64.decode(string).sliceArray(0 until BYTES)
-
-    init {
-        require(bytes.size == BYTES) { "Expected $BYTES bytes, got ${bytes.size}" }
+    public val bytes: ByteArray = Base64.decode(string).let { decoded ->
+        require(decoded.size >= BYTES) {
+            "SecretBasis must be Base64 of at least $BYTES bytes ($BASE64_CHARS characters), but decodes to ${decoded.size} bytes"
+        }
+        // Extra bytes are dropped rather than rejected: TerraformNeed<SecretBasis>.generated() makes 88 random
+        // Base64 characters, which decode to 66 bytes, and deployed servers hold such values.
+        decoded.sliceArray(0 until BYTES)
     }
+
+    override fun toString(): String = "SecretBasis(****)"
 
     @Transient
     @Volatile

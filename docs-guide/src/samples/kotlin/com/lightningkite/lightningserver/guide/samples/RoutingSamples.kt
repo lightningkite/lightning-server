@@ -6,120 +6,178 @@ import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.test.*
-import kotlinx.coroutines.*
+import com.lightningkite.services.data.*
+import kotlinx.html.*
+import kotlin.time.Duration.Companion.minutes
 // endregion routing-imports
 
-// region nested-paths
-object NestedServer : ServerBuilder() {
+// region routing-minimal
+object RoutingServer : ServerBuilder() {
+    // GET /hello
+    val hello = path.path("hello").get bind HttpHandler {
+        HttpResponse.plainText("Hello!")
+    }
 
-    // GET /api/v1/status
-    val status = path.path("api").path("v1").path("status").get bind HttpHandler {
-        HttpResponse.plainText("OK")
+    // GET /users/{id}
+    val user = path.path("users").arg<Int>("id").get bind HttpHandler { request ->
+        HttpResponse.plainText("User ${request.path.arg1}")
     }
 }
-// endregion nested-paths
+// endregion routing-minimal
 
-// region nested-paths-test
-fun nestedPathsTest() = NestedServer.testBlocking(settings = {}) {
-    val response = NestedServer.status.test()
-    check(response.body?.text() == "OK")
+// region routing-minimal-test
+fun routingMinimalTest() = RoutingServer.testBlocking(settings = {}) {
+    check(RoutingServer.hello.test().body?.text() == "Hello!")
+    check(RoutingServer.user.test(42).body?.text() == "User 42")
 }
-// endregion nested-paths-test
+// endregion routing-minimal-test
 
-// region http-methods
-object ItemServer : ServerBuilder() {
+// region routing-methods
+object RoutingItemServer : ServerBuilder() {
+    val items = path.path("items").arg<String>("id")
 
-    // PUT /items/{id} — replace an item entirely
-    val replace = path.path("items").arg<String>("id").put bind HttpHandler { request ->
+    val replace = items.put bind HttpHandler { request ->
         HttpResponse.plainText("Replaced ${request.path.arg1}")
     }
-
-    // PATCH /items/{id} — update fields on an item
-    val update = path.path("items").arg<String>("id").patch bind HttpHandler { request ->
+    val update = items.patch bind HttpHandler { request ->
         HttpResponse.plainText("Updated ${request.path.arg1}")
     }
-
-    // DELETE /items/{id} — remove an item
-    val remove = path.path("items").arg<String>("id").delete bind HttpHandler { request ->
+    val remove = items.delete bind HttpHandler { request ->
         HttpResponse.plainText("Deleted ${request.path.arg1}")
     }
 }
-// endregion http-methods
+// endregion routing-methods
 
-// region http-methods-test
-fun httpMethodsTest() = ItemServer.testBlocking(settings = {}) {
-    val replaced = ItemServer.replace.test("42")
-    check(replaced.body?.text() == "Replaced 42")
-
-    val updated = ItemServer.update.test("42")
-    check(updated.body?.text() == "Updated 42")
-
-    val deleted = ItemServer.remove.test("42")
-    check(deleted.body?.text() == "Deleted 42")
+// region routing-methods-test
+fun routingMethodsTest() = RoutingItemServer.testBlocking(settings = {}) {
+    check(RoutingItemServer.replace.test("42").body?.text() == "Replaced 42")
+    check(RoutingItemServer.update.test("42").body?.text() == "Updated 42")
+    check(RoutingItemServer.remove.test("42").body?.text() == "Deleted 42")
 }
-// endregion http-methods-test
+// endregion routing-methods-test
 
-// region multi-arg-server
-object PostServer : ServerBuilder() {
-
+// region routing-multi-arg
+object RoutingPostServer : ServerBuilder() {
     // GET /users/{userId}/posts/{postId}
-    // arg<String> produces PathSpec1<String>; chaining arg<Int> produces PathSpec2<String, Int>.
-    // Access the first argument as arg1 and the second as arg2.
     val getPost = path.path("users").arg<String>("userId")
         .path("posts").arg<Int>("postId").get bind HttpHandler { request ->
-        val userId = request.path.arg1
-        val postId = request.path.arg2
-        HttpResponse.plainText("User $userId, post $postId")
+            HttpResponse.plainText("User ${request.path.arg1}, post ${request.path.arg2}")
+        }
+}
+// endregion routing-multi-arg
+
+// region routing-multi-arg-test
+fun routingMultiArgTest() = RoutingPostServer.testBlocking(settings = {}) {
+    check(RoutingPostServer.getPost.test("alice", 7).body?.text() == "User alice, post 7")
+}
+// endregion routing-multi-arg-test
+
+// region routing-trailing
+object RoutingFilesServer : ServerBuilder() {
+    // GET /files/{...} matches /files/a, /files/a/b/c, ...
+    val file = path.path("files").any.get bind HttpHandler { request ->
+        HttpResponse.plainText("File ${request.path.trailingSegments}")
     }
 }
-// endregion multi-arg-server
+// endregion routing-trailing
 
-// region multi-arg-test
-fun multiArgTest() = PostServer.testBlocking(settings = {}) {
-    val response = PostServer.getPost.test("alice", 7)
-    check(response.body?.text() == "User alice, post 7")
+// region routing-trailing-test
+fun routingTrailingTest() = RoutingFilesServer.testBlocking(settings = {}) {
+    val response = RoutingFilesServer.file.test(trailingWildcard = PathSegments(listOf("docs", "readme.txt")))
+    check(response.body?.text() == "File docs/readme.txt")
 }
-// endregion multi-arg-test
+// endregion routing-trailing-test
 
-// region sub-builder
-// Declare API endpoints in a separate ServerBuilder object for clarity.
-object CommentsApi : ServerBuilder() {
+// region routing-request
+object RoutingSearchServer : ServerBuilder() {
+    // GET /search?q=...&limit=...
+    val search = path.path("search").get bind HttpHandler { request ->
+        val query = request.queryParameters["q"] ?: throw BadRequestException("Missing q")
+        val limit = request.queryParameters["limit"]?.toIntOrNull() ?: 10
+        val agent = request.headers[HttpHeader.UserAgent]?.root ?: "unknown"
+        HttpResponse.plainText("q=$query limit=$limit agent=$agent")
+    }
+
+    // POST /echo — reads the raw body
+    val echo = path.path("echo").post bind HttpHandler { request ->
+        val text = request.body?.text() ?: throw BadRequestException("Missing body")
+        HttpResponse.plainText(text)
+    }
+}
+// endregion routing-request
+
+// region routing-request-test
+fun routingRequestTest() = RoutingSearchServer.testBlocking(settings = {}) {
+    val found = RoutingSearchServer.search.test(
+        queryParameters = QueryParameters.parse("q=lightning&limit=5"),
+        headers = HttpHeaders(HttpHeader.UserAgent to "test-client"),
+    )
+    check(found.body?.text() == "q=lightning limit=5 agent=test-client")
+
+    val echoed = RoutingSearchServer.echo.test(body = TypedData.text("ping", MediaType.Text.Plain))
+    check(echoed.body?.text() == "ping")
+}
+// endregion routing-request-test
+
+// region routing-response
+object RoutingResponseServer : ServerBuilder() {
+    val create = path.path("notes").post bind HttpHandler {
+        HttpResponse(
+            body = TypedData.text("""{"id":"n1"}""", MediaType.Application.Json),
+            status = HttpStatus.Created,
+            headers = HttpHeaders {
+                add(HttpHeader.Location, "/notes/n1")
+                setCookie("lastNote", "n1", maxAge = 3600, httpOnly = true, secure = true, sameSite = HttpHeaders.SameSite.Lax)
+            },
+        )
+    }
+
+    val page = path.path("about").get bind HttpHandler {
+        HttpResponse.html {
+            body { +"About us" }
+        }
+    }
+
+    val old = path.path("old-about").get bind HttpHandler {
+        HttpResponse.pathMovedPermanently("/about")
+    }
+}
+// endregion routing-response
+
+// region routing-response-test
+fun routingResponseTest() = RoutingResponseServer.testBlocking(settings = {}) {
+    val created = RoutingResponseServer.create.test()
+    check(created.status == HttpStatus.Created)
+    check(created.headers[HttpHeader.Location]?.root == "/notes/n1")
+
+    check(RoutingResponseServer.old.test().status == HttpStatus.PermanentRedirect)
+}
+// endregion routing-response-test
+
+// region routing-include
+object RoutingCommentsApi : ServerBuilder() {
+    // GET /comments, relative to wherever this builder is mounted
     val list = path.path("comments").get bind HttpHandler {
         HttpResponse.plainText("[]")
     }
 }
 
-object BlogServer : ServerBuilder() {
-    // Mount CommentsApi at /blog — all its paths are prefixed with /blog.
-    // include is a ServerBuilder member; the left-hand side must be a PathSpec0.
-    val comments = path.path("blog") include CommentsApi
+object RoutingBlogServer : ServerBuilder() {
+    // Mounts RoutingCommentsApi.list at GET /blog/comments
+    val comments = path.path("blog") include RoutingCommentsApi
 }
-// endregion sub-builder
+// endregion routing-include
 
-// region sub-builder-test
-fun subBuilderTest() = BlogServer.testBlocking(settings = {}) {
-    val response = CommentsApi.list.test()
-    check(response.body?.text() == "[]")
+// region routing-include-test
+fun routingIncludeTest() = RoutingBlogServer.testBlocking(settings = {}) {
+    check(RoutingCommentsApi.list.test().body?.text() == "[]")
 }
-// endregion sub-builder-test
+// endregion routing-include-test
 
-// region query-params
-object SearchServer : ServerBuilder() {
-
-    // GET /search?q=...&limit=...
-    val search = path.path("search").get bind HttpHandler { request ->
-        val query = request.queryParameters["q"] ?: ""
-        val limit = request.queryParameters["limit"]?.toIntOrNull() ?: 10
-        HttpResponse.plainText("query=$query limit=$limit")
+// region routing-timeout
+object RoutingReportServer : ServerBuilder() {
+    val report = path.path("report").get bind HttpHandler(timeout = 5.minutes) {
+        HttpResponse.plainText("done")
     }
 }
-// endregion query-params
-
-// region query-params-test
-fun queryParamsTest() = SearchServer.testBlocking(settings = {}) {
-    val response = SearchServer.search.test(
-        queryParameters = QueryParameters.parse("q=lightning&limit=5")
-    )
-    check(response.body?.text() == "query=lightning limit=5")
-}
-// endregion query-params-test
+// endregion routing-timeout

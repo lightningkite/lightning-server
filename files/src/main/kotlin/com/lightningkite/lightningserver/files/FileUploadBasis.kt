@@ -30,7 +30,7 @@ private val logger = KotlinLogging.logger {}
  *
  * Include it once, then give each place that accepts uploads its own [UploadEndpoints]:
  * ```kotlin
- * val uploads = path.path("uploads") include UploadBasis(files, database, fileScanner = { listOf() })
+ * val uploads = path.path("uploads") include FileUploadBasis(files, database, fileScanner = Runtime { listOf() })
  * val avatarUpload = path.path("users").path("avatar-upload") module
  *     UploadEndpoints(uploads, "users/avatars", UserAuth.require())
  * ```

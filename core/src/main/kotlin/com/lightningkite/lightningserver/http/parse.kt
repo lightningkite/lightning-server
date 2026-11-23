@@ -5,6 +5,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import java.net.URLDecoder
+import java.net.URLEncoder
 
 
 /**
@@ -70,7 +72,7 @@ public value class PathSegments(public val segments: List<String>) : List<String
  * val params = QueryParameters.parse("filter=active&name=john%20doe")
  * println(params["filter"]) // "active"
  * println(params["name"]) // "john doe" (decoded)
- * println(params.toString()) // "filter=active&name=john%20doe" (encoded)
+ * println(params.toString()) // "filter=active&name=john+doe" (encoded)
  * ```
  *
  * Multiple parameters with the same key are supported (e.g., `tag=a&tag=b`).
@@ -92,7 +94,9 @@ public value class QueryParameters(public val entries: List<Pair<String, String>
      */
     public operator fun get(key: String): String? = entries.firstOrNull { it.first == key }?.second
 
-    override fun toString(): String = entries.joinToString("&") { "${it.first}=${it.second}" }
+    override fun toString(): String = entries.joinToString("&") {
+        "${URLEncoder.encode(it.first, Charsets.UTF_8)}=${URLEncoder.encode(it.second, Charsets.UTF_8)}"
+    }
 
     public companion object {
         /** An empty QueryParameters with no parameters. */
@@ -109,7 +113,7 @@ public value class QueryParameters(public val entries: List<Pair<String, String>
                 path.split('&')
                     .filter { it.isNotBlank() }
                     .map { it.split('=', limit = 2) }
-                    .map { it[0] to (it.getOrNull(1) ?: "") }
+                    .map { URLDecoder.decode(it[0], Charsets.UTF_8) to URLDecoder.decode(it.getOrNull(1) ?: "", Charsets.UTF_8) }
             )
         }
     }
@@ -149,6 +153,4 @@ public value class QueryParameters(public val entries: List<Pair<String, String>
  * 8. Consider adding a merge/combine method for QueryParameters to easily combine
  *    query strings from different sources.
  *
- * 9. The toString() implementation uses deprecated URLEncoder.encode(String, Charset).
- *    While it still works, consider updating to URLEncoder.encode(String, String) with "UTF-8".
  */

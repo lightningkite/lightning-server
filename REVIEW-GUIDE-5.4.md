@@ -266,8 +266,7 @@ Opt-in. Nothing outside the modules depends on them, the demo doesn't use them, 
   - New suites: `ExecutionInterceptorTest`, `InitiatorTest`, `TaskParentageTest`, `RuntimeCachedScopeTest`, `EncodingInterceptorTest`, `AuthEventTest`, `BackupCodeEndpointsTest` (+800 lines), Netty and Ktor socket lifecycle tests, AWS legacy-row tests, and the whole audit suite.
   - Stale names remain: `ImplementationHelpersHandleTest`, `DefaultExceptionHttpHandlerTest`.
 - **Docs:**
-  - Check these against the code, since they were substantively rewritten: [docs/runtime.md](docs/runtime.md), [core runtime index.md](core/src/main/kotlin/com/lightningkite/lightningserver/runtime/index.md), [docs/notifications.md](docs/notifications.md) (reorganized; troubleshooting removed), [docs/deploy-aws-ec2.md](docs/deploy-aws-ec2.md) (rewritten; OTel vendor sections cut), [docs/endpoints.md](docs/endpoints.md) (exception handler), [docs/sessions.md](docs/sessions.md) (auth events), [docs/tasks.md](docs/tasks.md) (startup and pre-deploy), [docs/modules.md](docs/modules.md), [CLAUDE.md](CLAUDE.md), [.claude/skills/lightning-server.md](.claude/skills/lightning-server.md).
-  - The rest of `docs/**` and `docs-guide/**` is API renames only.
+  - `docs/` and `docs-guide/drafts/` have since been folded into the guide (`docs-guide/guide/`, compiled samples) and deleted.  Check [core runtime index.md](core/src/main/kotlin/com/lightningkite/lightningserver/runtime/index.md), [CLAUDE.md](CLAUDE.md) and [.claude/skills/lightning-server.md](.claude/skills/lightning-server.md) against the code.
 
 ---
 

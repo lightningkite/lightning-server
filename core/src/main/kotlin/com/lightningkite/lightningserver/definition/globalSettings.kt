@@ -3,7 +3,6 @@ package com.lightningkite.lightningserver.definition
 import com.lightningkite.lightningserver.encryption.SecretBasis
 import com.lightningkite.services.LoggingSettings
 import com.lightningkite.services.telemetry.TelemetryBackend
-import com.lightningkite.services.otel.OpenTelemetrySettings
 import kotlinx.serialization.builtins.nullable
 
 /**
@@ -33,12 +32,12 @@ public val generalSettings: ServerSetting.Direct<GeneralServerSettings> =
 /**
  * Global setting for telemetry (distributed tracing and metrics) configuration.
  *
- * When null (the default), telemetry is disabled (no-op). Configure with an [OpenTelemetrySettings]
- * to export traces and metrics via OpenTelemetry. Common URL schemes: `log`, `dev`,
- * `otlp-grpc://host:port`, `otlp-https://host:port`. For custom batching or sampling use the
- * full [OpenTelemetrySettings] properties.
+ * A [TelemetryBackend.Settings]; the default URL `noop` disables telemetry. The OpenTelemetry schemes
+ * (`log`, `dev`, `otlp-grpc://host:port`, `otlp-https://host:port`, ...) are available once
+ * `com.lightningkite.services.otel.OtelTelemetryBackend` has been registered (reference it at startup, e.g.
+ * `OtelTelemetryBackend.register()`). Batching, limits, and sampling are further fields of
+ * [TelemetryBackend.Settings].
  *
- * @see OpenTelemetrySettings
  * @see TelemetryBackend
  */
 public val telemetrySettings: ServerSetting<TelemetryBackend.Settings, TelemetryBackend> =

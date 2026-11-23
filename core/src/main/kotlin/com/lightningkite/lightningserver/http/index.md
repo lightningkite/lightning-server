@@ -201,8 +201,8 @@ val endpoint = path.path("data").get bind HttpHandler { request ->
 
 ## See Also
 
-- **[Endpoints Documentation](../../../../../../../../docs/endpoints.md)** - Defining and routing endpoints
-- **[Typed Endpoints](../../../../../../../../docs/typed-endpoints.md)** - Type-safe API endpoint definitions
+- **[Endpoints Documentation](https://github.com/lightningkite/lightning-server/blob/master/docs-guide/guide/routing.md)** - Defining and routing endpoints
+- **[Typed Endpoints](https://github.com/lightningkite/lightning-server/blob/master/docs-guide/guide/typed-endpoints.md)** - Type-safe API endpoint definitions
 - **[CORS](../cors/)** - Cross-origin resource sharing implementation
 
 ## Testing

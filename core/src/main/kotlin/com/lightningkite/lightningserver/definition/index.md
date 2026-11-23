@@ -153,7 +153,7 @@ fun main() {
 
 ## See Also
 
-- [Setup](../../../../../../../../docs/setup.md) - Getting started with Lightning Server
-- [Endpoints](../../../../../../../../docs/endpoints.md) - Defining HTTP and WebSocket endpoints
-- [Tasks](../../../../../../../../docs/tasks.md) - Working with tasks and schedules
-- [Settings](../../../../../../../../docs/settings.md) - Configuring server settings
+- [Setup](https://github.com/lightningkite/lightning-server/blob/master/docs-guide/guide/setup.md) - Getting started with Lightning Server
+- [Endpoints](https://github.com/lightningkite/lightning-server/blob/master/docs-guide/guide/routing.md) - Defining HTTP and WebSocket endpoints
+- [Tasks](https://github.com/lightningkite/lightning-server/blob/master/docs-guide/guide/tasks.md) - Working with tasks and schedules
+- [Settings](https://github.com/lightningkite/lightning-server/blob/master/docs-guide/guide/settings.md) - Configuring server settings

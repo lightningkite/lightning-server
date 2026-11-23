@@ -312,9 +312,9 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         )
 
     /**
-     * Provides REST endpoints at `/sessions` for the authenticated user to list, read, update and delete their own sessions.
+     * Provides REST endpoints at `/sessions` for the authenticated user to list and read their own sessions; only a super-user can create or update them.
      *
-     * Deleting a session logs that device out.
+     * Sessions are never deleted, so they stay as an audit trail. To log a device out, terminate its session with [otherSessionTerminate] (or [sessionTerminate] for the current one).
      */
     public val sessions: ModelRestEndpoints<SUBJECT, Session<SUBJECT, ID>, Uuid> =
         path.path("sessions") include ModelRestEndpoints(info = sessionInfo)

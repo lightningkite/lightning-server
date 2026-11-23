@@ -271,14 +271,21 @@ public abstract class LocalEngine(server: ServerDefinition) : EngineBase(server)
                             cache.set("$name-lock", true, scheduleLockTtl)
                             try {
                                 logger.debug { "Running Schedule: $name" }
-                                it.executeWithMetrics()
+                                try {
+                                    it.executeWithMetrics()
+                                } catch (e: Exception) {
+                                    // Already reported.  A failed tick still waits for the next scheduled run:
+                                    // leaving nextRun in the past would rerun a failing task in a tight loop.
+                                    // Only a cancellation of this loop itself (shutdown) skips that.
+                                    currentCoroutineContext().ensureActive()
+                                }
                                 cache.set<Long>("$name-nextRun", nextRun)
                             } catch (e: CancellationException) {
                                 // Shutdown (or scope cancellation) interrupted this tick — honor it and stop the
                                 // loop rather than swallowing it. The lock is still released in `finally` below.
                                 throw e
                             } catch (e: Exception) {
-                                /*squish; already reported*/
+                                logger.error(e) { "Schedule $name could not record its next run." }
                             } finally {
                                 // Always release the lock, even if the tick was cancelled, so a mid-tick shutdown
                                 // can't leave "$name-lock" stuck until its TTL expires. NonCancellable guards ONLY this

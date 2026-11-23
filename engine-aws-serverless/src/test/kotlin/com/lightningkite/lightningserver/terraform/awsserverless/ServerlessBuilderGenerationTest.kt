@@ -135,4 +135,34 @@ class ServerlessBuilderGenerationTest {
         assertEquals("\${path.module}/build/lambda", archive["source_dir"]!!.jsonPrimitive.content)
     }
 
+    inner class DatadogDeployment : TerraformAwsServerlessBuilder<TestServer>(TestServer) {
+        override val handler: KClass<out AwsAdapter> = TestAwsAdapter::class
+        override val storageBucket = "test-tf-state"
+        override val region: Region = Region.US_WEST_2
+        override val displayName = "Datadog Test"
+        override val debug = true
+        override val emergencyContact = "ops@example.com".toEmailAddress()
+        override val applicationVpc: AwsVpc = AwsVpc.None
+        override val terraformRoot = File(tmpRoot, "datadog")
+
+        override fun TestServer.settings() {
+            fulfillSetting(secretBasis.name, Json.encodeToJsonElement(secretBasis.serializer, secretBasis.default))
+            fulfillSetting(loggingSettings.name, Json.encodeToJsonElement(loggingSettings.serializer, loggingSettings.default))
+            telemetrySettings.otelDatadog()
+        }
+    }
+
+    @Test
+    fun otelDatadogFulfillsTheTelemetrySetting() {
+        val d = DatadogDeployment()
+        d.write()
+        val telemetry = d.terraformRoot.listFiles { f -> f.name.endsWith(".tf.json") }!!.firstNotNullOf {
+            (Json.parseToJsonElement(it.readText()).jsonObject["locals"] as? JsonObject)?.get("settings_raw")?.jsonObject
+        }[telemetrySettings.name]!!
+        assertEquals("otlp-grpc", Json.decodeFromJsonElement(telemetrySettings.serializer, telemetry).url)
+        val environment = d.terraformRoot.findResource("aws_lambda_function", "main")!!["environment"]!!
+            .jsonObject["variables"]!!.jsonObject
+        assertEquals("\${var.datadog_api_key}", environment["DD_API_KEY"]!!.jsonPrimitive.content)
+    }
+
 }

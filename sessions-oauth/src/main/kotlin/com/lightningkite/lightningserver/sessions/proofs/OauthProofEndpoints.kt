@@ -44,6 +44,8 @@ import kotlin.uuid.Uuid
  * @param provider The provider to authenticate with, such as [OauthProviderInfo.google].
  * @param cache Holds the `state` nonce and PKCE verifier between the redirect and the callback.
  * @param credentials Returns the OAuth client ID and secret.
+ * @param property The property the proofs prove, such as `email`. When it isn't `email`, pass a [makeProof] that proves this property.
+ * @param makeProof Turns the provider's profile into a signed proof; by default it proves the profile's verified `email`.
  * @param continueUiAuthUrl Returns the UI URL to redirect to after authentication.
  */
 public class OauthProofEndpoints(
@@ -52,6 +54,7 @@ public class OauthProofEndpoints(
     override val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
     override val proofExpiration: Duration = 1.hours,
     private val credentials: Runtime<OauthProviderCredentials>,
+    property: String = "email",
     private val makeProof: suspend context(ServerRuntime, ProofMethod) (ExternalProfile) -> Proof =
         { profile ->
             val email = profile.email ?: throw BadRequestException("No email was found for this profile.")
@@ -72,7 +75,7 @@ public class OauthProofEndpoints(
 
     override val info: ProofMethodInfo = ProofMethodInfo(
         via = provider.identifierName,
-        property = "email",
+        property = property,
         strength = 10
     )
 
@@ -84,6 +87,9 @@ public class OauthProofEndpoints(
     ) { response: OauthResponse, _: Uuid ->
         val profile = provider.getProfile(response, credentials())
         val proof = makeProof(profile)
+        check(proof.property == info.property) {
+            "makeProof proved '${proof.property}', but this method is declared to prove '${info.property}', so login would reject it. Pass property = \"${proof.property}\"."
+        }
         serverRuntime.reportAuthEvent(AuthEvent.ProofAccepted(info, principal = proof.value))
         // Open-redirect note: the final destination is produced entirely by the app-supplied
         // `continueUiAuthUrl` from a server-generated, signed Proof. No user- or attacker-controllable

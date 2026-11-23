@@ -160,6 +160,16 @@ class CronTest {
     }
 
     @Test
+    fun testToStringWritesConsecutiveValuesAsRanges() {
+        val pattern = CronPattern(
+            minutes = listOf(0, 1, 2, 5, 58, 59),
+            hours = listOf(9),
+            months = listOf(Month.JANUARY, Month.FEBRUARY, Month.MARCH, Month.DECEMBER),
+        )
+        assertEquals("0-2,5,58-59 9 * 1-3,12 ?", pattern.toString())
+    }
+
+    @Test
     fun testDayOfWeekRange() {
         val range = DayOfWeek.MONDAY..DayOfWeek.FRIDAY
         val list = range.toList()
@@ -220,8 +230,22 @@ class CronTest {
     @Test
     fun `testCronDayOfWeekToString`() {
         // by Claude
-        val dow = CronDayOfWeek(DayOfWeek.MONDAY)
-        assertEquals("1", dow.toString())  // ISO day number: Monday = 1
+        // Quartz / EventBridge numbering: Sunday = 1 ... Saturday = 7.
+        assertEquals("1", CronDayOfWeek(DayOfWeek.SUNDAY).toString())
+        assertEquals("2", CronDayOfWeek(DayOfWeek.MONDAY).toString())
+        assertEquals("7", CronDayOfWeek(DayOfWeek.SATURDAY).toString())
+        assertEquals("6L", CronDayOfWeek(DayOfWeek.FRIDAY, last = true).toString())
+        assertEquals("2#2", CronDayOfWeek(DayOfWeek.MONDAY, recurrence = 2).toString())
+    }
+
+    @Test
+    fun weekdaysPatternInEventBridgeSyntax() {
+        val pattern = CronPattern(
+            minutes = listOf(0),
+            hours = listOf(9),
+            days = CronDays.DaysOfWeek(DayOfWeek.MONDAY..DayOfWeek.FRIDAY),
+        )
+        assertEquals("0 9 ? * 2,3,4,5,6", pattern.toString())
     }
 
     @Test

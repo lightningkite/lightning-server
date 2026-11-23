@@ -415,9 +415,9 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
 
 
     /**
-     * Health-check path the ALB polls; must return 2xx/3xx when the app is alive. Defaults to the
-     * server's autodetected `/meta/online` liveness endpoint (see [detectedOnlinePath]), falling
-     * back to `/meta/online` by convention. Deliberately a *liveness* path, not the deep
+     * Health-check path polled on each instance after a deploy (and by the scaling builder's ALB); must
+     * return 2xx/3xx when the app is alive. Defaults to `/meta/online`, which is not detected from the
+     * server: override it if your liveness endpoint lives elsewhere. Deliberately a *liveness* path, not the deep
      * `/meta/health`, so a slow downstream service can't make the ALB drain the whole fleet.
      */
     public open val healthCheckPath: String get() = "/meta/online"

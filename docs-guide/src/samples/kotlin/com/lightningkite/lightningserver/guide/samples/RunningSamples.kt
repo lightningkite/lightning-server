@@ -1,30 +1,36 @@
 package com.lightningkite.lightningserver.guide.samples
 
 // region running-imports
-import com.lightningkite.lightningserver.*
-import com.lightningkite.lightningserver.definition.builder.*
-import com.lightningkite.lightningserver.http.*
-import kotlinx.coroutines.*
+import com.lightningkite.lightningserver.engine.ktor.KtorEngine
+import com.lightningkite.lightningserver.settings.loadFromFile
+import com.lightningkite.services.kfile.KFile
+import io.ktor.server.netty.Netty
 // endregion running-imports
 
-// A minimal server definition used by the running-chapter build sample.
-// Kept private to this file so it does not clash with HelloServer in FirstEndpointSamples.
-private object RunningExampleServer : ServerBuilder() {
+// region serve
+fun serve() {
+    val built = HelloServer.build()
+    KtorEngine(built).apply {
+        settings.loadFromFile(KFile("settings.json"), internalSerializersModule)
+        start(Netty)
+    }
+}
+// endregion serve
 
-    // GET / — simple root response
-    val root = path.get bind HttpHandler {
-        HttpResponse.plainText("Hello from RunningExampleServer!")
+// region predeploy
+fun predeploy() {
+    KtorEngine(HelloServer.build()).apply {
+        settings.loadFromFile(KFile("settings.json"), internalSerializersModule)
+        runPreDeploy()
     }
 }
 
-// region build-server
-// ServerBuilder.build() seals all registries, caches calculations, and returns
-// a ServerDefinition — a pure description of your server with no external connections.
-// Passing the result to an engine is what actually binds a port and starts accepting requests.
-fun buildServer() {
-    val built = RunningExampleServer.build()
-    // `built` is a ServerDefinition: all endpoint registries are sealed and ready.
-    // Hand it to an engine to run (see the illustrative main() example in the chapter).
-    println("Server definition created with ${built.endpoints.entries.count()} endpoint entries")
+fun dev() {
+    KtorEngine(HelloServer.build()).apply {
+        settings.loadFromFile(KFile("settings.json"), internalSerializersModule)
+        settings.ready()
+        runPreDeployTasksBlocking()
+        start(Netty)
+    }
 }
-// endregion build-server
+// endregion predeploy

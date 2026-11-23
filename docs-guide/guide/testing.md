@@ -1,13 +1,85 @@
-# Testing Your Server
+# Testing
 
-Lightning Server was designed with testing in mind.  A single in-memory
-runtime — no running server, no network, no external services — exercises your
-endpoints exactly as production code does.  This chapter is the canonical
-reference for all the testing patterns used throughout the guide.
+`SERVER.testBlocking { }` starts your server in memory, with no port, network, or external services, and runs a test
+against it.  Endpoints, tasks, sockets and interceptors run the same code they run in production.
 
-## Imports
+<!-- sample: com/lightningkite/lightningserver/guide/samples/TestingSamples.kt#testing-full-example -->
+```kotlin
+class TestingGreetTest {
+    @Test
+    fun greetsByName() = TestingServer.testBlocking(settings = {}) {
+        assertEquals("Hello, Alice!", TestingServer.greet.test(null, TestGreetRequest("Alice")).greeting)
+    }
 
-All examples in this chapter use the following imports:
+    @Test
+    fun rejectsBlankName() = TestingServer.testBlocking(settings = {}) {
+        val error = assertFailsWith<HttpStatusException> { TestingServer.greet.test(null, TestGreetRequest("")) }
+        assertEquals("empty-name", error.detail)
+    }
+}
+```
+
+Each `testBlocking` call builds a fresh runtime, so in-memory databases and caches start empty in every test.  The
+block is a suspend lambda; `testBlocking` blocks the calling thread until it finishes, which is what a plain `@Test`
+method needs.  (`SERVER.test { }` is the same with a non-suspend block.)
+
+The server under test:
+
+<!-- sample: com/lightningkite/lightningserver/guide/samples/TestingSamples.kt#testing-server -->
+```kotlin
+@Serializable
+data class TestGreetRequest(val name: String)
+
+@Serializable
+data class TestGreetResponse(val greeting: String)
+
+@Serializable
+data class TestMember(override val _id: Uuid = Uuid.random(), val name: String) : HasId<Uuid>
+
+object TestMemberAuth : PrincipalType<TestMember, Uuid> {
+    override val idSerializer: KSerializer<Uuid> = Uuid.serializer()
+    override val subjectSerializer: KSerializer<TestMember> = TestMember.serializer()
+
+    context(server: ServerRuntime)
+    override suspend fun fetch(id: Uuid): TestMember =
+        TestingServer.members().get(id) ?: throw NotFoundException("Member not found")
+}
+
+object TestingServer : ServerBuilder() {
+    val database = setting("database", Database.Settings())
+    val members = database.registerTable<TestMember>("Member")
+
+    init {
+        registerBasicMediaTypeCoders()
+        register(TestMemberAuth)
+    }
+
+    val hello = path.path("hello").get bind HttpHandler {
+        HttpResponse.plainText("Hello!")
+    }
+
+    val greet = path.path("greet").post bind ApiHttpHandler(
+        summary = "Greet someone",
+        auth = noAuth,
+        successCode = HttpStatus.OK,
+        errorCases = listOf(LSError(http = 400, detail = "empty-name", message = "Name must not be blank")),
+        implementation = { input: TestGreetRequest ->
+            if (input.name.isBlank()) throw BadRequestException(detail = "empty-name", message = "Name must not be blank")
+            TestGreetResponse(greeting = "Hello, ${input.name}!")
+        }
+    )
+
+    val profile = path.path("profile").get bind ApiHttpHandler(
+        summary = "Get my profile",
+        auth = TestMemberAuth.require(),
+        successCode = HttpStatus.OK,
+        errorCases = emptyList(),
+        implementation = { _: Unit -> auth.fetch() }
+    )
+}
+```
+
+Imports:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/TestingSamples.kt#testing-imports -->
 ```kotlin
@@ -20,304 +92,151 @@ import com.lightningkite.lightningserver.runtime.test.*
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.*
 import com.lightningkite.lightningserver.typed.*
-import com.lightningkite.services.cache.*
+import com.lightningkite.services.data.*
 import com.lightningkite.services.database.*
-import kotlin.test.*
-import kotlinx.coroutines.*
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.serializer
+import kotlin.test.*
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
 import kotlin.uuid.*
 ```
 
-Notes:
+Keep `kotlinx.serialization.builtins.serializer` explicit: the `kotlinx.serialization.*` wildcard alone doesn't
+bring in `Uuid.serializer()`.
 
-- `kotlinx.serialization.builtins.serializer` must stay explicit — the wildcard
-  `kotlinx.serialization.*` brings in a top-level reified `serializer()` that
-  conflicts with the companion-generated `serializer()` inside `@Serializable`
-  classes when you call e.g. `Uuid.serializer()` directly.
-- `com.lightningkite.lightningserver.auth.*` brings in `PrincipalType`,
-  `noAuth`, `require`, `testAuth`, `fetch`, and the `register` extension on
-  `ServerBuilder`.
+## Settings
 
-## The Example Server
-
-To keep this chapter self-contained, it defines its own small server with
-three endpoints — a plain handler, a `noAuth` typed endpoint, and an
-authenticated typed endpoint — and its own `Member` principal type.
-
-### Data types and the Member principal type
-
-<!-- sample: com/lightningkite/lightningserver/guide/samples/TestingSamples.kt#testing-server-types -->
+<!-- sample: com/lightningkite/lightningserver/guide/samples/TestingSamples.kt#testing-settings -->
 ```kotlin
-@Serializable
-data class GreetRequest(val name: String)
-
-@Serializable
-data class GreetResponse(val greeting: String)
-
-@Serializable
-data class Member(
-    override val _id: Uuid = Uuid.random(),
-    val name: String,
-) : HasId<Uuid> {
-    companion object : PrincipalType<Member, Uuid> {
-        override val idSerializer: KSerializer<Uuid> = Uuid.serializer()
-        override val subjectSerializer: KSerializer<Member> = Member.serializer()
-
-        // In-memory store for testing — fetch() looks up by ID here.
-        // A production implementation would query a database table instead.
-        val store = mutableMapOf<Uuid, Member>()
-
-        context(server: ServerRuntime)
-        override suspend fun fetch(id: Uuid): Member =
-            store[id] ?: throw com.lightningkite.lightningserver.NotFoundException("Member not found")
-    }
+fun testingSettingsTest() = TestingServer.testBlocking(settings = { database set Database.Settings("ram") }) {
+    assertEquals(0, TestingServer.members().count())
 }
 ```
 
-`Member.Companion` implements `PrincipalType<Member, Uuid>`.  The three
-things it must supply: an `idSerializer`, a `subjectSerializer`, and a
-`fetch(id)` function.  Here `fetch()` reads from a companion-level map —
-simple for testing, no external service needed.  A real server would query a
-database table instead.
+The `settings` block sets any `ServerSetting` before the server starts (`set` is from
+`com.lightningkite.lightningserver.settings`).  Settings you don't set keep their declared defaults; for databases and
+caches that's `"ram"`, an in-process implementation.  See [Settings](settings.md).
 
-### The server
+## Calling endpoints
 
-<!-- sample: com/lightningkite/lightningserver/guide/samples/TestingSamples.kt#testing-server -->
-```kotlin
-object TestingServer : ServerBuilder() {
-    init { registerBasicMediaTypeCoders() }
+| Call | Goes through | Returns |
+|---|---|---|
+| `handler.test()` on an `HttpHandler` | The full HTTP pipeline: routing, HTTP interceptors, exception handler | `HttpResponse` |
+| `endpoint.test(auth, input)` on an `ApiHttpHandler` | The endpoint, called as server code: input validation, the auth requirement, execution interceptors | The typed output, or the thrown exception |
+| `socket.test()` on a `WebSocketHandler` | The socket interceptors; see [WebSockets](websockets.md) | A test connection |
 
-    val cache = setting("cache", Cache.Settings())
+Handlers with path arguments take them first: `getUser.test(userId)`, `getUser.test(userId, auth, Unit)`.  The raw
+`test()` also takes `headers`, `queryParameters`, `body`, `domain`, `protocol` and `sourceIp`.
 
-    init {
-        // register() is an extension on ServerBuilder from the auth module.
-        // It makes this PrincipalType discoverable when deserializing auth tokens.
-        register(Member)
-    }
-
-    // Plain HttpHandler — no type safety, returns an HttpResponse directly
-    val hello = path.path("hello").get bind HttpHandler {
-        HttpResponse.plainText("Hello!")
-    }
-
-    // noAuth typed endpoint — auth = noAuth means no authentication is required.
-    // The first argument to ApiHttpHandler.test() is the auth token; pass null for noAuth.
-    val greet = path.path("greet").post bind ApiHttpHandler(
-        summary = "Greet someone",
-        auth = noAuth,
-        successCode = HttpStatus.OK,
-        errorCases = listOf(
-            LSError(http = 400, detail = "empty-name", message = "Name must not be blank")
-        ),
-        implementation = { input: GreetRequest ->
-            if (input.name.isBlank())
-                throw BadRequestException(detail = "empty-name", message = "Name must not be blank")
-            GreetResponse(greeting = "Hello, ${input.name}!")
-        }
-    )
-
-    // Authenticated typed endpoint — auth = Member.require() means a Member token is required.
-    // The first argument to ApiHttpHandler.test() must be a non-null Authentication<Member>.
-    val profile = path.path("profile").get bind ApiHttpHandler(
-        summary = "Get member profile",
-        auth = Member.require(),
-        successCode = HttpStatus.OK,
-        errorCases = emptyList(),
-        implementation = { _: Unit ->
-            // auth is Authentication<Member>; fetch() loads the full Member from the store
-            auth.fetch()
-        }
-    )
-}
-```
-
-## Use `testBlocking` to Run Suspend Tests
-
-`SERVER.testBlocking {}` is the recommended way to write a test.  Its `action`
-is a **suspend** lambda, so you call suspend APIs — `.test()`, database and
-cache operations — directly inside it with no `runBlocking` wrapper.  The name
-signals that it blocks the calling thread until the action finishes, which is
-exactly what an ordinary (non-suspend) `@Test` method needs.
-
-<!-- sample: com/lightningkite/lightningserver/guide/samples/TestingSamples.kt#testing-testblocking -->
-```kotlin
-// SERVER.testBlocking { } is the recommended entry point for tests. Its action is a
-// suspend lambda, so you call suspend APIs (.test(), database/cache operations) directly —
-// no runBlocking wrapper. The name signals that it blocks the calling thread until the
-// action finishes, which is exactly what an ordinary (non-suspend) @Test method needs.
-fun testBlockingExplanation() = TestingServer.testBlocking(settings = { cache set Cache.Settings("ram") }) {
-    // .test() is a suspend call and works here because the action lambda is suspend.
-    val response = TestingServer.hello.test()
-    check(response.status == HttpStatus.OK)
-}
-```
-
-> **Lower-level alternative:** `SERVER.test {}` takes a non-suspend `action`,
-> so you must provide the coroutine scope yourself with
-> `SERVER.test { runBlocking { ... } }`.  Prefer `testBlocking` — it removes
-> that boilerplate.
-
-## Testing a Plain `HttpHandler`
-
-`HttpHandler.test()` returns an `HttpResponse`.  Inspect `.status` and
-`.body?.text()` to assert the outcome.  Note that `.text()` is a synchronous
-call on `TypedData`, not a suspend function.
-
-The `settings` lambda configures each `ServerSetting` before the runtime
-starts.  Use `"ram"` as the URL for `Cache.Settings` or `Database.Settings`
-to get the built-in in-process implementation — no external services needed.
-The `set` infix function is a context extension on `ServerSettings` (brought
-in by `import com.lightningkite.lightningserver.settings.set`).
+### Plain handlers
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/TestingSamples.kt#testing-plain-handler -->
 ```kotlin
-// The settings lambda configures each ServerSetting before the runtime starts.
-// "ram" is the built-in URL for the in-process cache — no external dependencies.
-fun plainHandlerTest() = TestingServer.testBlocking(settings = { cache set Cache.Settings("ram") }) {
-    // HttpHandler.test() returns an HttpResponse.
-    // Inspect .status and .body?.text() to assert the outcome.
+fun testingPlainHandlerTest() = TestingServer.testBlocking(settings = {}) {
     val response = TestingServer.hello.test()
-    check(response.status == HttpStatus.OK)
-    check(response.body?.text() == "Hello!")
+    assertEquals(HttpStatus.OK, response.status)
+    assertEquals("Hello!", response.body?.text())
 }
 ```
 
-## Testing a Typed `ApiHttpHandler` — noAuth
+### Authenticated endpoints
 
-`ApiHttpHandler.test(auth, input)` returns the typed `OUTPUT` directly.
-There is no `HttpResponse` to unwrap and no JSON to parse.
-
-The first argument is the authentication token.  For `noAuth` endpoints the
-`USER` type parameter is `Nothing?`, so pass `null`:
-
-<!-- sample: com/lightningkite/lightningserver/guide/samples/TestingSamples.kt#testing-noauth-typed -->
+<!-- sample: com/lightningkite/lightningserver/guide/samples/TestingSamples.kt#testing-auth -->
 ```kotlin
-fun noAuthTypedTest() = TestingServer.testBlocking(settings = { cache set Cache.Settings("ram") }) {
-    // ApiHttpHandler.test() takes (auth, input) and returns the typed OUTPUT directly —
-    // no HttpResponse to unwrap, no JSON to parse.
-    //
-    // For noAuth endpoints (USER = Nothing?), the auth argument must be null.
-    val result = TestingServer.greet.test(null, GreetRequest("Alice"))
-    check(result.greeting == "Hello, Alice!")
+fun testingAuthTest() = TestingServer.testBlocking(settings = {}) {
+    val alice = TestMember(name = "Alice")
+    TestingServer.members().insertOne(alice)
+
+    val profile = TestingServer.profile.test(TestMemberAuth.testAuth(alice), Unit)
+    assertEquals("Alice", profile.name)
 }
 ```
 
-## Testing a Typed `ApiHttpHandler` — Authenticated
+`testAuth(subject)` builds an `Authentication` without a session or token.  For `noAuth` endpoints pass `null`.
+Services such as `members()` can be used directly inside the block to set up data.
 
-For endpoints that require a specific principal type (`auth = Member.require()`),
-pass a non-null `Authentication<Member>`.
+### Errors
 
-`PrincipalType.testAuth(subject)` creates a synthetic authentication token for
-testing.  It must be called **inside** a `test {}` block because it needs the
-test engine in context (to capture the current clock time as `issuedAt`).
+The typed `test()` throws what the endpoint threw, so assert on the exception (`status`, `detail`), as in
+`rejectsBlankName` above.  To check what a client receives, send a raw request through the HTTP pipeline:
 
-<!-- sample: com/lightningkite/lightningserver/guide/samples/TestingSamples.kt#testing-auth-typed -->
+<!-- sample: com/lightningkite/lightningserver/guide/samples/TestingSamples.kt#testing-wire -->
 ```kotlin
-fun authTypedTest() = TestingServer.testBlocking(settings = { cache set Cache.Settings("ram") }) {
-    val alice = Member(name = "Alice")
-    Member.store[alice._id] = alice  // seed the in-memory store so fetch() finds her
-
-    // testAuth() creates a synthetic Authentication<Member> for the test.
-    val aliceAuth = Member.testAuth(alice)
-
-    // For authenticated endpoints (USER is non-nullable), pass a non-null Authentication.
-    val result = TestingServer.profile.test(aliceAuth, Unit)
-    check(result.name == "Alice")
-
-    Member.store.clear()  // clean up so tests don't bleed state
+fun testingWireTest() = TestingServer.testBlocking(settings = {}) {
+    val response = TestingServer.greet.test(body = TypedData.text("""{"name":""}""", MediaType.Application.Json))
+    assertEquals(HttpStatus.BadRequest, response.status)
 }
 ```
 
-## Asserting an Error Path
+The raw pipeline needs `registerBasicMediaTypeCoders()` on the server to read and write JSON bodies, error responses included; without it, errors come back as plain text (with their real status) and JSON bodies can't be read.
 
-`ApiHttpHandler.test()` calls the handler directly — it does **not** go
-through the HTTP serialization layer.  Errors thrown inside the implementation
-are propagated as Kotlin exceptions.
+## Code that needs a runtime
 
-Catch `HttpStatusException` and check `.status.code` and `.detail` to verify
-the right error fired:
+Some calls need a running execution rather than just the server: launching a task, `now()`, anything declared
+`context(ServerRuntime)`.  `execute { }` runs a block as the test's own execution:
 
-<!-- sample: com/lightningkite/lightningserver/guide/samples/TestingSamples.kt#testing-error-path -->
 ```kotlin
-fun errorPathTest() = TestingServer.testBlocking(settings = { cache set Cache.Settings("ram") }) {
-    // ApiHttpHandler.test() propagates HttpStatusException directly as a Kotlin exception.
-    // It does NOT serialize to/from HTTP, so the exception is exactly what the handler threw.
-    // Catch HttpStatusException and inspect .status.code and .detail to verify the right error fired.
-    try {
-        TestingServer.greet.test(null, GreetRequest(""))
-        error("Expected BadRequestException to be thrown")
-    } catch (e: HttpStatusException) {
-        check(e.status.code == 400)
-        check(e.detail == "empty-name")
+execute { TasksServer.sendWelcomeEmail.launch(WelcomeEmail("bob@example.com", "Bob")) }
+```
+
+Launched tasks run inline, so their effects are visible on the next line.  Startup and pre-deploy tasks don't run on
+their own; call `executeStartupTasks()` or `executePreDeployTasks()`.  A schedule's work runs with
+`schedule.executeWithMetrics()`.  See [Tasks](tasks.md#testing-a-task) and
+[Schedules](schedules.md#testing-a-schedule).
+
+## Controlling time
+
+<!-- sample: com/lightningkite/lightningserver/guide/samples/TestingSamples.kt#testing-clock -->
+```kotlin
+fun testingClockTest() {
+    var time = Instant.parse("2026-01-01T00:00:00Z")
+    val clock = object : Clock {
+        override fun now(): Instant = time
+    }
+    TestingServer.testBlocking(settings = {}, clock = { clock }) {
+        val before = execute { now() }
+        time += 2.hours
+        assertEquals(2.hours, execute { now() } - before)
     }
 }
 ```
 
-> **Note:** `ApiHttpHandler.test()` bypasses the HTTP exception-to-response
-> serialization path.  The raw exception is more convenient for assertions
-> (`.status.code`, `.detail`), but it means the JSON serialization of errors
-> is not exercised.  To test that path, drive the `HttpHandler` layer with
-> `HttpHandler.test()` and inspect `response.status.code`.
+`clock` replaces the server's clock, which `now()` and token issue times read.  It doesn't change how long
+`delay` waits.
 
-## A Complete Test Class
+## Build checks
 
-A test function must be annotated with `@Test` (`kotlin.test.Test`) for the
-test runner to discover and execute it.  Functions without `@Test` compile and
-can be called manually, but the runner silently ignores them.
+A build check validates the whole server once it's assembled, so a misconfiguration fails every test (and startup)
+instead of a request in production:
 
-Here is a complete, copy-pasteable test class that wires all the patterns
-together:
-
-<!-- sample: com/lightningkite/lightningserver/guide/samples/TestingSamples.kt#testing-full-example -->
+<!-- sample: com/lightningkite/lightningserver/guide/samples/TestingSamples.kt#testing-build-check -->
 ```kotlin
-// A complete, copy-pasteable test class.
-// @Test marks each method for the test runner. testBlocking {} runs the suspend action
-// to completion on the calling thread, so each non-suspend @Test method stays simple.
-class GreetServerTest {
-    @Test
-    fun `greet returns greeting for valid name`() = TestingServer.testBlocking(settings = { cache set Cache.Settings("ram") }) {
-        val result = TestingServer.greet.test(null, GreetRequest("Alice"))
-        check(result.greeting == "Hello, Alice!")
-    }
-
-    @Test
-    fun `greet rejects blank name`() = TestingServer.testBlocking(settings = { cache set Cache.Settings("ram") }) {
-        try {
-            TestingServer.greet.test(null, GreetRequest(""))
-            error("Expected exception")
-        } catch (e: HttpStatusException) {
-            check(e.status.code == 400)
-            check(e.detail == "empty-name")
+object LockCheckedServer : ServerBuilder() {
+    init {
+        buildCheck { definition ->
+            for ((path, schedule) in definition.schedules)
+                check(schedule.timeout < 1.hours) { "$path can outlive its schedule lock" }
         }
     }
 }
 ```
 
-Key points:
-- `@Test` is `kotlin.test.Test` — import `kotlin.test.Test`.
-- Each `@Test` method uses `SERVER.testBlocking {}`, whose suspend action runs to completion on the calling thread.
-- Methods are inside a class (standard JUnit requirement).
-- The `settings` lambda resets state per test — each test gets a fresh `"ram"` cache.
+`buildCheck` receives the root `ServerDefinition`, even when registered in a module, after every module is
+initialized; modules' checks run first.  It has no runtime, so it can't read settings or touch services.  Throw to fail
+`build()`.  Every `testBlocking` builds the server, so any test catches a failing check; a test of its own makes the
+point explicit:
 
-## Quick Reference
+<!-- sample: com/lightningkite/lightningserver/guide/samples/TestingSamples.kt#testing-build-check-test -->
+```kotlin
+fun testingBuildCheckTest() {
+    LockCheckedServer.build()
+}
+```
 
-| What you're testing | Method | Returns | Auth argument |
-|---|---|---|---|
-| Plain `HttpHandler` | `handler.test()` | `HttpResponse` | — |
-| Typed `noAuth` endpoint | `handler.test(null, input)` | typed `OUTPUT` | `null` |
-| Typed authenticated endpoint | `handler.test(auth, input)` | typed `OUTPUT` | `Member.testAuth(member)` |
+## Next
 
-### Import cheatsheet
-
-| Symbol | Import |
-|---|---|
-| `@Test` annotation | `kotlin.test.Test` |
-| `SERVER.test {}` block | `com.lightningkite.lightningserver.runtime.test.test` |
-| `ApiHttpHandler.test()` | `com.lightningkite.lightningserver.typed.test` |
-| `HttpHandler.test()` | same as `runtime.test.test` (included) |
-| `auth` (inside handler lambda) | `com.lightningkite.lightningserver.typed.auth` |
-| `testAuth()` | `com.lightningkite.lightningserver.auth.*` |
-| `fetch()` / `id` on `Authentication` | `com.lightningkite.lightningserver.auth.*` |
-| `set` (settings lambda) | `com.lightningkite.lightningserver.settings.set` |
-| `HttpResponse.plainText()` | `com.lightningkite.lightningserver.plainText` |
+- [Typed endpoints](typed-endpoints.md): the endpoints the typed `test()` calls.
+- [WebSockets](websockets.md): testing socket handlers.
+- [CORS and interceptors](cors-interceptors.md): testing headers that interceptors add.
