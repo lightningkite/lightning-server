@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 class OtelCollectorConfigTest {
 
     @Test
-    fun `grafana style config routes every signal to the otlp http exporter`() {
+    fun `grafana style config routes every signal through decouple to the otlp http exporter`() {
         val config = collectorConfig(
             endpoint = "https://otlp-gateway-prod-us-west-0.grafana.net/otlp",
             protocol = OtlpProtocol.HTTP,
@@ -29,6 +29,8 @@ class OtelCollectorConfigTest {
                     endpoint: localhost:4317
                   http:
                     endpoint: localhost:4318
+            processors:
+              decouple:
             exporters:
               otlphttp:
                 endpoint: https://otlp-gateway-prod-us-west-0.grafana.net/otlp
@@ -38,12 +40,15 @@ class OtelCollectorConfigTest {
               pipelines:
                 traces:
                   receivers: [otlp]
+                  processors: [decouple]
                   exporters: [otlphttp]
                 metrics:
                   receivers: [otlp]
+                  processors: [decouple]
                   exporters: [otlphttp]
                 logs:
                   receivers: [otlp]
+                  processors: [decouple]
                   exporters: [otlphttp]
             """.trimIndent() + "\n",
             config
