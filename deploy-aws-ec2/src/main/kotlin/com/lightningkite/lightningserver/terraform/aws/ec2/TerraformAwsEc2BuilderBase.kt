@@ -119,6 +119,12 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
     public open val serverCommand: String get() = "serve"
 
     /**
+     * File that, when present on an instance, sets `SERVER_COMMAND` and replaces [serverCommand] there.
+     * The scaling builder writes it at boot from each launch template's user data.
+     */
+    protected val commandEnvFile: String get() = "/etc/lightning-server/command.env"
+
+    /**
      * Command that runs pre-deploy tasks and exits (passed to the app launcher). Run once per
      * deploy, before the new version is cut over, while the current version keeps serving; a
      * non-zero exit aborts the deploy. The application must expose this command (see the framework's
@@ -1206,7 +1212,9 @@ Type=simple
 User=lightning-server
 Group=lightning-server
 WorkingDirectory=/var/lib/$$projectPrefix
-ExecStart=/opt/$$projectPrefix/server/bin/server $$serverCommand
+Environment="SERVER_COMMAND=$$serverCommand"
+EnvironmentFile=-$$commandEnvFile
+ExecStart=/opt/$$projectPrefix/server/bin/server $SERVER_COMMAND
 StateDirectory=$$projectPrefix
 StateDirectoryMode=0700
 CacheDirectory=$$projectPrefix

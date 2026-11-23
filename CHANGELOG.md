@@ -16,7 +16,9 @@ Each release groups entries under:
 
 ### API
 
-- Added a `schedules` parameter to `KtorEngine.start` (default `true`) and `KtorEngine.runWithoutHttp()`, which runs startup and scheduled tasks without serving HTTP. Together they split a deployment into request instances and one background instance.
+- Added a `schedules` parameter to `KtorEngine.start`, defaulting to `true`. Pass `false` when another instance runs the scheduled tasks.
+- **Behavior:** the EC2 builders' systemd unit now reads its command from `SERVER_COMMAND`, defaulting to `serverCommand`. The scaling builder sets it at boot from the launch template's user data. Regenerating changes the image and launch template, so an apply re-bakes the AMI and refreshes the fleet.
+- **Behavior:** `TerraformAwsScalingEc2Builder` now requires a distributed `engineCache`, the cache the schedule locks use, instead of checking the application's `cache`. A deployment with a RAM `engineCache` now fails to generate, and a RAM `cache` is allowed.
 - Added `LocalEngine.onShutdown(action)`. Graceful shutdown runs the actions before disconnecting services, alongside in-flight schedule ticks and within the same drain timeout, so background work the engine doesn't manage can unwind while its services are still connected.
 - Added `BuildCheck` and `ServerBuilder.buildCheck { }`: a check that runs once the whole server is built and receives the root `ServerDefinition`, even when registered in a module. Modules' checks run first. It has no runtime and is not kept on the definition. Throw from it to fail the build.
 - **Behavior:** the notification registration checks (every event has content and subscriptions) are now build checks, so a missing registration fails `build()` instead of server startup. The `/verify` startup tasks they replaced are gone.
