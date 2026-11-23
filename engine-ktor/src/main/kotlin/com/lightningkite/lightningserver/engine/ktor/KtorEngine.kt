@@ -347,6 +347,7 @@ public class KtorEngine(
      * engine.start(Netty)
      * ```
      */
+    @JvmOverloads
     public fun <TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.Configuration> start(
         factory: ApplicationEngineFactory<TEngine, TConfiguration>,
         schedules: Boolean = true,
