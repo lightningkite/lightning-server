@@ -65,7 +65,7 @@ Adding New Tests
 
 - Pattern: initialize server definitions and then call .test() on endpoints/handlers. Ensure Settings are populated as
   needed for your test.
-- Example: HTTP endpoint test (refer to docs/setup.md test pattern):
+- Example: HTTP endpoint test (see docs-guide/guide/testing.md):
     - Pass a settings lambda to testBlocking to override defaults, e.g. database set Database.Settings("ram").
     - engine-local is not required when using the test harness.
 - Example: Websocket multiplex test pattern (see core/src/test/.../MultiplexWebSocketHandlerTest.kt):

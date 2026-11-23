@@ -1,24 +1,11 @@
-# Authentication & Sessions
+# Authentication
 
-Lightning Server's auth model has three layers:
+Every endpoint declares an `AuthRequirement`.  On each request the framework reads the caller's credentials into an
+`Authentication<SUBJECT>` and checks it against that requirement before your handler runs.  This chapter covers that
+side: defining who can authenticate, requiring it on endpoints, and reading it in handlers.  How users get a token in
+the first place is in [Proof-based login](proof-session.md).
 
-- **Proof** — evidence that you are who you say (email OTP, SMS PIN, password,
-  OAuth token).  The `sessions-email`, `sessions-sms`, and related modules
-  supply ready-made proof endpoints.
-- **Principal / Subject** — the data model that represents an authenticated
-  entity (e.g. a `User` record).  You define this; the framework provides the
-  wiring.
-- **`Authentication<SUBJECT>`** — an in-memory token carrying the subject's ID,
-  the time it was issued, and which scopes it carries.  Endpoints receive this
-  token and use it to look up the full subject on demand.
-
-This chapter covers the practical core: defining a principal type, requiring
-auth on an endpoint, reading the authenticated user inside a handler, and
-testing authenticated endpoints.
-
-## Imports
-
-All examples in this chapter use the following imports:
+## Minimal example
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/AuthSamples.kt#auth-imports -->
 ```kotlin
@@ -33,34 +20,13 @@ import com.lightningkite.lightningserver.settings.*
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.services.data.*
 import com.lightningkite.services.database.*
-import kotlinx.coroutines.*
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.serializer
+import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.*
 ```
 
-Non-obvious import locations:
-
-- `com.lightningkite.lightningserver.auth.*` brings in `PrincipalType`,
-  `AuthRequirement`, `noAuth`, `testAuth`, `fetch`, `id`, and the `register`
-  extension on `ServerBuilder`.
-- `com.lightningkite.lightningserver.typed.*` also brings in the `auth` property
-  extension on `HttpAccess` — needed to read `auth` inside an
-  `ApiHttpHandler` implementation lambda.
-- `com.lightningkite.lightningserver.serialization.*` registers JSON (and other standard) media type encoders/decoders.  Required
-  when testing through the full HTTP pipeline (`HttpHandler.test()`), including
-  error response serialization.
-- `kotlinx.serialization.builtins.serializer` is imported (not
-  `kotlinx.serialization.serializer`) because `@Serializable` classes generate
-  a companion-scoped `serializer()` that conflicts with the top-level
-  `serializer<T>()` reified function from the `kotlinx-serialization-core`
-  artifact.
-
-## Defining a Model and a PrincipalType
-
-The **model** is a plain `@Serializable` data class.  It carries no server
-dependencies, which means it can live in a shared/models module alongside the
-client code:
+The subject is a plain model.  It has no server dependencies, so it can live in a shared module:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/AuthSamples.kt#user-model -->
 ```kotlin
@@ -69,19 +35,15 @@ data class UserProfile(
     override val _id: Uuid = Uuid.random(),
     val name: String,
     val email: String,
+    val isAdmin: Boolean = false,
 ) : HasId<Uuid>
 ```
 
-The **principal type** is a *separate object* that tells the framework how to
-work with this model as an auth subject.  Keeping it separate is important: if
-your models live in a shared Kotlin Multiplatform module that has no server
-dependency, putting `PrincipalType` on the companion would pull in server code
-into that module.  A separate object in the server module avoids this:
+A `PrincipalType` tells the framework how to serialize the subject and its ID, and how to load it.  It lives in the
+server module, next to the table it reads:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/AuthSamples.kt#user-auth -->
 ```kotlin
-// PrincipalType lives separately from the model so UserProfile can reside in a
-// shared/models module that carries no server dependencies.
 object UserAuth : PrincipalType<UserProfile, Uuid> {
     override val idSerializer: KSerializer<Uuid> = Uuid.serializer()
     override val subjectSerializer: KSerializer<UserProfile> = UserProfile.serializer()
@@ -93,190 +55,195 @@ object UserAuth : PrincipalType<UserProfile, Uuid> {
 }
 ```
 
-`PrincipalType<SUBJECT, ID>` tells the framework three things:
-
-1. How to serialize the ID (`idSerializer`)
-2. How to serialize the full subject (`subjectSerializer`)
-3. How to fetch a subject by ID from durable storage (`fetch`)
-
-`fetch` has a `ServerRuntime` context receiver — it has access to all
-registered services.  It should throw `NotFoundException` (not return `null`)
-when the ID does not exist.
-
-## Registering the Principal Type and Requiring Auth
-
-Call `register(UserAuth)` in your `ServerBuilder.init {}` block.
-Registration makes the framework aware of this principal so that
-`Authentication<UserProfile>` tokens can be deserialized back to the correct
-type when the server restarts.
-
-Use `UserAuth.require()` as the `auth` argument to `ApiHttpHandler` to
-declare that the endpoint requires a `UserProfile` token.  Compare this to
-`noAuth` (`AuthRequirement.None`) used in earlier chapters for public endpoints.
+Register it and require it:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/AuthSamples.kt#auth-server -->
 ```kotlin
 object UserProfileServer : ServerBuilder() {
     val database = setting("database", Database.Settings())
-
-    // registerTable defines the table, registers it, and creates its once-per-deploy prepare task.
-    // Access it at runtime by invoking it: userProfiles().
     val userProfiles = database.registerTable<UserProfile>("UserProfile")
 
     init {
-        // register() makes this principal type discoverable when deserializing tokens.
         register(UserAuth)
-        // registerBasicMediaTypeCoders() enables JSON serialization of HTTP request/response bodies,
-        // including error responses. Required when testing via HttpHandler.test() (the full HTTP pipeline).
         registerBasicMediaTypeCoders()
     }
 
-    // GET /profile — requires a UserProfile authentication token
     val getProfile = path.path("profile").get bind ApiHttpHandler(
         summary = "Get current user profile",
-        // UserAuth.require() returns an AuthRequirement that accepts only tokens issued for UserProfile.
-        // Compare to noAuth (AuthRequirement.None) used in earlier chapters.
         auth = UserAuth.require(),
-        successCode = HttpStatus.OK,
-        errorCases = emptyList(),
-        implementation = { _: Unit ->
-            // Inside an authenticated handler, `auth` is Authentication<UserProfile>.
-            // auth.id gives the Uuid; auth.fetch() loads the full UserProfile from the database.
-            auth.fetch()
-        }
+        implementation = { _: Unit -> auth.fetch() }
     )
 }
 ```
 
-Inside the implementation lambda:
+- `register(UserAuth)` lets tokens naming this principal be decoded.  `SessionManager` and `AuthEndpoints` register
+  their principal for you.
+- Inside the handler, `auth` is an `Authentication<UserProfile>`.  `auth.id` is read from the token with no database
+  call.  `auth.fetch()` loads the subject and caches it on that `Authentication`, so later calls in the same request
+  are free.
+- `fetch` should throw `NotFoundException` for an unknown ID rather than return null.
+- The principal's `name` (default: the subject's simple class name) is written into tokens and used as
+  `IdentificationAndPassword.type`.  Renaming it invalidates outstanding tokens.
 
-- The lambda receiver is `HttpAccess<PATH, UserProfile>`.
-- `auth` is `Authentication<UserProfile>` — the in-memory token.
-- `auth.id` gives the `Uuid` without a database round-trip (it is stored in
-  the token).
-- `auth.fetch()` suspends and loads the full `UserProfile` from the database;
-  the result is cached on the `Authentication` object so repeated calls within
-  one request are free.
+## Optional authentication
 
-Both `auth.id` and `auth.fetch()` are context extensions on `ServerRuntime`,
-which is already in scope inside the implementation lambda.
+Combine requirements with `or`.  `noAuth` accepts anyone and is always tried last:
 
-Note that `fetch()` must call the service owned by whichever `ServerBuilder`
-declares the `database` setting — in this chapter that is
-`UserProfileServer.database()`.
+<!-- sample: com/lightningkite/lightningserver/guide/samples/AuthSamples.kt#optional-auth -->
+```kotlin
+    val greeting = path.path("greeting").get bind ApiHttpHandler(
+        summary = "Greet the caller",
+        auth = UserAuth.require() or noAuth,
+        implementation = { _: Unit ->
+            val user = authOrNull?.fetch()
+            if (user == null) "Hello, guest" else "Hello, ${user.name}"
+        }
+    )
+```
 
-## Testing an Authenticated Endpoint
+Use `authOrNull` when the requirement may accept anonymous callers; `auth` is only available when it can't.  `or` also
+accepts several principal types: `UserAuth.require() or AdminAuth.require()`.
 
-`PrincipalType.testAuth(subject)` creates a synthetic `Authentication<SUBJECT>`
-for testing.  It must be called inside a `testBlocking {}` block because it needs a
-`ServerRuntime` in context (to capture the current clock time as `issuedAt`).
+## Scopes, recency, and custom checks
 
-Pass the resulting auth token as the first argument to the typed `.test()` call.
+<!-- sample: com/lightningkite/lightningserver/guide/samples/AuthSamples.kt#requirement-options -->
+```kotlin
+    val readReports = UserAuth.require(scope = RequiredScope("reports:read"))
+    val recentlySignedIn = UserAuth.require(maxAge = 10.minutes)
+    val adminOnly = UserAuth.require { it.fetch().isAdmin }
+```
 
-> To wrap these examples in a test class, annotate your test methods with `@Test` — see [Testing Your Server](testing.md) for the complete `@Test` + `testBlocking` pattern.
+| Parameter | Passes when |
+|---|---|
+| `scope` / `scopes` | The granted scopes cover every required scope.  The default is `RequiredScope.root`, so a session with narrowed scopes is rejected unless the endpoint names a scope it has. |
+| `maxAge` | The user proved their identity no longer ago than this, measured from `Authentication.sessionIssuedAt`.  Refreshing a token, creating a sub-session, and masquerading don't reset it. |
+| `requirement` | The suspending check returns true. |
+
+Scopes are `:`-separated paths.  A `GrantedScope` covers every `RequiredScope` it is a prefix of: granted `reports`
+meets required `reports:read`, and granted `*` (`GrantedScope.root`, what a normal login gets) meets everything.
+Granted `reports:read` does not meet required `reports`.
+
+For requirements that accept any principal type, use `anyAuth` (authenticated, no scope needed), `recentRootAuth`
+(root scope, authenticated within 10 minutes), or `AuthRequirement.Authenticated(scopes, maxAge, requirement)`.
+
+A request with no credentials, or whose authentication fails the requirement, gets **403**.  A request with a token
+that is malformed, expired, or revoked gets **401**, which tells the client to refresh.
+
+## Super-user, admin, and developer
+
+Framework modules guard their administrative operations (session administration, proof secret tables, funnels,
+denormalization refresh) with `AuthRequirement.IsSuperUser`, `IsAdmin`, and `IsDeveloper`.  They reject everyone until
+you set them, and `IsAdmin` and `IsDeveloper` fall back to `IsSuperUser`:
+
+<!-- sample: com/lightningkite/lightningserver/guide/samples/AuthSamples.kt#super-user -->
+```kotlin
+        AuthRequirement.isSuperUser = UserAuth.require { it.fetch().isAdmin }
+```
+
+Set it in a `ServerBuilder`'s `init`.  `AuthRequirement.isAdmin` and `AuthRequirement.isDeveloper` are set the same
+way, and your own endpoints can use `auth = AuthRequirement.IsAdmin`.
+
+## The `Authentication` object
+
+| Member | Meaning |
+|---|---|
+| `id` | The subject's ID. |
+| `fetch()` | The subject, loaded through `PrincipalType.fetch` and cached on this object. |
+| `principalName`, `rawId` | The principal's name and the serialized ID. |
+| `scopes` | The granted scopes. |
+| `sessionId` | The session it came from, or null (test auths, masquerades). |
+| `sessionIssuedAt` | When the user last proved their identity for this session.  `maxAge` measures from this. |
+| `tokenIssuedAt` | When the access token carrying it was minted, or null if it didn't come from an access token. |
+| `expiration` | When it stops being valid, or null. |
+| `fromMasquerade` | The real caller's authentication, when masquerading. |
+
+## Caching values on the authentication
+
+An `AuthCacheKey` computes a value from the `Authentication` once and keeps it in `Authentication.cache`:
+
+<!-- sample: com/lightningkite/lightningserver/guide/samples/AuthSamples.kt#auth-cache-key -->
+```kotlin
+object IsAdmin : AuthCacheKey<UserProfile, Boolean> {
+    override val id = "user-is-admin"
+    override val serializer = Boolean.serializer()
+    override val expireAfter = 5.minutes
+
+    context(server: ServerRuntime)
+    override suspend fun calculate(input: Authentication<UserProfile>): Boolean =
+        input.fetch().isAdmin
+}
+
+context(server: ServerRuntime)
+suspend fun canSeeAuditLog(auth: Authentication<UserProfile>): Boolean = auth.get(IsAdmin)
+```
+
+The cache is serialized into the access token, so a value computed on one request rides along on later ones until the
+token or `expireAfter` expires.  Keys listed in `PrincipalType.precache` are computed when the access token is minted.
+The subject loaded by `fetch()` is local-only and never enters the token.
+
+!!! warning
+    `JwtTokenFormat` tokens are signed but not encrypted, so the client can read anything in the cache.  The default
+    `PrivateTinyTokenFormat` encrypts it.
+
+## Masquerading
+
+A caller can act as another subject by sending `X-Masquerade: <principal name>/<id>`, or a query parameter of the same
+name for WebSockets.  Every masquerade is refused (403) until the target's principal type allows it:
+
+```kotlin
+object UserAuth : PrincipalType<UserProfile, Uuid> {
+    // ...
+    context(server: ServerRuntime)
+    override suspend fun permitMasquerade(from: Authentication<*>, into: Authentication<UserProfile>): Boolean =
+        AuthRequirement.IsSuperUser.accepts(from)
+}
+```
+
+The masqueraded authentication keeps the caller's scopes, expiration, and `sessionIssuedAt`, and records the caller in
+`fromMasquerade`.
+
+## Testing
+
+`PrincipalType.testAuth(subject)` builds an `Authentication` without logging in.  Pass it as the first argument of a
+typed endpoint's `test`:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/AuthSamples.kt#auth-test -->
 ```kotlin
 fun authTest() = UserProfileServer.testBlocking(settings = { database set Database.Settings("ram") }) {
-    // Seed a user directly into the database
-    val alice = UserProfileServer.userProfiles()
-        .insertOne(UserProfile(name = "Alice", email = "alice@example.com"))
+    val alice = userProfiles().insertOne(UserProfile(name = "Alice", email = "alice@example.com"))
 
-    // testAuth() creates an Authentication<UserProfile> for use in tests.
-    val aliceAuth = UserAuth.testAuth(alice)
-
-    // Pass the auth token as the first argument to the typed .test() call.
-    val profile = UserProfileServer.getProfile.test(aliceAuth, Unit)
-    check(profile.name == "Alice")
-    check(profile.email == "alice@example.com")
+    val profile = getProfile.test(UserAuth.testAuth(alice), Unit)
     check(profile._id == alice._id)
 }
 ```
 
-The `test {}` block (from `com.lightningkite.lightningserver.runtime.test.test`)
-provides a test engine with all settings resolved.  The `settings` lambda
-configures each setting before the engine starts — here, `database set
-Database.Settings("ram")` switches to the in-process RAM database so no
-external infrastructure is needed.
+`testAuth` also takes `issuedAt` (stored as `sessionIssuedAt`; set it in the past to test `maxAge`) and `scopes`
+(default root).
 
-## Testing: the Rejection Path
-
-When a protected endpoint is called without any credentials, the framework's
-`assert()` function throws `ForbiddenException` (HTTP 403).  Note that 403
-("you're not allowed") rather than 401 ("who are you?") is used here because
-no auth token was presented at all.  The `HttpHandler.test()` extension exercises
-the full HTTP pipeline including the exception handler, so the exception is
-serialized to an `HttpResponse` — inspect `.status.code` on the returned value:
+Calling the endpoint as a plain `HttpHandler` runs the full HTTP pipeline, credential reading included:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/AuthSamples.kt#auth-rejection-test -->
 ```kotlin
 fun authRejectionTest() = UserProfileServer.testBlocking(settings = { database set Database.Settings("ram") }) {
-    // Drive the endpoint as an HttpHandler (not ApiHttpHandler.test()) so the full
-    // auth-checking pipeline runs. The framework serializes the rejection into an HTTP
-    // response; inspect .status.code on the returned HttpResponse.
-    // Note: the framework throws ForbiddenException (403) when no credentials are
-    // supplied, which is distinct from an invalid token (401).
-    val response = UserProfileServer.getProfile.test()
+    val response = getProfile.test()
     check(response.status.code == 403)
 }
 ```
 
-## Auth Caching Keys
+To test with a real token, log in through the proof endpoints; see
+[Proof-based login](proof-session.md#testing-a-login).
 
-`auth.fetch()` is already cached on the `Authentication` object for the
-lifetime of a single request — repeated calls within one request are free.
-But sometimes you want to cache *derived* values (e.g., role flags, computed
-permissions, or expensive lookups) across requests.
+## Custom credential readers
 
-`AuthCacheKey<SUBJECT, T>` is a typealias for
-`SerializableCache.CalculatingKey<Authentication<SUBJECT>, Authentication<SUBJECT>, T>`: a key whose value is
-calculated from the `Authentication` on a cache miss.  Create one as an object, typically next to your
-`PrincipalType`:
+`SessionManager` is an `Authentication.Reader`: it turns the `Authorization` header (or query parameter, or cookie)
+into an `Authentication`.  For other credentials, such as API keys, implement `Authentication.Reader` and register it
+with `authReaders.register(reader)` in a `ServerBuilder`.  Readers run highest `priority` first and the first non-null
+result wins.  Return null for "no credentials of my kind", and throw `UnauthorizedException` for "credentials, but
+invalid".
 
-```kotlin
-// Illustrative — not a drift-checked sample.
-object IsAdmin : AuthCacheKey<UserProfile, Boolean> {
-    override val id = "my-app/is-admin"
-    override val serializer = Boolean.serializer()
-    override val expireAfter = 5.minutes
+## See also
 
-    // `input` is the Authentication<UserProfile> the value is derived from.
-    // Run any suspension here — database queries, etc.
-    context(server: ServerRuntime)
-    override suspend fun calculate(input: Authentication<UserProfile>): Boolean =
-        UserProfileServer.userProfiles()
-            .count(Condition { (it._id eq input.id) and (it.role eq "admin") }) > 0
-}
-```
-
-Use the key inside a handler:
-
-```kotlin
-// Illustrative.
-val isAdminValue: Boolean = auth.get(IsAdmin)   // suspends; cache miss → recomputes
-```
-
-`PrincipalType` also exposes two caching helpers out of the box:
-
-- **`subjectCacheKey`** — a pre-built `AuthCacheKey` that caches the result of
-  `fetch()` for 5 minutes in a local (in-process) cache.  `auth.fetch()` uses
-  this automatically, so you get per-request caching for free with no extra
-  setup.
-- **`precache`** — a `List<AuthCacheKey<SUBJECT, *>>` on your `PrincipalType`
-  object.  Any key you add here is eagerly populated on login, so the first
-  handler invocation after login never pays a cache-miss cost.
-
-> The code above is illustrative; the typealias and `get` accessor are in
-> `/auth/src/main/kotlin/.../Authentication.ext.kt`.
-> Unit-assertable sample regions cannot be added here because verifying the
-> caching behavior requires an external cache service.
-
-## How users log in
-
-The examples above show how to *consume* an `Authentication` token in an endpoint.
-Establishing that token — logging a user in — is handled by the `sessions` and
-`sessions-email` / `sessions-sms` / `sessions-oauth` modules.
-
-See [Proof & Session Authentication](proof-session.md) for the full flow: how proofs
-accumulate, how `AuthEndpoints` issues a session, and how the bearer token reaches your
-handler as `auth`.
+- [Proof-based login](proof-session.md): sessions, proof methods, tokens, and revocation
+- [OAuth](oauth.md): signing in with Google, Apple, Microsoft, or GitHub
+- [Permissions](permissions.md): per-row access rules built on `auth`
+- [Testing](testing.md)

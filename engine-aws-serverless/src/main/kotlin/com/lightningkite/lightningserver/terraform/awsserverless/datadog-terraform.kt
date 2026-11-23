@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.terraform.awsserverless
 
-import com.lightningkite.services.otel.OpenTelemetrySettings
+import com.lightningkite.services.telemetry.TelemetryBackend
 import com.lightningkite.services.terraform.TerraformNeed
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
@@ -10,7 +10,7 @@ import software.amazon.awssdk.services.lambda.model.Architecture
 import kotlin.time.Duration.Companion.minutes
 
 context(emitter: TerraformAwsServerlessBuilder<*>)
-public fun TerraformNeed<OpenTelemetrySettings?>.otelDatadog(
+public fun TerraformNeed<TelemetryBackend.Settings>.otelDatadog(
     version: Int = 88,
 ): Unit {
     val ext = if (emitter.architecture == Architecture.ARM64) "-ARM" else ""
@@ -33,9 +33,9 @@ public fun TerraformNeed<OpenTelemetrySettings?>.otelDatadog(
     emitter.lambdaEnvironment["DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_GRPC_ENDPOINT"] = "localhost:4317"
     emitter.fulfillSetting(
         name, Json.encodeToJsonElement(
-            OpenTelemetrySettings(
+            TelemetryBackend.Settings(
                 url = "otlp-grpc",
-                batching = OpenTelemetrySettings.BatchingRules(frequency = 1.minutes)
+                batching = TelemetryBackend.Settings.BatchingRules(frequency = 1.minutes)
             )
         )
     )

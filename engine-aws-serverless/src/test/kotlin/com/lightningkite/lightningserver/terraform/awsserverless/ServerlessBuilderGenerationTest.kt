@@ -26,7 +26,7 @@ class ServerlessBuilderGenerationTest {
 
     private val tmpRoot = File("build/test-terraform")
 
-    inner class Deployment : TerraformAwsServerlessDomainBuilder<TestServer>(TestServer) {
+    open inner class Deployment : TerraformAwsServerlessDomainBuilder<TestServer>(TestServer) {
         override val handler: KClass<out AwsAdapter> = TestAwsAdapter::class
         override val storageBucket = "test-tf-state"
         override val region: Region = Region.US_WEST_2
@@ -133,6 +133,71 @@ class ServerlessBuilderGenerationTest {
             (Json.parseToJsonElement(it.readText()).jsonObject["data"] as? JsonObject)?.get("archive_file")?.jsonObject?.get("lambda")?.jsonObject
         }
         assertEquals("\${path.module}/build/lambda", archive["source_dir"]!!.jsonPrimitive.content)
+    }
+
+    inner class DatadogDeployment : TerraformAwsServerlessBuilder<TestServer>(TestServer) {
+        override val handler: KClass<out AwsAdapter> = TestAwsAdapter::class
+        override val storageBucket = "test-tf-state"
+        override val region: Region = Region.US_WEST_2
+        override val displayName = "Datadog Test"
+        override val debug = true
+        override val emergencyContact = "ops@example.com".toEmailAddress()
+        override val applicationVpc: AwsVpc = AwsVpc.None
+        override val terraformRoot = File(tmpRoot, "datadog")
+
+        override fun TestServer.settings() {
+            fulfillSetting(secretBasis.name, Json.encodeToJsonElement(secretBasis.serializer, secretBasis.default))
+            fulfillSetting(loggingSettings.name, Json.encodeToJsonElement(loggingSettings.serializer, loggingSettings.default))
+            telemetrySettings.otelDatadog()
+        }
+    }
+
+    @Test
+    fun otelDatadogFulfillsTheTelemetrySetting() {
+        val d = DatadogDeployment()
+        d.write()
+        val telemetry = d.terraformRoot.listFiles { f -> f.name.endsWith(".tf.json") }!!.firstNotNullOf {
+            (Json.parseToJsonElement(it.readText()).jsonObject["locals"] as? JsonObject)?.get("settings_raw")?.jsonObject
+        }[telemetrySettings.name]!!
+        assertEquals("otlp-grpc", Json.decodeFromJsonElement(telemetrySettings.serializer, telemetry).url)
+        val environment = d.terraformRoot.findResource("aws_lambda_function", "main")!!["environment"]!!
+            .jsonObject["variables"]!!.jsonObject
+        assertEquals("\${var.datadog_api_key}", environment["DD_API_KEY"]!!.jsonPrimitive.content)
+    }
+
+    /** ADOT's layer has no decouple processor, so a config that uses it would fail at collector startup. */
+    @Test
+    fun otlpBackendsUseTheOpenTelemetryCollectorLayer() {
+        val d = object : Deployment() {
+            override val terraformRoot = File(tmpRoot, "serverless-grafana")
+            override fun TestServer.settings() {
+                fulfillSetting(secretBasis.name, Json.encodeToJsonElement(secretBasis.serializer, secretBasis.default))
+                fulfillSetting(loggingSettings.name, Json.encodeToJsonElement(loggingSettings.serializer, loggingSettings.default))
+                telemetrySettings.otelGrafanaCloud(instanceId = "1", zone = "prod-us-west-0")
+            }
+        }
+        d.write()
+        assertEquals(
+            listOf("arn:aws:lambda:us-west-2:184161586896:layer:opentelemetry-collector-amd64-0_24_0:1"),
+            d.terraformRoot.findResource("aws_lambda_function", "main")!!["layers"]!!.jsonArray.map { it.jsonPrimitive.content },
+        )
+    }
+
+    @Test
+    fun xRayUsesTheAdotCollectorLayer() {
+        val d = object : Deployment() {
+            override val terraformRoot = File(tmpRoot, "serverless-xray")
+            override fun TestServer.settings() {
+                fulfillSetting(secretBasis.name, Json.encodeToJsonElement(secretBasis.serializer, secretBasis.default))
+                fulfillSetting(loggingSettings.name, Json.encodeToJsonElement(loggingSettings.serializer, loggingSettings.default))
+                telemetrySettings.otelXRay()
+            }
+        }
+        d.write()
+        assertEquals(
+            listOf("arn:aws:lambda:us-west-2:901920570463:layer:aws-otel-collector-amd64-ver-0-117-0:1"),
+            d.terraformRoot.findResource("aws_lambda_function", "main")!!["layers"]!!.jsonArray.map { it.jsonPrimitive.content },
+        )
     }
 
 }

@@ -1,29 +1,10 @@
-# Database & the Query DSL
+# Database
 
-Lightning Server provides a type-safe DSL for querying and updating documents.
-Every query is expressed as a Kotlin lambda — the compiler rejects invalid field
-references at build time, and refactoring a model field name automatically
-updates all queries.
+Lightning Server stores models through Service Abstractions' database layer: one type-safe API over MongoDB,
+PostgreSQL, the in-memory `ram` backend, and others.  Queries are Kotlin expressions checked at compile time, and
+switching backends is a settings change.
 
-## Before You Begin
-
-> **Before you begin — KSP plugin required.**  `@Queryable` is
-> processed at build time by the KSP plugin.  Add these two lines to your
-> module's `build.gradle.kts` before using this chapter's examples:
->
-> ```kotlin
-> // build.gradle.kts
-> plugins {
->     alias(libs.plugins.ksp)
-> }
-> dependencies {
->     ksp(libs.services.database.processor)
-> }
-> ```
-
-## Imports
-
-All examples in this chapter use the following imports:
+## Minimal example
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/DatabaseSamples.kt#db-imports -->
 ```kotlin
@@ -37,16 +18,14 @@ import com.lightningkite.lightningserver.settings.*
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.services.data.*
 import com.lightningkite.services.database.*
-import kotlinx.coroutines.*
+import com.lightningkite.services.database.optics.*
 import kotlinx.coroutines.flow.*
-import kotlinx.serialization.*
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.uuid.*
 ```
 
-## Defining a Model
-
-Database models must implement `HasId<ID>` and be annotated with
-`@Queryable`:
+A model is a data class annotated `@Queryable` that implements `HasId`:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/DatabaseSamples.kt#note-model -->
 ```kotlin
@@ -54,25 +33,28 @@ Database models must implement `HasId<ID>` and be annotated with
 data class Note(
     override val _id: Uuid = Uuid.random(),
     val title: String,
-    val body: String,
+    val body: String = "",
+    val tags: Set<String> = setOf(),
+    val views: Int = 0,
+    val archivedAt: Instant? = null,
 ) : HasId<Uuid>
 ```
 
-`@Queryable` is processed by the KSP plugin at build time.
-It generates a typed field on the companion object for every property —
-`Note.title`, `Note._id`, `Note.body`.
-These fields are what `Condition {}` and `Modification {}` use to build
-type-safe queries.
+`@Queryable` makes the class `@Serializable` and has the KSP processor generate a field for each property
+(`Note.title`, `Note.tags`, ...).  Those fields are what queries are written with.  The processor must be on the
+module's KSP classpath:
 
-The `_id` field is the primary key.  Defaulting it to `Uuid.random()` means
-callers can create a `Note` without supplying an id and get a unique one for
-free.
+```kotlin
+// build.gradle.kts
+plugins {
+    alias(libs.plugins.ksp)
+}
+dependencies {
+    ksp(sa.database.processor)
+}
+```
 
-## Declaring the Database Setting
-
-Declare `val database = setting("database", Database.Settings())` in your
-`ServerBuilder`.  The default URL is `"ram"` — an in-process, zero-config
-database suitable for tests and local development:
+Declare a database setting and register each table once, by name:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/DatabaseSamples.kt#note-server -->
 ```kotlin
@@ -81,27 +63,20 @@ object NoteDbServer : ServerBuilder() {
 
     val database = setting("database", Database.Settings())
 
-    // registerTable defines the table, registers it, and creates its once-per-deploy prepare task.
-    // Access it at runtime by invoking it: notes().
     val notes = database.registerTable<Note>("Note")
 
-    // GET /notes — list all notes
     val list = path.path("notes").get bind ApiHttpHandler(
-        summary = "List all notes",
+        summary = "List notes that are not archived",
         auth = noAuth,
-        successCode = HttpStatus.OK,
-        errorCases = emptyList(),
         implementation = { _: Unit ->
-            notes().find(Condition.Always).toList()
+            notes().find(Note.archivedAt eq null).toList()
         }
     )
 
-    // POST /notes — create a new note
     val create = path.path("notes").post bind ApiHttpHandler(
         summary = "Create a note",
         auth = noAuth,
         successCode = HttpStatus.Created,
-        errorCases = emptyList(),
         implementation = { input: Note ->
             notes().insertOne(input)
         }
@@ -109,121 +84,177 @@ object NoteDbServer : ServerBuilder() {
 }
 ```
 
-Key points:
+`registerTable` returns an accessor: call it (`notes()`) inside a handler, task, or test to get the live
+`Table<Note>`.  Registering also creates a [pre-deploy task](tasks.md) that creates the collection and its
+indexes, so you don't prepare tables yourself.  Pick the table name deliberately: it is the collection name in the
+database, and renaming it orphans existing data.
 
-- **`notes()`** — `notes` is the registration returned by `registerTable`; invoking it inside a
-  handler resolves the live `Table<Note>` from the current `ServerRuntime`. `registerTable` also
-  created the once-per-deploy task that prepares the table's collection/indexes, so you don't wire
-  that up yourself.
-- **`Condition.Always`** — matches every document.  Use `Condition { }` to
-  narrow the query (shown in the test below).
-- **`find()` returns a `Flow<Note>`** — call `.toList()` to collect all results
-  eagerly, or `.collect { }` to stream them one at a time without loading the
-  full result set into memory.
-- **`insertOne(input)`** — inserts the document and returns the stored copy
-  (which may differ if the backend applies defaults or transformations).
+## Reading and writing
 
-## Testing with the In-Memory Database
-
-The `settings` lambda overrides the `database` setting to the `"ram"` backend,
-giving each test run a fresh, empty in-process database.  The same lambda is
-used in all previous chapters for the cache setting.  As in previous chapters,
-the first argument to `ApiHttpHandler.test()` is the auth token; `null` is
-correct for `noAuth` endpoints.  The infix `set` extension comes from
-`com.lightningkite.lightningserver.settings` and is already in the imports list.
-
-> To wrap these examples in a test class, annotate your test methods with `@Test` — see [Testing Your Server](testing.md) for the complete `@Test` + `testBlocking` pattern.
-
-<!-- sample: com/lightningkite/lightningserver/guide/samples/DatabaseSamples.kt#db-test -->
+<!-- sample: com/lightningkite/lightningserver/guide/samples/DatabaseSamples.kt#db-crud -->
 ```kotlin
 fun databaseTest() = NoteDbServer.testBlocking(settings = { database set Database.Settings("ram") }) {
-    // Insert two notes
-    val first = NoteDbServer.create.test(null, Note(title = "Shopping", body = "Eggs, milk"))
-    val second = NoteDbServer.create.test(null, Note(title = "Ideas", body = "Start a blog"))
+    val notes = NoteDbServer.notes()
 
-    // List returns both
-    val all = NoteDbServer.list.test(null, Unit)
-    check(all.size == 2)
+    val shopping = notes.insertOne(Note(title = "Shopping", body = "Eggs, milk", tags = setOf("home")))
+    notes.insert(listOf(Note(title = "Ideas"), Note(title = "Old", archivedAt = Clock.System.now())))
 
-    // Direct table access for condition / modification / delete
-    val table = NoteDbServer.notes()
+    check(notes.find(Note.tags.any { it eq "home" }).toList() == listOf(shopping))
+    check(notes.get(shopping._id) == shopping)
+    check(notes.count(Note.archivedAt eq null) == 2)
 
-    // Condition { } builds a type-safe query using generated path extensions
-    val found = table.find(Condition { it.title eq "Shopping" }).toList()
-    check(found.size == 1)
-    check(found[0]._id == first!!._id)
+    notes.updateOneById(shopping._id, Modification {
+        it.body assign "Eggs, milk, bread"
+        it.views += 1
+    })
+    check(notes.get(shopping._id)!!.views == 1)
 
-    // Modification { } builds a type-safe update
-    table.updateOneIgnoringResult(
-        Condition { it._id eq first._id },
-        Modification { it.body assign "Eggs, milk, bread" }
-    )
-    val updated = table.get(first._id)!!
-    check(updated.body == "Eggs, milk, bread")
+    notes.deleteMany(Note.archivedAt neq null)
+    check(notes.count() == 2)
 
-    // delete
-    table.deleteOneIgnoringOld(Condition { it._id eq second!!._id })
-    check(table.count() == 1)
+    check(NoteDbServer.list.test(null, Unit).size == 2)
 }
 ```
 
-### Query DSL mechanics
+`find` returns a `Flow`: `toList()` collects it, `collect { }` streams it.  The `ram` backend gives every test run a
+fresh, empty database; see [Testing](testing.md).
 
-**`Condition { it.title eq "Shopping" }`**
-- `it` is a `Optic<Note, Note>` — a typed handle on the whole document.
-- `.title` is a generated extension that narrows the path to `Optic<Note, String>`.
-- `eq "Shopping"` builds a `Condition<Note>` that matches documents where the
-  title field equals `"Shopping"`.
-- Other operators: `neq`, `lt`, `lte`, `gt`, `gte`, `inside` (IN list), `and`,
-  `or`, `not`.
+| Operation | Returns |
+|---|---|
+| `insertOne(model)`, `insert(models)` | the stored models |
+| `find(condition, orderBy, skip, limit)` | `Flow<T>` |
+| `findOne(condition)`, `get(id)`, `getMany(ids)` | `T?` / `List<T>` |
+| `count(condition)` | `Int` |
+| `updateOne(condition, modification)`, `updateOneById(id, modification)` | `EntryChange<T>` (`old`, `new`) |
+| `updateMany(condition, modification)` | `CollectionChanges<T>` |
+| `replaceOneById(id, model)`, `upsertOneById(id, model)` | `EntryChange<T>` |
+| `deleteOne(condition)`, `deleteMany(condition)` | the deleted models |
+| `deleteOneById(id)` | `Boolean` |
 
-**`Modification { it.body assign "Eggs, milk, bread" }`**
-- `assign` replaces the field value.
-- Other operators: `+= 1` (numeric increment), `+= listOf(...)` (list append),
-  `coerceAtLeast`, `coerceAtMost`.
+Every write also has an `...IgnoringResult` / `...IgnoringOld` variant (`updateOneIgnoringResult`,
+`updateManyIgnoringResult`, `deleteManyIgnoringOld`, ...) that returns only a `Boolean` or a count.  Use it when you
+don't need the changed rows; it saves the database a read.
 
-**`*IgnoringResult` variants**
-- `updateOneIgnoringResult` and `deleteOneIgnoringOld` skip fetching the old
-  or new document.  Use them when you don't need to inspect what changed —
-  they are faster because the database does not need to return data.
-- The non-ignoring variants (`updateOne`, `deleteOne`) return `EntryChange<Note>`
-  or `Model?` so you can log or react to the changed values.
+## Conditions
 
-**`table.get(id)`**
-- Looks up a single document by `_id`.  Returns `null` if not found.
+A condition is built from generated fields and infix operators:
 
-**`table.count(condition)`**
-- Returns the number of documents matching a condition.  Call `count()` with no
-  argument (or `Condition.Always`) to count all documents.
+<!-- sample: com/lightningkite/lightningserver/guide/samples/DatabaseSamples.kt#db-conditions -->
+```kotlin
+val noteConditions: List<Condition<Note>> = listOf(
+    Note.title eq "Shopping",
+    Note.views gte 10,
+    Note.title inside listOf("Shopping", "Ideas"),
+    Note.body contains "milk",                           // case-insensitive by default
+    Note.tags.any { it eq "home" },
+    Note.archivedAt.notNull lt Clock.System.now(),       // false when archivedAt is null
+    (Note.views gt 0) and (Note.archivedAt eq null),
+    (Note.title eq "A") or (Note.title eq "B"),
+    !Note.tags.any { it eq "spam" },
+    Condition { (it.views gt 0) and (it.title neq "") }, // lambda form
+    Condition.Always,
+)
+```
 
-## Switching Backends
+`Condition { it.field ... }` is the same thing written as a lambda over the model; it's handy when a condition
+names several fields.  Nested fields chain (`User.address.city`); `.notNull` steps into a nullable value and
+`.elements` into a collection.  Those two live in `com.lightningkite.services.database.optics`, so import it.
 
-Because the database is declared as a service-abstracted setting, switching from
-the in-memory backend to MongoDB or PostgreSQL is a configuration change, not a
-code change.  The generated `settings.json` for a server using `NoteDbServer`
-would look like:
+| Operator | Meaning |
+|---|---|
+| `eq`, `neq` | equal, not equal |
+| `eqNn` | equal, or `Condition.Never` when the value is `null` (handy with optional users) |
+| `gt`, `gte`, `lt`, `lte` | comparisons on `Comparable` values |
+| `inside`, `notInside` | value is (not) in a collection |
+| `contains` | substring; `contains(text, ignoreCase = false)` for case-sensitive |
+| `any { }`, `all { }` | some / every element of a list or set matches |
+| `and`, `or`, `!` | combine; `Condition.Always`, `Condition.Never` are the constants |
+| `allSet`, `anySet`, `allClear`, `anyClear` | bit flags on an `Int` field |
+
+Wrapper types expose their contents: `User.email.raw contains "@example.com"`, `Box.height.meters gt 1.8`.
+
+## Modifications
+
+<!-- sample: com/lightningkite/lightningserver/guide/samples/DatabaseSamples.kt#db-modifications -->
+```kotlin
+val tidyUp: Modification<Note> = Modification {
+    it.title assign "Groceries"
+    it.views += 1
+    it.tags.removeAll { tag -> tag eq "home" }
+    it.archivedAt assign null
+}
+```
+
+Several statements in one `Modification { }` apply together, atomically for that row.  Change each field once per
+modification: some backends reject two operators on the same field.
+
+| Operator | Applies to |
+|---|---|
+| `assign value` | any field |
+| `+= n`, `*= n` | numbers |
+| `coerceAtLeast v`, `coerceAtMost v` | `Comparable` values |
+| `+= item`, `+= items`, `addAll items` | lists and sets |
+| `-= item`, `-= items`, `removeAll items`, `removeAll { condition }` | lists and sets |
+| `forEach { }`, `forEachIf(condition, modification)` | modify each element of a list or set |
+| `it.address.notNull.city assign "Provo"` | nested fields; no change when `address` is null |
+
+Strings, maps, and dropping the first or last element have no special operator: `assign` the new value.
+
+Conditions and modifications are serializable values, which is how clients send them to
+[generated REST endpoints](model-rest.md).  You can also evaluate them locally: `condition(note)` returns a
+`Boolean`, `modification(note)` returns the modified copy.
+
+## Switching backends
+
+The setting is a URL.  In `settings.json`:
 
 ```json
 {
-  "database": "ram"
+  "database": "mongodb+srv://user:password@cluster0.example.mongodb.net/myapp?retryWrites=true"
 }
 ```
 
-Change `"ram"` to `"mongodb://host/dbname"` (or `"postgres://..."`) and restart
-— no Kotlin changes required.
+| URL | Backend | Module, and the class to reference |
+|---|---|---|
+| `ram` | In memory, empty at start | built in |
+| `ram-preload://path` | In memory, loaded from a JSON file or folder | built in |
+| `json-files://path` | In memory, persisted to JSON files | `sa.database.jsonfile` |
+| `mongodb://...`, `mongodb+srv://...` | MongoDB | `sa.database.mongodb`, `MongoDatabase` |
+| `mongodb-test` | Throwaway local MongoDB | `sa.database.mongodb`, `MongoDatabase` |
+| `mongodb-file://path` | Local MongoDB stored at `path` | `sa.database.mongodb`, `MongoDatabase` |
+| `postgresql://...` | PostgreSQL | `sa.database.postgres`, `PostgresDatabase` |
+| `delay://300/ram` | Any backend with artificial latency (ms), for testing UIs | built in |
 
-> **Note:** This JSON block is illustrative — it is generated output from the
-> first run of your server with `loadFromFile()`, not a drift-checked sample
-> region.
+A backend registers its URL schemes when its class is loaded, so reference it once in your server:
 
-## What's Next
+```kotlin
+object Server : ServerBuilder() {
+    init { MongoDatabase }
+    val database = setting("database", Database.Settings())
+}
+```
 
-- **Authentication** — add `auth = User.require()` to your endpoints and
-  enforce access control in handler lambdas.  Chapter 6 covers the proofs-based
-  session system.
-- **Query parameters and pagination** — `find(condition, orderBy, skip, limit)`
-  supports cursor-style pagination; wire query string parameters via the typed
-  endpoint API.
-- **ModelRestEndpoints** — for standard CRUD APIs, `ModelRestEndpoints` generates
-  list/get/create/update/delete endpoints from a single `modelInfo` declaration,
-  including OpenAPI documentation and permission enforcement.
+Service Abstractions also has Cassandra / AWS Keyspaces (`cassandra`, `keyspaces`) and SQL (`sql-h2`, `sql-mysql`,
+`sql-mariadb`, `sql-sqlite`) backends.  See [Settings](settings.md) for how settings files are loaded and
+[Services](services.md) for how URL-configured services work in general.
+
+## Gotchas
+
+- **One `registerTable` per table name.**  Registering the same name twice for the same type returns the same
+  registration; for a different type it throws `DuplicateRegistrationException`.
+- **Tables are prepared by pre-deploy tasks.**  A deployment that never runs them has no indexes; see
+  [Tasks](tasks.md).
+- **No transactions.**  Single-row writes are atomic; `updateMany`, `deleteMany`, and multi-model `insert` are not.
+  For compare-and-swap, see [Advanced database](advanced-database.md#compare-and-swap).
+- **`EntryChange.new` is computed**, by applying the modification to the row that was read.  Only `old` is what the
+  database actually held.
+- **Unordered by default.**  Without `orderBy`, result order depends on the backend.
+- **Import `kotlin.time.Instant` by name in model files**, not `kotlin.time.*`.  The generated field code
+  star-imports `kotlinx.datetime`, and two star-imported `Instant`s make the generated code fail to compile.
+
+## Next
+
+- [Advanced database](advanced-database.md): sorting, paging, aggregates, indexes, text search, signals.
+- [Model REST endpoints](model-rest.md): CRUD endpoints for a model without writing handlers.
+- [Permissions](permissions.md): who may read and write which rows and fields.
+- [Admin panel](meta-admin.md): the `@Admin...`, `@Description`, and `@References` annotations.

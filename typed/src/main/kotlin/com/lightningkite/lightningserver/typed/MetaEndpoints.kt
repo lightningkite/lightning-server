@@ -34,9 +34,15 @@ import kotlin.time.TimeSource
 
 public class MetaEndpoints(
     private val packageName: String,
-    private val database: RuntimeDeferred<Database>,
     private val cache: RuntimeDeferred<Cache>,
 ) : ServerBuilder() {
+
+    @Deprecated("MetaEndpoints never used the database.", ReplaceWith("MetaEndpoints(packageName, cache)"))
+    public constructor(
+        packageName: String,
+        @Suppress("UNUSED_PARAMETER") database: RuntimeDeferred<Database>,
+        cache: RuntimeDeferred<Cache>,
+    ) : this(packageName, cache)
 
     public val root: HttpHandler<PathSpec0> = path.slash.get bind HttpHandler {
         HttpResponse(body = TypedData.html {

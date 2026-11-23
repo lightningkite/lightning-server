@@ -1,13 +1,46 @@
 # Schedules
 
-A **scheduled task** is a recurring background job registered on your
-`ServerBuilder`.  The engine fires it at the configured time — no external
-cron daemon required.  Common uses: nightly cleanup, hourly metric snapshots,
-daily digest emails, periodic data syncs.
+A `ScheduledTask` runs on a fixed interval, at a time of day, or on a cron pattern: nightly cleanup, hourly syncs,
+digest emails.  The engine fires it; there's no separate cron daemon, and only one instance runs each tick.
 
-## Imports
+<!-- sample: com/lightningkite/lightningserver/guide/samples/SchedulesSamples.kt#schedules-server -->
+```kotlin
+object SchedulesServer : ServerBuilder() {
+    val cache = setting("cache", Cache.Settings())
 
-All examples in this chapter use the following imports:
+    val hourlyCleanup = path.path("schedules").path("hourly-cleanup") bind ScheduledTask(frequency = 1.hours) {
+        cache().add("cleanup:runs", 1)
+    }
+
+    val sendDigest = path.path("tasks").path("send-digest") bind Task { address: String ->
+        cache().set("digest:$address", "sent")
+    }
+
+    val nightlyDigest = path.path("schedules").path("nightly-digest") bind ScheduledTask(
+        timeOfDay = LocalTime(3, 0),
+        timeZone = TimeZone.of("America/Denver"),
+    ) {
+        for (address in listOf("alice@example.com", "bob@example.com")) sendDigest.launch(address)
+    }
+
+    val weekdayStandup = path.path("schedules").path("weekday-standup") bind ScheduledTask(
+        cron = CronPattern(
+            minutes = listOf(0),
+            hours = listOf(9),
+            days = CronDays.DaysOfWeek(DayOfWeek.MONDAY..DayOfWeek.FRIDAY),
+        ),
+        timeZone = TimeZone.UTC,
+    ) {
+        println("Standup in 15 minutes")
+    }
+}
+```
+
+As with [tasks](tasks.md), the bound path is the schedule's identity (it names its lock and its state), not an HTTP
+route.  Each tick runs as its own execution with a `ServerRuntime` in context.  `nightlyDigest` shows the usual shape
+for big jobs: the tick stays short and fans the work out to a task.
+
+Imports used in this chapter:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/SchedulesSamples.kt#schedules-imports -->
 ```kotlin
@@ -15,135 +48,85 @@ import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.data.*
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.*
-import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.runtime.test.*
 import com.lightningkite.services.cache.*
-import kotlin.test.*
-import kotlinx.coroutines.*
 import kotlinx.datetime.*
+import kotlin.test.*
 import kotlin.time.Duration.Companion.hours
-import kotlin.time.Duration.Companion.minutes
 ```
 
-`com.lightningkite.lightningserver.data.*` brings in `Schedule`,
-`CronPattern`, `CronDays`, and `DayOfWeek.rangeTo`.
-`kotlinx.datetime.*` brings in `LocalTime`, `TimeZone`, and `DayOfWeek`.
+`CronPattern`, `CronDays`, `Schedule` and the `DayOfWeek` range operator come from
+`com.lightningkite.lightningserver.data`; `LocalTime`, `TimeZone` and `DayOfWeek` from `kotlinx.datetime`.
 
-## Declaring a Scheduled Task
+## Schedule forms
 
-<!-- sample: com/lightningkite/lightningserver/guide/samples/SchedulesSamples.kt#schedule-server -->
-```kotlin
-object ScheduleServer : ServerBuilder() {
-
-    val cache = setting("cache", Cache.Settings())
-
-    // Declare a scheduled task on any path. The path is the task's identity —
-    // it does not correspond to an HTTP route.
-    //
-    // ScheduledTask(frequency) runs the body at a fixed interval.
-    // The handler runs with a ServerRuntime in context, so services are available.
-    val cleanup = path.path("schedules").path("cleanup") bind ScheduledTask(frequency = 1.hours) {
-        // Delete expired sessions, purge stale cache entries, compact logs, etc.
-        val count = 42  // illustrative; in production, query and delete from a database
-        println("Cleanup ran: removed $count expired records")
-        cache().set("cleanup:last-count", count, 2.hours)
-    }
-}
-```
-
-The path passed to `bind ScheduledTask(…)` is the task's **identity string**,
-used by the engine for distributed locking (see below).  It is not an HTTP route.
-
-The handler body runs with `ServerRuntime` as an implicit context receiver, so
-`cache()`, `database()`, and `launch(task, input)` are all available.
-
-### Schedule forms
-
-`ScheduledTask` has four factory overloads:
-
-| Form | When it runs |
+| Factory | Runs |
 |---|---|
-| `ScheduledTask(frequency = 1.hours)` | Every hour |
-| `ScheduledTask(frequency = 30.minutes)` | Every 30 minutes (minimum: 1 minute) |
-| `ScheduledTask(timeOfDay = LocalTime(3, 0), timeZone = TimeZone.UTC)` | Daily at 03:00 UTC |
-| `ScheduledTask(cron = CronPattern(…), timeZone = TimeZone.UTC)` | Any cron expression |
+| `ScheduledTask(frequency = 15.minutes)` | Every interval.  At least one minute. |
+| `ScheduledTask(timeOfDay = LocalTime(3, 0), timeZone = ...)` | Daily at that local time. |
+| `ScheduledTask(cron = CronPattern(...), timeZone = ...)` | Whenever the pattern matches. |
+| `ScheduledTask(schedule = Schedule.Daily(...))` | Takes a `Schedule` value directly. |
 
+Each takes `timeout` (default 5 minutes).
+
+`CronPattern` takes `minutes`, `hours`, `days` and `months`; anything left out means "every".  `days` is
+`CronDays.All`, `CronDays.DaysOfWeek(...)`, or `CronDays.DaysOfMonth(...)`.  Days of the month can be
+`CronDayOfMonth.Last` or `CronDayOfMonth.NearestWeekday(15)`; days of the week can be
+`CronDayOfWeek(DayOfWeek.FRIDAY, last = true)` (last Friday) or `CronDayOfWeek(DayOfWeek.MONDAY, recurrence = 2)`
+(second Monday).
+
+## Testing a schedule
+
+The timing belongs to the engine, but the work can run on demand:
+
+<!-- sample: com/lightningkite/lightningserver/guide/samples/SchedulesSamples.kt#schedules-test -->
 ```kotlin
-// Illustrative — these compile but the timing is engine-driven, not unit-testable.
-
-// Every 30 minutes
-val heartbeat = path.path("schedules").path("heartbeat") bind ScheduledTask(frequency = 30.minutes) {
-    println("Heartbeat at ${kotlinx.datetime.Clock.System.now()}")
-}
-
-// Daily at 03:00 UTC — e.g. for a nightly digest email
-val nightly = path.path("schedules").path("nightly") bind ScheduledTask(
-    timeOfDay = LocalTime(3, 0),
-    timeZone = TimeZone.UTC,
-) {
-    println("Sending nightly digest…")
-}
-
-// Weekdays at 09:00 using CronPattern
-val weekdayMorning = path.path("schedules").path("weekday-morning") bind ScheduledTask(
-    cron = CronPattern(
-        minutes = listOf(0),
-        hours = listOf(9),
-        days = CronDays.DaysOfWeek(DayOfWeek.MONDAY..DayOfWeek.FRIDAY),
-    ),
-    timeZone = TimeZone.of("America/New_York"),
-) {
-    println("Good morning, weekday!")
-}
-```
-
-## Testing a Scheduled Task
-
-Scheduled tasks are time-driven — the engine polls a distributed clock and
-fires the task when its next-run time has passed.  You cannot unit-test the
-*timing*, but you can test the *work* the task does.
-
-`ScheduledTask.executeWithMetrics()` is what the engine calls when the timer
-fires: it runs the task as its own execution, through the server's interceptors.
-It is marked `@EngineApi`, so a test that calls it opts in. Call it inside a
-`testBlocking {}` block to exercise the task body:
-
-<!-- sample: com/lightningkite/lightningserver/guide/samples/SchedulesSamples.kt#schedule-test -->
-```kotlin
-// Schedules are time-driven — the engine decides when to fire them.
-// But the WORK inside a schedule can be run on demand in a test.
-//
-// This tests the work the schedule does, not the timing. Running it the way the engine does is
-// engine API, so the test opts in.
 @OptIn(EngineApi::class)
-fun scheduleTest() = ScheduleServer.testBlocking(settings = {}) {
-    // Run the schedule the same way the engine does when the timer fires.
-    ScheduleServer.cleanup.executeWithMetrics()
+fun schedulesRunOnDemandTest() = SchedulesServer.testBlocking(settings = {}) {
+    SchedulesServer.hourlyCleanup.executeWithMetrics()
+    assertEquals(1, SchedulesServer.cache().get<Int>("cleanup:runs"))
 
-    val count = ScheduleServer.cache().get<Int>("cleanup:last-count")
-    assertEquals(42, count)
+    SchedulesServer.nightlyDigest.executeWithMetrics()
+    assertEquals("sent", SchedulesServer.cache().get<String>("digest:bob@example.com"))
 }
 ```
 
-## Distributed Execution and the Lock
+`executeWithMetrics()` is what the engine calls when a tick is due: the body runs as a new execution, through the
+server's execution interceptors.  It is engine API, hence the opt-in.  Tasks the tick launches run inline, as
+everywhere in tests.
 
-In a multi-instance deployment (rolling deploys, serverless warm starts, multiple
-Ktor/Netty pods) each instance runs its own schedule-poller loop.  The engine
-prevents duplicate execution via a distributed cache lock:
+## How ticks run
 
-1. Each instance polls its configured cache for a `"<path>-nextRun"` key.
-2. When the next-run timestamp is reached, the instance attempts to set
-   `"<path>-lock"` with `setIfNotExists`.  Only the first instance wins.
-3. The winner runs the task body; the losers wait for the next poll cycle.
-4. The lock is always released after the tick (even on cancellation), so a
-   crashed instance does not block the next run.
+**Local engines (Netty, Ktor, JDK).**  Every instance runs a loop per schedule, coordinated through the engine's cache
+(the `engine-cache` setting):
 
-The lock TTL defaults to 1 hour and is configurable via
-`EngineReliabilitySettings.scheduleLockTtl` (set it on your engine's run-config
-setting).  Because the lock is released as soon as the tick finishes (and on
-graceful shutdown), the TTL only acts as a backstop after a hard crash — but a
-task that runs longer than its lock TTL can have the lock expire before it
-finishes, allowing another instance to start a concurrent tick.  Design schedule
-bodies to complete well within their frequency interval, and design them to be
-**idempotent** — a duplicate or retried tick should be safe.
+1. The next run time is stored under `<path>-nextRun`.
+2. When it's due, an instance takes `<path>-lock` with `setIfNotExists`.  Only the winner runs the tick; the others
+   wait for the next one.
+3. After each tick, successful or not, the next run time moves forward.  The lock is released when the tick ends, even if it
+   fails or the server shuts down.
+
+So for more than one instance, `engine-cache` must be a shared cache (Redis, DynamoDB, ...).  With the default
+in-memory cache, every instance has its own lock and every instance runs every tick.  The stored next run time
+survives restarts as long as the cache does: if a run came due while every instance was down, the first instance back
+runs it once on boot.  A `frequency` schedule with no stored state first runs one interval after boot.
+
+A tick that throws is reported and waits for its next scheduled run; it isn't retried sooner.  Retry inside the tick
+if a failure should be retried before then.
+
+The lock expires after `scheduleLockTtl` (default 1 hour), set in the engine's run-config setting
+(`nettyRunConfig`, `ktorRunConfig` or `jdkRunConfig`, under `reliability`).  The TTL only matters after a hard crash,
+but a tick that runs longer than it can be started a second time by another instance.  On shutdown, a running tick is
+cancelled after `shutdownDrainTimeout`.  Design ticks to be short and safe to repeat.
+
+**AWS Lambda.**  The generated Terraform creates an EventBridge rule per schedule, which invokes the function with the
+schedule's path.  EventBridge works in UTC: a `timeOfDay` is converted to UTC once, so it does not follow daylight
+saving time, and a cron schedule's `timeZone` is not applied at all.  Use `TimeZone.UTC` for schedules you deploy to
+Lambda.  See [AWS deployment](aws-deployment.md).
+
+## Next
+
+- [Tasks](tasks.md): background work launched on demand, and startup/pre-deploy tasks.
+- [Caching](caching.md): choosing the shared cache that coordinates instances.
+- [Engines](engines.md): run-config settings, including `reliability`.

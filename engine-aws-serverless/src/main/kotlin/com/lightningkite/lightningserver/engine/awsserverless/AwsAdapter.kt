@@ -98,24 +98,18 @@ public open class AwsAdapter(server: ServerDefinition) : EngineBase(server), Req
             Core.getGlobalContext().register(this)
         }
         logger.info { "Loading settings..." }
-        System.getenv("LIGHTNING_SERVER_SETTINGS_SECRET_ID")?.let { secretId ->
-            SecretsManagerClient.create().getSecretValue {
-                it.secretId(secretId)
-            }.secretString().let { loadSettings(it.toByteArray()) }
-        }
-        val root = File(System.getenv("LAMBDA_TASK_ROOT"))
-        root.resolve("settings.json").takeIf { it.exists() }?.let {
-            it.readBytes().let { loadSettings(it) }
-        } ?: root.resolve("settings.enc").takeIf { it.exists() }?.let {
-            it.readBytes().let { loadSettings(it) }
-        } ?: run {
-            S3Client.create().getObject {
+        val root by lazy { File(System.getenv("LAMBDA_TASK_ROOT")!!) }
+        val bytes = System.getenv("LIGHTNING_SERVER_SETTINGS_SECRET_ID")
+            ?.let { secretId ->
+                SecretsManagerClient.create().getSecretValue { it.secretId(secretId) }.secretString().toByteArray()
+            }
+            ?: root.resolve("settings.json").takeIf { it.exists() }?.readBytes()
+            ?: root.resolve("settings.enc").takeIf { it.exists() }?.readBytes()
+            ?: S3Client.create().getObject {
                 it.bucket(System.getenv("LIGHTNING_SERVER_SETTINGS_BUCKET")!!)
                 it.key(System.getenv("LIGHTNING_SERVER_SETTINGS_FILE")!!)
-            }.use {
-                it.readBytes().let { loadSettings(it) }
-            }
-        }
+            }.use { it.readBytes() }
+        loadSettings(bytes)
     }
 
     protected open val region: Region by lazy { Region.of(System.getenv("AWS_REGION")) }

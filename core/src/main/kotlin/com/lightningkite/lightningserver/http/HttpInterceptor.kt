@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.http
 
+import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.instrument
@@ -20,11 +21,17 @@ import kotlinx.coroutines.CancellationException
  *
  * Example:
  * ```kotlin
- * val loggingInterceptor = HttpInterceptor { request, cont ->
- *     println("Request: ${request.path}")
- *     val response = cont(request)
- *     println("Response: ${response.status}")
- *     response
+ * object LoggingInterceptor : HttpInterceptor {
+ *     context(runtime: ServerRuntime)
+ *     override suspend fun <PATH : PathSpec> intercept(
+ *         request: HttpRequest<PATH>,
+ *         cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
+ *     ): HttpResponse {
+ *         println("Request: ${request.path}")
+ *         val response = cont(request)
+ *         println("Response: ${response.status}")
+ *         return response
+ *     }
  * }
  * ```
  *
@@ -32,7 +39,7 @@ import kotlinx.coroutines.CancellationException
  * ```kotlin
  * object Server : ServerBuilder() {
  *     init {
- *         install(loggingInterceptor)
+ *         install(LoggingInterceptor)
  *         install(CorsInterceptor(corsSettings))
  *     }
  * }
@@ -118,7 +125,9 @@ public suspend inline fun <PATH : PathSpec> HttpInterceptor.interceptInstrumente
         val response = try {
             @Suppress("UNCHECKED_CAST")
             server.server.exceptionHandler.handle(request as HttpRequest<PathSpec>, e)
-        } catch (_: Exception) {
+        } catch (handlerFailure: Exception) {
+            server.logger.error(handlerFailure) { "The exception handler failed while handling $e" }
+            server.reportException(handlerFailure)
             HttpResponse(status = HttpStatus.InternalServerError)
         }
         if (response.status.serverError) server.reportException(e)

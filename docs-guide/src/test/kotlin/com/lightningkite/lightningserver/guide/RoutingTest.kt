@@ -1,16 +1,14 @@
 package com.lightningkite.lightningserver.guide
 
-import com.lightningkite.lightningserver.guide.samples.httpMethodsTest
-import com.lightningkite.lightningserver.guide.samples.multiArgTest
-import com.lightningkite.lightningserver.guide.samples.nestedPathsTest
-import com.lightningkite.lightningserver.guide.samples.queryParamsTest
-import com.lightningkite.lightningserver.guide.samples.subBuilderTest
+import com.lightningkite.lightningserver.guide.samples.*
 import kotlin.test.Test
 
 class RoutingTest {
-    @Test fun `nested paths respond correctly`() { nestedPathsTest() }
-    @Test fun `put patch delete respond correctly`() { httpMethodsTest() }
-    @Test fun `two typed path arguments resolve correctly`() { multiArgTest() }
-    @Test fun `sub-builder mounted with include is reachable`() { subBuilderTest() }
-    @Test fun `query parameters are parsed and read correctly`() { queryParamsTest() }
+    @Test fun `minimal server answers both routes`() { routingMinimalTest() }
+    @Test fun `put patch delete share one path`() { routingMethodsTest() }
+    @Test fun `two typed path arguments resolve`() { routingMultiArgTest() }
+    @Test fun `trailing segments are captured`() { routingTrailingTest() }
+    @Test fun `query parameters headers and body are read`() { routingRequestTest() }
+    @Test fun `responses carry status and headers`() { routingResponseTest() }
+    @Test fun `included builder is reachable`() { routingIncludeTest() }
 }

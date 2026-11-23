@@ -1,210 +1,100 @@
-[![Nightly](https://img.shields.io/maven-metadata/v?strategy=latestProperty&label=lightningkite-maven-nightly&metadataUrl=https://lightningkite-maven.s3.us-west-2.amazonaws.com/com/lightningkite/lightningserver/core/maven-metadata.xml)](https://lightningkite-maven.s3.us-west-2.amazonaws.com/com/lightningkite/lightningserver/core/maven-metadata.xml)
+[![Latest core](https://img.shields.io/maven-metadata/v?label=core&metadataUrl=https://lightningkite-maven.s3.us-west-2.amazonaws.com/com/lightningkite/lightningserver/core/maven-metadata.xml)](https://lightningkite-maven.s3.us-west-2.amazonaws.com/com/lightningkite/lightningserver/core/maven-metadata.xml)
 
 # Lightning Server
 
-Lightning Server is a Kotlin server framework for building production backends
-faster.  You define typed endpoints, service settings, and authentication rules
-in plain Kotlin; the framework handles HTTP routing, SDK generation, unit
-testing (no running server required), and — the standout feature — derives your
-complete AWS Terraform infrastructure from the same server definition.  Add a
-service setting; get the matching cloud resource automatically.
+A Kotlin framework for HTTP and WebSocket backends.  You declare the whole server in plain Kotlin: endpoints with
+typed inputs, outputs and auth; the services it needs as settings; tasks and schedules.  From that one definition
+the framework serves requests, generates OpenAPI and typed client SDKs, runs your tests in memory, and writes the
+Terraform to deploy it on AWS.
 
-**Status:** pre-release (version 5).  The API is settling and breaking changes
-are still possible.  The nightly badge above tracks the latest published build.
-
----
-
-## Headline Differentiators
-
-- **Typed endpoints end-to-end** — input, output, auth user, and error cases
-  are all Kotlin types; the framework auto-generates an OpenAPI spec and
-  type-safe client SDKs from them.
-- **Swappable service abstractions** — Database, Cache, Files, Email, SMS, and
-  PubSub are declared as settings.  Swap implementations (MongoDB ↔ in-process
-  JSON, Redis ↔ RAM map) by changing one URL string; no application code
-  changes.
-- **Infrastructure from your server definition** — a
-  `TerraformAwsServerlessBuilder` subclass reads your service settings and
-  emits `.tf.json` files for Lambda, API Gateway, S3, DynamoDB, MongoDB Atlas,
-  CloudWatch alarms, and more.  The Terraform configuration is derived, not
-  hand-written.
-- **First-class unit testing** — `SERVER.test {}` starts an ephemeral
-  in-process engine; `endpoint.test(auth, input)` returns typed output
-  directly.  No Docker, no ports, no external services needed.
-- **Traceable executions** — every request, WebSocket phase, task, and schedule
-  tick runs as an execution that records what caused it, even across task
-  queues, so logs, telemetry, and the optional audit log can trace work back to
-  the request that started it.
-
----
-
-## Quick Start
-
-Add these imports at the top of your file:
-
-<!-- sample: com/lightningkite/lightningserver/guide/samples/FirstEndpointSamples.kt#imports -->
+<!-- sample: com/lightningkite/lightningserver/guide/samples/FirstEndpointSamples.kt#echo-server -->
 ```kotlin
-import com.lightningkite.lightningserver.*
-import com.lightningkite.lightningserver.auth.*
-import com.lightningkite.lightningserver.definition.builder.*
-import com.lightningkite.lightningserver.http.*
-import com.lightningkite.lightningserver.pathing.*
-import com.lightningkite.lightningserver.runtime.test.*
-import com.lightningkite.lightningserver.typed.*
-import kotlinx.coroutines.*
-import kotlinx.serialization.*
+object EchoServer : ServerBuilder() {
+    init { registerBasicMediaTypeCoders() }
+
+    // POST /echo
+    val echo = path.path("echo").post bind ApiHttpHandler(
+        summary = "Echo a message",
+        description = "Returns the message back with its character count.",
+        auth = noAuth,
+        implementation = { input: EchoRequest ->
+            EchoResponse(
+                echo = input.message,
+                length = input.message.length
+            )
+        }
+    )
+}
 ```
 
-The minimal server is a `ServerBuilder` object:
-
-<!-- sample: com/lightningkite/lightningserver/guide/samples/FirstEndpointSamples.kt#hello-server -->
+<!-- sample: com/lightningkite/lightningserver/guide/samples/FirstEndpointSamples.kt#echo-server-test -->
 ```kotlin
-object HelloServer : ServerBuilder() {
+fun echoServerTest() = EchoServer.testBlocking(settings = {}) {
+    val result = EchoServer.echo.test(null, EchoRequest("ping"))
+    check(result.echo == "ping")
+    check(result.length == 4)
+}
+```
 
-    // GET / — responds with a plain-text greeting
-    val root = path.get bind HttpHandler {
-        HttpResponse.plainText("Hello, Lightning Server!")
+## What you get
+
+- **Typed endpoints end to end.**  Input, output, auth and error cases are Kotlin types; OpenAPI and Kotlin and
+  TypeScript SDKs are generated from them.
+- **Swappable services.**  Database, cache, files, email, SMS and pub/sub are settings.  Switch MongoDB for an
+  in-memory store, or Redis for a RAM map, by changing a URL in `settings.json`.
+- **In-memory testing.**  `Server.testBlocking { }` runs the real server with no port and no external services;
+  `endpoint.test(auth, input)` returns the typed result.
+- **Infrastructure from the definition.**  A deployment object reads your settings and writes Terraform for
+  Lambda or EC2, with the database, cache, buckets and alarms they need.
+- **Batteries.**  Auto-CRUD with row and field permissions, live queries, login by PIN, password, TOTP, passkey or
+  OAuth, uploads and image previews, notifications, rate limiting, telemetry and an audit log.
+
+## Documentation
+
+The guide lives in [`docs-guide/guide`](docs-guide/guide/index.md) and is published with MkDocs.  Start with:
+
+- [Overview](docs-guide/guide/overview.md): the mental model
+- [Setup](docs-guide/guide/setup.md): Gradle configuration
+- [Your first endpoint](docs-guide/guide/first-endpoint.md)
+- [Condensed guide](docs-guide/guide/condensed-guide.md): every feature as one short, tested example
+- [Project structure](docs-guide/guide/project-structure.md): which module does what
+
+Kotlin samples in the guide (and in this README) are compiled, and `DriftCheckTest` fails the build when a code
+block and its sample source differ.
+
+## Installing
+
+Artifacts are in the Lightning Kite Maven repository.  Import the stack catalog in `settings.gradle.kts`:
+
+```kotlin
+dependencyResolutionManagement {
+    repositories {
+        maven("https://lightningkite-maven.s3.us-west-2.amazonaws.com")
+        mavenCentral()
+    }
+    versionCatalogs {
+        create("lk") { from("com.lightningkite:stack-catalog:<version>") }
     }
 }
 ```
 
-Test it without starting a server:
+and depend on modules through it (`implementation(lk.lightningserver.core.asProvider())`).  Each module is versioned
+on its own, so take versions from the catalog.  [Setup](docs-guide/guide/setup.md) has the full build file and
+where to find the latest catalog version.
 
-<!-- sample: com/lightningkite/lightningserver/guide/samples/FirstEndpointSamples.kt#hello-server-test -->
-```kotlin
-fun helloServerTest() = runBlocking {
-    HelloServer.test(settings = {}) {
-        val response = HelloServer.root.test()
-        check(response.body?.text() == "Hello, Lightning Server!")
-    }
-}
-```
-
-For the full walkthrough — imports, typed endpoints, auth, database, testing,
-and AWS deployment — start with the guide:
-**[Your First Endpoint](docs-guide/guide/first-endpoint.md)**
-
----
-
-## Documentation (Guide)
-
-The `docs-guide/` module contains compiled-sample chapters: every code block is
-drift-checked against the compiled source on every CI run.
-
-| Chapter | What it covers |
-|---|---|
-| [Your First Endpoint](docs-guide/guide/first-endpoint.md) | `ServerBuilder`, `HttpHandler`, `HttpResponse`, running your first test |
-| [Routing & Path Parameters](docs-guide/guide/routing.md) | Nested paths, all HTTP methods, typed path args, sub-builders, query params |
-| [Typed Endpoints, Errors & SDK Generation](docs-guide/guide/typed-endpoints.md) | `ApiHttpHandler`, `LSError`, `errorCases`, success codes, SDK generation |
-| [Services & Settings](docs-guide/guide/services.md) | Declaring and swapping service settings; in-process RAM mocks for tests |
-| [Database & the Query DSL](docs-guide/guide/database.md) | Type-safe `Condition {}` / `Modification {}` DSL, `@Queryable`, CRUD |
-| [Authentication & Sessions](docs-guide/guide/auth.md) | `PrincipalType`, `User.require()`, reading `auth.id` / `auth.fetch()` in handlers |
-| [Testing Your Server](docs-guide/guide/testing.md) | `SERVER.test {}`, `HttpHandler.test()`, `ApiHttpHandler.test(auth, input)`, `@Test` |
-| [Deploying to AWS](docs-guide/guide/aws-deployment.md) | `AwsAdapter`, `TerraformAwsServerlessBuilder`, service → Terraform, deploy workflow |
-
-> The `docs/` directory contains reference documentation by topic.  Its code
-> samples are not compiled, so where it and the guide differ, trust the guide.
-
----
-
-## Build & Test Commands
+## Working on this repository
 
 ```bash
-# Build all modules
-./gradlew build
-
-# Run checks (tests + linting)
-./gradlew check
-
-# Assemble without running tests
-./gradlew assemble
-
-# Run just the docs-guide tests (verifies all guide code blocks)
-./gradlew :docs-guide:test
-
-# Run tests for a specific module
-./gradlew :core:test
-
-# Run the demo server (Ktor — recommended for development)
-./gradlew :demo:run --args="serve"
-
-# Run the demo server (Netty)
-./gradlew :demo:run --args="serveNetty"
-
-# Run the demo server (JDK)
-./gradlew :demo:run --args="serveJdk"
-
-# Generate client SDKs from the demo
-./gradlew :demo:run --args="sdk"
-
-# Publish to local Maven
-./gradlew publishToMavenLocal
+./gradlew build                     # build and test every module
+./gradlew :core:test                # one module's tests
+./gradlew :docs-guide:test          # compile the guide's samples and check the docs match them
+./gradlew :demo:run --args="serve"  # run the demo server (Ktor); serveNetty and serveJdk also work
+./gradlew :demo:run --args="sdk"    # regenerate the demo's client SDK
 ```
 
----
-
-## Module Overview
-
-The project follows a paired pattern: most features have a `*-shared`
-multiplatform module (KMP; used by client SDKs) and a JVM module.
-
-| Module | Purpose |
-|---|---|
-| `core` / `core-shared` | Base HTTP types, routing, settings, serialization |
-| `typed` / `typed-shared` | Typed `ApiHttpHandler`, OpenAPI spec, SDK generation |
-| `auth` / `auth-shared` | `PrincipalType`, `AuthRequirement`, token handling |
-| `audit` / `audit-shared` | Audit logging: request origins, which fields of which records reached clients, queries, changes, and auth events |
-| `sessions*` | Pre-built session flows: password, email and SMS PINs, TOTP, WebAuthn, backup codes, known devices, OAuth |
-| `files` / `files-shared` | File upload/download with S3, Azure, and local backends |
-| `media` / `media-shared` | Image processing |
-| `notifications` / `notifications-shared` | Event-driven notifications over email, SMS, push, and in-app |
-| `ratelimit` | Request rate limiting |
-| `engine-local` | Base engine for single-process deployments (unit tests use `TestRunner` from `core`) |
-| `engine-ktor` | Ktor-based HTTP server (Netty or CIO) |
-| `engine-netty` | Standalone Netty HTTP server |
-| `engine-jdk-server` | Pure JDK HTTP server |
-| `engine-aws-serverless` | AWS Lambda handler (`AwsAdapter`) + Terraform generation |
-| `deploy-aws-ec2` | Terraform generation for EC2 deployments, single-instance or auto-scaling |
-| `secret-source-aws` | AWS Secrets Manager integration for deployment secrets |
-| `demo` | Reference implementation and integration test bed |
-| `docs-guide` | Compiled-sample documentation harness |
-
-Service implementations (MongoDB, Redis, S3, SES, etc.) live in the separate
-[service-abstractions](https://github.com/lightningkite/service-abstractions)
-repository and are brought in as dependencies.
-
----
-
-## Adding to Your Project
-
-Artifacts are published to the Lightning Kite Maven repository.  Add the
-repository and dependency to your `build.gradle.kts`:
-
-```kotlin
-repositories {
-    maven("https://lightningkite-maven.s3.us-west-2.amazonaws.com")
-    mavenCentral()
-}
-
-dependencies {
-    // Core + typed endpoints
-    implementation("com.lightningkite.lightningserver:core:<version>")
-    implementation("com.lightningkite.lightningserver:typed:<version>")
-
-    // Choose an engine for local development
-    implementation("com.lightningkite.lightningserver:engine-ktor:<version>")
-
-    // In-process engine for unit tests
-    testImplementation("com.lightningkite.lightningserver:engine-local:<version>")
-}
-```
-
-Replace `<version>` with the version shown in the nightly badge at the top of
-this file.  The group ID is `com.lightningkite.lightningserver`; artifact IDs
-match the module directory names above.
-
----
+Releases are made by the `lk` tool, which owns every module's version; don't publish by hand.  Notable changes go
+in [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
-See [LICENSE.txt](LICENSE.txt).
+Apache 2.0.  See [LICENSE.txt](LICENSE.txt).

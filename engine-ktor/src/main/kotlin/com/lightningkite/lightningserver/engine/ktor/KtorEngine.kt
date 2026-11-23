@@ -47,7 +47,7 @@ import kotlin.time.Clock
  *
  * @property host The host address to bind to (defaults to "0.0.0.0" for all interfaces)
  * @property port The port number to listen on (defaults to 8080)
- * @property realIpHeader Optional header name to extract the real client IP from (useful behind proxies).
+ * @property realIpHeader Header a trusted reverse proxy stamps with the client IP, such as `X-Forwarded-For`; the right-most entry is used (see [HttpHeaders.getProxiedSourceIp]). Only set it when every request arrives through that proxy.
  *                        Common values: "X-Forwarded-For", "X-Real-IP"
  * @property requestIdHeader Optional header name carrying a request ID stamped by a **trusted**
  *   reverse proxy, adopted as the authoritative request ID. Leave null (the default) to always
@@ -333,23 +333,28 @@ public class KtorEngine(
      * This method:
      * 1. Ensures settings are ready and validated
      * 2. Runs any startup tasks defined in the server
-     * 3. Starts the schedule coordinator
+     * 3. Starts the schedule coordinator, unless [schedules] is `false`
      * 4. Starts the HTTP server and blocks until shutdown
      *
      * @param TEngine The type of Ktor engine
      * @param TConfiguration The type of engine configuration
      * @param factory The Ktor engine factory (e.g., Netty, CIO, Jetty)
+     * @param schedules Whether this instance runs scheduled tasks. Pass `false` when another instance runs them.
      *
      * Example:
      * ```kotlin
      * engine.start(Netty)
      * ```
      */
-    public fun <TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.Configuration> start(factory: ApplicationEngineFactory<TEngine, TConfiguration>) {
+    @JvmOverloads
+    public fun <TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.Configuration> start(
+        factory: ApplicationEngineFactory<TEngine, TConfiguration>,
+        schedules: Boolean = true,
+    ) {
         this.settings.ready()
         runBlocking { runStartupTasks() }
         val reliability = ktorRunConfig().reliability
-        startSchedules(reliability.scheduleLockTtl)
+        if (schedules) startSchedules(reliability.scheduleLockTtl)
         val drainMillis = reliability.shutdownDrainTimeout.inWholeMilliseconds
         val server = embeddedServer(
             factory = factory,

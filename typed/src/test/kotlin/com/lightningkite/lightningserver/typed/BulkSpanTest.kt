@@ -124,7 +124,6 @@ class BulkSpanTest {
 
         val meta = path.path("meta") include MetaEndpoints(
             packageName = "com.lightningkite.lightningserver.typed",
-            database = database,
             cache = cache,
         )
     }

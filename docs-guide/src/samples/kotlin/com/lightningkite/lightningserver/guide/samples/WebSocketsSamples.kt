@@ -2,142 +2,164 @@ package com.lightningkite.lightningserver.guide.samples
 
 // region websockets-imports
 import com.lightningkite.lightningserver.*
+import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.runtime.test.*
+import com.lightningkite.lightningserver.serialization.*
+import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.websockets.*
-import kotlin.test.*
-import kotlinx.coroutines.*
+import com.lightningkite.services.pubsub.PubSub
+import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.*
 import kotlinx.serialization.builtins.serializer
 // endregion websockets-imports
 
-// region echo-ws-server
-object EchoWsServer : ServerBuilder() {
-
-    // ws:// /echo — echoes every text frame back to the client with a prefix
-    //
-    // WebSocketHandler takes four lifecycle callbacks:
-    //   willConnect  — called BEFORE the connection is established; returns STORAGE
-    //   didConnect   — called AFTER the connection is established
-    //   messageFromClient — called for each incoming frame from the client
-    //   disconnect   — called when the connection closes
-    //
-    // STORAGE is the per-connection state. Here it is Unit — the echo handler
-    // needs no per-connection data. For stateful handlers (e.g. tracking a username
-    // or a room), use a data class.
+// region ws-echo
+object WsEchoServer : ServerBuilder() {
+    // ws://.../echo
     val echo = path.path("echo") bind WebSocketHandler(
-        storageSerializer = Unit.serializer(),
         willConnect = { Unit },
-        didConnect = {
-            // Send a greeting frame as soon as the client connects.
-            send("Echo server ready")
-        },
-        messageFromClient = { frame ->
-            // `frame` is a WebSocketFrame — either Text or Binary.
-            // WebSocketFrame.text is a convenience property that returns the string
-            // content for text frames (hex for binary).
-            send("Echo: ${frame.text}")
-        },
-        disconnect = { /* no cleanup needed */ }
+        didConnect = { send("Echo server ready") },
+        messageFromClient = { frame -> send("Echo: ${frame.text}") },
     )
 }
-// endregion echo-ws-server
+// endregion ws-echo
 
-// region echo-ws-test
-fun echoWsTest() = EchoWsServer.testBlocking(settings = {}) {
-    // .test() on a WebSocketHandler returns a TestWebSocket.
-    // The connection is fully established (willConnect + didConnect already ran).
+// region ws-echo-test
+fun wsEchoTest() = WsEchoServer.testBlocking(settings = {}) {
     val received = mutableListOf<String>()
-
-    val ws = EchoWsServer.echo.test()
-
-    // Capture frames the server sends back via onMessageSent.
+    val ws = WsEchoServer.echo.test()
     ws.onMessageSent = { frame -> received.add(frame.text) }
 
-    // The didConnect greeting arrives before test() returns, so it's already in
-    // the received list if the handler sent it synchronously. In this case the
-    // greeting was sent in didConnect which ran before test() returned.
-    // We reset and only check the echo:
-    received.clear()
-
-    // Send a text frame to the server.
     ws.send(WebSocketFrame("hello"))
-
-    // The server's messageFromClient ran synchronously; received now holds the reply.
-    check(received.size == 1) { "Expected 1 reply, got ${received.size}" }
-    check(received[0] == "Echo: hello") { "Unexpected reply: ${received[0]}" }
-
+    check(received == listOf("Echo: hello"))
     ws.close()
 }
-// endregion echo-ws-test
+// endregion ws-echo-test
 
-// region pubsub-ws-server
-object BroadcastServer : ServerBuilder() {
+// region ws-chat
+@Serializable
+data class ChatMember(val room: String, val name: String)
 
-    // A topic is a named pub/sub channel. Declare it on any PathSpec in your ServerBuilder.
-    // Any number of WebSocket connections can subscribe to the same topic.
-    // The server (or any HTTP endpoint) can publish to the topic to push messages to all subscribers.
-    val announcementTopic = path.path("announce-topic").topic(String.serializer())
+object WsChatServer : ServerBuilder() {
+    // One channel per room id.
+    val roomTopic = path.path("room-topic").arg<String>("room").topic(String.serializer())
 
-    // POST /announce — HTTP endpoint that publishes to the topic
-    val announce = path.path("announce").post bind HttpHandler { request ->
-        val message = request.body!!.text()
-        // send() on a topic pushes to all subscribed WebSocket connections.
-        announcementTopic.send(message)
-        HttpResponse.plainText("Announced: $message")
-    }
-
-    // ws:// /listen — clients subscribe to the announcement topic and receive pushes
-    val listen = path.path("listen") bind WebSocketHandler(
-        storageSerializer = Unit.serializer(),
-        willConnect = { Unit },
-        didConnect = {
-            // subscribe() registers this connection to receive messages from the topic.
-            // The topicHandlers block below decides what to do when a message arrives.
-            subscribe(announcementTopic)
+    // ws://.../rooms/{room}?name=...
+    val room = path.path("rooms").arg<String>("room") bind WebSocketHandler(
+        willConnect = { request ->
+            val name = request.queryParameters["name"] ?: throw BadRequestException("Missing name")
+            ChatMember(room = request.path.arg1, name = name)
+        },
+        didConnect = { subscribe(roomTopic, currentState.room) },
+        messageFromClient = { frame ->
+            roomTopic.send(currentState.room, "${currentState.name}: ${frame.text}")
         },
         topicHandlers = {
-            // Bind a handler for each topic this connection subscribes to.
-            // `message.value` is the typed payload published to the topic.
-            announcementTopic bind { message ->
-                send(message.value)
-            }
+            roomTopic bind { message -> send(message.value) }
         },
-        disconnect = { /* unsubscription is automatic on close */ }
+    )
+
+    // POST /rooms/{room}/announce — any code with a ServerRuntime can publish
+    val announce = path.path("rooms").arg<String>("room").path("announce").post bind HttpHandler { request ->
+        roomTopic.send(request.path.arg1, "Announcement: ${request.body?.text()}")
+        HttpResponse()
+    }
+}
+// endregion ws-chat
+
+// region ws-chat-test
+fun wsChatTest() = WsChatServer.testBlocking(settings = {}) {
+    val lobby = mutableListOf<String>()
+    val other = mutableListOf<String>()
+    val ann = WsChatServer.room.test("lobby", queryParameters = QueryParameters.parse("name=Ann"))
+    val bob = WsChatServer.room.test("lobby", queryParameters = QueryParameters.parse("name=Bob"))
+    val cy = WsChatServer.room.test("garden", queryParameters = QueryParameters.parse("name=Cy"))
+    bob.onMessageSent = { lobby.add(it.text) }
+    cy.onMessageSent = { other.add(it.text) }
+
+    ann.send(WebSocketFrame("hi"))
+    check(lobby == listOf("Ann: hi"))
+    check(other.isEmpty())
+
+    // Publishing needs a ServerRuntime, which execute { } provides in a test.
+    execute { WsChatServer.roomTopic.send("garden", "Watering at noon") }
+    check(other == listOf("Watering at noon"))
+
+    ann.close()
+    bob.close()
+    cy.close()
+}
+// endregion ws-chat-test
+
+// region ws-typed
+@Serializable
+data class PriceRequest(val symbol: String)
+
+@Serializable
+data class PriceUpdate(val symbol: String, val cents: Long)
+
+object WsPriceServer : ServerBuilder() {
+    init { registerBasicMediaTypeCoders() }
+
+    val prices = path.path("prices") bind ApiWebSocketHandler(
+        summary = "Prices",
+        description = "Send a symbol; receive its price.",
+        auth = noAuth,
+        willConnectType = { _ -> Unit },
+        messageFromClientType = { request: PriceRequest ->
+            send(PriceUpdate(request.symbol, cents = 12_345))
+        },
     )
 }
-// endregion pubsub-ws-server
+// endregion ws-typed
 
-// region pubsub-ws-test
-fun broadcastWsTest() = BroadcastServer.testBlocking(settings = {}) {
+// region ws-typed-test
+fun wsTypedTest() = WsPriceServer.testBlocking(settings = {}) {
     val received = mutableListOf<String>()
+    val ws = WsPriceServer.prices.test()
+    ws.onMessageSent = { received.add(it.text) }
 
-    // Connect two clients.
-    val ws1 = BroadcastServer.listen.test()
-    val ws2 = BroadcastServer.listen.test()
-    ws1.onMessageSent = { received.add("ws1:${it.text}") }
-    ws2.onMessageSent = { received.add("ws2:${it.text}") }
-
-    // Publish as the test's own work. sendWebSocketSubscriptionMessage is dispatched
-    // synchronously in the test runtime, so both connections receive the frame
-    // before the next line executes.
-    execute { BroadcastServer.announcementTopic.send("hello everyone") }
-
-    check(received.contains("ws1:hello everyone"))
-    check(received.contains("ws2:hello everyone"))
-
-    ws1.close()
-    ws2.close()
+    ws.send(WebSocketFrame("""{"symbol":"LK"}"""))
+    check(received == listOf("""{"symbol":"LK","cents":12345}"""))
+    ws.close()
 }
-// endregion pubsub-ws-test
+// endregion ws-typed-test
 
-// @Test class so the sample functions are exercised by the test runner.
-// Each test calls a sample function defined above so coverage is real.
-class WebSocketSamplesTest {
-    @Test
-    fun echoWsRuns() = echoWsTest()
+// region ws-multiplex
+object WsAppServer : ServerBuilder() {
+    val chat = path.path("chat") include WsChatServer
 
-    @Test
-    fun broadcastWsRuns() = broadcastWsTest()
+    // One physical socket that carries many logical ones.
+    val multiplex = path.path("multiplex") bind MultiplexWebSocketHandler()
 }
+// endregion ws-multiplex
+
+// region ws-coroutine
+object WsCoroutineServer : ServerBuilder() {
+    val pubsub = setting("pubsub", PubSub.Settings())
+
+    // ws://.../count
+    val counter = path.path("count") include object : CoroutineWebSocketHandler() {
+        override val pubSub = this@WsCoroutineServer.pubsub
+
+        context(serverRuntime: ServerRuntime)
+        override suspend fun handle(
+            request: WebSocketConnectRequest<PathSpec0>,
+            waitForFullConnect: suspend () -> Unit,
+            incoming: Flow<WebSocketFrame>,
+            send: suspend (WebSocketFrame) -> Unit,
+        ) {
+            waitForFullConnect()
+            var count = 0
+            incoming.collect { frame ->
+                count++
+                send(WebSocketFrame("$count: ${frame.text}"))
+            }
+        }
+    }
+}
+// endregion ws-coroutine

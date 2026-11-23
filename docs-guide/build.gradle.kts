@@ -17,14 +17,35 @@ plugins {
 }
 
 dependencies {
-    // The modules a "getting started" example needs:
+    // Every module a guide chapter shows.
     implementation(project(":core"))
     implementation(project(":typed"))
     implementation(project(":auth"))
+    implementation(project(":audit"))
+    implementation(project(":sessions"))
+    implementation(project(":sessions-email"))
+    implementation(project(":sessions-sms"))
+    implementation(project(":sessions-totp"))
+    implementation(project(":sessions-oauth"))
+    implementation(project(":files"))
+    implementation(project(":media"))
+    implementation(project(":ratelimit"))
+    implementation(project(":notifications"))
     implementation(project(":engine-local"))
-    implementation(sa.database.jsonfile)
+    implementation(project(":engine-ktor"))
+    implementation(project(":engine-netty"))
+    implementation(project(":engine-jdk-server"))
+    implementation(project(":engine-aws-serverless"))
+    implementation(project(":deploy-aws-ec2"))
+    implementation(project(":secret-source-aws"))
     implementation(sa.database)
+    implementation(sa.database.jsonfile)
+    implementation(sa.database.mongodb)
     implementation(sa.cache)
+    implementation(sa.cache.redis)
+    implementation(sa.cache.dynamodb)
+    implementation(sa.pubsub.redis)
+    implementation(sa.files.s3)
     ksp(sa.database.processor)
 
     // kotlin.test.junit is promoted to implementation so @Test is available in src/samples/kotlin
@@ -56,5 +77,8 @@ kotlin {
 tasks.named<Test>("test") {
     inputs.dir(layout.projectDirectory.dir("guide"))
         .withPropertyName("guideMarkdown")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file(rootProject.layout.projectDirectory.file("README.md"))
+        .withPropertyName("readme")
         .withPathSensitivity(PathSensitivity.RELATIVE)
 }

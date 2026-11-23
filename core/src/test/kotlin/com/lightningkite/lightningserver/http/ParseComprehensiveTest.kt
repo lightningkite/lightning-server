@@ -144,11 +144,20 @@ class ParseComprehensiveTest {
     }
 
     @Test
+    fun `QueryParameters parse URL-decodes keys and values`() {
+        val params = QueryParameters.parse("na%20me=john%20doe&q=a+b&amp=x%26y%3Dz")
+        assertEquals("john doe", params["na me"])
+        assertEquals("a b", params["q"])
+        assertEquals("x&y=z", params["amp"])
+    }
+
+    @Test
     fun `QueryParameters roundtrip preserves data`() {
         val original = listOf(
             "foo" to "bar",
             "baz" to "qux",
-            "space" to "hello world"
+            "space" to "hello world",
+            "reserved" to "a&b=c%d"
         )
         val params = QueryParameters(original)
         val stringForm = params.toString()

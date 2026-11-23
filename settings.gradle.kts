@@ -67,6 +67,7 @@ dependencyResolutionManagement {
         maven("https://lightningkite-maven.s3.us-west-2.amazonaws.com")
     }
     versionCatalogs {
+        create("cli") { from("com.lightningkite.stack:kotliner-cli-catalog:1000.0.0") }
         create("sa") { from("com.lightningkite.stack:service-abstractions-catalog:1000.0.0") }
     }
 }

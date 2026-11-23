@@ -493,7 +493,8 @@ public abstract class NotificationBulkDispatcher<E : EventTypeLike, USER : HasId
                             Condition.Or(
                                 self.email.notNull.shouldBeSentNow(lastRun, now),
                                 self.sms.notNull.shouldBeSentNow(lastRun, now),
-                                self.push.notNull.shouldBeSentNow(lastRun, now)
+                                self.push.notNull.shouldBeSentNow(lastRun, now),
+                                self.inApp.notNull.shouldBeSentNow(lastRun, now),
                             )
                         ),
                         orderBy = sort(self) {

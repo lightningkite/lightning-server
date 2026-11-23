@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.terraform.aws.ec2
 
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.engine.local.engineCache
 import com.lightningkite.services.Untested
 import com.lightningkite.services.terraform.*
 import com.lightningkite.services.terraform.TerraformJsonObject.Companion.expression
@@ -25,8 +26,7 @@ import kotlinx.serialization.json.*
  *   returned to service once healthy before the next is touched.
  *
  * **Requirement:** because the fleet has multiple instances, scheduled tasks are coordinated
- * through the shared cache (see Lightning Server's schedule locking). The configured cache must
- * therefore be a *distributed* cache (Redis / Memcached / DynamoDB); a per-instance RAM cache is
+ * through the engine's cache ([engineCache]). It must therefore be a *distributed* cache (Redis / Memcached / DynamoDB); a per-instance RAM cache is
  * rejected in [validateConfiguration].
  *
  * The VPC must be an [AwsVpc.VpcInfo] (Terraform-managed or pre-existing) that provides private
@@ -210,19 +210,15 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
     }
 
     override fun validateConfiguration() {
-        // The fleet relies on the shared cache to ensure scheduled tasks run once across all
+        // The fleet relies on the engine cache's locks to ensure scheduled tasks run once across all
         // instances. A per-instance RAM cache would run every schedule on every instance.
-        val cacheJson = settings["cache"]
-        val url = when (cacheJson) {
-            is JsonPrimitive -> cacheJson.contentOrNull
-            is JsonObject -> (cacheJson["url"] as? JsonPrimitive)?.contentOrNull
-            else -> null
-        }?.trim()?.lowercase()
-        if (url != null && (url.isEmpty() || url == "ram" || url.startsWith("ram://"))) {
+        val url = Json.decodeFromJsonElement(engineCache.serializer, settings.getValue(engineCache.name)).url
+        val scheme = url.substringBefore("://")
+        if (scheme == "ram" || scheme == "ram-unsafe") {
             throw IllegalStateException(
-                "TerraformAwsScalingEc2Builder requires a distributed cache (e.g. redis://, " +
+                "TerraformAwsScalingEc2Builder requires a distributed cache in `${engineCache.name}` (e.g. redis://, " +
                         "memcached://, dynamodb://) so scheduled tasks coordinate across the fleet, " +
-                        "but the configured cache is '$url'. A per-instance RAM cache would run every " +
+                        "but it is '$url'. A per-instance RAM cache would run every " +
                         "scheduled task on every instance."
             )
         }
@@ -818,7 +814,7 @@ $indentedScript
                     }
                 }
                 "user_data" - expression(
-                    $$"""base64encode(templatefile("${path.module}/boot.sh", { deployment_bucket = aws_s3_bucket.deployment.id, aws_region = "$$applicationRegion" }))"""
+                    $$"""base64encode(templatefile("${path.module}/boot.sh", { deployment_bucket = aws_s3_bucket.deployment.id, aws_region = "$$applicationRegion", server_command = "$$serverCommand" }))"""
                 )
                 "tag_specifications" {
                     "resource_type" - "instance"
@@ -912,10 +908,12 @@ $indentedScript
 
     /**
      * Minimal per-boot user-data: it records the deployment bucket + region for the baked
-     * redeploy script, then runs that script to fetch the latest JAR + settings and start the
-     * service. Everything else is already baked into the golden AMI.
+     * redeploy script and the command this instance runs, then runs that script to fetch the
+     * latest JAR + settings and start the service. Everything else is already baked into the
+     * golden AMI.
      *
-     * `${'$'}{deployment_bucket}` / `${'$'}{aws_region}` are filled by terraform `templatefile()`.
+     * `${'$'}{deployment_bucket}` / `${'$'}{aws_region}` / `${'$'}{server_command}` are filled by
+     * terraform `templatefile()`.
      */
     private fun bootScript(): String = $$"""
 #!/bin/bash
@@ -925,6 +923,9 @@ cat > /etc/lightning-server/deploy.env << 'DEPLOY_ENV_EOF'
 DEPLOYMENT_BUCKET=${deployment_bucket}
 AWS_REGION_NAME=${aws_region}
 DEPLOY_ENV_EOF
+cat > $$commandEnvFile << 'COMMAND_ENV_EOF'
+SERVER_COMMAND="${server_command}"
+COMMAND_ENV_EOF
 
 # Fetch the latest application + settings and start the service. The baked redeploy script
 # rolls back to the previous version on failure; on a brand-new instance there is nothing to

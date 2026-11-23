@@ -66,4 +66,4 @@ object Server : ServerBuilder() {
 }
 ```
 
-See [media.md](../../../../../../../../docs/media.md) for comprehensive documentation.
+See [media.md](https://github.com/lightningkite/lightning-server/blob/master/docs-guide/guide/media.md) for comprehensive documentation.

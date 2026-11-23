@@ -4,7 +4,7 @@ import org.junit.Test
 import java.io.File
 import kotlin.test.fail
 
-// Verifies that every fenced code block in the guide Markdown files is
+// Verifies that every fenced code block in the guide Markdown files (and README.md) is
 // byte-identical to the named region in the corresponding sample source.
 //
 // HOW IT WORKS
@@ -42,10 +42,12 @@ class DriftCheckTest {
             .toList()
 
         check(mdFiles.isNotEmpty()) { "No Markdown files found in $guideDir" }
+        val readme = moduleRoot.resolve("../README.md")
+        check(readme.exists()) { "README not found at $readme" }
 
         val failures = mutableListOf<String>()
 
-        for (mdFile in mdFiles.sorted()) {
+        for (mdFile in mdFiles.sorted() + readme) {
             val lines = mdFile.readLines()
             var i = 0
             while (i < lines.size) {

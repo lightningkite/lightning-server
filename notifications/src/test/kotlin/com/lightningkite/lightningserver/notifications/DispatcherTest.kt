@@ -116,6 +116,50 @@ class DispatcherTest {
                 { user -> "SMS Only: ${event.subject.name}" }
             }
         }
+
+        val inAppDelayed = handler.event("In-App Delayed", Server.modelInfo) { notif ->
+            notif.subscribed(
+                email = null,
+                sms = null,
+                push = null,
+                inApp = Frequency.delayed(1.hours)
+            ) { event ->
+                setOf(event.subject.ownerId)
+            }
+            notif.content { event ->
+                { user -> "In-App Delayed: ${event.subject.name}" }
+            }
+        }
+    }
+
+    @Test
+    fun `delayed in-app-only notification is marked sent after refresh`() {
+        val clock = TestClock()
+
+        Server.test(
+            settings = { context ->
+                sms setStatic TestSMS("sms", context)
+                email setStatic TestEmailService("email", context)
+            },
+            clock = { clock }
+        ) {
+            runBlocking {
+                val user = TestUser(name = "InAppDelayedUser")
+                execute {
+                    Server.userInfo.table().insertOne(user)
+                    Notifications.inAppDelayed(TestModel(name = "Delayed", ownerId = user._id))
+                }
+                val before = execute { Notifications.Dispatcher.info.table().all().toList() }.single { it.user == user._id }
+                assertFalse(before.inApp!!.sent)
+
+                clock.measuredFrom = clock.measuredFrom + 2.hours
+                val after = execute {
+                    Notifications.Dispatcher.refreshNotifications()
+                    Notifications.Dispatcher.info.table().get(before._id)
+                }
+                assertTrue(after!!.inApp!!.sent)
+            }
+        }
     }
 
     // ===== Event-Triggered Dispatch Tests =====

@@ -10,7 +10,7 @@ plugins {
 
 dependencies {
     api(project(":sessions"))
-    implementation(libs.webauthn4j.core)
+    api(libs.webauthn4j.core)
 
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)

@@ -1,431 +1,181 @@
 # Caching
 
-Lightning Server's cache abstraction wraps external key-value stores — RAM, Redis,
-Memcached, DynamoDB — behind a single `Cache` interface.  Values are serialised
-with KotlinX Serialization.  Swapping backends is a config-file change; no code
-changes required.
-
-## Imports
-
-All examples in this chapter use the following imports:
+A `Cache` is a shared key-value store with expiry and atomic operations: memoizing slow lookups, one-time tokens,
+locks, and counters.  Values are any `@Serializable` type.  The backend (in-memory, Redis, Memcached, DynamoDB) is
+chosen by a URL in `settings.json`.
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/CachingSamples.kt#caching-imports -->
 ```kotlin
+import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.builder.*
+import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.runtime.test.*
+import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.*
+import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.services.cache.*
+import com.lightningkite.services.withClock
+import kotlinx.serialization.Serializable
 import kotlin.test.*
-import kotlin.time.Duration.Companion.hours
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
-import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 ```
 
-`com.lightningkite.lightningserver.runtime.test.*` provides `testBlocking`.
-`com.lightningkite.lightningserver.settings.*` provides the `set` infix used inside
-the `testBlocking` settings lambda to configure which backend a setting resolves to.
-
-## Declaring the Cache
+## Caching a slow lookup
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/CachingSamples.kt#cache-server -->
 ```kotlin
-object CacheServer : ServerBuilder() {
-    // "cache" becomes the key in settings.json.
-    // Cache.Settings() defaults to "ram" — a ConcurrentHashMap-backed in-process cache.
+@Serializable
+data class Forecast(val city: String, val highCelsius: Int)
+
+object WeatherServer : ServerBuilder() {
+    init { registerBasicMediaTypeCoders() }
+
     val cache = setting("cache", Cache.Settings())
+
+    val forecast = path.path("forecast").post bind ApiHttpHandler(
+        summary = "Get a city's forecast",
+        auth = noAuth,
+        implementation = { city: String ->
+            val key = "forecast:$city"
+            cache().get<Forecast>(key)
+                ?: fetchForecast(city).also { cache().set(key, it, timeToLive = 10.minutes) }
+        }
+    )
+}
+
+// Stands in for a slow call to a weather API.
+suspend fun fetchForecast(city: String): Forecast = Forecast(city, highCelsius = 21)
+```
+
+`get` returns `null` when the key is absent or expired; on a miss the handler fetches and stores the value for ten
+minutes.  When the source data changes, `cache().remove(key)` so the next read refetches.
+
+## Operations
+
+<!-- sample: com/lightningkite/lightningserver/guide/samples/CachingSamples.kt#cache-operations -->
+```kotlin
+fun cacheOperationsTest() = WeatherServer.testBlocking(settings = { cache set Cache.Settings("ram") }) {
+    val cache = cache()
+
+    cache.set("greeting", "hello")
+    assertEquals("hello", cache.get<String>("greeting"))
+    cache.remove("greeting")
+    assertNull(cache.get<String>("greeting"))
+
+    // One-time token: the second read finds nothing.
+    cache.set("reset:abc", "user@example.com", timeToLive = 30.minutes)
+    assertEquals("user@example.com", cache.getAndRemove<String>("reset:abc"))
+    assertNull(cache.getAndRemove<String>("reset:abc"))
+
+    // Lock: only the first caller gets it.
+    assertTrue(cache.setIfNotExists("lock:report", true, timeToLive = 5.minutes))
+    assertFalse(cache.setIfNotExists("lock:report", true, timeToLive = 5.minutes))
+
+    // Counter: a missing key starts at the added amount.
+    assertEquals(1L, cache.add("hits:home", 1L))
+    assertEquals(3L, cache.add("hits:home", 2L))
+
+    // Read-modify-write, retried if another writer changes the value in between.
+    assertTrue(cache.modify<List<String>>("recent", maxTries = 5) { (it ?: emptyList()) + "a" })
+    assertEquals(listOf("a"), cache.get<List<String>>("recent"))
 }
 ```
 
-Call `cache()` inside any handler or task body to get the live `Cache` instance.
-`cache` itself is a lazy handle; calling it at module-load time (outside a handler
-or test runtime) will crash because no `ServerRuntime` exists yet.
+| Operation | Returns | Notes |
+|---|---|---|
+| `get<T>(key)` | `T?` | `null` if absent or expired. |
+| `set(key, value, timeToLive)` | | `timeToLive = null` (the default) never expires. |
+| `remove(key)` | | No error if absent. |
+| `getAndRemove<T>(key)` | `T?` | Reads and deletes; for tokens that must be used once. |
+| `setIfNotExists(key, value, timeToLive)` | `Boolean` | `true` if this call stored it.  Give locks a `timeToLive`, so a crashed holder can't keep it forever, and `remove` in a `finally`. |
+| `add(key, amount, timeToLive)` | `Long` / `Int` | Adds to a number (negative to subtract); a missing key starts at `amount`. |
+| `modify<T>(key, maxTries, timeToLive) { old -> new }` | `Boolean` | Compare-and-swap loop; `false` if every try lost a race.  Returning `null` removes the key. |
+| `compareAndSet(key, serializer, expected, new)` | `Boolean` | The primitive `modify` is built on. |
 
-## Basic `get` and `set`
+The typed overloads above infer the serializer from `T`; overloads taking a `KSerializer` exist for generic code.
 
-The reified extension functions on `Cache` infer the serialiser from the type parameter,
-so you never need to supply one manually.  The non-reified overloads (which take an
-explicit `KSerializer<T>`) exist for writing generic helpers.
+For per-client request limits, use [Rate Limiting](rate-limiting.md) rather than hand-rolled counters.
 
+## Typed keys
+
+A `CacheKey` fixes a key's name and type in one place, so every read and write agrees:
+
+<!-- sample: com/lightningkite/lightningserver/guide/samples/CachingSamples.kt#cache-key -->
 ```kotlin
-// Illustrative — not a drift-checked sample.
-// All cache calls require a ServerRuntime in context (inside a handler or testBlocking).
+val homeHits = CacheKey.OfLong("hits:home")
 
-// Store a string; no TTL — lives until evicted or the process restarts.
-cache().set("greeting", "hello")
-
-// Retrieve it — returns null if absent or expired.
-val greeting: String? = cache().get<String>("greeting")
-
-// Store with a TTL — the key is automatically removed after 1 hour.
-cache().set("session:${token}", sessionData, timeToLive = 1.hours)
-
-// Any @Serializable type works; the reified extension infers the serializer.
-cache().set("prefs:${userId}", userPrefs, timeToLive = 24.hours)
-val prefs: UserPrefs? = cache().get<UserPrefs>("prefs:${userId}")
-```
-
-`get` returns `null` on a cache miss (key absent or TTL elapsed).  There is no
-distinction between "never set" and "expired".
-
-## Cache-Aside Pattern
-
-Cache-aside is the standard read strategy: check the cache first; on a miss, load
-from the source of truth and populate the cache.
-
-```kotlin
-// Illustrative — not a drift-checked sample.
-// Requires ServerRuntime in context; in production, annotate with context(server: ServerRuntime).
-// `users` is the registration declared on the ServerBuilder:
-//     val users = database.registerTable<User>("User")
-
-suspend fun getUser(id: Uuid): User {
-    val key = "user:$id"
-
-    // 1. Try the cache first
-    val cached: User? = cache().get<User>(key)
-    if (cached != null) return cached
-
-    // 2. Miss — load from the source of truth
-    val user = users().get(id)
-        ?: throw NotFoundException("user $id not found")
-
-    // 3. Populate cache for future reads
-    cache().set(key, user, timeToLive = 15.minutes)
-    return user
+fun cacheKeyTest() = WeatherServer.testBlocking(settings = {}) {
+    cache().add(homeHits, 1L)
+    assertEquals(1L, cache().get(homeHits))
 }
 ```
 
-On writes, invalidate or update the cached entry so stale data is not served:
+`CacheKey<T>("name")` works for any serializable type; `OfLong`, `OfInt`, and `OfInstant` also support `add`
+(`OfInstant` adds a `Duration`).
 
-```kotlin
-// Illustrative — not a drift-checked sample.
-suspend fun updateUser(id: Uuid, modification: Modification<User>): User {
-    val updated = users().updateOneById(id, modification)
-        ?: throw NotFoundException("user $id not found")
-
-    // Invalidate — next read will reload from the database.
-    cache().remove("user:$id")
-    return updated
-}
-```
-
-## `getAndRemove` — One-Time Tokens
-
-`getAndRemove` retrieves a value and atomically deletes it in one step.  It is the
-right tool for one-time tokens (email verification links, password-reset codes) where
-the token must be consumed on first use.
-
-```kotlin
-// Illustrative — not a drift-checked sample.
-
-// Store a verification token with a 30-minute window.
-val token = Uuid.random().toString()
-cache().set("verify:$token", userId, timeToLive = 30.minutes)
-
-// Later — consume the token (returns null if already used or expired).
-val userId: Uuid? = cache().getAndRemove<Uuid>("verify:$token")
-if (userId == null) throw UnauthorizedException("invalid or expired token")
-```
-
-> **Atomicity note:** Redis and DynamoDB backends implement `getAndRemove` as a
-> single atomic operation (`GETDEL` / `DeleteItem`).  The `ram` in-process backend
-> also atomically removes the entry.  The base-interface default is non-atomic
-> (read then delete) — rely on atomicity only when using a backend that documents it.
-
-## `setIfNotExists` — Distributed Locks
-
-`setIfNotExists` writes a value only if the key is absent, and returns `true` if the
-write succeeded.  This is the building block for distributed mutex locks.
-
-```kotlin
-// Illustrative — not a drift-checked sample.
-val lockKey = "lock:monthly-report"
-val acquired = cache().setIfNotExists(
-    key = lockKey,
-    value = "locked",
-    timeToLive = 5.minutes,   // auto-release if the process crashes
-)
-
-if (!acquired) {
-    // Another instance already holds the lock — skip this run.
-    return
-}
-
-try {
-    generateMonthlyReport()
-} finally {
-    cache().remove(lockKey)
-}
-```
-
-The `timeToLive` guard is essential: without it, a crash while the lock is held would
-leave it permanently set and block all future attempts.
-
-> **Backend note:** Redis and Memcached implement `setIfNotExists` as a single atomic
-> `SET NX` / `add` command.  DynamoDB uses a conditional `PutItem`.  The `ram`
-> backend uses `ConcurrentHashMap.compute` for atomicity within a single process.
-
-## Atomic Counters via `add`
-
-`add` atomically increments (or decrements) a numeric value.  If the key does not
-exist, it is created with the given value as its initial count.
-
-```kotlin
-// Illustrative — not a drift-checked sample.
-
-// Increment a page-view counter; returns the new value.
-val views: Long = cache().add("views:article:$articleId", 1L)
-
-// Decrement (pass a negative value).
-val remaining: Long = cache().add("seats:event:$eventId", -1L)
-
-// Int overload — returns Int.
-val score: Int = cache().add("score:${userId}", 10)
-```
-
-`add` is the right tool for any monotonically changing numeric state that does not
-need compare-and-swap semantics (rate limiters, hit counters, queue depths).
-
-### Rate Limiting with `add`
-
-```kotlin
-// Illustrative — not a drift-checked sample.
-// Requires ServerRuntime in context.
-suspend fun checkRateLimit(userId: String, windowSeconds: Int, maxRequests: Int): Boolean {
-    val key = "ratelimit:$userId:${Clock.System.now().epochSeconds / windowSeconds}"
-    val count = cache().add(key, 1L, timeToLive = windowSeconds.seconds)
-    return count <= maxRequests
-}
-```
-
-## Compare-and-Swap via `modify`
-
-`modify` reads the current value, applies a transformation, and writes back using a
-compare-and-swap loop, retrying up to `maxTries` times on conflicts.  If the
-`modification` lambda returns `null`, the key is deleted.
-
-```kotlin
-// Illustrative — not a drift-checked sample.
-
-// Safe increment of a counter even under concurrent writers.
-cache().modify<Int>(
-    key = "page-views",
-    maxTries = 5,
-) { current ->
-    (current ?: 0) + 1
-}
-
-// Delete the entry when a condition is met; return null to remove the key.
-cache().modify<String>(
-    key = "cart:${userId}",
-    maxTries = 3,
-) { current ->
-    if (current.isNullOrEmpty()) null else current
-}
-```
-
-`modify` returns `true` if the write succeeded within `maxTries` attempts.  A return
-value of `false` is safe to ignore for best-effort counters; treat it as an error
-when correctness is required.
-
-> **Backend note:** Redis uses a Lua script for true CAS atomicity.  Memcached uses
-> GETS/CAS tokens.  The `ram` backend uses `ConcurrentHashMap.compute`.  The default
-> interface implementation is a non-atomic read-then-compare loop — backends should
-> override with native CAS where available.
+There is no key namespacing beyond what you put in the key: prefix keys by feature (`"forecast:"`, `"lock:"`), or wrap
+a cache in `PrefixCache(cache(), "shop:")` to share one backend between apps.
 
 ## Backends
 
-### Built-in: `ram` and `ram-unsafe`
-
-Both are always registered; no extra module required.
-
-| URL | Description |
-|-----|-------------|
-| `ram` (default) | `ConcurrentHashMap`-backed; thread-safe; per-process only. |
-| `ram-unsafe` | Plain `HashMap`; no locking; single-threaded use only. |
-
-`ram` is the right default for tests.  It is not suitable for multi-instance
-production deployments because each process has a separate in-memory map.
-
 ```json
-{ "cache": "ram" }
+{ "cache": "redis://cache.internal:6379" }
 ```
 
-### Redis
+| URL | Module | Register with |
+|---|---|---|
+| `ram` (default) | built in | |
+| `ram-unsafe` (not thread-safe) | built in | |
+| `redis://[:password@]host:port[/db]` | `cache-redis` | `RedisCache` |
+| `memcached://host:port[,host:port]` | `cache-memcached` | `MemcachedCache` |
+| `memcached-aws://config-endpoint:port` (ElastiCache auto-discovery) | `cache-memcached` | `MemcachedCache` |
+| `memcached-test` (starts a local `memcached` from `PATH`) | `cache-memcached` | `MemcachedCache` |
+| `dynamodb://[accessKey:secretKey@]region/table` | `cache-dynamodb` | `DynamoDbCache` |
+| `dynamodb-local` (downloads and runs DynamoDB Local) | `cache-dynamodb` | `DynamoDbCache` |
 
-Illustrative — not a drift-checked sample.  Requires the `cache-redis` module.
+Reference the class in your server's `init {}` so its scheme is registered (see
+[Services](services.md#registering-a-backend)).  Only `redis://` is registered for Redis; `rediss://` is not.
+Full URL syntax: [Cache URLs](https://github.com/lightningkite/service-abstractions/blob/main/docs/settings-url-reference.md#cache).
 
-```kotlin
-import com.lightningkite.services.cache.redis.RedisCache
+`ram` lives in one process.  With more than one server instance, use a shared backend, or each instance has its own
+cache and locks don't lock.
 
-object Server : ServerBuilder() {
-    val cache = setting("cache", Cache.Settings())
-
-    init {
-        RedisCache   // touches the object; registers "redis://" and "rediss://" schemes
-    }
-}
-```
-
-```json
-{ "cache": "redis://localhost:6379" }
-```
-
-| URL | Effect |
-|-----|--------|
-| `redis://host:6379` | Unencrypted |
-| `redis://user:pass@host:6379` | Authenticated |
-| `rediss://host:6380` | TLS/SSL |
-| `redis-sentinel://host1:26379,host2:26379/mymaster` | Sentinel HA |
-
-Redis `setIfNotExists` and `modify` use Lua scripts for true atomicity.
-
-### Memcached
-
-Illustrative — not a drift-checked sample.  Requires the `cache-memcached` module.
-
-```kotlin
-import com.lightningkite.services.cache.memcached.MemcachedCache
-
-object Server : ServerBuilder() {
-    val cache = setting("cache", Cache.Settings())
-
-    init {
-        MemcachedCache   // registers "memcached://", "memcached-aws://", "memcached-test://"
-    }
-}
-```
-
-```json
-{ "cache": "memcached://localhost:11211" }
-```
-
-| URL | Effect |
-|-----|--------|
-| `memcached://host:11211` | Single server |
-| `memcached://h1:11211,h2:11211` | Multi-server with automatic sharding |
-| `memcached-aws://config.cache.amazonaws.com:11211` | AWS ElastiCache |
-| `memcached-test://` | Embedded instance for integration tests |
-
-> Memcached TTL precision is seconds; sub-second TTLs are rounded up.
-
-### DynamoDB
-
-Illustrative — not a drift-checked sample.  Requires the `cache-dynamodb` module.
-
-```kotlin
-import com.lightningkite.services.cache.dynamodb.DynamoDbCache
-
-object Server : ServerBuilder() {
-    val cache = setting("cache", Cache.Settings())
-
-    init {
-        DynamoDbCache   // registers "dynamodb://" and "dynamodb-local://"
-    }
-}
-```
-
-```json
-{ "cache": "dynamodb://us-east-1/my-cache-table" }
-```
-
-| URL | Effect |
-|-----|--------|
-| `dynamodb://region/table` | IAM-role / environment credentials |
-| `dynamodb://key:secret@region/table` | Explicit credentials |
-| `dynamodb-local://` | DynamoDB Local for integration tests |
-
-DynamoDB notes:
-- Tables are created automatically on first access (~10–30 s delay).
-- TTL is best-effort; expired items may persist for minutes to hours.  `get`
-  filters them out client-side.
-- No native CAS; `modify` uses the retry-based default implementation.
-
-### Using Non-Default Backends: Register Early
-
-The `ram` backend is always registered.  Every other backend registers its URL
-scheme when its companion object (or top-level singleton) is first touched by the
-JVM class loader.  If you skip the `init` block, a `settings.json` pointing at
-`"redis://…"` will fail to parse at startup.
-
-Touch each backend you intend to configure in a single `init` block:
-
-```kotlin
-// Illustrative — not a drift-checked sample.
-init {
-    RedisCache
-    MemcachedCache
-    DynamoDbCache
-}
-```
+| Backend | `setIfNotExists`, `add`, `modify` | `getAndRemove` |
+|---|---|---|
+| `ram` | atomic | atomic |
+| Redis | atomic | atomic (`GETDEL`) |
+| Memcached | atomic | read, then delete |
+| DynamoDB | atomic (conditional writes) | atomic |
 
 ## Testing
 
-Use `Cache.Settings("ram")` in your `testBlocking` settings lambda.  Each
-`testBlocking` call creates a fresh `MapCache` instance — no shared state, no
-cleanup needed between tests.
+Each `testBlocking` gets a fresh `ram` cache.  Expiry follows the clock in the coroutine context, so `withClock` tests
+it without waiting:
 
-<!-- sample: com/lightningkite/lightningserver/guide/samples/CachingSamples.kt#cache-test -->
+<!-- sample: com/lightningkite/lightningserver/guide/samples/CachingSamples.kt#cache-ttl-test -->
 ```kotlin
-fun cacheTest() = CacheServer.testBlocking(settings = { cache set Cache.Settings("ram") }) {
-    val c = CacheServer.cache()
+fun cacheTtlTest() = WeatherServer.testBlocking(settings = {}) {
+    val start = Instant.parse("2026-01-01T00:00:00Z")
+    fun clockAt(instant: Instant) = object : Clock { override fun now() = instant }
 
-    // set + get round-trip
-    c.set("greeting", "hello")
-    assertEquals("hello", c.get<String>("greeting"))
-
-    // null on a miss
-    assertNull(c.get<String>("no-such-key"))
-
-    // overwrite: set replaces the existing value
-    c.set("greeting", "world")
-    assertEquals("world", c.get<String>("greeting"))
-
-    // remove
-    c.remove("greeting")
-    assertNull(c.get<String>("greeting"))
-
-    // getAndRemove: returns the value and atomically deletes the key in one step
-    c.set("verify:token-abc", "user@example.com", timeToLive = 30.minutes)
-    assertEquals("user@example.com", c.getAndRemove<String>("verify:token-abc"))
-    assertNull(c.getAndRemove<String>("verify:token-abc"))  // key is now gone
-
-    // setIfNotExists: write only if the key is absent — the basis for distributed locks
-    assertTrue(c.setIfNotExists("lock:report", "locked", timeToLive = 5.minutes))
-    assertFalse(c.setIfNotExists("lock:report", "locked", timeToLive = 5.minutes))  // already exists
-
-    // add: atomic increment; key is created when it first appears
-    assertEquals(1L, c.add("hits:page1", 1L))
-    assertEquals(2L, c.add("hits:page1", 1L))
-    assertEquals(1L, c.add("hits:page1", -1L))  // decrement
+    withClock(clockAt(start)) { cache().set("code", "1234", timeToLive = 5.minutes) }
+    withClock(clockAt(start + 4.minutes)) { assertEquals("1234", cache().get<String>("code")) }
+    withClock(clockAt(start + 6.minutes)) { assertNull(cache().get<String>("code")) }
 }
 ```
 
-Being explicit about `Cache.Settings("ram")` protects the test from breaking if the
-server's default is ever changed to a production backend.
+## Gotchas
 
-TTL is not simulated in the `ram` backend — items persist for the duration of the
-`testBlocking` call.  If your code under test relies on TTL-based expiry, you will
-need to drive expiry manually (e.g., by calling `remove`) or use a backend that
-supports it.
+- `null` means absent, so a cached `null` can't be told from a miss.  Cache a wrapper if "known to be empty" matters.
+- `ram` stores objects without serializing them, so a type that can't round-trip through JSON works in tests and fails
+  on Redis or DynamoDB.
+- `ram` drops expired entries only when they are read; keys that are written once and never read again stay in memory.
+- There is no key listing or pattern delete.
 
-## Key Design Notes
+## Next
 
-- **Null means absent** — `get` returns `null` for both "never set" and "expired".
-  There is no way to distinguish them.
-- **No scan / list** — the `Cache` interface does not expose key enumeration or
-  pattern-delete.  These operations are backend-specific and intentionally omitted.
-- **Serialisation** — values are serialised using the server's
-  `internalSerializersModule`.  Any `@Serializable` type works; primitive types
-  (`String`, `Int`, `Long`, `Boolean`, etc.) work without annotation.
-- **Key namespacing** — there is no built-in key namespacing.  Use conventional
-  prefixes (`"user:"`, `"lock:"`, `"ratelimit:"`) to avoid collisions between
-  unrelated features.
-
-## See Also
-
-- [Services & Settings](services.md) — how `setting()` declarations work and the
-  URL-scheme registration model
-- [Tasks](tasks.md) — background jobs that often use the cache for deduplication
-- [Authentication & Sessions](auth.md) — the auth session layer uses the cache
-  internally for token storage
+- [Services](services.md): declaring services and switching backends.
+- [Pub/Sub](pubsub.md): broadcasting messages between instances.
+- [Rate Limiting](rate-limiting.md): per-client limits stored in the cache.

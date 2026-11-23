@@ -1,18 +1,38 @@
 # Tasks
 
-A **task** is a named, serializable unit of work that runs outside the
-request/response cycle.  You declare it once on a `ServerBuilder`, invoke it
-from anywhere that has a `ServerRuntime` in context (an HTTP handler, a
-WebSocket callback, a scheduled job), and the engine decides how to execute it.
+A task is work that runs outside the request that asked for it: sending an email, resizing an upload, calling a slow
+API.  Declare it once on a `ServerBuilder` and launch it from any handler; the engine decides where it runs.  The same
+chapter covers startup and pre-deploy tasks, which run when the server boots or deploys.
 
-Locally and in tests, `LocalEngine` runs the task body **synchronously** (inline,
-before `launch()` returns), so effects are immediately observable.  In serverless
-deployments the engine serializes the input and dispatches it via pub/sub for
-background processing — your handler code is identical either way.
+<!-- sample: com/lightningkite/lightningserver/guide/samples/TasksSamples.kt#tasks-server -->
+```kotlin
+@Serializable
+data class WelcomeEmail(val address: String, val name: String)
 
-## Imports
+object TasksServer : ServerBuilder() {
+    val cache = setting("cache", Cache.Settings())
 
-All examples in this chapter use the following imports:
+    val sendWelcomeEmail = path.path("tasks").path("send-welcome-email") bind Task { input: WelcomeEmail ->
+        // Stand-in for sending the email.
+        cache().set("welcomed:${input.address}", input.name)
+    }
+
+    val register = path.path("register").arg<String>("email").post bind HttpHandler { request ->
+        sendWelcomeEmail.launch(WelcomeEmail(address = request.arg1, name = "New user"))
+        HttpResponse.plainText("Registered")
+    }
+}
+```
+
+The path a task is bound to is its identity, not an HTTP route.  Keep it stable across deploys: a queued task is looked
+up by that path when it runs.  The input can be any serializable type, and the body runs with a `ServerRuntime` in
+context, so settings and services (`cache()`, `database()`, other tasks) are available.
+
+`sendWelcomeEmail.launch(input)` and `sendWelcomeEmail(input)` are the same call.  Both need a running execution (a
+handler, a socket callback, another task, a schedule), and the launched task runs as its child, so logs and traces lead
+back to the request that caused it.
+
+Imports used in this chapter:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/TasksSamples.kt#tasks-imports -->
 ```kotlin
@@ -20,96 +40,118 @@ import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.runtime.test.*
+import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.services.cache.*
-import kotlin.test.*
-import kotlinx.coroutines.*
+import com.lightningkite.services.database.*
 import kotlinx.serialization.Serializable
+import kotlin.test.*
 import kotlin.time.Duration.Companion.minutes
 ```
 
-## Declaring and Invoking a Task
+## Where tasks run
 
-<!-- sample: com/lightningkite/lightningserver/guide/samples/TasksSamples.kt#task-server -->
+| Engine | What `launch` does |
+|---|---|
+| Tests (`testBlocking`) | Runs the task inline; it finishes before `launch` returns. |
+| Local engines (Netty, Ktor, JDK) | Starts it in a background coroutine in the same process.  Nothing is persisted: a restart drops tasks in flight. |
+| AWS Lambda | Invokes the function asynchronously with the serialized input, so the task runs in its own invocation. |
+
+A task that throws is reported like any other failed execution; `launch` does not see the exception (except in tests,
+where it runs inline).  On Lambda, failed asynchronous invocations can be retried, so make task bodies safe to run
+twice.  There is no ordering between tasks: if order matters, carry it in the input or in the database.
+
+## Testing a task
+
+<!-- sample: com/lightningkite/lightningserver/guide/samples/TasksSamples.kt#tasks-test -->
+```kotlin
+fun tasksLaunchTest() = TasksServer.testBlocking(settings = {}) {
+    TasksServer.register.test("alice@example.com")
+    assertEquals("New user", TasksServer.cache().get<String>("welcomed:alice@example.com"))
+
+    // launch() needs a running execution; execute { } gives the test one.
+    execute { TasksServer.sendWelcomeEmail.launch(WelcomeEmail("bob@example.com", "Bob")) }
+    assertEquals("Bob", TasksServer.cache().get<String>("welcomed:bob@example.com"))
+}
+```
+
+Because tasks run inline in tests, their effects are visible on the next line.
+
+## Timeouts and explicit serializers
+
+<!-- sample: com/lightningkite/lightningserver/guide/samples/TasksSamples.kt#tasks-timeout -->
+```kotlin
+val monthlyReport = Task(timeout = 30.minutes) { month: String ->
+    println("Building the report for $month")
+}
+```
+
+The default timeout is 5 minutes.  On Lambda the function's own time limit also applies, whichever is shorter.
+
+For polymorphic or contextual input types, pass the serializer yourself: `Task(MyInput.serializer()) { input -> ... }`.
+
+## Startup and pre-deploy tasks
+
+<!-- sample: com/lightningkite/lightningserver/guide/samples/TasksSamples.kt#tasks-lifecycle -->
 ```kotlin
 @Serializable
-data class WelcomeEmailInput(val address: String, val name: String)
+data class VisitCounter(override val _id: String, val value: Int) : HasId<String>
 
-object TaskServer : ServerBuilder() {
+object TasksLifecycleServer : ServerBuilder() {
+    val database = setting("database", Database.Settings())
+    val counters = database.registerTable<VisitCounter>("VisitCounter")
 
-    val cache = setting("cache", Cache.Settings())
-
-    // Declare a task on any path. The path acts as a unique identifier — it does not
-    // correspond to an HTTP route. A Task executes its body when launched.
-    //
-    // Use Task { input: TYPE -> ... } (reified) when the input type is known at the call
-    // site. The serializer is derived automatically. The handler runs with a ServerRuntime
-    // in context, so it has access to settings, services, and other tasks.
-    val sendWelcomeEmail = path.path("tasks").path("send-welcome-email") bind Task { input: WelcomeEmailInput ->
-        println("Sending welcome email to ${input.address} (name=${input.name})")
-        // Record the work in cache so tests can observe the effect.
-        cache().set("last-welcome-email", input.address, 5.minutes)
+    val seedCounters = path.path("predeploy").path("seed-counters") bind PreDeployTask(
+        dependencies = { listOf(counters.preDeployTask) },
+    ) {
+        if (counters().get("visits") == null) counters().insertOne(VisitCounter("visits", 0))
     }
 
-    // HTTP endpoint that launches the task.
-    // launch() submits the task to the engine. In tests the engine executes it
-    // synchronously (inline). In production, the engine may queue it via pub/sub
-    // for background processing.
-    val register = path.path("register").post bind HttpHandler { _ ->
-        // In real code you'd parse the request body here and pass it to launch().
-        // See the "task-test" region for how to call launch() directly in a test.
-        sendWelcomeEmail.launch(WelcomeEmailInput("example@example.com", "Example"))
-        HttpResponse.plainText("Registered!")
+    val logBoot = path.path("startup").path("log-boot") bind StartupTask {
+        println("Instance starting")
     }
 }
 ```
 
-Key points:
+| | `StartupTask` | `PreDeployTask` |
+|---|---|---|
+| Runs | On every instance, at boot, before it serves | Once per deploy, before the new version serves |
+| Good for | Per-process setup: warming a local cache, logging the build | Work that must not race between instances: migrations, backfills, preparing tables |
+| On failure | The instance fails to start | The deploy is aborted; the previous version keeps serving |
+| `dependencies` | `Collection<StartupTask>` | `() -> Collection<PreDeployTask>`, a lambda so it can name tasks declared later or in other modules |
 
-- The path passed to `bind Task { … }` is the task's **identity string**, used
-  by the engine to route queued work.  It is not an HTTP route.
-- `Task { input: TYPE -> … }` is the reified factory.  For polymorphic or
-  contextual types, use `Task(serializer) { input -> … }` with an explicit
-  `KSerializer<INPUT>`.
-- The handler body runs with `ServerRuntime` as an implicit context receiver, so
-  you can call `cache()`, `database()`, or any other service accessor.
-- `launch(input)` is the one call to submit work.  It requires a `ServerRuntime`
-  in context, so it can only be called from inside another handler, task, or
-  scheduled job.
+Both run in dependency order, with independent tasks running concurrently.  A dependency cycle fails `build()`.
+`registerTable` creates a pre-deploy task (`counters.preDeployTask`) that creates the table's collection and indexes;
+depend on it before touching the table.
 
-## Testing a Task
+Every pre-deploy task runs on every deploy; nothing records that it ran before.  Write them so that running again
+changes nothing, like `seedCounters` above.  For work that must happen exactly once ever, `predeployOnce(database) { }`
+and `startupOnce(database) { }` (in `typed`) record completion in the database under the task's path.  A failed run is
+recorded and rethrown, so it fails the deploy (or startup); the next run tries again.
 
-In `TestRunner` (used by the `SERVER.test { }` block), `task.launch(input)` runs
-the task body **inline** — the body completes before `launch()` returns.  This
-means you can assert effects on the very next line.  Since `launch` needs a
-`ServerRuntime`, the test calls it inside `execute { }`:
+On the local engines, `runPreDeploy()` runs the pre-deploy tasks without serving (the body of a `predeploy`
+command), and `runPreDeployTasksBlocking()` runs them just before `start()` in a dev process; see
+[Running](running.md).  On AWS, the
+generated Terraform invokes the new function version to run them before switching traffic to it; see
+[AWS deployment](aws-deployment.md).
 
-<!-- sample: com/lightningkite/lightningserver/guide/samples/TasksSamples.kt#task-test -->
+Tests don't run either kind automatically:
+
+<!-- sample: com/lightningkite/lightningserver/guide/samples/TasksSamples.kt#tasks-lifecycle-test -->
 ```kotlin
-fun taskTest() = TaskServer.testBlocking(settings = {}) {
-    // Launch the task as the test's own work. TestRunner runs dispatched tasks inline, so
-    // the task body completes before launch() returns and the effect is immediately
-    // visible in the next line.
-    execute { TaskServer.sendWelcomeEmail.launch(WelcomeEmailInput("alice@example.com", "Alice")) }
+fun tasksLifecycleTest() = TasksLifecycleServer.testBlocking(settings = {}) {
+    executePreDeployTasks()
+    executePreDeployTasks()  // every deploy runs them again, so they must be safe to repeat
+    assertEquals(0, TasksLifecycleServer.counters().get("visits")?.value)
 
-    val logged = TaskServer.cache().get<String>("last-welcome-email")
-    assertEquals("alice@example.com", logged)
+    executeStartupTasks()
 }
 ```
 
-## Delivery Semantics
+## Next
 
-The delivery guarantee depends on the engine:
-
-- **`LocalEngine` / `TestRunner`**: synchronous, inline — no queue, no retries.
-  The task body runs and completes before `launch()` returns (in `TestRunner`) or
-  in a short-lived coroutine (in `LocalEngine`).
-- **Serverless (AWS Lambda)**: the engine serializes the input and publishes it to
-  the configured pub/sub channel.  Delivery is at-least-once.  Design task
-  bodies to be **idempotent** — a retried invocation with the same input should
-  produce the same outcome.
-
-There is no built-in ordering guarantee between different task invocations.  If
-order matters, express it in your task logic (e.g. sequence numbers in the
-input, a database row that tracks progress).
+- [Schedules](schedules.md): run work on an interval, a time of day, or a cron pattern.
+- [Caching](caching.md): deduplicating and locking work across instances.
+- [Observability](observability.md): following a launched task back to its request.

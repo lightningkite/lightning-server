@@ -9,62 +9,100 @@ import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.test.*
 import com.lightningkite.lightningserver.serialization.*
 import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.services.data.*
 import kotlinx.serialization.*
 // endregion error-handling-imports
 
 // region error-server
-object ItemLookupServer : ServerBuilder() {
+@Serializable
+data class SignupForm(val email: String)
 
-    init {
-        // registerBasicMediaTypeCoders() enables JSON serialization of HTTP request/response bodies,
-        // including error responses. Required when testing via HttpHandler.test() (the full HTTP pipeline).
-        registerBasicMediaTypeCoders()
-    }
+object ErrorsServer : ServerBuilder() {
+    init { registerBasicMediaTypeCoders() }
 
-    // In-process data — no external service needed for this example.
-    private val catalog = mapOf("apple" to "A red fruit", "banana" to "A yellow fruit")
+    private val takenEmails = setOf("taken@example.com")
 
-    // GET /items/{name} — returns the item description or throws a structured exception
-    val getItem = path.path("items").arg<String>("name").get bind ApiHttpHandler(
-        summary = "Get item by name",
+    // POST /signup
+    val signup = path.path("signup").post bind ApiHttpHandler(
+        summary = "Sign up",
         auth = noAuth,
-        successCode = HttpStatus.OK,
+        successCode = HttpStatus.Created,
         errorCases = listOf(
-            LSError(http = 400, detail = "empty-name", message = "Item name must not be blank"),
-            LSError(http = 404, detail = "item-not-found", message = "No item with that name exists")
+            LSError(http = 400, detail = "invalid-email", message = "That is not an email address"),
+            LSError(http = 409, detail = "email-taken", message = "That email address is already in use"),
         ),
-        implementation = { _: Unit ->
-            val name = route.arg1
-            if (name.isBlank())
-                throw BadRequestException(detail = "empty-name", message = "Item name must not be blank")
-            catalog[name]
-                ?: throw NotFoundException(detail = "item-not-found", message = "No item with that name exists")
+        implementation = { input: SignupForm ->
+            if ("@" !in input.email)
+                throw BadRequestException(detail = "invalid-email", message = "That is not an email address")
+            if (input.email in takenEmails)
+                throw HttpStatusException(
+                    status = HttpStatus.Conflict,
+                    detail = "email-taken",
+                    message = "That email address is already in use",
+                    data = input.email,
+                )
+            "Welcome!"
         }
     )
+
+    // GET /busy — an error response with extra headers
+    val busy = path.path("busy").get bind HttpHandler {
+        throw HttpStatusException(
+            status = HttpStatus.ServiceUnavailable,
+            detail = "maintenance",
+            message = "Down for maintenance",
+            headers = HttpHeaders(HttpHeader.RetryAfter to "120"),
+        )
+    }
 }
 // endregion error-server
 
 // region error-typed-test
-fun errorTypedTest() = ItemLookupServer.testBlocking(settings = {}) {
-    // ApiHttpHandler.test() calls the implementation lambda directly.
-    // Thrown HttpStatusExceptions propagate as Kotlin exceptions — not as HTTP responses.
-    // Catch HttpStatusException and inspect .status.code and .detail to verify the right error fired.
+fun errorTypedTest() = ErrorsServer.testBlocking(settings = {}) {
     try {
-        ItemLookupServer.getItem.test("unknown-item", null, Unit)
-        error("Expected NotFoundException")
+        ErrorsServer.signup.test(null, SignupForm("taken@example.com"))
+        error("Expected a conflict")
     } catch (e: HttpStatusException) {
-        check(e.status.code == 404)
-        check(e.detail == "item-not-found")
+        check(e.status == HttpStatus.Conflict)
+        check(e.detail == "email-taken")
     }
 }
 // endregion error-typed-test
 
 // region error-http-test
-fun errorHttpTest() = ItemLookupServer.testBlocking(settings = {}) {
-    // HttpHandler.test() drives the full HTTP pipeline, including the exception handler.
-    // The thrown exception is converted to an HttpResponse — inspect .status.code on the result.
-    // This is what real HTTP clients see: an HttpResponse with status 404 and an LSError JSON body.
-    val response = ItemLookupServer.getItem.test("unknown-item")
-    check(response.status.code == 404)
+fun errorHttpTest() = ErrorsServer.testBlocking(settings = {}) {
+    val response = ErrorsServer.signup.test(
+        body = TypedData.text("""{"email":"not-an-email"}""", MediaType.Application.Json)
+    )
+    check(response.status == HttpStatus.BadRequest)
+    // Decoding the body needs a ServerRuntime, so it runs inside execute { }.
+    val error = execute { response.toLSError() }
+    check(error.detail == "invalid-email")
+
+    val busy = ErrorsServer.busy.test()
+    check(busy.status == HttpStatus.ServiceUnavailable)
+    check(busy.headers[HttpHeader.RetryAfter]?.root == "120")
 }
 // endregion error-http-test
+
+// region error-rethrow
+@Serializable
+data class DateInput(val text: String)
+
+object ErrorsDateServer : ServerBuilder() {
+    init { registerBasicMediaTypeCoders() }
+
+    val parse = path.path("parse-date").post bind ApiHttpHandler(
+        summary = "Parse date",
+        auth = noAuth,
+        errorCases = listOf(LSError(http = 400, detail = "invalid-date", message = "Not an ISO date")),
+        implementation = { input: DateInput ->
+            try {
+                kotlinx.datetime.LocalDate.parse(input.text).toString()
+            } catch (e: IllegalArgumentException) {
+                throw BadRequestException(detail = "invalid-date", message = "Not an ISO date", cause = e)
+            }
+        }
+    )
+}
+// endregion error-rethrow

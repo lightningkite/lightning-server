@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
+import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.encryption.Signer
@@ -9,6 +10,7 @@ import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
 import com.lightningkite.services.data.PhoneNumber
 import com.lightningkite.services.data.toPhoneNumber
+import com.lightningkite.services.data.toPhoneNumberOrNull
 import com.lightningkite.services.sms.SMS
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
@@ -49,18 +51,15 @@ public class SmsProofEndpoints(
     /**
      * Returns [to] in E.164 format, such as `+15551234567`.
      *
-     * This removes any extension after `x`, keeps only the digits, and prepends `+`. A 10-digit number is assumed to be from the US and gets the country code `1`, so `555.123.4567 x123` becomes `+15551234567`.
+     * Follows [toPhoneNumber]: a number without `+` is assumed to be from the US, so `(555) 123-4567` becomes `+15551234567`.
+     *
+     * @throws BadRequestException with detail `invalid-phone-number` if [to] is not a phone number, including one with an extension, since an SMS cannot be sent to it.
      */
-    override fun normalize(to: String): String = to
-        .removePrefix("+")
-        .substringBefore('x')
-        .filter { it.isDigit() }
-        .let {
-            "+" + when (it.length) {
-                10 -> "1$it"
-                else -> it
-            }
-        }
+    override fun normalize(to: String): String = to.toPhoneNumberOrNull()?.raw
+        ?: throw BadRequestException(
+            detail = "invalid-phone-number",
+            message = "That is not a phone number. Include the country code, such as +44, for numbers outside the US."
+        )
 
     /** Applies [screenPhone] to the normalized phone number. */
     context(_: ServerRuntime)

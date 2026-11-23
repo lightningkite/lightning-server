@@ -1,160 +1,50 @@
-# Services & Settings
+# Services
 
-Lightning Server abstracts external services — caches, databases, file storage,
-email, SMS — behind a uniform settings-driven model.  You declare which services
-your server needs once, in the `ServerBuilder`, and the framework handles wiring
-them up from configuration at startup.
+Databases, caches, file storage, email, SMS, and pub/sub are *services*: you declare one as a setting, and a URL in
+`settings.json` picks its backend.  Code written against `Cache` runs unchanged on an in-memory map in tests and on
+Redis in production.
 
-## Imports
-
-All examples in this chapter use the following imports:
+The service interfaces and their backends come from
+[Service Abstractions](https://github.com/lightningkite/service-abstractions); this chapter covers how a Lightning
+Server declares and uses them.
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/ServicesSamples.kt#services-imports -->
 ```kotlin
-import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.builder.*
+import com.lightningkite.lightningserver.engine.local.engineCache
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.runtime.test.*
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.*
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.services.cache.*
-import kotlinx.coroutines.*
-import kotlinx.serialization.*
+import kotlin.test.*
 ```
 
-## Declaring a Service Setting
-
-Call `setting("key", ServiceType.Settings())` inside your `ServerBuilder`.
-The string key becomes the field name in `settings.json`; the `Settings`
-value provides the default (and describes the available backends):
-
-<!-- sample: com/lightningkite/lightningserver/guide/samples/ServicesSamples.kt#counter-types -->
-```kotlin
-@Serializable
-data class CounterRequest(val name: String)
-
-@Serializable
-data class CounterResponse(val name: String, val value: Long)
-```
+## A server with a cache
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/ServicesSamples.kt#counter-server -->
 ```kotlin
 object CounterServer : ServerBuilder() {
     init { registerBasicMediaTypeCoders() }
 
-    // Declare the cache service. The string "cache" becomes the key in settings.json.
-    // Cache.Settings() defaults to "ram" — an in-process map backed by ConcurrentHashMap.
     val cache = setting("cache", Cache.Settings())
 
-    // POST /counter/increment — adds 1 to a named counter stored in the cache
-    val increment = path.path("counter").path("increment").post bind ApiHttpHandler(
+    val increment = path.path("counter").post bind ApiHttpHandler(
         summary = "Increment a named counter",
-        description = "Adds 1 to the named counter and returns the new value.",
         auth = noAuth,
-        successCode = HttpStatus.OK,
-        errorCases = emptyList(),
-        implementation = { input: CounterRequest ->
-            // Access the live cache instance by invoking the setting: cache()
-            // cache() is callable anywhere a ServerRuntime context is available,
-            // which includes every handler implementation lambda.
-            val newValue = cache().add("counter:${input.name}", 1L)
-            CounterResponse(name = input.name, value = newValue)
-        }
-    )
-
-    // POST /counter/read — returns the current counter value without incrementing
-    val read = path.path("counter").path("read").post bind ApiHttpHandler(
-        summary = "Read a named counter",
-        description = "Returns the current value of the named counter, or 0 if it has never been set.",
-        auth = noAuth,
-        successCode = HttpStatus.OK,
-        errorCases = emptyList(),
-        implementation = { input: CounterRequest ->
-            // Cache.get<T>() returns null when the key is absent; coerce to 0.
-            val value = cache().get<Long>("counter:${input.name}") ?: 0L
-            CounterResponse(name = input.name, value = value)
-        }
+        implementation = { name: String -> cache().add("counter:$name", 1L) }
     )
 }
 ```
 
-A few things to note:
+`setting("cache", Cache.Settings())` declares a setting named `cache` whose default is `Cache.Settings()`, the URL
+`"ram"`.  The value it returns is a handle, not a cache: call `cache()` to get the live `Cache`.  The call needs a
+runtime in context, which handlers, tasks, schedules, startup tasks, and `testBlocking` bodies have; the compiler
+rejects it anywhere else.  The service is built once per runtime and reused.
 
-- **`cache`** is a `ServerSetting` — a lazy handle, not the live service.
-  Calling `cache()` inside a handler resolves it against the running runtime.
-  Calling it at module-load time (e.g., at the top of a companion object) would
-  crash because no runtime exists yet.
-- **`Cache.Settings()`** takes a URL string.  The default is `"ram"`, which is
-  built in and needs no external infrastructure.  Other backends are registered
-  by their implementation modules: `"redis://…"`, `"memcached://…"`.  Switching
-  backends is a configuration change, not a code change.
-- **All service types follow the same shape**: `Database.Settings()`,
-  `ExternalFileSystem.Settings()`, `EmailService.Settings()` — one `setting()`
-  declaration per service, one URL string in settings.json.
-
-## Using Non-Default Backends: Reference Them Early
-
-The default URL for every service type (`"ram"` for Cache, `"ram"` for
-Database, `"local"` for files, etc.) is built into the core module and
-registers itself automatically.  Non-default backends — MongoDB, Redis,
-Memcached, DynamoDB, S3, SES, Twilio — live in separate modules.  Each
-backend's companion object (or top-level object) registers a URL scheme
-handler when it is first referenced by the JVM class loader.
-
-**If the backend object is never referenced, its URL scheme is never
-registered**, and a `settings.json` that points at that backend (e.g.
-`"mongodb://…"`) will fail to parse at startup with an
-`UnknownUrlScheme`-style error.
-
-The fix is to touch each backend object you might use in an `init {}` block
-inside your `ServerBuilder`, *before* settings are loaded:
-
-```kotlin
-// Illustrative — from demo/src/main/kotlin/.../Server.kt.
-// The sole purpose of these statements is to ensure each companion initializer
-// runs so that its URL scheme handler is registered before settings.json loads.
-// None of these objects need to be assigned to a variable.
-object Server : ServerBuilder() {
-    val database = setting("database", Database.Settings())
-    val cache = setting("cache", Cache.Settings())
-    val files = setting("files", ExternalFileSystem.Settings())
-
-    init {
-        MongoDatabase       // registers "mongodb://"
-        MemcachedCache      // registers "memcached://"
-        DynamoDbCache       // registers "dynamodb://"
-        S3ExternalFileSystem  // registers "s3://"
-        JsonFileDatabase    // registers "jsonfile://"
-        // ... and so on for any backend your settings.json might name
-    }
-}
-```
-
-A few details:
-
-- **Order matters** — the `init {}` block runs when the `object` is first
-  accessed, which happens before `loadFromFile` is called.  Referencing
-  backend objects anywhere before settings load is fine; `init {}` is the
-  canonical place.
-- **You don't have to reference ALL backends** — only those you might
-  configure in `settings.json`.  The demo server references all of them so
-  that any settings file works without a code change.
-- **Tests that use `"ram"`** never need this, because the RAM backends are
-  always registered.
-
-> This is illustrative prose; the URL-scheme registration mechanism is
-> verified against `demo/src/main/kotlin/.../Server.kt` (init block, lines
-> ~87–102).  No compiled sample region is added here because the backends
-> (MongoDatabase, S3, etc.) are not available in the docs-guide module.
-
-## The settings.json File
-
-When you run your server for the first time with `loadFromFile(KFile("settings.json"), ...)`,
-Lightning Server writes a generated `settings.json` with all declared defaults and
-then exits with a `MissingSettingFile` exception.  Run again and it reads the
-file normally:
+The setting becomes one line of `settings.json`:
 
 ```json
 {
@@ -162,57 +52,128 @@ file normally:
 }
 ```
 
-Every declared `setting(key, default)` produces one line.  Edit the value to
-point at a real backend — the server code never changes.
+## Switching backends
 
-> **Note:** This JSON block is illustrative — it matches the output you would
-> see for `CounterServer` above, but it is not a drift-checked sample region
-> because settings.json is a generated file, not a compiled Kotlin source.
+Change the URL; the code stays the same:
 
-## Configuring Services in Tests
-
-The `test {}` block's `settings` lambda gives you a `ServerSettings` receiver
-in which you can override any declared setting before the runtime starts.  Use
-the infix `set` to supply a settings value.
-
-> To wrap these examples in a test class, annotate your test methods with `@Test` — see [Testing Your Server](testing.md) for the complete `@Test` + `testBlocking` pattern.
-
-<!-- sample: com/lightningkite/lightningserver/guide/samples/ServicesSamples.kt#counter-test -->
-```kotlin
-// Override the setting inside the settings lambda so the test uses
-// a fresh in-memory cache. "ram" is a built-in URL that resolves to a
-// ConcurrentHashMap-backed MapCache — no external service needed.
-fun counterTest() = CounterServer.testBlocking(settings = { cache set Cache.Settings("ram") }) {
-    // Call increment twice; the counter should reach 2.
-    CounterServer.increment.test(null, CounterRequest("hits"))
-    val result = CounterServer.increment.test(null, CounterRequest("hits"))
-    check(result.value == 2L)
-
-    // A counter that was never incremented reads as 0.
-    val missing = CounterServer.read.test(null, CounterRequest("unset"))
-    check(missing.value == 0L)
+```json
+{
+  "cache": "redis://cache.internal:6379"
 }
 ```
 
-The `cache set Cache.Settings("ram")` call explicitly sets the `cache` setting
-to the in-memory backend.  This is slightly redundant for `Cache` because its
-default is already `"ram"`, but being explicit protects the test from breaking
-if the `ServerBuilder` default ever changes to a production backend.
-Spelling it out makes the `"ram"` URL visible in the test itself, so the reader
-can see at a glance which backend is active.
+Every service follows the same pattern.  The defaults need no infrastructure:
 
-Each `test {}` call creates a fresh runtime — a fresh `MapCache` instance in
-this case — so tests never share state.  No cleanup code needed.
+| Service | Declaration | Default URL |
+|---|---|---|
+| Database | `setting("database", Database.Settings())` | `ram` |
+| Cache | `setting("cache", Cache.Settings())` | `ram` |
+| Pub/sub | `setting("pubSub", PubSub.Settings())` | `local` |
+| File storage | `setting("files", ExternalFileSystem.Settings())` | `file://<working dir>/local/files?serveUrl=files` |
+| Email | `setting("email", EmailService.Settings())` | `console` |
+| SMS | `setting("sms", SMS.Settings())` | `console` |
+| Push notifications | `setting("notifications", NotificationService.Settings("test"))` | none; pass one |
 
-The `null` first argument to `.test(null, ...)` is the auth token; `null` is
-correct for `noAuth` endpoints (see Chapter 1 for a fuller explanation).
+Every URL scheme each service accepts is listed in Service Abstractions'
+[Settings URL Reference](https://github.com/lightningkite/service-abstractions/blob/main/docs/settings-url-reference.md).
 
-## What's Next
+## Registering a backend
 
-- **Database** — declare `val database = setting("database", Database.Settings())`
-  and use `"ram"` in tests.  Chapter 5 covers the type-safe query DSL for
-  inserting, finding, and updating documents.
-- **Files** — `ExternalFileSystem.Settings()` provides presigned URLs and
-  multipart upload support; the `"local"` backend writes to a temp directory.
-- **Multiple services** — any number of settings can be declared in a single
-  `ServerBuilder`; override as many as needed in the `settings = { }` lambda.
+`ram`, `local`, `console` and the other defaults are built in.  Every other backend lives in its own module and
+registers its URL scheme when its class is first initialized, so add the dependency and touch the class before
+settings load:
+
+```kotlin
+// build.gradle.kts
+implementation("com.lightningkite.services:cache-redis:<version>")
+```
+
+```kotlin
+import com.lightningkite.services.cache.redis.RedisCache
+import com.lightningkite.services.database.mongodb.MongoDatabase
+
+object Server : ServerBuilder() {
+    val database = setting("database", Database.Settings())
+    val cache = setting("cache", Cache.Settings())
+
+    init {
+        // Referencing each class runs its companion's init, which registers its URL scheme.
+        MongoDatabase
+        RedisCache
+    }
+}
+```
+
+Without this, startup fails and logs `No handler redis for ... - available handlers are ...`: the module may be on the
+classpath, but its scheme was never registered.  Reference every backend any of your settings files might name; tests on the
+built-in defaults need none.  The [Settings URL Reference](https://github.com/lightningkite/service-abstractions/blob/main/docs/settings-url-reference.md#cheatsheet)
+names the class to reference for each scheme.
+
+## Two of the same service
+
+Settings are independent, so two caches are two settings:
+
+```kotlin
+val cache = setting("cache", Cache.Settings())
+val sessionCache = setting("sessionCache", Cache.Settings())
+```
+
+Setting names are global across the server and its modules; two settings with one name fail the build with
+`ConflictingSettingsException`.
+
+## Sharing one backend with the engine
+
+Local engines (Ktor, Netty, JDK) declare their own `engine-cache` (schedule locks) and `engine-pubSub` (WebSocket
+topics) settings.  `bind` points them at yours, so one URL configures both and the engine keys leave
+`settings.json`:
+
+<!-- sample: com/lightningkite/lightningserver/guide/samples/ServicesSamples.kt#shared-cache -->
+```kotlin
+object SharedCacheServer : ServerBuilder() {
+    val cache = setting("cache", Cache.Settings())
+
+    init {
+        // The engine's own "engine-cache" setting now resolves to this one and leaves settings.json.
+        engineCache bind cache
+    }
+}
+```
+
+`enginePubSub bind pubSub` does the same for pub/sub (see [Pub/Sub](pubsub.md#websocket-topics-across-instances)).
+`bind` works for any two settings with the same result type.
+
+## Services in tests
+
+`testBlocking`'s `settings` block runs before the runtime starts.  `set` replaces a setting's value; unset settings keep
+their defaults:
+
+<!-- sample: com/lightningkite/lightningserver/guide/samples/ServicesSamples.kt#counter-test -->
+```kotlin
+fun counterTest() = CounterServer.testBlocking(settings = { cache set Cache.Settings("ram") }) {
+    assertEquals(1L, increment.test(null, "hits"))
+    assertEquals(2L, increment.test(null, "hits"))
+}
+```
+
+Each `testBlocking` call builds a fresh runtime, so in-memory services start empty in every test.  Naming `"ram"`
+explicitly keeps the test in memory even if the server's default later changes.
+
+To inject a ready-made instance instead of a URL, use `setStatic`, which takes the setting's result type:
+
+<!-- sample: com/lightningkite/lightningserver/guide/samples/ServicesSamples.kt#counter-set-static -->
+```kotlin
+fun counterStaticTest() = CounterServer.testBlocking(settings = { context -> cache setStatic MapCache("test", context) }) {
+    assertEquals(1L, increment.test(null, "hits"))
+}
+```
+
+## Deploying
+
+Service settings double as Terraform inputs: a deployment builder can create the backend and write its URL, e.g.
+`cache.awsDynamoDb()`.  See [Terraform](terraform.md).
+
+## Next
+
+- [Settings](settings.md): the settings file, loading, secrets, and every framework setting.
+- [Database](database.md), [Caching](caching.md), [Pub/Sub](pubsub.md), [Files](files.md), [Email](email.md):
+  using each service.

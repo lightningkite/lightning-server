@@ -55,7 +55,7 @@ internal fun originMatches(allowed: List<String>, origin: String): Boolean {
  *
  * ## GOTCHA: Empty limitToDomains
  * An empty list in [CorsSettings.limitToDomains] means NO origins are allowed.
- * Use `null` to allow all origins (mirroring behavior).
+ * Use `listOf("*")` to allow all origins (mirroring behavior).
  *
  * @param config Runtime configuration for CORS behavior
  **/
@@ -75,8 +75,6 @@ public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpIn
         // If no Origin header, request is not cross-origin - pass through without CORS headers
         val origin = request.headers[HttpHeader.Origin]?.root ?: return cont(request)
 
-        // Check if origin matches allowed patterns
-        // null limitToDomains = allow all, non-null = check against patterns
         val originAllowed =
             config.limitToDomains.takeUnless { it == allowAll }?.let { originMatches(it, origin) } ?: true
 

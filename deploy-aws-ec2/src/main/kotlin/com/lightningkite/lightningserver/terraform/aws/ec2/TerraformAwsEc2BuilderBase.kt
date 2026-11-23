@@ -119,6 +119,12 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
     public open val serverCommand: String get() = "serve"
 
     /**
+     * File that, when present on an instance, sets `SERVER_COMMAND` and replaces [serverCommand] there.
+     * The scaling builder writes it at boot from each launch template's user data.
+     */
+    protected val commandEnvFile: String get() = "/etc/lightning-server/command.env"
+
+    /**
      * Command that runs pre-deploy tasks and exits (passed to the app launcher). Run once per
      * deploy, before the new version is cut over, while the current version keeps serving; a
      * non-zero exit aborts the deploy. The application must expose this command (see the framework's
@@ -415,9 +421,9 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
 
 
     /**
-     * Health-check path the ALB polls; must return 2xx/3xx when the app is alive. Defaults to the
-     * server's autodetected `/meta/online` liveness endpoint (see [detectedOnlinePath]), falling
-     * back to `/meta/online` by convention. Deliberately a *liveness* path, not the deep
+     * Health-check path polled on each instance after a deploy (and by the scaling builder's ALB); must
+     * return 2xx/3xx when the app is alive. Defaults to `/meta/online`, which is not detected from the
+     * server: override it if your liveness endpoint lives elsewhere. Deliberately a *liveness* path, not the deep
      * `/meta/health`, so a slow downstream service can't make the ALB drain the whole fleet.
      */
     public open val healthCheckPath: String get() = "/meta/online"
@@ -1206,7 +1212,9 @@ Type=simple
 User=lightning-server
 Group=lightning-server
 WorkingDirectory=/var/lib/$$projectPrefix
-ExecStart=/opt/$$projectPrefix/server/bin/server $$serverCommand
+Environment="SERVER_COMMAND=$$serverCommand"
+EnvironmentFile=-$$commandEnvFile
+ExecStart=/opt/$$projectPrefix/server/bin/server $SERVER_COMMAND
 StateDirectory=$$projectPrefix
 StateDirectoryMode=0700
 CacheDirectory=$$projectPrefix

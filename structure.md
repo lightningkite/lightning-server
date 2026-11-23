@@ -1,3 +1,3 @@
 # Structure
 
-See [docs/modules.md](docs/modules.md) for the module structure and dependency graph.
+See [Project structure](docs-guide/guide/project-structure.md) for the module structure and dependency graph.
