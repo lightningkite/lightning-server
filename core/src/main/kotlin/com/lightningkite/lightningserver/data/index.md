@@ -40,13 +40,7 @@ Conversion utilities between Java `File` and multiplatform `KFile`.
 
 **Usage**: Bridge between Java APIs and Lightning Server's multiplatform file handling.
 
-### LongBits.kt
-
-Compact bit set stored in a single Long, supporting indices 0-63.
-
-- **LongBits**: Value class wrapping a Long as a bit set
-- Iterable interface for enumerating set bits
-- String representation using ranges (e.g., "0-5,10,15-20")
+Bit sets (`IntBitIndices`, `LongBitIndices`) live in `core-shared`; `CronPattern` uses `LongBitIndices`.
 
 **Usage**: Efficiently store small sets of integers, particularly for cron minute/hour patterns.
 
@@ -99,8 +93,8 @@ Type-safe, serializable cache with optional expiration.
 1. **Request Caching**: Cache computed values within a request to avoid redundant calculations
 2. **Task Scheduling**: Define when background tasks should run using cron patterns or schedules
 3. **Data Expiration**: Wrap cached data with expiration times
-4. **Bit Operations**: Use LongBits for compact storage of small integer sets
+4. **Bit Operations**: Use `IntBitIndices` / `LongBitIndices` (in `core-shared`) for compact storage of small integer sets
 
 ## Related Documentation
 
-See [Data Utilities](../../../../../../../../docs/data-utilities.md) for usage examples and best practices.
+See [Data Utilities](https://github.com/lightningkite/lightning-server/blob/master/docs-guide/guide/architecture.md) for usage examples and best practices.

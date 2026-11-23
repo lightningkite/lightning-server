@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.test.execute
+import com.lightningkite.lightningserver.runtime.test.executePreDeployTasks
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.runBlocking
@@ -158,7 +159,7 @@ class DoOnceTest {
     @Test
     fun `doOnce stores error message when action throws`() = runBlocking {
         TestServer.test({}) {
-            try {
+            val thrown = assertFailsWith<Exception> {
                 execute {
                     doOnce(
                         key = "error-test",
@@ -167,9 +168,8 @@ class DoOnceTest {
                         throw Exception("Test error message")
                     }
                 }
-            } catch (e: Exception) {
-                // Expected
             }
+            assertEquals("Test error message", thrown.message, "doOnce must rethrow the action's failure")
 
             val table = database().table(actionTable)
             val record = table.get("error-test")
@@ -187,7 +187,7 @@ class DoOnceTest {
             var executionCount = 0
 
             // First call - throws error
-            try {
+            assertFailsWith<Exception> {
                 execute {
                     doOnce(
                         key = "retry-test",
@@ -197,8 +197,6 @@ class DoOnceTest {
                         throw Exception("First attempt error")
                     }
                 }
-            } catch (e: Exception) {
-                // Expected
             }
 
             // Second call - should retry since first failed
@@ -212,6 +210,19 @@ class DoOnceTest {
             }
 
             assertEquals(2, executionCount, "Action should execute twice - once for failure, once for retry")
+        }
+    }
+
+    object FailingPreDeployServer : ServerBuilder() {
+        val database = setting("database", Database.Settings())
+        val migrate = path.path("migrate") bind predeployOnce(database) { throw Exception("migration failed") }
+    }
+
+    @Test
+    fun `failing predeployOnce fails the pre-deploy phase`() = runBlocking {
+        FailingPreDeployServer.test({}) {
+            val thrown = assertFailsWith<Exception> { executePreDeployTasks() }
+            assertEquals("migration failed", thrown.message)
         }
     }
 

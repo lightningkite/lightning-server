@@ -175,6 +175,6 @@ processTask(myData)
 
 ## See Also
 
-- [Runtime Documentation](../../../../../../../../docs/runtime.md) - Detailed runtime guide
+- [Runtime Documentation](https://github.com/lightningkite/lightning-server/blob/master/docs-guide/guide/architecture.md) - Detailed runtime guide
 - [Testing Guide](../../../../../../../../docs-guide/guide/testing.md) - Testing best practices
 - [Server Definition](../definition/index.md) - Server structure and configuration

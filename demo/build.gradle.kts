@@ -76,7 +76,7 @@ dependencies {
     implementation(sa.phonecall.test)
     implementation(sa.voiceagent.openai)
 
-    implementation(libs.kotlinerCli)
+    implementation(cli.kotliner.cli)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)
 }

@@ -21,22 +21,6 @@ import com.lightningkite.services.database.postRawChanges
 import kotlinx.serialization.KSerializer
 
 /**
- * Returns this table wrapped so that every change it makes to an [Audited] field is recorded in [log].
- *
- * Each change is recorded after it is made, through [AuditMutationLog.logAuditedFieldChanges]. The
- * `…IgnoringResult` and `…IgnoringOld` calls run as their effect-returning equivalents so the changed rows can
- * be recorded.
- *
- * The model must be registered in the [AuditRegistry] passed to [log]. The registry registers the
- * [AuditedModel]s used by the server's endpoints when pre-deploy tasks run, so a model that no endpoint uses
- * has no entry. Changes to an unregistered model throw [IllegalStateException] *after* the change has been
- * made, so the change stands but the caller sees a failure.
- */
-context(serverRuntime: ServerRuntime)
-public fun <T : AuditedModel<ID>, ID : AuditedModel.Id<*, ID>> Table<T>.logAuditedFieldChanges(log: AuditMutationLog): Table<T> =
-    postRawChanges { changes -> log.logAuditedFieldChanges(serializer, changes) }
-
-/**
  * Records changes to [AuditedModel]s as [AuditMutationRecord]s.
  *
  * It is not installed; wrap each table it should record with [logAuditedFieldChanges].

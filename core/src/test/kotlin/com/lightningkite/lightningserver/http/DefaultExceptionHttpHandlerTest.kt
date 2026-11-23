@@ -51,6 +51,25 @@ class DefaultExceptionHttpHandlerTest {
         }
     }
 
+    object ServerWithoutCoders : ServerBuilder() {
+        val throwNotFound = path.path("not-found").get bind HttpHandler {
+            throw NotFoundException("Resource not found")
+        }
+    }
+
+    @Test
+    fun `HttpStatusException keeps its status as plain text when no media coders are registered`() {
+        ServerWithoutCoders.test(
+            settings = { generalSettings set GeneralServerSettings(debug = false) }
+        ) {
+            runBlocking {
+                val response = ServerWithoutCoders.throwNotFound.test()
+                assertEquals(404, response.status.code)
+                assertEquals("Resource not found", response.body?.text())
+            }
+        }
+    }
+
     @Test
     fun `BadRequestException returns 400 status`() {
         TestServer.test(

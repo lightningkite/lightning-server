@@ -18,8 +18,9 @@ import kotlin.math.roundToInt
  * format conversion, and quality settings. All parameters are optional; when all are null, the preview
  * will only apply EXIF orientation corrections without other transformations.
  *
- * @property sizeInPixels The maximum size allowed for both width and height in pixels. Images larger
- *                        than this in either dimension will be scaled down proportionally.
+ * @property sizeInPixels The target length in pixels of the image's shorter side. The image is scaled
+ *                        down proportionally (never up) until its shorter side is this size, so the
+ *                        longer side stays larger: 400×300 at 200 becomes 266×200.
  * @property forceRatio The aspect ratio to enforce (width/height). If set, the image will be cropped
  *                      or padded to match this ratio. For example, 16.0/9.0 for widescreen format.
  * @property type The target media type for format conversion. If null, the original format is preserved.

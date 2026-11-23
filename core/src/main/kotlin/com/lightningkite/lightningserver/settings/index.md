@@ -142,6 +142,6 @@ The settings system provides helpful error messages and auto-remediation:
 
 ## See Also
 
-- [Settings Documentation](../../../../../../../../docs/settings.md) - User guide for working with settings
+- [Settings Documentation](https://github.com/lightningkite/lightning-server/blob/master/docs-guide/guide/settings.md) - User guide for working with settings
 - `ServerSetting` class - Individual setting definition
 - `ServerBuilder` class - Server definition with settings registration

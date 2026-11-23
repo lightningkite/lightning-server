@@ -56,30 +56,63 @@ plugins:
 
 nav:
   - Home: index.md
-  - Guide:
+  - Getting started:
     - Overview: overview.md
-    - Project Structure: project-structure.md
-    - Your First Endpoint: first-endpoint.md
-    - Running Your Server: running.md
+    - Condensed guide: condensed-guide.md
+    - Setup: setup.md
+    - Your first endpoint: first-endpoint.md
+    - Project structure: project-structure.md
+    - Running: running.md
+  - Building APIs:
     - Routing: routing.md
-    - Typed Endpoints: typed-endpoints.md
-    - Model REST Endpoints: model-rest.md
-    - Bulk Endpoints: bulk-endpoints.md
-    - Services & Settings: services.md
-    - Database & Query DSL: database.md
+    - Typed endpoints: typed-endpoints.md
+    - Error handling: error-handling.md
     - Validation: validation.md
-    - Authentication & Sessions: auth.md
-    - Proof & Session: proof-session.md
+    - Serialization: serialization.md
     - WebSockets: websockets.md
+    - Bulk requests and funnels: bulk-endpoints.md
+    - Client SDKs: client-sdks.md
+    - CORS and interceptors: cors-interceptors.md
+    - Rate limiting: rate-limiting.md
+    - Meta endpoints and admin: meta-admin.md
+  - Data:
+    - Services: services.md
+    - Settings: settings.md
+    - Database: database.md
+    - Advanced database: advanced-database.md
+    - Model REST endpoints: model-rest.md
+    - Permissions: permissions.md
+    - Realtime model updates: model-realtime.md
+    - Caching: caching.md
+    - Pub/Sub: pubsub.md
+    - Files: files.md
+    - Media: media.md
+  - Users and messaging:
+    - Authentication: auth.md
+    - Proof-based login: proof-session.md
+    - OAuth: oauth.md
+    - Encryption: encryption.md
+    - Email and SMS: email.md
+    - Notifications: notifications.md
+  - Background work:
     - Tasks: tasks.md
     - Schedules: schedules.md
-    - Caching: caching.md
-    - Error Handling: error-handling.md
+  - Operations:
     - Testing: testing.md
-    - Deploying to AWS: aws-deployment.md
-  # The Dokka API reference is a pre-built HTML site dropped into site/api/
-  # during the build process. It is linked here as an external nav entry so
-  # readers can navigate to it from the sidebar.
-  # To regenerate: ./gradlew dokkaHtmlMultiModule  (or :core:dokkaGeneratePublicationHtml for a single module)
-  # Then copy build/dokka/htmlMultiModule/ → site/api/  (see CI sketch in tmp/release-readiness-plan.md)
-  - API Reference: api/index.html
+    - Observability: observability.md
+    - Engines: engines.md
+    - Deploying to AWS Lambda: aws-deployment.md
+    - Deploying to EC2: deploy-ec2.md
+    - Deploying to a VM: deploy-vm.md
+    - Terraform: terraform.md
+  - Reference:
+    - Architecture: architecture.md
+    # Dokka output is uploaded per module by `lk docs` (metawork); this is core's.
+    - API reference (Dokka): https://lightningkite-maven.s3.us-west-2.amazonaws.com/com/lightningkite/lightningserver/core/docs/
+  - Appendix:
+    - Coming from Django: appendix/vs-django.md
+    - Coming from Rails: appendix/vs-rails.md
+    - Coming from Spring: appendix/vs-spring.md
+    - Migrating v4 to v5: appendix/migration-v4-to-v5.md
+    - Migrating v5.1 to v5.2: appendix/migration-v5.1-to-v5.2.md
+    - Migrating to epoch 1: appendix/migration-to-epoch-1.md

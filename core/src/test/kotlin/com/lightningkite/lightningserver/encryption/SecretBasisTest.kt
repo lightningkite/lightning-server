@@ -20,6 +20,31 @@ class SecretBasisTest {
     }
 
     @Test
+    fun generatedStringHasExpectedLength() {
+        assertEquals(SecretBasis.BASE64_CHARS, SecretBasis().string.length)
+    }
+
+    @Test
+    fun tooShortInputFailsWithClearMessage() {
+        val short = kotlin.io.encoding.Base64.encode(ByteArray(32))
+        val error = assertFailsWith<IllegalArgumentException> { SecretBasis(short) }
+        assertContains(error.message!!, "at least 64 bytes")
+    }
+
+    @Test
+    fun terraformGeneratedValueIsAccepted() {
+        // Same shape as TerraformNeed<SecretBasis>.generated(): 88 random Base64 characters, 66 bytes decoded.
+        val terraformStyle = "A".repeat(87) + "/"
+        assertEquals(SecretBasis.BYTES, SecretBasis(terraformStyle).bytes.size)
+    }
+
+    @Test
+    fun toStringDoesNotRevealSecret() {
+        val basis = SecretBasis()
+        assertFalse(basis.toString().contains(basis.string))
+    }
+
+    @Test
     fun testSecretBasisSerialization() {
         val basis = SecretBasis()
         val reconstructed = SecretBasis(basis.string)

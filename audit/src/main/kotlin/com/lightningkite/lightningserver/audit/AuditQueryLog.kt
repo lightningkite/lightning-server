@@ -12,20 +12,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.builtins.ListSerializer
 
 /**
- * Returns this table wrapped so that every query against it is recorded in [log] before it runs.
- *
- * Every read and write is recorded, including the privileged ones a server makes internally. A query whose
- * record cannot be written does not run.
- *
- * The model must be registered in the [AuditRegistry] passed to [log]. The registry registers the
- * [AuditedModel]s used by the server's endpoints when pre-deploy tasks run, so a model that no endpoint uses
- * has no entry, and every query against it throws [IllegalStateException] without running.
- */
-context(runtime: ServerRuntime)
-public fun <T : AuditedModel<ID>, ID : AuditedModel.Id<*, ID>> Table<T>.logQueries(log: AuditQueryLog): Table<T> =
-    AuditQueryLogTable(this, log, runtime)
-
-/**
  * Records queries against [AuditedModel]s as [AuditQueryRecord]s.
  *
  * It is not installed; wrap each table it should record with [logQueries].
@@ -36,7 +22,7 @@ public class AuditQueryLog(
     public val table: Runtime<Table<AuditQueryRecord>>,
 )
 
-private class AuditQueryLogTable<T : Any>(
+internal class AuditQueryLogTable<T : Any>(
     override val wraps: Table<T>,
     private val log: AuditQueryLog,
     private val runtime: ServerRuntime,

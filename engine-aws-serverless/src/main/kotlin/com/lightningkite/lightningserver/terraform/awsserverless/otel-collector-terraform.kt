@@ -46,9 +46,10 @@ private const val COLLECTOR_CONFIG_FILE = "collector.yaml"
 private const val COLLECTOR_CONFIG_PATH = "/var/task/$COLLECTOR_CONFIG_FILE"
 
 /**
- * Configures OpenTelemetry for AWS Lambda using the AWS Distro for OpenTelemetry (ADOT) Collector layer.
+ * Configures OpenTelemetry for AWS Lambda using a collector Lambda layer: the OpenTelemetry project's
+ * layer when exporting to an [otlpEndpoint], the AWS Distro for OpenTelemetry (ADOT) layer for X-Ray.
  *
- * This sets up the ADOT Collector Lambda extension which runs as a sidecar process in your Lambda
+ * This sets up the collector Lambda extension which runs as a sidecar process in your Lambda
  * function, collecting traces, metrics, and logs and forwarding them to an OTLP-compatible backend.
  *
  * **Note:** This uses the collector-only layer (no auto-instrumentation). Your application must
@@ -57,10 +58,10 @@ private const val COLLECTOR_CONFIG_PATH = "/var/task/$COLLECTOR_CONFIG_FILE"
  * ## Architecture
  *
  * ```
- * Lambda Function → ADOT Collector (localhost:4317) → Your OTLP Backend
+ * Lambda Function → Collector (localhost:4317) → Your OTLP Backend
  * ```
  *
- * The ADOT collector runs as a Lambda extension and receives telemetry via gRPC on localhost:4317.
+ * The collector runs as a Lambda extension and receives telemetry via gRPC on localhost:4317.
  * It then exports to your configured backend (Honeycomb, Grafana Cloud, X-Ray, etc.).
  *
  * ## Tail-Based Sampling for Errors
@@ -78,8 +79,11 @@ private const val COLLECTOR_CONFIG_PATH = "/var/task/$COLLECTOR_CONFIG_FILE"
  * 3. **Head-based with high error bias**: Use ADOT's built-in sampling but set a higher ratio,
  *    accepting the cost trade-off.
  *
- * @param collectorLayerVersion The ADOT collector layer version string (e.g., "0-117-0" for v0.117.0).
- *                              Check https://github.com/aws-observability/aws-otel-lambda for the latest.
+ * @param collectorLayerVersion The collector layer version string. With an [otlpEndpoint] this is the
+ *                              OpenTelemetry project's layer (e.g., "0_24_0",
+ *                              https://github.com/open-telemetry/opentelemetry-lambda/releases); without
+ *                              one it is the ADOT layer (e.g., "0-117-0",
+ *                              https://github.com/aws-observability/aws-otel-lambda).
  * @param layerVersion The layer version number (typically 1 for new versions).
  * @param otlpEndpoint The OTLP endpoint the collector forwards to (e.g., "api.honeycomb.io:443").
  *                     If null, uses the default X-Ray exporter.
@@ -106,7 +110,7 @@ private const val COLLECTOR_CONFIG_PATH = "/var/task/$COLLECTOR_CONFIG_FILE"
  */
 context(emitter: TerraformAwsServerlessBuilder<*>)
 public fun TerraformNeed<TelemetryBackend.Settings>.otelCollector(
-    collectorLayerVersion: String = "0-117-0",
+    collectorLayerVersion: String,
     layerVersion: Int = 1,
     otlpEndpoint: String? = null,
     otlpProtocol: OtlpProtocol = OtlpProtocol.GRPC,
@@ -120,10 +124,13 @@ public fun TerraformNeed<TelemetryBackend.Settings>.otelCollector(
 ): Unit {
     val arch = if (emitter.architecture == Architecture.ARM64) "arm64" else "amd64"
 
-    // Add the ADOT collector-only layer (NO auto-instrumentation)
-    // ARN format: arn:aws:lambda:<region>:901920570463:layer:aws-otel-collector-<arch>-ver-<version>:<layer-version>
-    // See: https://github.com/aws-observability/aws-otel-lambda
-    emitter.lambdaLayers += "arn:aws:lambda:${emitter.region.id()}:901920570463:layer:aws-otel-collector-$arch-ver-$collectorLayerVersion:$layerVersion"
+    // Collector-only layers (no auto-instrumentation). An OTLP backend needs the OpenTelemetry
+    // project's layer, because ADOT's ships without the decouple processor (see collectorConfig).
+    // X-Ray needs ADOT's, whose built-in configuration exports there.
+    emitter.lambdaLayers += if (otlpEndpoint != null)
+        "arn:aws:lambda:${emitter.region.id()}:184161586896:layer:opentelemetry-collector-$arch-$collectorLayerVersion:$layerVersion"
+    else
+        "arn:aws:lambda:${emitter.region.id()}:901920570463:layer:aws-otel-collector-$arch-ver-$collectorLayerVersion:$layerVersion"
 
     // Service identification
     val effectiveServiceName = serviceName ?: emitter.handler.qualifiedName ?: emitter.projectPrefix
@@ -224,8 +231,11 @@ internal fun collectorConfig(
         appendLine("        endpoint: localhost:${OtlpProtocol.GRPC.defaultPort}")
         appendLine("      http:")
         appendLine("        endpoint: localhost:${OtlpProtocol.HTTP.defaultPort}")
-        // No processors: the application's own SDK batches before it reaches the collector, and the
-        // reduced collector in the Lambda layer publishes no list of the processors it ships with.
+        // The Lambda layer turns off exporter queues, so without decouple the app's flush waits for the
+        // backend's round trip and the response waits on it. Decouple acknowledges at once and holds
+        // the extension's next-event call until the export finishes, which is after the response.
+        appendLine("processors:")
+        appendLine("  decouple:")
         appendLine("exporters:")
         appendLine("  $exporter:")
         appendLine("    endpoint: $endpoint")
@@ -246,25 +256,26 @@ internal fun collectorConfig(
         ).forEach { pipeline ->
             appendLine("    $pipeline:")
             appendLine("      receivers: [otlp]")
+            appendLine("      processors: [decouple]")
             appendLine("      exporters: [$exporter]")
         }
     }
 }
 
 /**
- * Configures OpenTelemetry to export to Honeycomb via the ADOT Lambda layer.
+ * Configures OpenTelemetry to export to Honeycomb via the OpenTelemetry collector Lambda layer.
  *
  * Honeycomb supports tail-based sampling via their Refinery product, which can be configured
  * to always keep traces with errors while sampling successful traces at a lower rate.
  *
- * @param collectorLayerVersion The ADOT collector layer version string.
+ * @param collectorLayerVersion The OpenTelemetry collector layer version string.
  * @param layerVersion The layer version number.
  * @param dataset The Honeycomb dataset name (optional, defaults to service name).
  * @param samplingRatio Client-side sampling ratio (Honeycomb also supports server-side via Refinery).
  */
 context(emitter: TerraformAwsServerlessBuilder<*>)
 public fun TerraformNeed<TelemetryBackend.Settings>.otelHoneycomb(
-    collectorLayerVersion: String = "0-117-0",
+    collectorLayerVersion: String = "0_24_0",
     layerVersion: Int = 1,
     dataset: String? = null,
     samplingRatio: Double? = null,
@@ -300,9 +311,9 @@ public fun TerraformNeed<TelemetryBackend.Settings>.otelHoneycomb(
 }
 
 /**
- * Configures OpenTelemetry to export to Grafana Cloud via the ADOT Lambda layer.
+ * Configures OpenTelemetry to export to Grafana Cloud via the OpenTelemetry collector Lambda layer.
  *
- * @param collectorLayerVersion The ADOT collector layer version string.
+ * @param collectorLayerVersion The OpenTelemetry collector layer version string.
  * @param layerVersion The layer version number.
  * @param instanceId Your Grafana Cloud instance ID.
  * @param zone The Grafana Cloud zone (e.g., "prod-us-east-0").
@@ -312,7 +323,7 @@ public fun TerraformNeed<TelemetryBackend.Settings>.otelHoneycomb(
  */
 context(emitter: TerraformAwsServerlessBuilder<*>)
 public fun TerraformNeed<TelemetryBackend.Settings>.otelGrafanaCloud(
-    collectorLayerVersion: String = "0-117-0",
+    collectorLayerVersion: String = "0_24_0",
     layerVersion: Int = 1,
     instanceId: String,
     zone: String = "prod-us-east-0",

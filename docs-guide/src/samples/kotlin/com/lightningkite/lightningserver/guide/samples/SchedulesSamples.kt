@@ -5,48 +5,53 @@ import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.data.*
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.*
-import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.runtime.test.*
 import com.lightningkite.services.cache.*
-import kotlin.test.*
-import kotlinx.coroutines.*
 import kotlinx.datetime.*
+import kotlin.test.*
 import kotlin.time.Duration.Companion.hours
-import kotlin.time.Duration.Companion.minutes
 // endregion schedules-imports
 
-// region schedule-server
-object ScheduleServer : ServerBuilder() {
-
+// region schedules-server
+object SchedulesServer : ServerBuilder() {
     val cache = setting("cache", Cache.Settings())
 
-    // Declare a scheduled task on any path. The path is the task's identity —
-    // it does not correspond to an HTTP route.
-    //
-    // ScheduledTask(frequency) runs the body at a fixed interval.
-    // The handler runs with a ServerRuntime in context, so services are available.
-    val cleanup = path.path("schedules").path("cleanup") bind ScheduledTask(frequency = 1.hours) {
-        // Delete expired sessions, purge stale cache entries, compact logs, etc.
-        val count = 42  // illustrative; in production, query and delete from a database
-        println("Cleanup ran: removed $count expired records")
-        cache().set("cleanup:last-count", count, 2.hours)
+    val hourlyCleanup = path.path("schedules").path("hourly-cleanup") bind ScheduledTask(frequency = 1.hours) {
+        cache().add("cleanup:runs", 1)
+    }
+
+    val sendDigest = path.path("tasks").path("send-digest") bind Task { address: String ->
+        cache().set("digest:$address", "sent")
+    }
+
+    val nightlyDigest = path.path("schedules").path("nightly-digest") bind ScheduledTask(
+        timeOfDay = LocalTime(3, 0),
+        timeZone = TimeZone.of("America/Denver"),
+    ) {
+        for (address in listOf("alice@example.com", "bob@example.com")) sendDigest.launch(address)
+    }
+
+    val weekdayStandup = path.path("schedules").path("weekday-standup") bind ScheduledTask(
+        cron = CronPattern(
+            minutes = listOf(0),
+            hours = listOf(9),
+            days = CronDays.DaysOfWeek(DayOfWeek.MONDAY..DayOfWeek.FRIDAY),
+        ),
+        timeZone = TimeZone.UTC,
+    ) {
+        println("Standup in 15 minutes")
     }
 }
-// endregion schedule-server
+// endregion schedules-server
 
-// region schedule-test
-// Schedules are time-driven — the engine decides when to fire them.
-// But the WORK inside a schedule can be run on demand in a test.
-//
-// This tests the work the schedule does, not the timing. Running it the way the engine does is
-// engine API, so the test opts in.
+// region schedules-test
 @OptIn(EngineApi::class)
-fun scheduleTest() = ScheduleServer.testBlocking(settings = {}) {
-    // Run the schedule the same way the engine does when the timer fires.
-    ScheduleServer.cleanup.executeWithMetrics()
+fun schedulesRunOnDemandTest() = SchedulesServer.testBlocking(settings = {}) {
+    SchedulesServer.hourlyCleanup.executeWithMetrics()
+    assertEquals(1, SchedulesServer.cache().get<Int>("cleanup:runs"))
 
-    val count = ScheduleServer.cache().get<Int>("cleanup:last-count")
-    assertEquals(42, count)
+    SchedulesServer.nightlyDigest.executeWithMetrics()
+    assertEquals("sent", SchedulesServer.cache().get<String>("digest:bob@example.com"))
 }
-// endregion schedule-test
+// endregion schedules-test

@@ -182,12 +182,12 @@ public suspend fun Signer.sign(string: String): String = Base64.encode(sign(stri
  * @return `true` if the signature is valid, `false` otherwise
  */
 public suspend fun Signer.verify(string: String, signature: String): Boolean =
-    verify(string.encodeToByteArray(), signature.encodeToByteArray())
+    verify(string.encodeToByteArray(), Base64.decode(signature))
 
 public fun Signer.signBlocking(string: String): String = Base64.encode(signBlocking(string.encodeToByteArray()))
 
 public fun Signer.verifyBlocking(string: String, signature: String): Boolean =
-    verifyBlocking(string.encodeToByteArray(), signature.encodeToByteArray())
+    verifyBlocking(string.encodeToByteArray(), Base64.decode(signature))
 
 /**
  * Creates an ES256 (ECDSA with SHA-256) signer from this key pair.

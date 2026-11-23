@@ -87,7 +87,6 @@ class DisclosureLogEndToEndTest {
 
         val meta = path.path("meta") include MetaEndpoints(
             packageName = "com.lightningkite.lightningserver.audit",
-            database = database,
             cache = cache,
         )
     }

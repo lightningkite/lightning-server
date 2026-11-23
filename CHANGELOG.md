@@ -45,6 +45,15 @@ Each release groups entries under:
 - Added `HttpStatusException.headers`, which the default exception handler adds to the response (such as a `Retry-After`).
 - Added a `ServerBuilder.install` overload for an interceptor that is both an `ExecutionInterceptor` and an `HttpInterceptor`.
 - **Breaking:** `RateLimitInterceptor` is now an `ExecutionInterceptor` plus an `HttpInterceptor`, and no longer a `WebSocketInterceptor`. It gains `exempt: List<HttpHandler<*>>` and `exemptSockets: List<WebSocketHandler<*, *>>`, placed before `requestLimits`, so a positional `requestLimits` lambda must now be passed by name or as a trailing lambda.
+- `OauthProviderCredentialsApple.toOauthProviderCredentials()` and `generateJwt()` need only an `Engine`, so Sign in with Apple credentials can be supplied from a `Runtime { }` lambda.
+- `OauthProofEndpoints` has a `property` parameter (default `"email"`), so a custom `makeProof` can prove another property, and login accepts it.
+- **Breaking:** `BitIndices` moved from `audit-shared` to `core-shared` (package `com.lightningkite.lightningserver.data`) and is now a sealed interface with two value classes: `IntBitIndices` (the old `BitIndices`, still queryable with `containsAll`/`containsAny`) and `LongBitIndices`. `bitIndicesOf` is now `intBitIndicesOf` / `longBitIndicesOf`, and `toArray()` is gone in favor of the standard `toIntArray()`. `FieldIdentifierSet.Segment` is `IntBitIndices`; the stored form is unchanged.
+- **Breaking:** removed `LongBits`; use `LongBitIndices`, which numbers bits from the most significant end and throws `IndexOutOfBoundsException` for an out-of-range index. `CronPattern`'s `minutes`, `hours` and `months` are now `LongBitIndices`.
+- Deprecated the `MetaEndpoints(packageName, database, cache)` constructor; use `MetaEndpoints(packageName, cache)`. The database was never used.
+- Added `HttpHeaders.getProxiedSourceIp(header)`: the client IP a trusted proxy recorded, taken as the right-most entry of its forwarding header.
+- `otelDatadog()` now extends `TerraformNeed<TelemetryBackend.Settings>`, so `telemetrySettings.otelDatadog()` compiles; it previously could not be called on the telemetry setting.
+- `AwsAdapter` gained `protected open fun getenv(name)` and `readSettingsSecret(secretId)`, to let tests replace the environment and Secrets Manager.
+- Added `ServerSettings.settingsSchemaJson(module)`, which covers the engine's and framework's keys and leaves out bound settings. `ServerBuilder.settingsSchemaJson` is deprecated.
 
 ### Behavior
 
@@ -78,6 +87,22 @@ Each release groups entries under:
 - **HTTP metrics on the exception path now carry the real route.** The route pattern is resolved once at the top of `handle()` and reused for both success and failure metrics/spans, so failed requests no longer record `route = "unknown"`.
 - **Ktor WebSocket lifecycle is now traced.** The Ktor engine routes `willConnect` / `didConnect` / `messageFromClient` / `disconnect` through the `*WithMetrics` wrappers, matching the instrumentation of the other engines.
 - **Scheduled tasks emit OTel spans.** `LocalEngine` now wraps scheduled-task polling and execution in `schedule.poll <name>` and `schedule.tick <name>` spans, with `schedule.name` and `schedule.lockHeld` attributes.
+- **Security:** with `realIpHeader` set, the Netty, Ktor and JDK engines use the right-most entry of the header (the address the trusted proxy appended) instead of the whole value. Clients could previously spoof their IP through `X-Forwarded-For`, which affected rate limiting and audit.
+- **Security:** `Signer.verify(String, String)` and `verifyBlocking(String, String)` now Base64-decode the signature, so they verify what `sign(String)` returns (previously they always returned false).
+- `AwsAdapter` loads settings from the Secrets Manager secret once. It no longer falls through to the bundled file and S3, which loaded settings twice or crashed.
+- `SecretBasis` rejects values shorter than 64 bytes with a clear error, `toString()` no longer prints the secret, `SecretBasis()` generates exactly 64 bytes, and `BASE64_CHARS` is corrected to 88.
+- `OauthProofEndpoints` fails at the callback with a clear `IllegalStateException` when `makeProof` proves a property other than the declared one. Before, login rejected the proof.
+- `doOnce`, and so `startupOnce` and `predeployOnce`, now rethrows the action's failure after recording it, instead of logging and returning. A failed `predeployOnce` fails the deploy, and a failed `startupOnce` fails startup. A later run still retries.
+- Local engines (Netty, Ktor, JDK): a schedule whose tick throws now waits for its next scheduled run instead of rerunning immediately in a tight loop. A task's own timeout no longer stops its schedule.
+- `NettyEngine` now applies `webSocketSettings.ping` and `pongTimeout` like `KtorEngine`: an unanswered ping closes the socket with 1011 "Ping timeout".
+- `CronPattern.toString` writes day-of-week as Sunday=1 … Saturday=7 (Quartz/EventBridge). AWS Lambda weekday cron schedules were off by one day.
+- `TerraformAwsScalingEc2Builder` rejects a RAM `engine-cache` (`ram`, `ram-unsafe`). It used to check a setting named `cache`, so the check never applied.
+- `FullyCustomizableSubscriptions` default subscriptions keep `FullEventSubscription.inApp` (it was dropped, so in-app was always immediate), and `UpdateRetainingUserChanges` updates `inApp` like the other channels.
+- `refreshNotifications` also sends notifications whose in-app delivery came due, so a delayed in-app-only notification is marked sent instead of staying unsent.
+- `AnnotationValidators.StandardWithExternalModule` and `StandardWithInternalModule` now use the module they are named for; they were swapped.
+- Typed GET/HEAD input (`HttpRequest.queryParameters(serializer)`) is decoded with `externalSerialization`, like request bodies, instead of `internalSerialization`.
+- `QueryParameters.parse` URL-decodes keys and values, and `QueryParameters.toString` URL-encodes them, as their KDoc said. `/meta/bulk` sub-request query strings are now decoded. WebSocket connection rows stored by an older version whose query values contain a raw `+` or `%` decode differently.
+- With no media coders registered, `HttpExceptionHandler.Default` answers in plain text with the error's real status instead of a bare 500. An exception handler that throws is now logged and reported instead of being swallowed.
 
 ### Tests
 

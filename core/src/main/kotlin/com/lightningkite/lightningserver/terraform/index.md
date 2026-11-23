@@ -182,8 +182,8 @@ fun main() {
 
 ## Related Documentation
 
-- User Guide: [Terraform](../../../../../../../../docs/terraform.md)
-- AWS Deployment: [Deploying to AWS](../../../../../../../../docs/deploy-aws.md)
+- User Guide: [Terraform](https://github.com/lightningkite/lightning-server/blob/master/docs-guide/guide/terraform.md)
+- AWS Deployment: [Deploying to AWS](https://github.com/lightningkite/lightning-server/blob/master/docs-guide/guide/aws-deployment.md)
 - Service Abstractions: Implemented in the `services` artifact
 
 ## Known Limitations

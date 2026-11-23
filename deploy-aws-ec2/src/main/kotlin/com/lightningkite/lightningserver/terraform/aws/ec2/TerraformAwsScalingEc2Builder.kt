@@ -210,19 +210,15 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
     }
 
     override fun validateConfiguration() {
-        // The fleet relies on the engine cache's schedule locks to run each scheduled task once across
-        // all instances. A per-instance RAM cache would run every schedule on every instance.
-        val cacheJson = settings[engineCache.name]
-        val url = when (cacheJson) {
-            is JsonPrimitive -> cacheJson.contentOrNull
-            is JsonObject -> (cacheJson["url"] as? JsonPrimitive)?.contentOrNull
-            else -> null
-        }?.trim()?.lowercase()
-        if (url != null && (url.isEmpty() || url == "ram" || url.startsWith("ram://"))) {
+        // The fleet relies on the engine cache's locks to ensure scheduled tasks run once across all
+        // instances. A per-instance RAM cache would run every schedule on every instance.
+        val url = Json.decodeFromJsonElement(engineCache.serializer, settings.getValue(engineCache.name)).url
+        val scheme = url.substringBefore("://")
+        if (scheme == "ram" || scheme == "ram-unsafe") {
             throw IllegalStateException(
-                "TerraformAwsScalingEc2Builder requires a distributed cache (e.g. redis://, " +
+                "TerraformAwsScalingEc2Builder requires a distributed cache in `${engineCache.name}` (e.g. redis://, " +
                         "memcached://, dynamodb://) so scheduled tasks coordinate across the fleet, " +
-                        "but the configured cache is '$url'. A per-instance RAM cache would run every " +
+                        "but it is '$url'. A per-instance RAM cache would run every " +
                         "scheduled task on every instance."
             )
         }

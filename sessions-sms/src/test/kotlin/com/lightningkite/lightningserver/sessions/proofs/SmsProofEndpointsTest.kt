@@ -285,7 +285,7 @@ class SmsProofEndpointsTest {
     }
 
     @Test
-    fun `extension is stripped from phone number`() = runBlocking {
+    fun `invalid phone number is rejected without sending`() = runBlocking {
         object : ServerBuilder() {
             val cache = setting("cache", Cache.Settings("ram"))
             val sms = setting("sms", SMS.Settings("test"))
@@ -312,11 +312,13 @@ class SmsProofEndpointsTest {
                 val smsService = server.sms() as TestSMS
                 smsService.reset()
 
-                // Phone number with extension should have extension stripped
-                server.smsProof.start.test(null, "5551234567x123")
-
-                val msg = smsService.messageHistory[0]
-                assertEquals("+15551234567", msg.to.raw)
+                for (input in listOf("5551234567x123", "12345", "555-123-456")) {
+                    val error = assertFailsWith<BadRequestException>(input) {
+                        server.smsProof.start.test(null, input)
+                    }
+                    assertEquals("invalid-phone-number", error.detail)
+                }
+                assertEquals(0, smsService.messageHistory.size)
             }
         }
     }

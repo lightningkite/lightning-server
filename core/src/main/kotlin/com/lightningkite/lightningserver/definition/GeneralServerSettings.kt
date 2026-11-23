@@ -16,8 +16,9 @@ import kotlinx.serialization.Serializable
  *                     trailing slash.
  * @property wsUrl The base WebSocket URL for this server (e.g., "wss://api.example.com"). Defaults to the
  *                 appropriate WebSocket protocol based on [publicUrl] (wss for https, ws for http).
- * @property debug Whether the server is running in debug/development mode. Affects CORS behavior and may be
- *                 used by application code for development-specific features. Should be false in production.
+ * @property debug Whether the server is running in debug/development mode. Error responses then carry the
+ *                 exception's stack trace, and a 500 also names the exception's class and message; other modules
+ *                 and application code may also check it. Must be false in production, since those responses leak internals.
  * @property emergencyContact Optional contact information (email or phone) for emergency server issues.
  *                            May be used in error pages or monitoring alerts.
  */

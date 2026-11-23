@@ -1,18 +1,55 @@
-# Error Handling & Exceptions
+# Error handling
 
-Lightning Server uses a structured, type-safe error system built around two
-classes: `HttpStatusException` on the server (the Kotlin exception you throw)
-and `LSError` on the wire (the JSON body clients receive).  The two convert to
-each other losslessly, which means the same information available in a Kotlin
-`catch` block is available to a TypeScript client.
+To fail a request, throw an `HttpStatusException`.  The framework turns it into a response with that status and an
+`LSError` JSON body, which generated clients decode back into the same fields.  Any other exception becomes a 500 that
+hides its details outside debug mode.
 
-This chapter covers the error system in depth.  For a first look at `errorCases`
-and `LSError` in the context of a typed endpoint, see
-[Typed Endpoints](typed-endpoints.md).
+<!-- sample: com/lightningkite/lightningserver/guide/samples/ErrorHandlingSamples.kt#error-server -->
+```kotlin
+@Serializable
+data class SignupForm(val email: String)
 
-## Imports
+object ErrorsServer : ServerBuilder() {
+    init { registerBasicMediaTypeCoders() }
 
-All examples in this chapter use the following imports:
+    private val takenEmails = setOf("taken@example.com")
+
+    // POST /signup
+    val signup = path.path("signup").post bind ApiHttpHandler(
+        summary = "Sign up",
+        auth = noAuth,
+        successCode = HttpStatus.Created,
+        errorCases = listOf(
+            LSError(http = 400, detail = "invalid-email", message = "That is not an email address"),
+            LSError(http = 409, detail = "email-taken", message = "That email address is already in use"),
+        ),
+        implementation = { input: SignupForm ->
+            if ("@" !in input.email)
+                throw BadRequestException(detail = "invalid-email", message = "That is not an email address")
+            if (input.email in takenEmails)
+                throw HttpStatusException(
+                    status = HttpStatus.Conflict,
+                    detail = "email-taken",
+                    message = "That email address is already in use",
+                    data = input.email,
+                )
+            "Welcome!"
+        }
+    )
+
+    // GET /busy — an error response with extra headers
+    val busy = path.path("busy").get bind HttpHandler {
+        throw HttpStatusException(
+            status = HttpStatus.ServiceUnavailable,
+            detail = "maintenance",
+            message = "Down for maintenance",
+            headers = HttpHeaders(HttpHeader.RetryAfter to "120"),
+        )
+    }
+}
+```
+
+Imports used in this chapter:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/ErrorHandlingSamples.kt#error-handling-imports -->
 ```kotlin
@@ -24,318 +61,142 @@ import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.test.*
 import com.lightningkite.lightningserver.serialization.*
 import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.services.data.*
 import kotlinx.serialization.*
 ```
 
-Non-obvious imports:
+## Exceptions
 
-- `com.lightningkite.lightningserver.*` brings in `HttpStatusException`, `LSError`,
-  `BadRequestException`, `UnauthorizedException`, `ForbiddenException`,
-  `NotFoundException`, and `toException` / `toLSError` helpers.
-- `com.lightningkite.lightningserver.pathing.*` brings in `arg1` (and `arg2`, `arg3`)
-  — the type-safe path-argument accessors on `ResolvedPath`.
-- `com.lightningkite.lightningserver.typed.*` brings in `route`, the `Access`
-  extension that converts a request's matched path into a `ResolvedPath`.
-- `com.lightningkite.lightningserver.serialization.*` registers JSON (and other
-  standard) media type encoders/decoders.  Required when testing through the full
-  HTTP pipeline (`HttpHandler.test()`), including error response serialization.
-
-## The Exception Hierarchy
-
-All Lightning Server exceptions extend `HttpStatusException`.  Each subclass
-maps to a fixed HTTP status code:
-
-| Exception class | HTTP status |
+| Exception | Status |
 |---|---|
-| `BadRequestException` | 400 Bad Request |
-| `UnauthorizedException` | 401 Unauthorized |
-| `ForbiddenException` | 403 Forbidden |
-| `NotFoundException` | 404 Not Found |
-| `HttpStatusException(HttpStatus(N), ...)` | N (any status) |
+| `BadRequestException` | 400 |
+| `UnauthorizedException` | 401 |
+| `ForbiddenException` | 403 |
+| `NotFoundException` | 404 |
+| `HttpStatusException(status = ...)` | any |
 
-The specialised subclasses exist so that call-site intent is clear and so code
-readers can grep for them.  For any status outside 400 / 401 / 403 / 404, throw
-`HttpStatusException` directly with the code you need.
+Each takes `detail`, `message`, `data`, and `cause`, all optional:
 
-## Throwing Exceptions
+- `detail`: a short, stable, machine-readable slug (`"email-taken"`).  Clients branch on this.
+- `message`: a sentence for humans.  It may change between releases, so clients shouldn't parse it.
+- `data`: extra context as a string, often JSON.
+- `cause`: the underlying exception, for logs.
 
-Each class has two construction forms: a **named-parameter form** for rich error
-metadata, and a **single-message helper** for quick throws.
+`HttpStatusException` also takes `headers`, which are added to the error response (for example `Retry-After`).
+`BadRequestException("text")` and the other one-argument forms set only the message.
 
-### Named-parameter form
+## The response body
 
-```kotlin
-// Illustrative — exception constructors are not drift-checked here;
-// see core/src/main/kotlin/com/lightningkite/lightningserver/exceptions.kt for the full signatures.
-
-// HttpStatusException for codes outside the named subclasses:
-throw HttpStatusException(
-    status  = HttpStatus(409),
-    detail  = "conflict",          // machine-readable slug for SDK / client pattern-matching
-    message = "That email address is already in use.",  // human-readable sentence
-    data    = "user-456"           // data is a String; use .toString() for non-string values
-)
-
-// Subclasses use the same parameter names (no status arg — it is fixed):
-throw BadRequestException(
-    detail  = "invalid-format",
-    message = "Email address must contain '@'."
-)
-
-throw NotFoundException(
-    detail  = "user-not-found",
-    message = "No user with that ID exists."
-)
-
-throw ForbiddenException(
-    detail  = "insufficient-role",
-    message = "Only administrators may delete accounts."
-)
+```json
+{
+  "http": 409,
+  "detail": "email-taken",
+  "message": "That email address is already in use",
+  "data": "taken@example.com"
+}
 ```
 
-### Single-message helper
+`LSError` is defined in `core-shared`, so Kotlin clients share the type.  It has a fifth field, `stackTrace`, filled
+only in debug mode.  The body is encoded according to the request's `Accept` header, like any other response.
 
-Each exception class has a companion top-level function that accepts only a
-human-readable string.  These are the right choice when a `detail` slug is not
-needed — quick guard assertions, internal throws that aren't exposed as API
-error cases:
+Converting between the two forms:
 
+- `exception.toLSError()` gives the body an exception produces.
+- `lsError.toException()` and `HttpStatusException(lsError)` rebuild the exception, for example to rethrow an error
+  received from another Lightning Server.
+- `response.toLSError()` decodes an error `HttpResponse`; if the body isn't an `LSError`, it returns one built from the
+  status with `detail = "unknown"`.
+
+## Unexpected exceptions and debug mode
+
+An exception that isn't an `HttpStatusException` becomes a 500.  What the client sees depends on the `debug` flag in
+the server's general settings ([Settings](settings.md)):
+
+| | `detail` | `message` | `stackTrace` |
+|---|---|---|---|
+| `debug = false` | `"unknown"` | `"An unknown error occurred"` | absent |
+| `debug = true` | the exception's class name | the exception's message | the full stack trace |
+
+With `debug = true`, every error response, including `HttpStatusException`s, carries a stack trace.  Never enable it in
+production.
+
+There is no API for replacing the exception handler (`HttpExceptionHandler.Default`), so shape errors by what you
+throw.  When a library throws its own exception, catch it and rethrow an `HttpStatusException`:
+
+<!-- sample: com/lightningkite/lightningserver/guide/samples/ErrorHandlingSamples.kt#error-rethrow -->
 ```kotlin
-// Illustrative.
-throw BadRequestException("Denominator must not be zero.")
-throw UnauthorizedException("Session token is expired.")
-throw NotFoundException("Requested resource was not found.")
-throw ForbiddenException("You do not have permission to perform this action.")
-```
+@Serializable
+data class DateInput(val text: String)
 
-The helpers set `detail = ""` so they will not appear in `errorCases`
-matching (see the advisory warning section below).
+object ErrorsDateServer : ServerBuilder() {
+    init { registerBasicMediaTypeCoders() }
 
-## Declaring `errorCases` on a Typed Endpoint
-
-`ApiHttpHandler` takes an `errorCases` list of `LSError` values that declare
-which structured errors this endpoint may return.  These values appear in the
-generated OpenAPI spec and SDK so clients can pattern-match on the `detail` slug.
-The framework does **not** validate at runtime that your `throw` matches the
-list — that responsibility stays with you.
-
-The example below uses a GET endpoint with a path argument (`arg<String>`).
-Inside the implementation lambda, `route.arg1` retrieves the matched path
-segment as a `String`:
-
-<!-- sample: com/lightningkite/lightningserver/guide/samples/ErrorHandlingSamples.kt#error-server -->
-```kotlin
-object ItemLookupServer : ServerBuilder() {
-
-    init {
-        // registerBasicMediaTypeCoders() enables JSON serialization of HTTP request/response bodies,
-        // including error responses. Required when testing via HttpHandler.test() (the full HTTP pipeline).
-        registerBasicMediaTypeCoders()
-    }
-
-    // In-process data — no external service needed for this example.
-    private val catalog = mapOf("apple" to "A red fruit", "banana" to "A yellow fruit")
-
-    // GET /items/{name} — returns the item description or throws a structured exception
-    val getItem = path.path("items").arg<String>("name").get bind ApiHttpHandler(
-        summary = "Get item by name",
+    val parse = path.path("parse-date").post bind ApiHttpHandler(
+        summary = "Parse date",
         auth = noAuth,
-        successCode = HttpStatus.OK,
-        errorCases = listOf(
-            LSError(http = 400, detail = "empty-name", message = "Item name must not be blank"),
-            LSError(http = 404, detail = "item-not-found", message = "No item with that name exists")
-        ),
-        implementation = { _: Unit ->
-            val name = route.arg1
-            if (name.isBlank())
-                throw BadRequestException(detail = "empty-name", message = "Item name must not be blank")
-            catalog[name]
-                ?: throw NotFoundException(detail = "item-not-found", message = "No item with that name exists")
+        errorCases = listOf(LSError(http = 400, detail = "invalid-date", message = "Not an ISO date")),
+        implementation = { input: DateInput ->
+            try {
+                kotlinx.datetime.LocalDate.parse(input.text).toString()
+            } catch (e: IllegalArgumentException) {
+                throw BadRequestException(detail = "invalid-date", message = "Not an ISO date", cause = e)
+            }
         }
     )
 }
 ```
 
-Note that `registerBasicMediaTypeCoders()` is called in `init` so that the HTTP
-pipeline can serialize error responses as JSON.  Omitting it causes test failures
-when calling the raw `HttpHandler.test()` helper (see Testing below).
+## Declaring error cases
 
-## The `LSError` Response Shape
+Typed endpoints list their errors in `errorCases`, which feeds the OpenAPI spec, the docs UI, and SDK comments.  The
+list is documentation; your code still has to throw.  When a typed endpoint throws a non-blank `detail` that isn't in
+`errorCases` with the same status, the `com.lightningkite.lightningserver.typed.ApiHttpHandler` logger warns:
 
-When your handler throws an `HttpStatusException`, the framework's exception
-handler catches it, converts it to an `LSError`, serializes it (respecting the
-client's `Accept` header), and sends it as the HTTP response body.
-
-`LSError` is a `@Serializable` data class defined in `core-shared` (available
-on both JVM and generated client SDKs):
-
-```kotlin
-// Illustrative — exact source in core-shared/src/commonMain/kotlin/.../LSError.kt.
-@Serializable
-data class LSError(
-    val http: Int,                // HTTP status code, e.g. 404
-    val detail: String = "",      // machine-readable slug, e.g. "item-not-found"
-    val message: String = "",     // human-readable sentence
-    val data: String = "",        // optional extra context; always a String
-    val stackTrace: String? = null  // only populated in debug mode (see below)
-)
+```
+Endpoint threw HttpStatusException(status=404, detail="account-suspended") not present in its declared errorCases [404:item-not-found]. Add it to errorCases or align the thrown detail so clients/docs stay accurate.
 ```
 
-A 404 for a missing item looks like this over the wire:
+The error still reaches the client; the warning only flags drift between the contract and the code.  Exceptions
+thrown with a blank `detail` (the one-argument forms) are never checked.
 
-```json
-{
-  "http": 404,
-  "detail": "item-not-found",
-  "message": "No item with that name exists",
-  "data": ""
-}
-```
+## Testing errors
 
-Clients should pattern-match on `detail` — not `message` — because messages
-are human-readable and may change between releases without a breaking-change bump.
-
-### Conversion helpers
-
-`HttpStatusException` and `LSError` are bidirectionally convertible:
-
-```kotlin
-// Illustrative — both helpers are in com.lightningkite.lightningserver.
-
-// Exception → LSError (used internally by the exception handler)
-val lsError: LSError = exception.toLSError()
-
-// LSError → exception (useful when receiving an error from a downstream call)
-val exception: HttpStatusException = lsError.toException()
-
-// toException() also accepts per-call message/data overrides:
-val exception2: HttpStatusException = lsError.toException(message = "Custom override")
-
-// Construct an exception directly from an LSError:
-throw HttpStatusException(lsError)
-```
-
-## Debug Mode
-
-When `generalSettings().debug` is `true`, the framework:
-
-1. Includes the exception class name and message for **any** exception (not just
-   `HttpStatusException`) rather than returning the generic "An unknown error
-   occurred" used in production.
-2. Populates `stackTrace` in the `LSError` body.
-
-In production (`debug = false`), any exception that is not an
-`HttpStatusException` is returned as HTTP 500 with `detail = "unknown"` and no
-stack trace.  This prevents implementation details from leaking to clients.
-
-> Keep `debug = false` in production.  The `stackTrace` field is present in the
-> `LSError` schema so generated clients can read it during development, but it
-> should never be populated in a deployed service.
-
-## Testing: the Typed Test (Kotlin exception path)
-
-`ApiHttpHandler.test()` calls the implementation lambda directly without going
-through the full HTTP pipeline.  When the implementation throws an
-`HttpStatusException`, the exception propagates as a normal Kotlin exception.
-Catch it and inspect `e.status.code` and `e.detail`:
-
-> To wrap these examples in a test class, annotate your test methods with
-> `@Test` — see [Testing Your Server](testing.md) for the complete `@Test` +
-> `testBlocking` pattern.
+A typed `.test()` rethrows the exception, so assert on its fields:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/ErrorHandlingSamples.kt#error-typed-test -->
 ```kotlin
-fun errorTypedTest() = ItemLookupServer.testBlocking(settings = {}) {
-    // ApiHttpHandler.test() calls the implementation lambda directly.
-    // Thrown HttpStatusExceptions propagate as Kotlin exceptions — not as HTTP responses.
-    // Catch HttpStatusException and inspect .status.code and .detail to verify the right error fired.
+fun errorTypedTest() = ErrorsServer.testBlocking(settings = {}) {
     try {
-        ItemLookupServer.getItem.test("unknown-item", null, Unit)
-        error("Expected NotFoundException")
+        ErrorsServer.signup.test(null, SignupForm("taken@example.com"))
+        error("Expected a conflict")
     } catch (e: HttpStatusException) {
-        check(e.status.code == 404)
-        check(e.detail == "item-not-found")
+        check(e.status == HttpStatus.Conflict)
+        check(e.detail == "email-taken")
     }
 }
 ```
 
-The `null` auth argument is correct for `noAuth` endpoints; see
-[Authentication & Sessions](auth.md) for how this changes when the endpoint
-requires a user token.
-
-## Testing: the HTTP Pipeline (status-code path)
-
-For HTTP-level testing — status codes, headers, response bodies — call the raw
-`.test()` on the underlying `HttpHandler` rather than on the typed
-`ApiHttpHandler`.  The `HttpHandler.test()` extension drives the full pipeline
-including the exception handler, so the thrown exception is converted to an
-`HttpResponse` before being returned:
+The HTTP `.test()` runs the exception handler and returns the response a client would get:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/ErrorHandlingSamples.kt#error-http-test -->
 ```kotlin
-fun errorHttpTest() = ItemLookupServer.testBlocking(settings = {}) {
-    // HttpHandler.test() drives the full HTTP pipeline, including the exception handler.
-    // The thrown exception is converted to an HttpResponse — inspect .status.code on the result.
-    // This is what real HTTP clients see: an HttpResponse with status 404 and an LSError JSON body.
-    val response = ItemLookupServer.getItem.test("unknown-item")
-    check(response.status.code == 404)
+fun errorHttpTest() = ErrorsServer.testBlocking(settings = {}) {
+    val response = ErrorsServer.signup.test(
+        body = TypedData.text("""{"email":"not-an-email"}""", MediaType.Application.Json)
+    )
+    check(response.status == HttpStatus.BadRequest)
+    // Decoding the body needs a ServerRuntime, so it runs inside execute { }.
+    val error = execute { response.toLSError() }
+    check(error.detail == "invalid-email")
+
+    val busy = ErrorsServer.busy.test()
+    check(busy.status == HttpStatus.ServiceUnavailable)
+    check(busy.headers[HttpHeader.RetryAfter]?.root == "120")
 }
 ```
 
-This test verifies the same scenario as `errorTypedTest` above but at the HTTP
-level.  Both are useful: the typed test is simpler and gives you direct access to
-the exception fields; the HTTP test verifies that the exception handler wiring is
-correct and that the status code survives the full serialization round-trip.
+## Next
 
-## The Advisory Warning
-
-If you throw an `HttpStatusException` with a non-blank `detail` slug that does
-not appear in `errorCases`, the framework logs a warning via the
-`com.lightningkite.lightningserver.typed.ApiHttpHandler` logger:
-
-```
-Endpoint threw HttpStatusException(status=404, detail="account-suspended")
-not present in its declared errorCases [404:item-not-found].
-Add it to errorCases or align the thrown detail so clients/docs stay accurate.
-```
-
-The exception is still rethrown and the client receives the correct error
-response — the warning is advisory only.  Its purpose is to surface contract
-drift between what you declared in `errorCases` and what you actually throw.
-When you see it, either add the missing `LSError` to `errorCases` or change the
-`detail` slug to one already in the list.
-
-> Wart: the warning fires on any non-blank detail slug that is absent from the
-> list — there is no suppression mechanism.  If a helper or interceptor throws
-> with a fixed slug (e.g., an input validation interceptor), you must add that
-> slug to every endpoint's `errorCases` to silence the warning, or live with
-> the log noise.
-
-## Custom Exception Handler
-
-`HttpExceptionHandler` is the interface that turns an exception into a response, and `HttpExceptionHandler.Default` is
-the implementation every server uses. There is currently no API for installing a different one, so to control error
-responses:
-
-- Throw an `HttpStatusException` subclass with the `detail` and `message` you want, as shown above.
-- Catch library exceptions in your handler and rethrow them as one, for example mapping `IllegalArgumentException` to
-  `BadRequestException`:
-
-```kotlin
-// Illustrative — not drift-checked.
-val parsed = try {
-    parseInput(input)
-} catch (e: IllegalArgumentException) {
-    throw BadRequestException(detail = "invalid-argument", message = e.message ?: "Invalid argument")
-}
-```
-
-## What's Next
-
-- **Typed Endpoints** — full `errorCases`, `successCode`, and SDK generation
-  reference: [Typed Endpoints](typed-endpoints.md)
-- **Authentication & Sessions** — how `ForbiddenException` (403) and
-  `UnauthorizedException` (401) surface from the auth layer:
-  [Authentication & Sessions](auth.md)
-- **Testing** — the full `testBlocking` / `@Test` pattern:
-  [Testing Your Server](testing.md)
+- [Validation](validation.md): input constraint failures, reported as `validation-failed`.
+- [Typed endpoints](typed-endpoints.md): `errorCases` alongside the other endpoint metadata.
+- [Client SDKs](client-sdks.md#calling-the-api-directly): what clients receive.

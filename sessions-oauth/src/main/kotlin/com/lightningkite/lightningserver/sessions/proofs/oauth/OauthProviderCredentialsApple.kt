@@ -2,7 +2,7 @@ package com.lightningkite.lightningserver.sessions.proofs.oauth
 
 import com.lightningkite.lightningserver.encryption.ES256
 import com.lightningkite.lightningserver.encryption.signBlocking
-import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.now
 import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.algorithms.EC
@@ -31,13 +31,13 @@ public data class OauthProviderCredentialsApple(
     val keyId: String,
     val keyString: String,
 ) {
-    context(_: ServerRuntime)
+    context(_: Engine)
     public fun toOauthProviderCredentials(): OauthProviderCredentials = OauthProviderCredentials(
         id = serviceId,
         secret = generateJwt()
     )
 
-    context(_: ServerRuntime)
+    context(_: Engine)
     public fun generateJwt(): String {
         val withDefaults = Json { encodeDefaults = true; explicitNulls = false }
 
