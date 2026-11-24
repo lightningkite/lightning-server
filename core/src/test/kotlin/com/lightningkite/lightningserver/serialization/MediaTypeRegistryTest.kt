@@ -10,6 +10,8 @@ import com.lightningkite.services.data.TypedData
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.SerializationStrategy
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlin.test.*
 
 /**
@@ -249,6 +251,25 @@ class MediaTypeRegistryTest {
                 assertSame(PreferredCoders.encoder, MediaType.Application.Json.encoder)
                 assertSame(PreferredCoders.encoder, listOf(MediaType.Application.Json).encoder?.second)
                 assertSame(PreferredCoders.decoder, MediaType.Application.Json.decoder)
+            }
+        }
+    }
+
+    @Test
+    fun `binary media types use their own formats`() = runBlocking {
+        TestServer.test({}) {
+            execute {
+                val value = listOf("a", "b")
+                val serializer = ListSerializer(String.serializer())
+                val serialization = Serialization()
+                for ((mediaType, format) in listOf(
+                    MediaType("application", "x-lightningserver-kotlin-wire") to serialization.kotlinWireFormat,
+                    MediaType("application", "x-lightningserver-kotlin-bytes") to serialization.oldKotlinBytesFormat,
+                )) {
+                    val encoded = assertNotNull(mediaType.encoder).encode(mediaType, serializer, value)
+                    assertContentEquals(format.encodeToByteArray(serializer, value), encoded.data.bytes(), mediaType.toString())
+                    assertEquals(value, assertNotNull(mediaType.decoder).decode(encoded, serializer))
+                }
             }
         }
     }

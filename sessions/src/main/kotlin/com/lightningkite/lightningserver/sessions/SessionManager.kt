@@ -12,12 +12,16 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.currentRequestTrace
+import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.serialization.parse
+import com.lightningkite.lightningserver.serialization.toTypedData
 import com.lightningkite.lightningserver.sessions.token.*
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.services.database.optics.*
 import com.lightningkite.services.cache.*
+import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.database.*
 import com.lightningkite.services.telemetry.TelemetryAttributes
 import com.lightningkite.services.telemetry.TelemetryKey
@@ -28,7 +32,12 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.builtins.serializer
 import kotlin.io.encoding.Base64
+import java.net.URI
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.seconds
+import com.lightningkite.lightningserver.definition.secretBasis
+import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -71,6 +80,17 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
      * The decorator is applied ahead of permissions, so it sees privileged and unprivileged access alike, and it sees reads as well as writes. To observe writes only, use `sessionInfo.registerChangeListener`.
      */
     private val sessionSignals: context(ServerRuntime) (Table<Session<SUBJECT, ID>>) -> Table<Session<SUBJECT, ID>> = { it },
+    /**
+     * Whether the refresh token cookie is marked `Secure`. Turn it off only for local development over plain http,
+     * where native clients and Safari won't send a `Secure` cookie.
+     */
+    private val refreshTokenCookieSecure: Runtime<Boolean> = Runtime { true },
+    /**
+     * Whether [read] accepts a refresh token as a bearer credential, for legacy clients that send one instead of an
+     * access token. Off by default: the long-lived token then travels on every request, and each use writes to the
+     * database. A rotating session's refresh token is never accepted this way: see [rotateRefreshToken].
+     */
+    private val acceptRefreshTokenAsBearer: Runtime<Boolean> = Runtime { false },
 ) : ServerBuilder(), Authentication.Reader<SUBJECT> {
     public object Scopes {
         public val self: RequiredScope = RequiredScope("auth:self")
@@ -181,7 +201,10 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                     read = canUse or isRoot,
                     readMask = Mask(
                         listOf(
-                            Condition.Never to Modification(spath) { it.secretHash assign "" }
+                            Condition.Never to Modification(spath) {
+                                it.secretHash assign ""
+                                it.previousSecretHash assign null
+                            }
                         )
                     ),
                     update = isRoot,
@@ -210,21 +233,39 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     /**
      * Returns the authentication carried by [request], or `null` if it carries no credentials.
      *
-     * The token is read from the `Authorization` header, then the `Authorization` or `jwt` query parameter, then the `Authorization` cookie. It is parsed as an access token first, and as a refresh token if that fails. Prefer the header, since URLs are often logged.
+     * The access token is read from the `Authorization` header (`Bearer` optional). A WebSocket connect request may
+     * instead carry it in an `Authorization` or `jwt` query parameter, since browsers can't set headers on a WebSocket.
+     * A refresh token is rejected unless [acceptRefreshTokenAsBearer] is on: otherwise only the token endpoints
+     * ([tokenSimple], [tokenFromCookie]) accept them.
      *
-     * @throws UnauthorizedException if credentials are present but invalid.
+     * @throws BadRequestException if a request other than a WebSocket connect carries a token in its URL, where it
+     *   would end up in logs.
+     * @throws UnauthorizedException if the token is a refresh token, or an invalid access token.
      */
     context(server: ServerRuntime)
     override suspend fun read(request: Request<*>): Authentication<SUBJECT>? {
-        val rawHeader = request.headers[HttpHeader.Authorization]
-        val token =
-            rawHeader?.root?.removePrefix("bearer ")?.removePrefix("Bearer ")
-                ?: request.queryParameters.find {
-                    it.first.equals(HttpHeader.Authorization, ignoreCase = true)
-                }?.second?.replace(' ', '+')
-                ?: request.queryParameters.find { it.first == "jwt" }?.second?.replace(' ', '+')
-                ?: request.headers.cookies[HttpHeader.Authorization]
-                ?: return null
+        val headerToken = request.headers[HttpHeader.Authorization]?.root?.removePrefix("bearer ")?.removePrefix("Bearer ")
+        val queryToken = request.queryParameters.find {
+            it.first.equals(HttpHeader.Authorization, ignoreCase = true) || it.first == "jwt"
+        }?.second?.replace(' ', '+')
+        if (queryToken != null && request !is WebSocketConnectRequest<*>)
+            throw BadRequestException("Send the access token in the Authorization header, not the URL.")
+        val token = headerToken ?: queryToken ?: return null
+
+        val refreshToken = RefreshToken(token)
+        if (refreshToken.valid) {
+            if (!acceptRefreshTokenAsBearer())
+                throw UnauthorizedException("A refresh token is not an access token; exchange it at a token endpoint.")
+            return refreshToken.session(request)
+                ?.let { (session, subject) -> session.toAuth(subject) }
+                ?.also { auth ->
+                    currentRequestTrace()?.enrich(TelemetryAttributes {
+                        putIfNotNull(TelemetryKeys.Session.id, auth.sessionId)
+                        put(TelemetryKeys.User.id, auth.id.toString())
+                        put(authorizationMethod, "refresh token")
+                    })
+                }
+        }
 
         try {
             return tokenFormat().read(principal, token)
@@ -254,14 +295,6 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                         put(authorizationMethod, "access token")
                     })
                 }
-                ?: RefreshToken(token).session(request)?.let { (session, subject) -> session.toAuth(subject) }
-                    ?.also { auth ->
-                        currentRequestTrace()?.enrich(TelemetryAttributes {
-                            putIfNotNull(TelemetryKeys.Session.id, auth.sessionId)
-                            put(TelemetryKeys.User.id, auth.id.toString())
-                            put(authorizationMethod, "refresh token")
-                        })
-                    }
         } catch (e: TokenException) {
             throw UnauthorizedException(e.message ?: "JWT issue")
         }
@@ -321,7 +354,8 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
      * @param expires When the session expires, or `null` for never.
      * @param stale The initial stale time, which [sessionStaleAfter] then updates on each use.
      * @param scopes The scopes granted to the session, with full access by default.
-     * @param oauthClient Currently unused.
+     * @param oauthClient The OAuth client the session is issued to; see [Session.oauthClient].
+     * @param audience The resource the session's access tokens are for; see [Session.audience].
      * @param derivedFrom The parent session if this is a sub-session.
      * @param authenticatedAt See [Session.authenticatedAt].
      * @throws ForbiddenException if the subject is not permitted to authenticate.
@@ -335,6 +369,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         stale: Instant? = null,
         scopes: Set<GrantedScope> = setOf(GrantedScope.root),
         oauthClient: String? = null,
+        audience: String? = null,
         derivedFrom: Uuid? = null,
         authenticatedAt: Instant = now(),
     ): Pair<Session<SUBJECT, ID>, RefreshToken> = newSession(
@@ -344,6 +379,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         stale = stale,
         scopes = scopes,
         oauthClient = oauthClient,
+        audience = audience,
         derivedFrom = derivedFrom,
         authenticatedAt = authenticatedAt,
     )
@@ -364,6 +400,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         stale: Instant? = null,
         scopes: Set<GrantedScope> = setOf(GrantedScope.root),
         oauthClient: String? = null,
+        audience: String? = null,
         derivedFrom: Uuid? = null,
         authenticatedAt: Instant = now(),
     ): Pair<Session<SUBJECT, ID>, RefreshToken> {
@@ -384,7 +421,11 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             createdAt = now(),
             authenticatedAt = authenticatedAt,
             lastUsed = now(),
-//            oauthClient = oauthClient,  TODO: OAuth
+            oauthClient = oauthClient,
+            audience = audience,
+            // Rotating from the start, an OAuth client's refresh token is refused by [tokenSimple] and [read], which
+            // would skip the OAuth token endpoint's client checks and the reuse detection.
+            rotatedAt = if (oauthClient != null) now() else null,
             derivedFrom = derivedFrom,
         ).also { sessionInfo.table().insertOne(it) }.let {
             it to RefreshToken(principal.name, it._id, secret)
@@ -412,10 +453,11 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         return Authentication(
             principalType = principal,
             id = subjectId,
-            sessionId = _id,
+            sessionId = _id.toString(),
             sessionIssuedAt = authenticatedAt ?: createdAt,
             scopes = effectiveScopes,
             cache = SerializableCache<Authentication<SUBJECT>>().apply { set(principal.subjectCacheKey, subject) },
+            audience = audience,
         )
     }
 
@@ -466,14 +508,17 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     }
 
     /**
-     * Returns the session that the refresh token in [request] refers to, or `null` if the token is malformed.
+     * Returns the live session that this refresh token refers to, and whether the token is the session's previous one
+     * rather than its current one, or `null` if the token is malformed.
      *
-     * This checks the token's type, secret, expiration, staleness and termination, then records the user agent and IP and resets the stale time. That makes every use of a refresh token a database write.
+     * A previous token is only returned within [ROTATION_GRACE] of the rotation that retired it. After that, presenting
+     * it means someone else may hold a copy, so the session is terminated.
      *
-     * @throws UnauthorizedException if the token is well-formed but invalid.
+     * @throws UnauthorizedException if the token is well-formed but its session is missing, expired, stale or
+     *   terminated, its secret matches neither the current nor the previous one, or it is a reused previous one.
      */
     context(server: ServerRuntime)
-    private suspend fun RefreshToken.session(request: Request<*>): Pair<Session<SUBJECT, ID>, SUBJECT>? {
+    private suspend fun RefreshToken.liveSession(request: Request<*>): Pair<Session<SUBJECT, ID>, Boolean>? {
         if (!valid) {
             tokenRejected(AuthEvent.TokenRejected.Reason.Malformed, request)
             return null
@@ -488,9 +533,13 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             throw UnauthorizedException("No such session")
         }
         // SECURITY: Constant-time hash comparison to prevent timing attacks
-        if (!plainTextSecret.checkAgainstHash(session.secretHash)) {
-            session.rejected(AuthEvent.SessionRejected.Reason.SecretMismatch, request)
-            throw UnauthorizedException("Incorrect hash for session")
+        val isPrevious = when {
+            plainTextSecret.checkAgainstHash(session.secretHash) -> false
+            session.previousSecretHash?.let { plainTextSecret.checkAgainstHash(it) } == true -> true
+            else -> {
+                session.rejected(AuthEvent.SessionRejected.Reason.SecretMismatch, request)
+                throw UnauthorizedException("Incorrect hash for session")
+            }
         }
         if ((session.expires ?: Instant.DISTANT_FUTURE) < now()) {
             session.rejected(AuthEvent.SessionRejected.Reason.Expired, request)
@@ -504,16 +553,57 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             session.rejected(AuthEvent.SessionRejected.Reason.Terminated, request)
             throw UnauthorizedException("Session has been terminated.")
         }
+        if (isPrevious && now() >= session.rotatedAt!! + ROTATION_GRACE) {
+            session.rejected(AuthEvent.SessionRejected.Reason.Reused, request)
+            terminateSessionById(session._id, null)
+            throw UnauthorizedException("This refresh token was already used, so its session has been terminated.")
+        }
+        return session to isPrevious
+    }
 
+    /**
+     * Returns the session [token] belongs to, whether live or not, if it is the session's current refresh token or its
+     * previous one within [ROTATION_GRACE] of the rotation, which [rotateRefreshToken] would still accept. Otherwise
+     * `null`. Unlike using the token, this records nothing and ends no session, for endpoints that only identify a
+     * token, such as OAuth revocation and introspection.
+     */
+    context(server: ServerRuntime)
+    public suspend fun refreshTokenSession(token: RefreshToken): Session<SUBJECT, ID>? {
+        if (!token.valid || token.type != principal.name) return null
+        val id = try {
+            token._id
+        } catch (e: IllegalArgumentException) {
+            return null
+        }
+        val session = sessionInfo.table().get(id) ?: return null
+        val isCurrent = token.plainTextSecret.checkAgainstHash(session.secretHash)
+        val isPreviousInGrace = session.previousSecretHash?.let { token.plainTextSecret.checkAgainstHash(it) } == true &&
+            now() < session.rotatedAt!! + ROTATION_GRACE
+        return session.takeIf { isCurrent || isPreviousInGrace }
+    }
+
+    // Deterministic, so the server can re-derive the current secret from the previous one, and two requests rotating
+    // the same secret at once arrive at the same next one.
+    private val rotationSigner = secretBasis.signer("refreshTokenRotation")
+
+    context(server: ServerRuntime)
+    private suspend fun nextSecret(secret: String): String =
+        Base64.encode(rotationSigner.await().sign(secret.encodeToByteArray()))
+
+    /**
+     * Checks that the subject of [session] may still authenticate, then records this use: the user agent and IP, a
+     * reset stale time, and the last-used time. That makes every use of a refresh token a database write.
+     *
+     * @throws ForbiddenException if [permitAuthentication] turns the subject away.
+     */
+    context(server: ServerRuntime)
+    private suspend fun Session<SUBJECT, ID>.recordUse(request: Request<*>): SUBJECT {
         // Loaded only once the token itself checks out, so a bad token never costs a subject load
-        val subject = principal.fetch(session.subjectId)
+        val subject = principal.fetch(subjectId)
         if (!permitAuthentication(subject)) {
-            session.rejected(AuthEvent.SessionRejected.Reason.AuthenticationNotPermitted, request)
+            rejected(AuthEvent.SessionRejected.Reason.AuthenticationNotPermitted, request)
             throw ForbiddenException()
         }
-
-        // Lazy migration: if using old slow PBKDF2 hash, upgrade to fast SHA-256 hash
-        val shouldMigrate = session.secretHash.isSlowHash()
 
         // Update session metadata on each use for audit trail and sliding expiration
         sessionInfo.table().updateOneById(_id, Modification(spath) {
@@ -529,13 +619,79 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             sessionStaleAfter(subject)?.let { length ->
                 it.stale assign now() + length
             }
-
-            // Migrate from slow PBKDF2 hash to fast SHA-256 hash
-            if (shouldMigrate) {
-                it.secretHash assign plainTextSecret.fastHash()
-            }
         })
-        return session to subject
+        return subject
+    }
+
+    /**
+     * Returns the session that this refresh token refers to, or `null` if the token is malformed. A rotating session's
+     * tokens are refused: see [rotateRefreshToken].
+     *
+     * @throws UnauthorizedException if the token is well-formed but invalid, or belongs to a rotating session.
+     */
+    context(server: ServerRuntime)
+    private suspend fun RefreshToken.session(request: Request<*>): Pair<Session<SUBJECT, ID>, SUBJECT>? {
+        val (session, _) = liveSession(request) ?: return null
+        // Accepting it here would let it skip rotation and its reuse detection.
+        if (session.rotatedAt != null) {
+            session.rejected(AuthEvent.SessionRejected.Reason.RotatingSession, request)
+            throw UnauthorizedException("This session's refresh token rotates, so it only works at the endpoint that rotates it.")
+        }
+        // Lazy migration from the old slow PBKDF2 hash to the fast SHA-256 one
+        if (session.secretHash.isSlowHash()) {
+            sessionInfo.table().updateOneById(session._id, Modification(spath) { it.secretHash assign plainTextSecret.fastHash() })
+        }
+        return session to session.recordUse(request)
+    }
+
+    /**
+     * Exchanges [presented] for its session's next refresh token, returning that with the session and subject, or
+     * `null` if [presented] is malformed. The session rotates from then on, and [tokenSimple] and [read] refuse its
+     * tokens.
+     *
+     * - The current token is replaced by the next one, an HMAC of it with a key derived from `secretBasis`, and becomes
+     *   the previous one. Two requests rotating the same token at once both get the same next one.
+     * - The previous token, within [ROTATION_GRACE] of the rotation, gets the current one back without rotating: its
+     *   response may have been lost, or crossed another tab's request.
+     * - The previous token after that means someone else may hold a copy: the session is terminated, with
+     *   [AuthEvent.SessionRejected.Reason.Reused].
+     * - Any older token can't be told from a wrong one, and is refused without ending the session.
+     *
+     * Only hashes are stored, as for any refresh token. Changing `secretBasis` makes the current token impossible to
+     * re-derive, so a previous one is then refused, also without ending the session; the current one still rotates.
+     * The rotation key is as strong as `secretBasis`, which is large and random.
+     *
+     * The session returned is as it was read, before this rotation.
+     *
+     * @throws UnauthorizedException if the token is well-formed but invalid or retired.
+     * @throws ForbiddenException if [permitAuthentication] turns the subject away.
+     */
+    context(server: ServerRuntime)
+    public suspend fun rotateRefreshToken(presented: RefreshToken, request: Request<*>): RotatedRefreshToken<SUBJECT, ID>? {
+        val (session, isPrevious) = presented.liveSession(request) ?: return null
+        if (isPrevious) {
+            val current = nextSecret(presented.plainTextSecret)
+            // Check the derived one to make sure it's right; if not, we'll just have to error
+            if (!current.checkAgainstHash(session.secretHash)) {
+                session.rejected(AuthEvent.SessionRejected.Reason.SecretMismatch, request)
+                throw UnauthorizedException("This refresh token can no longer be renewed.")
+            }
+            return RotatedRefreshToken(session, session.recordUse(request), RefreshToken(principal.name, session._id, current))
+        }
+
+        val subject = session.recordUse(request)
+        val next = nextSecret(presented.plainTextSecret)
+        // Conditional on the current hash, so of two requests rotating the same token only one writes. The other's
+        // next secret is the same.
+        sessionInfo.table().updateOne(
+            (spath._id eq session._id) and (spath.secretHash eq session.secretHash),
+            Modification(spath) {
+                it.secretHash assign next.fastHash()
+                it.previousSecretHash assign session.secretHash
+                it.rotatedAt assign now()
+            },
+        )
+        return RotatedRefreshToken(session, subject, RefreshToken(principal.name, session._id, next))
     }
 
     /**
@@ -552,53 +708,146 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 val (session, subject) = RefreshToken(refresh).session(request)
                     ?: throw BadRequestException("Refresh token not recognized")
 
-                // This is the only place access tokens are minted, and [session] has just set lastUsed.
+                // Access tokens are minted only right after a refresh token use has set lastUsed, as [session] just did.
                 // invalidateSessionsWithLiveTokens relies on that; any new mint path must update lastUsed too.
                 tokenFormat().create(principal, session.toAuth(subject).apply { precache(principal.precache) })
             }
         )
 
     /**
-     * Creates a sub-session of the current session, returning its refresh token.
+     * Creates a sub-session of the session behind [parent], returning it and its refresh token.
      *
-     * Its scopes cannot exceed the parent's, and requesting root (the default) grants the parent's scopes. Its expiration cannot exceed the parent's, it inherits the parent's stale time, and terminating the parent terminates it.
+     * Its scopes cannot exceed the parent's, and requesting root (the default) grants the parent's scopes. Its expiration cannot exceed the parent's, it inherits the parent's stale time, authentication time and audience, and terminating the parent terminates it.
      *
-     * @throws UnauthorizedException if the current session cannot be found, has no session ID, or is terminated.
-     * @throws ForbiddenException if the requested scopes exceed the parent session's scopes.
+     * There is no endpoint for this: anyone holding an access token could have used one to mint a long-lived refresh token.
+     *
+     * @throws UnauthorizedException if [parent] has no session ID, or its session cannot be found or is terminated.
+     * @throws ForbiddenException if [scopes] exceed the parent session's scopes.
      */
-    public val createSubSession: ApiHttpHandler<PathSpec0, SUBJECT, SubSessionRequest, String> =
-        path.path("sub-session").post bind explicitApiHttpHandler(
-            auth = sessionInfo.auth.subscope(ModelInfo.Scopes.create),
-            inputType = SubSessionRequest.serializer(),
-            outputType = String.serializer(),
-            summary = "Create Sub Session",
-            functionName = "subsession",
-            description = "Creates a session with more limited authorization",
-            implementation = { request: SubSessionRequest ->
-                val sessionUuid = this.auth.sessionId?.let(Uuid::parse) ?: throw UnauthorizedException()
-                val session = sessionInfo.table().get(sessionUuid)
-                    ?: throw UnauthorizedException()
-                // An access token outlives its session's termination by a few minutes.
-                if (session.terminated != null) throw UnauthorizedException("Session has been terminated.")
-                val scopes = if (request.scopes == setOf(GrantedScope.root)) session.scopes else request.scopes
-                if (!session.scopes.meetsRequirements(scopes.mapTo(HashSet()) { RequiredScope(it.asString) }))
-                    throw ForbiddenException("Sub-session scopes must be within the parent session's scopes.")
+    context(_: ServerRuntime)
+    public suspend fun newSubSession(
+        parent: Authentication<SUBJECT>,
+        label: String? = null,
+        scopes: Set<GrantedScope> = setOf(GrantedScope.root),
+        expires: Instant? = null,
+    ): Pair<Session<SUBJECT, ID>, RefreshToken> {
+        // TODO: We'll probably change this in the future to require 'sudo mode' / recent auth
+        val sessionUuid = parent.sessionId?.let(Uuid::parse) ?: throw UnauthorizedException()
+        val session = sessionInfo.table().get(sessionUuid)
+            ?: throw UnauthorizedException()
+        // An access token outlives its session's termination by a few minutes.
+        if (session.terminated != null) throw UnauthorizedException("Session has been terminated.")
+        val grantedScopes = if (scopes == setOf(GrantedScope.root)) session.scopes else scopes
+        if (!session.scopes.meetsRequirements(grantedScopes.mapTo(HashSet()) { RequiredScope(it.asString) }))
+            throw ForbiddenException("Sub-session scopes must be within the parent session's scopes.")
 
-                newSession(
-                    label = request.label,
-                    subject = auth.fetch(),
-                    derivedFrom = sessionUuid,
-                    scopes = scopes,
-                    // Sub-session expires can't exceed parent session expiration
-                    expires = session.expires
-                        ?.let { minOf(it, request.expires ?: Instant.DISTANT_FUTURE) }
-                        ?: request.expires,
-                    stale = session.stale,
-                    oauthClient = request.oauthClient,
-                    authenticatedAt = session.authenticatedAt ?: session.createdAt,
-                ).second.string
-            }
+        return newSession(
+            label = label,
+            subject = parent.fetch(),
+            derivedFrom = sessionUuid,
+            scopes = grantedScopes,
+            // Sub-session expires can't exceed parent session expiration
+            expires = session.expires
+                ?.let { minOf(it, expires ?: Instant.DISTANT_FUTURE) }
+                ?: expires,
+            stale = session.stale,
+            authenticatedAt = session.authenticatedAt ?: session.createdAt,
+            audience = session.audience,
         )
+    }
+
+    /**
+     * Exchanges the refresh token in the [refreshTokenCookieName] cookie for an access token, like [tokenSimple].
+     *
+     * The cookie is set by [setRefreshTokenCookie] and is sent only to this endpoint. Each call replaces it with the
+     * session's next refresh token; see [rotateRefreshToken].
+     *
+     * @throws UnauthorizedException if the cookie is missing, or its refresh token is expired, revoked, retired, or
+     *   otherwise invalid.
+     */
+    public val tokenFromCookie: ApiHttpHandler<PathSpec0, HasId<*>?, Unit, String> =
+        path.path("token").path("cookie").post bind object : ApiHttpHandler<PathSpec0, HasId<*>?, Unit, String> by explicitApiHttpHandler(
+            auth = noAuth,
+            inputType = Unit.serializer(),
+            outputType = String.serializer(),
+            summary = "Get Token From Cookie",
+            description = "Returns an access token for the refresh token held in the HttpOnly cookie set by setRefreshTokenCookie.",
+            implementation = { _ -> throw UnsupportedOperationException("getTokenFromCookie sets a cookie, so it only works over HTTP.") },
+        ) {
+            @OverrideOnly
+            context(server: ServerRuntime)
+            override suspend fun handle(request: HttpRequest<PathSpec0>): HttpResponse {
+                val refresh = request.headers.cookies[refreshTokenCookieName]
+                    ?: throw UnauthorizedException("No refresh token cookie")
+                val rotated = rotateRefreshToken(RefreshToken(refresh), request)
+                    ?: throw UnauthorizedException("Refresh token not recognized")
+                // Like tokenSimple, the refresh token use has just set lastUsed; see the note there.
+                val accessToken = tokenFormat().create(principal, rotated.session.toAuth(rotated.subject).apply { precache(principal.precache) })
+                return HttpResponse(
+                    body = accessToken.toTypedData(request.headers.accept, outputType),
+                    headers = HttpHeaders {
+                        add(HttpHeader.Vary, HttpHeader.Accept)
+                        setRefreshCookie(rotated.refreshToken, rotated.session)
+                    },
+                )
+            }
+        }
+
+    /**
+     * Validates a refresh token and moves its session into an HttpOnly cookie that only [tokenFromCookie] receives.
+     *
+     * This is how a web client keeps its session out of reach of page scripts: log in with [AuthEndpoints.login2], send
+     * the refresh token here, then forget it and get access tokens from [tokenFromCookie]. The cookie holds the
+     * session's next refresh token rather than the one sent, which passed through page scripts and is now retired, as
+     * [rotateRefreshToken] describes.
+     *
+     * @throws BadRequestException if the refresh token format is invalid.
+     * @throws UnauthorizedException if the refresh token is expired, revoked, or otherwise invalid.
+     */
+    public val setRefreshTokenCookie: ApiHttpHandler<PathSpec0, HasId<*>?, String, Unit> =
+        path.path("token").path("set-cookie").post bind object : ApiHttpHandler<PathSpec0, HasId<*>?, String, Unit> by explicitApiHttpHandler(
+            auth = noAuth,
+            inputType = String.serializer(),
+            outputType = Unit.serializer(),
+            summary = "Set Refresh Token Cookie",
+            description = "Moves a web client's refresh token into an HttpOnly cookie after login, so page scripts never need to keep it. Get access tokens from it with getTokenFromCookie.",
+            implementation = { _ -> throw UnsupportedOperationException("setRefreshTokenCookie sets a cookie, so it only works over HTTP.") },
+        ) {
+            @OverrideOnly
+            context(server: ServerRuntime)
+            override suspend fun handle(request: HttpRequest<PathSpec0>): HttpResponse {
+                // A cross-site HTML form can send form or text bodies but not JSON, so this keeps another site from
+                // planting its own session in the browser (login CSRF).
+                val body = request.body?.takeIf { it.mediaType.copy(parameters = mapOf()) == MediaType.Application.Json }
+                    ?: throw BadRequestException("The refresh token must be sent as application/json.")
+                val rotated = rotateRefreshToken(RefreshToken(body.parse(inputType)), request)
+                    ?: throw BadRequestException("Refresh token not recognized")
+                return HttpResponse(
+                    status = successCode,
+                    headers = HttpHeaders { setRefreshCookie(rotated.refreshToken, rotated.session) },
+                )
+            }
+        }
+
+    context(server: ServerRuntime)
+    private fun HttpHeaders.Builder.setRefreshCookie(token: RefreshToken, session: Session<SUBJECT, ID>) = setCookie(
+        name = refreshTokenCookieName,
+        value = token.string,
+        // Browsers cap a cookie's lifetime at 400 days whatever it asks for.
+        expiresAt = session.expires ?: (now() + 400.days),
+        path = refreshTokenCookiePath(),
+        secure = refreshTokenCookieSecure(),
+        httpOnly = true,
+        sameSite = HttpHeaders.SameSite.Strict,
+    )
+
+    /** The name of the cookie [setRefreshTokenCookie] sets and [tokenFromCookie] reads. */
+    public val refreshTokenCookieName: String = "RefreshToken"
+
+    // Scoped to the one endpoint that reads it, so no other request carries the long-lived token.
+    context(server: ServerRuntime)
+    private fun refreshTokenCookiePath(): String =
+        URI(generalSettings().publicUrl).rawPath.trimEnd('/') + tokenFromCookie.location.path.toString()
 
     /** Returns the authenticated subject's data, requiring the `auth:self` scope. */
     public val self: ApiHttpHandler<PathSpec0, SUBJECT, Unit, SUBJECT> =
@@ -613,20 +862,37 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     /**
      * Terminates the current session, requiring the `auth:sessions:terminate` scope.
      *
-     * Its refresh token stops working, but access tokens already issued stay valid until they expire. Its sub-sessions are terminated too.
+     * Its refresh token stops working, but access tokens already issued stay valid until they expire. Its sub-sessions are
+     * terminated too. The response also deletes the [refreshTokenCookieName] cookie.
      */
     public val sessionTerminate: ApiHttpHandler<PathSpec0, SUBJECT, Unit, Unit> =
-        path.path("terminate").post bind explicitApiHttpHandler(
+        path.path("terminate").post bind object : ApiHttpHandler<PathSpec0, SUBJECT, Unit, Unit> by explicitApiHttpHandler(
             summary = "Terminate Current Session",
             functionName = "terminateSession",
             auth = principal.require(scopes = setOf(Scopes.terminate)),
             inputType = Unit.serializer(),
             outputType = Unit.serializer(),
             errorCases = listOf(),
-            implementation = { _ ->
-                terminateSessionById(Uuid.parse(auth.sessionId!!), null)
+            implementation = { _ -> terminateSessionById(Uuid.parse(auth.sessionId!!), null) },
+        ) {
+            @OverrideOnly
+            context(server: ServerRuntime)
+            override suspend fun handle(request: HttpRequest<PathSpec0>): HttpResponse {
+                @OptIn(OverrideOnly::class)
+                val response = super.handle(request)
+                return response.copy(headers = response.headers.copy {
+                    setCookie(
+                        name = refreshTokenCookieName,
+                        value = "deleted",
+                        maxAge = 0,
+                        path = refreshTokenCookiePath(),
+                        secure = refreshTokenCookieSecure(),
+                        httpOnly = true,
+                        sameSite = HttpHeaders.SameSite.Strict,
+                    )
+                })
             }
-        )
+        }
 
     /**
      * Terminates the session with the given ID, requiring the `auth:sessions:terminate` scope.
@@ -679,18 +945,22 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
 private const val INVALIDATION_CONCURRENCY: Int = 100
 
+// Long enough for another tab's request that crossed a rotation to arrive, short enough that a stolen copy rarely fits.
+private val ROTATION_GRACE: Duration = 60.seconds
+
+/** The result of [SessionManager.rotateRefreshToken]: the session, its subject, and the refresh token to hand out. */
+public data class RotatedRefreshToken<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
+    val session: Session<SUBJECT, ID>,
+    val subject: SUBJECT,
+    val refreshToken: RefreshToken,
+)
+
 /*
  * TODO: SessionManager API Improvements and Recommendations
  *
  * 1. BULK SESSION TERMINATION
  *    - Add endpoint to terminate all sessions for a user (except current)
  *    - Useful for "logout from all devices"
- *
- * 3. REFRESH TOKEN ROTATION
- *    - Implement refresh token rotation for better security
- *    - Each refresh invalidates the old token and issues a new one
- *    - Helps detect token theft (both attacker and victim get invalid token)
- *    - Consider making this configurable per-principal
  *
  * 4. DEVICE FINGERPRINTING
  *    - Currently tracks user agent and IP, but doesn't enforce consistency
@@ -708,12 +978,6 @@ private const val INVALIDATION_CONCURRENCY: Int = 100
  *    - These are useful for server-to-server operations (webhooks, background jobs)
  *    - Consider enabling with clear documentation about security implications
  *    - Presigned tokens bypass session validation - use with extreme caution
- *
- * 8. OAUTH INTEGRATION
- *    - oauthClient field exists but is unused (TODO comment in code)
- *    - Complete OAuth 2.0 flow implementation
- *    - Support OAuth refresh token to Lightning refresh token mapping
- *    - Handle OAuth token revocation
  *
  * 9. SESSION EVENTS AND HOOKS
  *    - Add hooks for session lifecycle events (created, used, expired, terminated)

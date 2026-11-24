@@ -194,9 +194,10 @@ fun wsTypedTest() = WsPriceServer.testBlocking(settings = {}) {
 
 ## Authentication
 
-Browsers can't set an `Authorization` header on a WebSocket, so the session manager also reads the token from an
-`Authorization` or `jwt` query parameter (`wss://api.example.com/rooms/lobby?jwt=...`) and from an `Authorization`
-cookie.  Prefer the header where the client can set one: URLs end up in logs.  See [Authentication](auth.md).
+Browsers can't set an `Authorization` header on a WebSocket, so on a WebSocket connect the session manager also reads
+the access token from an `Authorization` or `jwt` query parameter (`wss://api.example.com/rooms/lobby?jwt=...`).
+Prefer the header where the client can set one: URLs end up in logs.  Plain HTTP requests with a token in the URL are
+rejected with 400.  See [Authentication](auth.md).
 
 ## Multiplexing
 
@@ -212,7 +213,7 @@ object WsAppServer : ServerBuilder() {
 }
 ```
 
-Every frame on it is a JSON `MultiplexMessage`:
+Every frame on it is a JSON `MultiplexMessage` (a binary frame from the client is one in `KotlinWireFormat`):
 
 ```json
 { "channel": "c1", "path": "/chat/rooms/lobby", "queryParams": { "name": ["Ann"] }, "start": true }
@@ -281,7 +282,9 @@ The lifecycle above is the same everywhere; the machinery differs.
 - **Local engines** (Ktor, Netty, JDK) keep sockets in process.  Topic messages go through `engine-pubSub`, so several
   instances need a shared backend.
 - **AWS (API Gateway + Lambda)** stores each connection's state and subscriptions in DynamoDB, and each phase may run on
-  a different Lambda.  That is why the state is serializable and cross-connection messages use topics.
+  a different Lambda.  That is why the state is serializable and cross-connection messages use topics.  The state is
+  stored in `KotlinWireFormat`, so it survives adding fields with defaults; a socket whose row an incompatible release
+  wrote is closed on its next event, and the client reconnects.
 
 See [Engines](engines.md).
 

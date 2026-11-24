@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.services.data.Unsafe
+import com.lightningkite.services.serializers.WireId
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 
@@ -115,22 +116,22 @@ public fun WebSocketSubscriptionMessage<*, *>.topicPath(): String =
  */
 @Serializable
 public data class WebSocketConnectRequest<PATH : PathSpec>(
-    override val path: RawWebSocketPath<PATH>,
-    override val queryParameters: QueryParameters = QueryParameters.EMPTY,
-    override val headers: HttpHeaders = HttpHeaders.EMPTY,
-    override val domain: String = "",
-    override val protocol: String = "",
-    override val sourceIp: String = "",
-    override val upstreamRequestId: String? = null,
-    override val cache: SerializableCache<WebSocketConnectRequest<*>> = SerializableCache(),
+    @WireId(1) override val path: RawWebSocketPath<PATH>,
+    @WireId(2) override val queryParameters: QueryParameters = QueryParameters.EMPTY,
+    @WireId(3) override val headers: HttpHeaders = HttpHeaders.EMPTY,
+    @WireId(4) override val domain: String = "",
+    @WireId(5) override val protocol: String = "",
+    @WireId(6) override val sourceIp: String = "",
+    @WireId(7) override val upstreamRequestId: String? = null,
+    @WireId(8) override val cache: SerializableCache<WebSocketConnectRequest<*>> = SerializableCache(),
     /**
      * Engine-specific socket identifier for direct message sending.
      * For AWS API Gateway, this is the connection ID.
      * Used by CoroutineWebSocketHandler to bypass pub/sub for direct sends.
      */
-    val engineSocketId: String? = null,
+    @WireId(9) val engineSocketId: String? = null,
     /** The identity of the logical socket this request opens, constant across every phase of its lifetime. */
-    val socketId: Execution.ID,
+    @WireId(10) val socketId: Execution.ID,
 ) : Request<PATH>() {
     /** The gateway's identifier for a socket is the socket itself, so there is nothing else to hold. */
     override val engineRequestId: String? get() = engineSocketId

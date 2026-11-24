@@ -210,14 +210,26 @@ class HttpHeadersTest {
         }
         val setCookies = headers.getMany(HttpHeader.SetCookie)
         assertEquals(1, setCookies.size)
-        val cookie = setCookies.first()
-        assertEquals("session", cookie.parameters["key"])
-        assertEquals("abc123", cookie.parameters["value"])
-        assertEquals("3600", cookie.parameters["maxAge"])
-        assertEquals("/api", cookie.parameters["path"])
-        assertEquals("", cookie.parameters["secure"])
-        assertEquals("", cookie.parameters["httpOnly"])
-        assertEquals("Strict", cookie.parameters["sameSite"])
+        assertEquals(
+            "session=abc123; Max-Age=3600; Path=/api; Secure; HttpOnly; SameSite=Strict",
+            setCookies.first().toHttpString()
+        )
+    }
+
+    @Test
+    fun `builder setCookie writes Expires as an HTTP date`() {
+        val headers = HttpHeaders {
+            setCookie(name = "session", value = "abc123", expiresAt = kotlin.time.Instant.parse("2030-01-02T03:04:05Z"))
+        }
+        assertEquals(
+            "session=abc123; Expires=Wed, 2 Jan 2030 03:04:05 GMT; Path=/",
+            headers.getMany(HttpHeader.SetCookie).single().toHttpString()
+        )
+    }
+
+    @Test
+    fun `builder setCookie rejects an empty value`() {
+        assertFailsWith<IllegalArgumentException> { HttpHeaders { setCookie(name = "session", value = "") } }
     }
 
     @Test

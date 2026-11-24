@@ -1,5 +1,7 @@
 package com.lightningkite.lightningserver.sessions.token
 
+import com.lightningkite.lightningserver.InternalLightningServerApi
+import com.lightningkite.lightningserver.auth.Authentication
 import kotlinx.serialization.Serializable
 
 
@@ -21,8 +23,18 @@ public data class JwtClaims(
     val scope: String,
     val sid: String? = null,
     val siat: Long, // The Session issue time.
+    /** The cache as JWTs wrote it before KotlinWireFormat: entries in OldKotlinBytesFormat.  Read only. */
     val cache: String? = null,
+    /** The cache, entries in KotlinWireFormat. */
+    val wireCache: String? = null,
 )
+
+/** For an authentication decoded from a token written before KotlinWireFormat. */
+@OptIn(InternalLightningServerApi::class)
+internal fun Authentication<*>.markCachesAsOldFormat() {
+    cache.markEntriesAsOldFormat()
+    fromMasquerade?.markCachesAsOldFormat()
+}
 
 public open class TokenException(message: String, override val cause: Throwable? = null) : Exception(message)
 public open class JwtException(message: String) : TokenException(message)

@@ -368,22 +368,26 @@ Endpoints, relative to where you mount it:
 | `POST proofs-check` | none | Like `login`, but creates nothing |
 | `GET auth-requirements` | `auth:requirements` scope | The caller's options and required strength, for re-authenticating |
 | `POST token/simple` | none | Refresh token → access token |
+| `POST token/set-cookie` | none | Refresh token → HttpOnly cookie; see below |
+| `POST token/cookie` | the cookie | Cookie's refresh token → access token |
 | `GET self` | `auth:self` scope | The caller's subject |
-| `POST sub-session` | session | Creates a narrower session; see below |
 | `POST terminate` | `auth:sessions:terminate` scope | Logs out the current session |
 | `POST {sessionId}/terminate` | `auth:sessions:terminate` scope | Logs out another of the caller's sessions |
 | `sessions` | `auth:sessions` scope | REST listing of the caller's sessions |
 
-Credentials are read from the `Authorization` header (`Bearer` optional), then an `Authorization` or `jwt` query
-parameter, then an `Authorization` cookie.  A refresh token also works as a credential, but each use writes to the
-database; send access tokens on ordinary requests.
+Access tokens are read from the `Authorization` header (`Bearer` optional).  A WebSocket connect may instead put
+the access token in an `Authorization` or `jwt` query parameter, since browsers can't set headers on one; any other
+request with a token in its URL gets a 400, since URLs end up in logs.  Refresh tokens are not credentials: only the
+`token/...` endpoints take them, and sending one as `Authorization` gets a 401.  For legacy clients that do,
+`acceptRefreshTokenAsBearer = Runtime { true }` turns that back on, except for a session whose refresh token
+rotates (below); each such use writes to the database.
 
 ### Token formats
 
 | `tokenFormat` | Token | |
 |---|---|---|
-| `PrivateTinyTokenFormat()` (default) | `<principal>/<base64>` | Encrypted; the client can't read it |
-| `PublicTinyTokenFormat()` | `tt/<principal>/<base64>` | Signed, not encrypted |
+| `PrivateTinyTokenFormat()` (default) | `w/<principal>/<base64>` | Encrypted; the client can't read it |
+| `PublicTinyTokenFormat()` | `tw/<principal>/<base64>` | Signed, not encrypted |
 | `JwtTokenFormat()` | HS512 JWT | For other systems that read JWTs |
 
 They live in `com.lightningkite.lightningserver.sessions.token`.  All default to a 5-minute `expiration` and derive
@@ -401,17 +405,44 @@ val auth = path.path("auth") module object : AuthEndpoints<Account, Uuid>(
 ) { /* ... */ }
 ```
 
+### Keeping a web client's refresh token in a cookie
+
+A refresh token in `localStorage` can be read by any script on the page.  A web client can hand it to the server
+instead:
+
+1. Log in with `login2` as usual.
+2. Send the refresh token to `POST token/set-cookie` (`setRefreshTokenCookie`), then forget it.  The response sets the
+   `RefreshToken` cookie: `HttpOnly`, `Secure`, `SameSite=Strict`, with its `Path` limited to `token/cookie`, so no
+   other request carries it.  It expires with the session.
+3. Get each access token from `POST token/cookie` (`getTokenFromCookie`), which needs no body.  A 401 means logged out.
+
+The cookie's refresh token rotates.  `token/set-cookie` stores the session's next token rather than the one sent,
+which passed through page scripts.  Each `token/cookie` call replaces the cookie with the next one.  For 60 seconds
+after a rotation, the token it replaced still works and gets the current one back, in case a response was lost or
+another tab's request crossed it.  After that, using it means someone copied it, and terminates the session.  Older
+tokens are simply refused.  A rotating session's tokens don't work at `token/simple` or as a bearer token.  Each
+token is an HMAC of the one before it with a key derived from `secretBasis`; after changing `secretBasis` the
+replaced token is refused, but the current one keeps working.  `rotateRefreshToken(token, request)` is the same
+exchange, for other endpoints that rotate.
+
+`POST terminate` also deletes the cookie.  The cookie is only sent same-site, and a cross-origin client must send
+requests with credentials, which needs CORS to allow them.  `token/set-cookie` accepts only a JSON body, so a
+cross-site form can't plant a session.  For local development over plain http, where native clients and Safari won't
+send a `Secure` cookie, pass `refreshTokenCookieSecure = Runtime { false }`.
+
 ### Sub-sessions
 
-`POST sub-session` with `SubSessionRequest(label, scopes, expires)` returns a refresh token for a new session derived
-from the caller's, for handing narrower access to another app or device:
+`newSubSession(parent, label, scopes, expires)` returns a new session derived from the one behind the `Authentication`
+`parent`, and its refresh token, for handing narrower access to another app or device:
 
-- `scopes` must be within the parent's (403 otherwise).  The default, root, means "the same as the parent".
+- `scopes` must be within the parent's (`ForbiddenException` otherwise).  The default, root, means "the same as the
+  parent".
 - It expires no later than the parent and inherits the parent's authentication time, so it can't pass a `maxAge` check
   the parent couldn't.
 - Terminating the parent terminates it, and its own sub-sessions.
 
-For access that must outlive the user's login (a long-running integration), create a separate session instead.
+It is a server-side call with no endpoint: one would let anyone holding a stolen access token mint a long-lived refresh
+token.  For access that must outlive the user's login (a long-running integration), create a separate session instead.
 
 ### Logging out and revoking access
 
@@ -441,8 +472,8 @@ one or two cache reads per request, and requests fail if the cache does.  Use a 
 
 ## Auth events
 
-`sessions` reports sessions created, terminated, and rejected, and proofs issued, accepted, and rejected, as
-`AuthEvent`s.  Install an `AuthEventListener` to receive them:
+`sessions` reports sessions created, terminated, and rejected, proofs issued, accepted, and rejected, and changes
+to a user's login factors, as `AuthEvent`s.  Install an `AuthEventListener` to receive them:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/ProofSessionSamples.kt#auth-listener -->
 ```kotlin
@@ -454,10 +485,26 @@ object AuditedLoginServer : ServerBuilder() {
                 runtime.logger.warn { "Rejected ${event.method.via} proof for ${event.principal}" }
         }
     })
+
+    // In a real app, email the user here, so they hear about changes they did not make.
+    val factorNotices = install(object : AuthEventListener {
+        context(runtime: ServerRuntime)
+        override suspend fun onEvent(event: AuthEvent) {
+            if (event is AuthEvent.FactorChanged)
+                runtime.logger.info { "${event.method.via} ${event.change} for ${event.principal}" }
+        }
+    })
 }
 ```
 
-A listener that throws is logged and doesn't affect the request.  The `audit` module's `AuthEventLog` records every
+`AuthEvent.FactorChanged` is raised after a password is set, changed, or disabled, a TOTP authenticator is confirmed,
+replaced, or disabled, a passkey or known device is added or disabled, or backup codes are reset or cleared, whether
+through the proof endpoints, their REST endpoints, or your own writes through their `modelInfo`.  `change` is
+`Added`, `Replaced`, or `Removed`.  Nothing tells the user about these unless you install a listener that does, and
+you should: an unexpected change is how a user learns someone else is in their account.  Email and phone number
+changes are edits to your own user model, so watch those with its signals.
+
+A listener that throws is logged and doesn't affect the request, or undo the change it reports.  The `audit` module's `AuthEventLog` records every
 event to the database.
 
 ## Security notes

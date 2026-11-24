@@ -72,6 +72,15 @@ public sealed interface AuthEvent {
 
             /** The session was explicitly terminated. */
             Terminated,
+
+            /**
+             * A rotating session's previous refresh token was presented after the grace following its rotation, so
+             * someone else may hold a copy. The session is terminated.
+             */
+            Reused,
+
+            /** A rotating session's refresh token was presented somewhere other than an endpoint that rotates it. */
+            RotatingSession,
         }
     }
 
@@ -172,6 +181,42 @@ public sealed interface AuthEvent {
         val principal: String,
         override val request: Request<*>? = null,
     ) : AuthEvent
+
+    /**
+     * Represents a change to the credentials the subject [principal] (of principal type [principalType]) can log in with by [method].
+     *
+     * Raised after the change is written, by the password, TOTP, WebAuthN, known device and backup code endpoints, however
+     * it was made: their own endpoints, their REST endpoints, or app code writing through their `modelInfo`.
+     *
+     * Nothing tells the user unless the app installs an [AuthEventListener] that does, which it should: an unexpected
+     * change is how a user finds out someone else is in their account.  As with every [AuthEvent], a listener that
+     * throws is logged and the change stands.
+     *
+     * Email addresses and phone numbers are properties of the app's own subject model, so changes to them are not
+     * reported here; watch them with that model's signals.
+     *
+     * [request] is `null` for every change but a backup code reset or clear, since the others are observed at the database.
+     *
+     * For example, a user sets a new password, or revokes a passkey.
+     */
+    public data class FactorChanged(
+        val method: ProofMethodInfo,
+        val principalType: String,
+        val principal: String,
+        val change: Change,
+        override val request: Request<*>? = null,
+    ) : AuthEvent {
+        public enum class Change {
+            /** The subject gained a credential of this method. */
+            Added,
+
+            /** The subject's single credential of this method was swapped for a new one, such as a password change. */
+            Replaced,
+
+            /** A credential of this method was revoked.  Expiry is not reported. */
+            Removed,
+        }
+    }
 }
 
 /** Receives each [AuthEvent] once installed with [install]. */

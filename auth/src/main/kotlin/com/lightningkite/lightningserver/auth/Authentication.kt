@@ -15,6 +15,7 @@ import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.data.Unsafe
 import com.lightningkite.services.database.HasId
+import com.lightningkite.services.serializers.WireId
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.NothingSerializer
 import kotlinx.serialization.builtins.nullable
@@ -37,6 +38,7 @@ import kotlin.time.Instant
  * @param scopes The scopes granted to this authentication (defaults to root)
  * @param fromMasquerade If this is a masquerade, the original authentication
  * @param cache Optional cache for storing fetched data
+ * @param audience The one resource this authentication is for (RFC 8707), or null for this server's own API
  * @return A new [Authentication] instance
  */
 context(server: Engine)
@@ -50,6 +52,7 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
     scopes: Set<GrantedScope> = setOf(GrantedScope.root),
     fromMasquerade: Authentication<*>? = null,
     cache: SerializableCache<Authentication<SUBJECT>>? = null,
+    audience: String? = null,
 ): Authentication<SUBJECT> =
     @OptIn(Unsafe::class) // SAFETY: Invariants upheld by function signature and type params.
     Authentication.fromRawParts(
@@ -62,7 +65,8 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
         expiration = expiration,
         scopes = scopes,
         fromMasquerade = fromMasquerade,
-        cache = cache
+        cache = cache,
+        audience = audience,
     )
 
 /**
@@ -136,6 +140,9 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
  * @property scopes The permissions granted to this authentication
  * @property fromMasquerade If masquerading, the original authentication
  * @property cache Cache for storing computed values
+ * @property audience The one resource this authentication is for, such as `https://example.com/mcp` for a token an
+ *   OAuth client got for an MCP server, or null for this server's own API.  Only a resource that checks it (see
+ *   `BearerChallenge`) refuses a token for another audience; elsewhere the scopes alone limit what it can do.
  *
  * @see PrincipalType
  * @see GrantedScope
@@ -144,15 +151,18 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
 @Serializable
 @ConsistentCopyVisibility
 public data class Authentication<SUBJECT : HasId<*>> private constructor(
-    public val principalName: String,
-    public val rawId: String,
-    public val sessionId: String?,
-    public val sessionIssuedAt: Instant,
-    public val tokenIssuedAt: Instant? = null,
-    public val expiration: Instant? = null,
-    public val scopes: Set<GrantedScope> = setOf(GrantedScope.root),
-    public val fromMasquerade: Authentication<*>? = null,
-    override val cache: SerializableCache<Authentication<SUBJECT>> = SerializableCache(),
+    // Wire ids keep tiny tokens small; never reuse one.  Keep the declaration order, and add fields last, while old
+    // tiny tokens are still read with the positional OldKotlinBytesFormat.
+    @WireId(1) public val principalName: String,
+    @WireId(2) public val rawId: String,
+    @WireId(3) public val sessionId: String?,
+    @WireId(4) public val sessionIssuedAt: Instant,
+    @WireId(5) public val tokenIssuedAt: Instant? = null,
+    @WireId(6) public val expiration: Instant? = null,
+    @WireId(7) public val scopes: Set<GrantedScope> = setOf(GrantedScope.root),
+    @WireId(8) public val fromMasquerade: Authentication<*>? = null,
+    @WireId(9) override val cache: SerializableCache<Authentication<SUBJECT>> = SerializableCache(),
+    @WireId(10) public val audience: String? = null,
 ) : Caching<Authentication<SUBJECT>> {
     public companion object {
         @Unsafe("Principal id must match expected type and be serialized correctly")
@@ -168,6 +178,7 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
             scopes: Set<GrantedScope>,
             fromMasquerade: Authentication<*>?,
             cache: SerializableCache<Authentication<SUBJECT>>?,
+            audience: String?,
         ): Authentication<SUBJECT> {
             val auth = Authentication(
                 principalName = principalType.name,
@@ -178,7 +189,8 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
                 expiration = expiration,
                 scopes = scopes,
                 fromMasquerade = fromMasquerade,
-                cache = cache ?: SerializableCache()
+                cache = cache ?: SerializableCache(),
+                audience = audience,
             )
             auth.cachedType = principalType
             auth.cachedId = id
@@ -252,6 +264,7 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
         expiration: Instant? = this.expiration,
         tokenIssuedAt: Instant? = this.tokenIssuedAt,
         scopes: Set<GrantedScope> = this.scopes,
+        audience: String? = this.audience,
     ): Authentication<SUBJECT> = Authentication(
         principalName = this.principalName,
         rawId = this.rawId,
@@ -262,6 +275,7 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
         scopes = scopes,
         fromMasquerade = this.fromMasquerade,
         cache = this.cache,
+        audience = audience,
     )
 
     // caching
@@ -345,6 +359,7 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
                 scopes = this.scopes,
                 fromMasquerade = this,
                 cache = this.cache as SerializableCache<Authentication<HasId<*>>>,
+                audience = this.audience,
             )
 
             return if (principal.permitMasquerade(this, mask)) mask

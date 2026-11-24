@@ -12,7 +12,10 @@ import com.lightningkite.lightningserver.runtime.test.TestRunner
 import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
+import com.lightningkite.lightningserver.sessions.AuthEvent
+import com.lightningkite.lightningserver.sessions.AuthEventListener
 import com.lightningkite.lightningserver.sessions.EstablishTotp
+import com.lightningkite.lightningserver.sessions.install
 import com.lightningkite.lightningserver.sessions.TotpSecret
 import com.lightningkite.lightningserver.sessions.proofs.extensions.code
 import com.lightningkite.lightningserver.sessions.proofs.extensions.generator
@@ -21,6 +24,9 @@ import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
+import com.lightningkite.services.database.Modification
+import com.lightningkite.services.database.optics.*
+import com.lightningkite.lightningserver.sessions.disabledAt
 import dev.turingcomplete.kotlinonetimepassword.HmacAlgorithm
 import dev.turingcomplete.kotlinonetimepassword.TimeBasedOneTimePasswordConfig
 import kotlinx.coroutines.flow.toList
@@ -683,6 +689,15 @@ class TimeBasedOTPProofEndpointsTest {
         }
     }
 
+    private class FactorChanges : AuthEventListener {
+        val changes = mutableListOf<AuthEvent.FactorChanged.Change>()
+
+        context(runtime: ServerRuntime)
+        override suspend fun onEvent(event: AuthEvent) {
+            if (event is AuthEvent.FactorChanged) changes += event.change
+        }
+    }
+
     private inner class ReplacementServer : ServerBuilder() {
         val database = setting("database", Database.Settings("ram"))
         val cache = setting("cache", Cache.Settings("ram"))
@@ -691,6 +706,8 @@ class TimeBasedOTPProofEndpointsTest {
             register(TestUser)
             registerBasicMediaTypeCoders()
         }
+
+        val factorChanges = install(FactorChanges())
 
         val totpEndpoints = path.path("auth").path("totp") include TimeBasedOTPProofEndpoints(
             database = database,
@@ -816,4 +833,37 @@ class TimeBasedOTPProofEndpointsTest {
             val active = server.secrets().filter { it.disabledAt == null }
             assertEquals(setOf("Old Phone", "Second Try"), active.map { it.label }.toSet())
         }
+
+    @Test
+    fun `confirming, replacing and revoking a secret are each reported once, failed attempts are not`() = runBlocking {
+        val user = TestUser(Uuid.random(), "factors@example.com")
+        TestUser.users[user._id] = user
+        val server = ReplacementServer()
+        server.test({}) {
+            @Suppress("UNCHECKED_CAST")
+            val auth = TestUser.testAuth(user) as Authentication<HasId<*>>
+            suspend fun pending() = server.secrets().single { it.disabledAt == null && it.lastUsedAt == null }
+
+            server.totpEndpoints.establish.test(auth, EstablishTotp("Phone"))
+            assertFailsWith<BadRequestException> { server.totpEndpoints.confirm.test(auth, "000000") }
+            assertEquals(listOf(), server.factorChanges.changes)
+            server.totpEndpoints.confirm.test(auth, pending().code)
+            assertEquals(listOf(AuthEvent.FactorChanged.Change.Added), server.factorChanges.changes)
+
+            server.totpEndpoints.establish.test(auth, EstablishTotp("Abandoned"))
+            server.totpEndpoints.establish.test(auth, EstablishTotp("New Phone"))
+            server.totpEndpoints.confirm.test(auth, pending().code)
+            assertEquals(
+                listOf(AuthEvent.FactorChanged.Change.Added, AuthEvent.FactorChanged.Change.Replaced),
+                server.factorChanges.changes,
+            )
+
+            val active = server.secrets().single { it.disabledAt == null }
+            server.totpEndpoints.rest.modify.test(active._id, auth, Modification<TotpSecret> { it.disabledAt assign Clock.System.now() })
+            assertEquals(
+                listOf(AuthEvent.FactorChanged.Change.Added, AuthEvent.FactorChanged.Change.Replaced, AuthEvent.FactorChanged.Change.Removed),
+                server.factorChanges.changes,
+            )
+        }
+    }
 }

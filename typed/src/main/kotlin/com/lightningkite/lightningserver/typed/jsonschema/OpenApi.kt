@@ -275,18 +275,6 @@ public val openApiDescription: OpenApiRoot
                         scheme = "bearer",
                         bearerFormat = "JWT",
                     ),
-                    "param" to OpenApiSecurity(
-                        type = OpenApiSecurityType.apiKey,
-                        description = "Parameter",
-                        name = "jwt",
-                        inside = OpenApiParameterType.query
-                    ),
-                    "cookie" to OpenApiSecurity(
-                        type = OpenApiSecurityType.apiKey,
-                        description = "Cookie",
-                        name = "Authorization",
-                        inside = OpenApiParameterType.cookie
-                    )
                 )
             ),
             servers = listOf(
@@ -295,8 +283,6 @@ public val openApiDescription: OpenApiRoot
             security = listOf(
                 mapOf(),
                 mapOf("header" to emptyList()),
-                mapOf("param" to emptyList()),
-                mapOf("cookie" to emptyList()),
             ),
             paths = runtime.server
                 .sdk()

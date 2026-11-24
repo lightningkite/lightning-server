@@ -63,6 +63,11 @@ public class KnownDeviceProofEndpoints(
             val table = signals?.invoke(serverRuntime, table) ?: table
             table.interceptCreate {
                 it.copy(hash = it.hash.fastHash(), expiresAt = now() + expires())
+            }.postCreate { created ->
+                serverRuntime.reportAuthEvent(AuthEvent.FactorChanged(info, created.subjectType, created.subjectId, AuthEvent.FactorChanged.Change.Added))
+            }.postChange { old, new ->
+                if (old.disabledAt == null && new.disabledAt != null)
+                    serverRuntime.reportAuthEvent(AuthEvent.FactorChanged(info, new.subjectType, new.subjectId, AuthEvent.FactorChanged.Change.Removed))
             }
         },
         permissions = {

@@ -19,7 +19,8 @@ class SerializationTest {
         assertNotNull(serialization.json)
         assertNotNull(serialization.jsonWithoutDefaults)
         assertNotNull(serialization.formDataFormat)
-        assertNotNull(serialization.kotlinBytesFormat)
+        assertNotNull(serialization.kotlinWireFormat)
+        assertNotNull(serialization.oldKotlinBytesFormat)
         assertNotNull(serialization.stringArrayFormat)
     }
 
@@ -75,7 +76,8 @@ class SerializationTest {
         assertEquals(customModule, serialization.json.serializersModule)
         assertEquals(customModule, serialization.jsonWithoutDefaults.serializersModule)
         assertEquals(customModule, serialization.formDataFormat.serializersModule)
-        assertEquals(customModule, serialization.kotlinBytesFormat.serializersModule)
+        assertEquals(customModule, serialization.kotlinWireFormat.serializersModule)
+        assertEquals(customModule, serialization.oldKotlinBytesFormat.serializersModule)
         assertEquals(customModule, serialization.stringArrayFormat.serializersModule)
     }
 }

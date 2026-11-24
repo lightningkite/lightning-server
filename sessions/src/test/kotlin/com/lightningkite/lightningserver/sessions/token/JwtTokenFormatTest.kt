@@ -291,6 +291,36 @@ class JwtTokenFormatTest {
     }
 
     @Test
+    fun `a resource audience on this server round-trips as aud`() = runBlocking {
+        TestServer.test({}) {
+            val jwtFormat = createJwtFormat()
+            val userId = Uuid.random()
+            val bound = Authentication(principalType = TestUser, id = userId, sessionId = null, audience = "https://test.example.com/mcp")
+            val token = execute { jwtFormat.create(TestUser, bound) }
+            val payload = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL).decode(token.split('.')[1]).decodeToString()
+            assertTrue("\"aud\":\"https://test.example.com/mcp\"" in payload, payload)
+            assertEquals("https://test.example.com/mcp", execute { jwtFormat.read(TestUser, token) }!!.audience)
+
+            val firstParty = execute { jwtFormat.create(TestUser, Authentication(principalType = TestUser, id = userId, sessionId = null)) }
+            assertNull(execute { jwtFormat.read(TestUser, firstParty) }!!.audience)
+        }
+    }
+
+    @Test
+    fun `a resource audience on another server is rejected`() = runBlocking {
+        TestServer.test({}) {
+            val other = JwtTokenFormat(
+                hasher = RuntimeDeferred.Cached { testBasis.HS256("jwt-test") },
+                issuer = Runtime { "https://test.example.com" },
+                audience = Runtime { "https://test.example.com.evil.com" },
+            )
+            val auth = Authentication(principalType = TestUser, id = Uuid.random(), sessionId = null, audience = "https://test.example.com.evil.com/mcp")
+            val token = execute { other.create(TestUser, auth) }
+            assertFailsWith<JwtException> { execute { createJwtFormat().read(TestUser, token) } }
+        }
+    }
+
+    @Test
     fun `wrong issuer is rejected`() = runBlocking {
         TestServer.test({}) {
             val issuer1 = createJwtFormat()

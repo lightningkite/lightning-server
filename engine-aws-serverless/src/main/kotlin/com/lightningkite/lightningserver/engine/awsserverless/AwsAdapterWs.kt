@@ -11,7 +11,7 @@ import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.data.Unsafe
-import com.lightningkite.services.serializers.KotlinBytesFormat
+import com.lightningkite.services.serializers.KotlinWireFormat
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import software.amazon.awssdk.core.SdkBytes
@@ -32,7 +32,7 @@ internal class WebSocketStateGoneException(socketId: String) :
 
 internal class AwsAdapterWs(val root: AwsAdapter) {
     val wsUrl: String get() = with(root) { generalSettings.invoke().wsUrl }
-    val encoding: KotlinBytesFormat get() = root.internalSerialization.kotlinBytesFormat
+    val encoding: KotlinWireFormat get() = root.internalSerialization.kotlinWireFormat
 
     val webSocketDynamo by lazy {
         AwsWebSocketDynamoDb(
@@ -235,7 +235,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
             root.logger.warn { "No topic found for ${event.topic}" }
             return APIGatewayV2HTTPResponse(500, body = "No topic found for ${event.topic}")
         }
-        val fullValue = event.data.value(root.internalSerialization.kotlinBytesFormat, fullTopicMatch.value.type)
+        val fullValue = event.data.value(root.internalSerialization.kotlinWireFormat, fullTopicMatch.value.type)
         webSocketDynamo.forSubscribers(event.topic) { path, ids ->
             try {
                 // AWS Lambda WebSockets all go through root path "/" with query param routing.
@@ -330,7 +330,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                             WebSocketPublish.serializer(),
                             WebSocketPublish(
                                 topic,
-                                AnonType(root.internalSerialization.kotlinBytesFormat, output, serializer)
+                                AnonType(root.internalSerialization.kotlinWireFormat, output, serializer)
                             )
                         )
                     )

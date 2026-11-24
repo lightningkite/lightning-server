@@ -47,7 +47,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
         @Suppress("UNCHECKED_CAST")
         override val request: WebSocketConnectRequest<PathSpec> get() = wrapped.currentState.map.getValue(channel).request as WebSocketConnectRequest<PathSpec>
         override var currentState: T = wrapped.currentState.map.getValue(channel).storage.value(
-            internalSerialization.kotlinBytesFormat,
+            internalSerialization.kotlinWireFormat,
             handler.storageSerializer
         )
             private set
@@ -86,7 +86,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                 ?: throw IllegalStateException("Multiplex channel $channel was closed while it was being handled.")
 
             return info.storage.value(
-                server.internalSerialization.kotlinBytesFormat,
+                server.internalSerialization.kotlinWireFormat,
                 handler.storageSerializer
             )
         }
@@ -115,12 +115,12 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
             wrapped.queueStateUpdate { data ->
                 data.updateChannel(channel) { info ->
                     val underlying = info.storage.value(
-                        server.internalSerialization.kotlinBytesFormat,
+                        server.internalSerialization.kotlinWireFormat,
                         handler.storageSerializer
                     )
                     info.copy(
                         storage = AnonType(
-                            server.internalSerialization.kotlinBytesFormat,
+                            server.internalSerialization.kotlinWireFormat,
                             modification(underlying),
                             handler.storageSerializer
                         )
@@ -134,12 +134,12 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
             wrapped.updateStateImmediately { data ->
                 data.updateChannel(channel) { info ->
                     val underlying = info.storage.value(
-                        server.internalSerialization.kotlinBytesFormat,
+                        server.internalSerialization.kotlinWireFormat,
                         handler.storageSerializer
                     )
                     info.copy(
                         storage = AnonType(
-                            server.internalSerialization.kotlinBytesFormat,
+                            server.internalSerialization.kotlinWireFormat,
                             modification(underlying).also {
                                 currentState = it
                             },
@@ -209,7 +209,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
         val message = try {
             when (frame) {
                 is WebSocketFrame.Binary ->
-                    serverRuntime.externalSerialization.kotlinBytesFormat.decodeFromByteArray<MultiplexMessage>(frame.content)
+                    serverRuntime.externalSerialization.kotlinWireFormat.decodeFromByteArray<MultiplexMessage>(frame.content)
 
                 is WebSocketFrame.Text ->
                     serverRuntime.externalSerialization.json.decodeFromString<MultiplexMessage>(frame.content)
@@ -248,7 +248,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                             map = it.map + (message.channel to MultiplexWebSocketHandlerConnectionInfo(
                                 request = request,
                                 storage = AnonType(
-                                    serverRuntime.internalSerialization.kotlinBytesFormat,
+                                    serverRuntime.internalSerialization.kotlinWireFormat,
                                     storage,
                                     channelHandler.storageSerializer
                                 ),

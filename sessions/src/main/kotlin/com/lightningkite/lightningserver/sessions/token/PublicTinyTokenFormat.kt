@@ -11,6 +11,10 @@ import kotlin.io.encoding.Base64
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
+/**
+ * Signed, unencrypted tokens: `tw/<principal>/<base64 of signature + Authentication in KotlinWireFormat>`.
+ * Tokens from before KotlinWireFormat (`tt/<principal>/`, OldKotlinBytesFormat) are still read.
+ */
 public class PublicTinyTokenFormat(
     public val hasher: RuntimeDeferred<Signer> = secretBasis.signer("public-tiny-token"),
     public override val expiration: Duration = 5.minutes,
@@ -23,7 +27,7 @@ public class PublicTinyTokenFormat(
         auth: Authentication<SUBJECT>,
     ): String {
         val now = now()
-        return "tt/${principal.name}/" + server.internalSerialization.kotlinBytesFormat
+        return "tw/${principal.name}/" + server.internalSerialization.kotlinWireFormat
             .encodeToByteArray(
                 Authentication.serializer(principal.subjectSerializer),
                 auth.copy(
@@ -40,8 +44,13 @@ public class PublicTinyTokenFormat(
         principal: PrincipalType<SUBJECT, ID>,
         value: String,
     ): Authentication<SUBJECT>? {
-        val prefix = "tt/${principal.name}/"
-        if (!value.startsWith(prefix)) return null
+        val wirePrefix = "tw/${principal.name}/"
+        val oldPrefix = "tt/${principal.name}/"
+        val prefix = when {
+            value.startsWith(wirePrefix) -> wirePrefix
+            value.startsWith(oldPrefix) -> oldPrefix
+            else -> return null
+        }
 
         val decoded = Base64.UrlSafe.decode(value.drop(prefix.length))
 
@@ -51,14 +60,14 @@ public class PublicTinyTokenFormat(
         // Good: Signature verification happens before deserialization, preventing tampering
         if (!hasher.await().verify(data, signature)) throw TokenException("Incorrect signature")
 
+        val format = if (prefix == oldPrefix) server.internalSerialization.oldKotlinBytesFormat
+        else server.internalSerialization.kotlinWireFormat
         val auth = try {
-            server.internalSerialization.kotlinBytesFormat.decodeFromByteArray(
-                Authentication.serializer(principal.subjectSerializer),
-                data
-            )
+            format.decodeFromByteArray(Authentication.serializer(principal.subjectSerializer), data)
         } catch (e: Exception) {
             throw TokenException("Invalid Token Data", e)
         }
+        if (prefix == oldPrefix) auth.markCachesAsOldFormat()
 
         if (auth.expiration != null && now() > auth.expiration!!) throw TokenException("Token has expired")
         return auth

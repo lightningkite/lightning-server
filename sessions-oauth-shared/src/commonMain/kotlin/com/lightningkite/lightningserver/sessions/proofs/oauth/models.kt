@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.sessions.proofs.oauth
 
+import com.lightningkite.lightningserver.ExperimentalOauthProviderApi
 import com.lightningkite.services.data.Queryable
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.Serializable
@@ -13,8 +14,12 @@ import kotlin.uuid.Uuid
  * @property niceName The name of the client application.
  * @property logo The URL of the client's logo for consent screens.
  * @property scopes The scopes the client may request.
- * @property secrets The client's secrets, of which there can be several for rotation.
- * @property redirectUris The redirect URIs the client may use, which must match exactly.
+ * @property secrets The client's secrets, of which there can be several for rotation.  A client with no active secret
+ *   is public and authenticates with PKCE alone.
+ * @property redirectUris The redirect URIs the client may use, which must match exactly.  A loopback URI
+ *   (`http://127.0.0.1`, `http://[::1]` or `http://localhost`) also matches the same URI on any port (RFC 8252).
+ * @property postLogoutRedirectUris Where the OpenID end-session endpoint may send the browser afterwards.
+ * @property allowRefreshTokens Whether the client gets refresh tokens.
  */
 @Queryable
 public data class OauthClient(
@@ -24,9 +29,9 @@ public data class OauthClient(
     val scopes: Set<String> = setOf(),
     val secrets: Set<OauthClientSecret> = setOf(),
     val redirectUris: Set<String> = setOf(),
-) : HasId<String> {
-
-}
+    @ExperimentalOauthProviderApi val postLogoutRedirectUris: Set<String> = setOf(),
+    @ExperimentalOauthProviderApi val allowRefreshTokens: Boolean = true,
+) : HasId<String>
 
 /**
  * Represents a client secret, which can be disabled without deletion.

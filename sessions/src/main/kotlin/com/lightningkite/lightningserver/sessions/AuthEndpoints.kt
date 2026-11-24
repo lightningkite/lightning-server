@@ -34,6 +34,8 @@ import kotlin.uuid.Uuid
  * @param principal Defines the type of principal being authenticated and how to fetch it.
  * @param tokenFormat The format of generated session tokens.
  * @param tokenInvalidationChecks Whether access tokens can be revoked before they expire; see [SessionManager]
+ * @param refreshTokenCookieSecure Whether the refresh token cookie is `Secure`; off only for local http development. See [SessionManager].
+ * @param acceptRefreshTokenAsBearer Whether a refresh token works as a bearer credential, for legacy clients. See [SessionManager].
  */
 public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     principal: PrincipalType<SUBJECT, ID>,
@@ -41,7 +43,17 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     private val cache: Runtime<Cache>,
     tokenFormat: Runtime<TokenFormat> = Runtime { PrivateTinyTokenFormat() },
     tokenInvalidationChecks: Boolean = false,
-) : SessionManager<SUBJECT, ID>(principal, database, tokenFormat, cache, tokenInvalidationChecks) {
+    refreshTokenCookieSecure: Runtime<Boolean> = Runtime { true },
+    acceptRefreshTokenAsBearer: Runtime<Boolean> = Runtime { false },
+) : SessionManager<SUBJECT, ID>(
+    principal = principal,
+    database = database,
+    tokenFormat = tokenFormat,
+    cache = cache,
+    tokenInvalidationChecks = tokenInvalidationChecks,
+    refreshTokenCookieSecure = refreshTokenCookieSecure,
+    acceptRefreshTokenAsBearer = acceptRefreshTokenAsBearer,
+) {
     init {
         sdkSettings.defaultInfo = SdkModule.Info(principal.name + "Auth")
         sdkSettings.clientInterface =

@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.data
 
 import com.lightningkite.lightningserver.runtime.Engine
+import com.lightningkite.services.serializers.WireId
 import kotlinx.serialization.Serializable
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -27,8 +28,8 @@ import kotlin.time.Instant
  */
 @Serializable
 public data class Expiring<T>(
-    val value: T,
-    val expiresAt: Instant?,
+    @WireId(1) val value: T,
+    @WireId(2) val expiresAt: Instant?,
 ) {
     /**
      * Returns true if the value has expired based on the server's current time.

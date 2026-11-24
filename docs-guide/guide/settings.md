@@ -311,6 +311,7 @@ These are declared by your server, under keys you choose:
 | `RateLimitSettings` (ratelimit) | `rateLimit` | `{"headerPrefix": "X-RateLimit-", "rateLimiterId": "general", "includeHeaders": true}` | [Rate Limiting](rate-limiting.md) |
 | `OauthProviderCredentials` (sessions-oauth) | `googleOAuth`, `githubOAuth`, ... | `{"id": "<client-id>", "secret": "<client-secret>"}` | [OAuth](oauth.md) |
 | `OauthProviderCredentialsApple` (sessions-oauth) | `appleOAuth` | `{"serviceId": "...", "teamId": "...", "keyId": "...", "keyString": "<.p8 contents>"}` | [OAuth](oauth.md) |
+| `OidcSigningKey` (sessions-oauth) | `oidcSigningKey` | `"<base64 PKCS#8 RSA private key>"` | [OAuth authorization server](oauth-provider.md) |
 | `SecretBasis` (core) | your choice | `"<base64 of 64 random bytes>"` | [Encryption](encryption.md) |
 
 Modules can declare settings of their own: mounting `ClientTelemetryEndpoints` adds `clientTelemetryRateLimit`

@@ -89,7 +89,7 @@ class PrivateTinyTokenFormatTest {
             assertNotNull(token)
 
             // Token should start with principal name followed by /
-            assert(token.startsWith("TestUser/")) { "Token should start with principal name" }
+            assert(token.startsWith("w/TestUser/")) { "Token should start with w/principal name" }
 
             // Read back the token
             val readAuth = execute { format.read(TestUser, token) }
@@ -166,7 +166,7 @@ class PrivateTinyTokenFormatTest {
 
             val token = execute { format.create(TestUser, auth) }
 
-            // Token starts with "TestUser/" so reading as OtherUser should return null
+            // Token starts with "w/TestUser/" so reading as OtherUser should return null
             val result = execute { format.read(OtherUser, token) }
             assertNull(result, "Token for different principal type should return null")
         }
@@ -221,8 +221,8 @@ class PrivateTinyTokenFormatTest {
             val token = execute { format.create(TestUser, auth) }
 
             // Tamper with the encrypted part (after the /)
-            val prefix = token.substringBefore('/') + "/"
-            val encrypted = token.substringAfter('/')
+            val prefix = token.substringBeforeLast('/') + "/"
+            val encrypted = token.substringAfterLast('/')
             val tamperedEncrypted = encrypted.toMutableList()
             if (tamperedEncrypted.isNotEmpty()) {
                 tamperedEncrypted[0] = if (tamperedEncrypted[0] == 'A') 'B' else 'A'
@@ -271,13 +271,15 @@ class PrivateTinyTokenFormatTest {
     fun `authentic token whose data does not decode throws TokenException`() = runBlocking {
         TestServer.test({}) {
             execute {
-                assertFailsWith<TokenException> {
-                    createTinyTokenFormat().read(
-                        TestUser,
-                        "TestUser/" + Base64.UrlSafe.encode(
-                            testBasis.cipher("tiny-token-test").encrypt(byteArrayOf(1, 2, 3))
+                for (prefix in listOf("w/TestUser/", "TestUser/")) {
+                    assertFailsWith<TokenException>(prefix) {
+                        createTinyTokenFormat().read(
+                            TestUser,
+                            prefix + Base64.UrlSafe.encode(
+                                testBasis.cipher("tiny-token-test").encrypt(byteArrayOf(1, 2, 3))
+                            )
                         )
-                    )
+                    }
                 }
             }
         }

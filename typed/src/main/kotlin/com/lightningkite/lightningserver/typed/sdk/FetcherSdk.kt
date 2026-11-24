@@ -10,7 +10,15 @@ import com.lightningkite.lightningserver.typed.LiveVersion
 import com.lightningkite.lightningserver.typed.sdk.SDK.processToModules
 import com.lightningkite.lightningserver.typed.sdk.SDK.sdk
 import com.lightningkite.services.data.ExperimentalLightningServer
+import com.lightningkite.services.database.nullElement
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.descriptors.capturedKClass
+import org.objectweb.asm.AnnotationVisitor
+import org.objectweb.asm.ClassReader
+import org.objectweb.asm.ClassVisitor
+import org.objectweb.asm.Opcodes
+import org.objectweb.asm.Type
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 import kotlin.reflect.KTypeParameter
@@ -127,6 +135,12 @@ public class FetcherSdk(
         val data = server.server.sdk(rootInfo)
         val processed = data.processToModules().ensureUniqueNames()
 
+        val optInMarkers = processed.optInMarkers()
+        fun Appendable.appendFileHeader() {
+            if (optInMarkers.isNotEmpty()) appendLine("@file:OptIn(${optInMarkers.joinToString { "$it::class" }})")
+            appendLine("package $packageName")
+        }
+
         val needToGenerateLiveVersions = data.asSequence().any { node ->
             node.layer.endpoints.keys.any { it?.item?.needsGeneration() == true }
         }
@@ -134,12 +148,12 @@ public class FetcherSdk(
         when (fileStructure) {
             is Structure.MultipleFiles -> {
                 archive.appendableEntry(fileStructure.interfaceFilename) {
-                    appendLine("package $packageName")
+                    appendFileHeader()
                     appendImports(processed, "com.lightningkite.lightningserver.typed.RequestMetadata")
                     writeInterface(processed)
                 }
                 archive.appendableEntry(fileStructure.liveFilename) {
-                    appendLine("package $packageName")
+                    appendFileHeader()
                     appendImports(
                         processed,
                         "com.lightningkite.lightningserver.HttpMethod",
@@ -152,7 +166,7 @@ public class FetcherSdk(
                     writeLive(processed)
                 }
                 if (needToGenerateLiveVersions) archive.appendableEntry(fileStructure.generatedLiveVersionsFilename) {
-                    appendLine("package $packageName")
+                    appendFileHeader()
                     appendImports(
                         processed,
                         "com.lightningkite.lightningserver.HttpMethod",
@@ -169,7 +183,7 @@ public class FetcherSdk(
 
             is Structure.SingleFile -> {
                 archive.appendableEntry(fileStructure.filename) {
-                    appendLine("package $packageName")
+                    appendFileHeader()
                     appendImports(
                         processed,
                         "com.lightningkite.lightningserver.HttpMethod",
@@ -197,6 +211,57 @@ public class FetcherSdk(
         (imports.toList() + module.imports())
             .distinct()
             .joinTo(this, "\n", prefix = "\n", postfix = "\n") { "import $it" }
+    }
+
+    /** The Kotlin names of the `@RequiresOptIn` markers on the classes the generated code names. */
+    private fun SDK.Module.optInMarkers(): List<String> {
+        fun SDK.Module.allFunctions(): List<SDK.Function> = functions + children.flatMap { it.allFunctions() }
+        fun KSerializer<*>.withNested(): List<KSerializer<*>> = listOf(this) + subSerializers().flatMap { it.withNested() }
+
+        return allFunctions()
+            .flatMap { function -> listOf(function.outputType) + function.arguments.map { it.type } }
+            .flatMap { it.withNested() }
+            .mapNotNull { it.namedClass() }
+            .distinct()
+            .flatMap { it.annotationClasses() }
+            // By name: the compiler only allows RequiresOptIn as an annotation, not as RequiresOptIn::class.
+            .filter { annotation -> annotation.annotationClasses().any { it.name == "kotlin.RequiresOptIn" } }
+            .map { it.kotlin.qualifiedName ?: throw SDK.GenerationException("Opt-in marker $it has no qualified name") }
+            .distinct()
+            .sorted()
+    }
+
+    /** The class this serializer's type is named by in generated code, or null for types without one, like `kotlin.String`. */
+    @OptIn(ExperimentalSerializationApi::class)
+    private fun KSerializer<*>.namedClass(): Class<*>? {
+        descriptor.capturedKClass?.let { return it.java }
+        if (nullElement() != null) return null // its element is visited on its own
+        // The same name kotlinTypeString writes. Nested classes are Outer$Inner in bytecode, and nothing in the
+        // name says which dots are package separators, so each split is tried from the innermost.
+        var name = descriptor.serialName.substringBefore('/').substringBefore('<')
+        while (true) {
+            try {
+                return Class.forName(name, false, FetcherSdk::class.java.classLoader)
+            } catch (_: ClassNotFoundException) {
+            }
+            val lastDot = name.lastIndexOf('.')
+            if (lastDot == -1) return null
+            name = name.substring(0, lastDot) + "$" + name.substring(lastDot + 1)
+        }
+    }
+
+    // Opt-in markers, and RequiresOptIn itself, are BINARY-retained, which reflection can't see, so this reads the class file.
+    private fun Class<*>.annotationClasses(): List<Class<*>> {
+        val classFile = getResourceAsStream("/" + name.replace('.', '/') + ".class")
+            ?: throw SDK.GenerationException("No class file found for $name")
+        val names = ArrayList<String>()
+        classFile.use { ClassReader(it) }.accept(object : ClassVisitor(Opcodes.ASM9) {
+            override fun visitAnnotation(descriptor: String, visible: Boolean): AnnotationVisitor? {
+                names += Type.getType(descriptor).className
+                return null
+            }
+        }, ClassReader.SKIP_CODE)
+        return names.map { Class.forName(it, false, classLoader) }
     }
 
     context(_: Engine)

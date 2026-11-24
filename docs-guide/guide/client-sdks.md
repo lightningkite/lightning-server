@@ -217,11 +217,12 @@ Intended breaks can be listed in an `ApiAllowlist`.
 Clients without an SDK follow the same conventions the SDKs use:
 
 - **Formats.** Send `Content-Type` and `Accept`.  A server with the basic coders accepts `application/json` (the default),
-  `application/x-www-form-urlencoded`, and `application/x-lightningserver-kotlin-bytes`; see
+  `application/x-www-form-urlencoded`, and `application/x-lightningserver-kotlin-wire` (or the older
+  `application/x-lightningserver-kotlin-bytes`); see
   [Serialization](serialization.md).
 - **GET input** is the input object's fields as query parameters: `GET /products?text=lamp&limit=5`.
-- **Authentication.** `Authorization: Bearer <token>`.  Where headers aren't possible (browser WebSockets), the token
-  may go in an `Authorization` or `jwt` query parameter.  Getting a token is covered in [Authentication](auth.md).
+- **Authentication.** `Authorization: Bearer <token>`.  Where headers aren't possible (browser WebSockets), the access
+  token may go in an `Authorization` or `jwt` query parameter; only WebSocket connects accept that.  Getting a token is covered in [Authentication](auth.md).
 - **Errors** are JSON `LSError` bodies (`http`, `detail`, `message`, `data`); branch on `detail`.  See
   [Error handling](error-handling.md#the-response-body).
 - **Database queries** to [Model REST](model-rest.md) endpoints take `Condition` and `Modification` JSON.

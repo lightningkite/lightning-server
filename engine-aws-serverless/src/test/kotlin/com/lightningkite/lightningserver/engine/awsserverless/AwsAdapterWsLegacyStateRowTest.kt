@@ -11,16 +11,15 @@ import com.lightningkite.lightningserver.websockets.text
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.builtins.NothingSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
+import software.amazon.awssdk.core.SdkBytes
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue
-import java.io.IOException
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFails
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -30,8 +29,8 @@ import kotlin.test.assertTrue
  * was deployed then.  Every phase after `${'$'}connect` therefore has to end such a socket rather than
  * fail on it, or a rolling deploy breaks every socket open across it.
  *
- * The rows here are written by [putLegacySocketRow] in the fork point's own layout, which the current
- * serializer cannot decode at all.
+ * The rows here are written by [putLegacySocketRow] in the fork point's own layout, under the attributes
+ * releases before KotlinWireFormat used.
  */
 class AwsAdapterWsLegacyStateRowTest {
 
@@ -164,25 +163,46 @@ class AwsAdapterWsLegacyStateRowTest {
     }
 
     /**
-     * The fixture has to be genuinely unreadable, or every test built on it is theatre.  If
-     * [LegacyWebSocketConnectRequest] ever drifts into a layout the current serializer accepts, this
-     * fails here rather than quietly turning the rest of the file green for the wrong reason.
+     * A row the release before KotlinWireFormat wrote holds a request of today's shape in OldKotlinBytesFormat
+     * under the old attributes.  It would decode with that format, but socket rows are never read in it: the
+     * row is stale, so the socket is ended.
      */
     @Test
-    fun legacyBlobCannotBeDecodedByTheCurrentSerializer() {
+    fun rowWithOnlyOldAttributesEndsTheSocket() {
         val adapter = adapter()
-        val encoding = adapter.internalSerialization.kotlinBytesFormat
-        val blob = encoding.encodeToByteArray(
-            LegacyWebSocketConnectRequest.serializer(NothingSerializer()),
-            adapter.legacyConnectRequest("fixture-check")
+        val connectionId = "old-attributes-row"
+        val channel = adapter.connect(connectionId)
+        val current = assertNotNull(adapter.stateRow(connectionId))
+        val request = adapter.internalSerialization.kotlinWireFormat.decodeFromByteArray(
+            WebSocketConnectRequest.serializer(NothingSerializer()),
+            current.getValue("wsWireRequest").b().asByteArray(),
         )
-        val thrown = assertFails {
-            encoding.decodeFromByteArray(WebSocketConnectRequest.serializer(NothingSerializer()), blob)
+        runBlocking {
+            adapter.countingDynamo.putItem {
+                it.tableName(adapter.stateTableName())
+                it.item(
+                    mapOf(
+                        socketIdColumn to AttributeValue.fromS(connectionId),
+                        oldStateColumn to current.getValue("wsWireState"),
+                        oldRequestColumn to AttributeValue.fromB(
+                            SdkBytes.fromByteArray(
+                                adapter.internalSerialization.oldKotlinBytesFormat.encodeToByteArray(
+                                    WebSocketConnectRequest.serializer(NothingSerializer()),
+                                    request,
+                                )
+                            )
+                        ),
+                        expireColumn to current.getValue(expireColumn),
+                    )
+                )
+            }.await()
         }
-        assertTrue(
-            thrown is SerializationException || thrown is IOException,
-            "A fork-point blob must fail to decode as a schema mismatch, not as $thrown"
-        )
+
+        val response = adapter.invoke(clientMessage(connectionId, "Ping!"))
+        adapter.awaitPendingInvocations()
+
+        assertEquals(204, response.statusCode, "A stale row is discarded, not reported as a failure: ${response.body}")
+        assertSocketEnded(adapter, connectionId, channel)
     }
 
     @Test
@@ -275,6 +295,10 @@ class AwsAdapterWsLegacyStateRowTest {
         val connectionId = "healthy-socket"
         val channel = adapter.connect(connectionId)
         SampleServer.disconnectHandlerRuns.set(0)
+        assertEquals(
+            setOf(socketIdColumn, "wsWireState", "wsWireRequest", expireColumn),
+            assertNotNull(adapter.stateRow(connectionId)).keys,
+        )
 
         assertEquals(200, adapter.invoke(clientMessage(connectionId, "Ping!")).statusCode)
         adapter.awaitPendingInvocations()

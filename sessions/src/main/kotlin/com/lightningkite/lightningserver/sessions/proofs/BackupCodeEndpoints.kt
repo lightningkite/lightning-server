@@ -163,7 +163,7 @@ public class BackupCodeEndpoints(
             implementation = { _: Unit ->
                 // Revokes the codes that are still live. Redeemed rows stay: they are a record of an
                 // authentication that happened, not a secret that needs withdrawing.
-                modelInfo.table().deleteManyIgnoringOld(
+                val revoked = modelInfo.table().deleteManyIgnoringOld(
                     Condition {
                         it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) and
                                 it.usedAt.eq(null)
@@ -189,6 +189,8 @@ public class BackupCodeEndpoints(
                         createdAt = now(),
                     )
                 })
+                val change = if (revoked > 0) AuthEvent.FactorChanged.Change.Replaced else AuthEvent.FactorChanged.Change.Added
+                serverRuntime.reportAuthEvent(AuthEvent.FactorChanged(info, auth.principalName, auth.rawId, change, request))
 
                 newCodes.map { code -> code.chunked(5).joinToString("-") }
             }
@@ -216,11 +218,14 @@ public class BackupCodeEndpoints(
             examples = listOf(),
             implementation = { _: Unit ->
                 // As above: clearing withdraws live codes, it does not erase redemption history.
-                modelInfo.table().deleteManyIgnoringOld(
+                val cleared = modelInfo.table().deleteManyIgnoringOld(
                     Condition {
                         it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) and
                                 it.usedAt.eq(null)
                     }
+                )
+                if (cleared > 0) serverRuntime.reportAuthEvent(
+                    AuthEvent.FactorChanged(info, auth.principalName, auth.rawId, AuthEvent.FactorChanged.Change.Removed, request)
                 )
             }
         )

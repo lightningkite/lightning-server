@@ -87,8 +87,8 @@ class PublicTinyTokenFormatTest {
             val token = execute { format.create(TestUser, auth) }
             assertNotNull(token)
 
-            // Token should start with tt/principal name followed by /
-            assert(token.startsWith("tt/TestUser/")) { "Token should start with tt/principal name" }
+            // Token should start with tw/principal name followed by /
+            assert(token.startsWith("tw/TestUser/")) { "Token should start with tw/principal name" }
 
             // Read back the token
             val readAuth = execute { format.read(TestUser, token) }
@@ -164,7 +164,7 @@ class PublicTinyTokenFormatTest {
 
             val token = execute { format.create(TestUser, auth) }
 
-            // Token starts with "tt/TestUser/" so reading as OtherUser should return null
+            // Token starts with "tw/TestUser/" so reading as OtherUser should return null
             val result = execute { format.read(OtherUser, token) }
             assertNull(result, "Token for different principal type should return null")
         }
@@ -235,13 +235,15 @@ class PublicTinyTokenFormatTest {
     @Test
     fun `authentic token whose data does not decode throws TokenException`() = runBlocking {
         TestServer.test({}) {
-            assertFailsWith<TokenException> {
-                execute {
-                    createPublicTinyTokenFormat().read(TestUser, byteArrayOf(1, 2, 3).let { data ->
-                        "tt/TestUser/" + Base64.UrlSafe.encode(
-                            testBasis.HS256("public-tiny-token-test").sign(data) + data
-                        )
-                    })
+            for (prefix in listOf("tw/TestUser/", "tt/TestUser/")) {
+                assertFailsWith<TokenException>(prefix) {
+                    execute {
+                        createPublicTinyTokenFormat().read(TestUser, byteArrayOf(1, 2, 3).let { data ->
+                            prefix + Base64.UrlSafe.encode(
+                                testBasis.HS256("public-tiny-token-test").sign(data) + data
+                            )
+                        })
+                    }
                 }
             }
         }

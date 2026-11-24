@@ -29,11 +29,18 @@ public interface AuthClientEndpoints<USER : HasId<ID>, ID : Comparable<ID>> {
     /** Returns a short-lived access token in exchange for the long-lived refresh token [input]. */
     public suspend fun getTokenSimple(input: String): String
 
+    /** Returns a short-lived access token for the refresh token held in the cookie set by [setRefreshTokenCookie]. */
+    public suspend fun getTokenFromCookie(): String
+
+    /**
+     * Moves the refresh token [input] into an HttpOnly cookie, so a web client need not keep it.
+     *
+     * Call it right after logging in, then forget the refresh token and use [getTokenFromCookie].
+     */
+    public suspend fun setRefreshTokenCookie(input: String)
+
     /** Returns the authenticated user. */
     public suspend fun getSelf(): USER
-
-    /** Returns a refresh token for a new sub-session of the current session, with the label, scopes and expiration in [input]. */
-    public suspend fun subsession(input: SubSessionRequest): String
 
     /** Returns the available proof options and the minimum strength required. */
     public suspend fun authRequirements(): AuthRequirements

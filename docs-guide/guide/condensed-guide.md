@@ -349,7 +349,7 @@ object Account : ServerBuilder() {
 
 ## Log users in with proofs and sessions
 
-Proofs (email PIN, password, ...) are exchanged for a session; the refresh token becomes a bearer token:
+Proofs (email PIN, password, ...) are exchanged for a session; the refresh token is exchanged for short-lived access tokens, which are the bearer tokens:
 
 <!-- sample: com/lightningkite/lightningserver/guide/condensed/CondensedSamples.kt#login -->
 ```kotlin
@@ -378,8 +378,8 @@ object Login : ServerBuilder() {
 }
 ```
 
-Client flow: `POST /auth/email/start` → email arrives → `POST /auth/email/prove` → `POST /auth/login` → send
-`Authorization: Bearer <token>`.
+Client flow: `POST /auth/email/start` → email arrives → `POST /auth/email/prove` → `POST /auth/login` (refresh
+token) → `POST /auth/token/simple` (access token) → send `Authorization: Bearer <access token>`.
 
 Full chapter: [Proof & Session](proof-session.md).
 

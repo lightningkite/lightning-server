@@ -90,7 +90,15 @@ append (`+=`), and list/set drop-first/last.  `assign` the new value instead.
   ScreeningResult`, and `SmsProofEndpoints(verifyPhone = ...)` becomes `screenPhone`.  The old parameters still
   work, deprecated.  `WebAuthNProofEndpoints`' `expiration` is now `challengeExpiration`.
 - **Sub-sessions** inherit their parent's authentication time, can't exceed its scopes, and end when it is
-  terminated.
+  terminated.  They are created server-side with `newSubSession`: the `POST sub-session` endpoint, the client's
+  `subsession` and `SubSessionRequest` are gone, since a stolen access token could mint a long-lived refresh token
+  through them.
+- **Only access tokens authenticate requests.**  A refresh token sent as `Authorization` now gets a 401: exchange it
+  at `token/simple` first.  If old clients can't be updated yet, pass `acceptRefreshTokenAsBearer = Runtime { true }`
+  to the `SessionManager` / `AuthEndpoints`.
+- **Tokens in URLs work only on WebSocket connects.**  An HTTP request with an `Authorization` or `jwt` query
+  parameter gets a 400; send the header.
+- **The `Authorization` cookie is no longer read.**  A request carrying only that cookie is unauthenticated.
 
 ## Clients
 

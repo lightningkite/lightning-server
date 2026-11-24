@@ -38,7 +38,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
             override val request: WebSocketConnectRequest<PathSpec>
                 get() = wrapped.currentState.request as WebSocketConnectRequest<PathSpec>
             override var currentState: T = wrapped.currentState.underlyingData.value(
-                runtime.internalSerialization.kotlinBytesFormat,
+                runtime.internalSerialization.kotlinWireFormat,
                 handler.storageSerializer
             )
                 private set
@@ -56,7 +56,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
             context(server: ServerRuntime)
             override suspend fun repullState(): T =
                 wrapped.repullState().underlyingData.value(
-                    runtime.internalSerialization.kotlinBytesFormat,
+                    runtime.internalSerialization.kotlinWireFormat,
                     handler.storageSerializer
                 )
 
@@ -65,12 +65,12 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
                 wrapped.queueStateUpdate { data ->
                     val underlying =
                         data.underlyingData.value(
-                            runtime.internalSerialization.kotlinBytesFormat,
+                            runtime.internalSerialization.kotlinWireFormat,
                             handler.storageSerializer
                         )
                     data.copy(
                         underlyingData = AnonType(
-                            runtime.internalSerialization.kotlinBytesFormat,
+                            runtime.internalSerialization.kotlinWireFormat,
                             modification(underlying),
                             handler.storageSerializer
                         )
@@ -83,12 +83,12 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
                 wrapped.updateStateImmediately { data ->
                     val underlying =
                         data.underlyingData.value(
-                            runtime.internalSerialization.kotlinBytesFormat,
+                            runtime.internalSerialization.kotlinWireFormat,
                             handler.storageSerializer
                         )
                     data.copy(
                         underlyingData = AnonType(
-                            runtime.internalSerialization.kotlinBytesFormat,
+                            runtime.internalSerialization.kotlinWireFormat,
                             modification(underlying).also { currentState = it },
                             handler.storageSerializer
                         )
@@ -165,7 +165,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
         return QueryParamWebSocketHandlerData(
             request,
             AnonType(
-                serverRuntime.internalSerialization.kotlinBytesFormat,
+                serverRuntime.internalSerialization.kotlinWireFormat,
                 startData,
                 otherHandler.storageSerializer as KSerializer<Any?>
             )

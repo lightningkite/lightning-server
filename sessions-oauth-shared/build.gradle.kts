@@ -16,6 +16,8 @@ kotlin {
     compilerOptions {
         optIn.add("kotlin.time.ExperimentalTime")
         optIn.add("kotlin.uuid.ExperimentalUuidApi")
+        // The generated optics and serializers touch the provider's models.
+        optIn.add("com.lightningkite.lightningserver.ExperimentalOauthProviderApi")
     }
 
     applyDefaultHierarchyTemplate()
@@ -51,6 +53,7 @@ kotlin {
                 api(libs.kotlinx.serialization.json)
                 api(libs.kotlinx.datetime)
                 api(sa.database.shared)
+                api(project(":core-shared"))
             }
             kotlin {
                 srcDir(file("build/generated/ksp/common/commonMain/kotlin"))

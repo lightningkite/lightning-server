@@ -6,7 +6,7 @@ import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.executeInlineWithMetrics
-import com.lightningkite.services.serializers.KotlinBytesFormat
+import com.lightningkite.services.serializers.KotlinWireFormat
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -16,7 +16,7 @@ import software.amazon.awssdk.services.lambda.model.InvokeRequest
 
 internal class AwsAdapterTask(val root: AwsAdapter) {
     val json: Json get() = root.internalSerialization.json
-    val format: KotlinBytesFormat get() = root.internalSerialization.kotlinBytesFormat
+    val format: KotlinWireFormat get() = root.internalSerialization.kotlinWireFormat
 
     /**
      * The queued payload, and the only thing that survives to the invocation that runs the task.
@@ -63,7 +63,7 @@ internal class AwsAdapterTask(val root: AwsAdapter) {
                 with(root) {
                     @OptIn(EngineApi::class)
                     task.executeInlineWithMetrics(
-                        event.input.value(root.internalSerialization.kotlinBytesFormat, task.serializer),
+                        event.input.value(root.internalSerialization.kotlinWireFormat, task.serializer),
                         event.cause,
                     )
                 }

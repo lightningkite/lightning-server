@@ -2,6 +2,8 @@ package com.lightningkite.lightningserver.typed.jsonrpc
 
 import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.OverrideOnly
+import com.lightningkite.lightningserver.auth.AuthRequirement
+import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
@@ -42,11 +44,14 @@ private val logger = KotlinLogging.logger("com.lightningkite.lightningserver.typ
  *
  * @param PATH The path specification type
  * @param methods List of available RPC methods
+ * @param auth Asserted before the request body is read, so a caller that fails it gets the HTTP 401 or 403 and learns
+ *   nothing about versions or methods. Each method still asserts its own [JsonRpcMethod.auth] afterwards.
  * @param check Runs on every parsed request before its method is looked up, e.g. to enforce headers a protocol built on
  *   JSON-RPC requires; throw [JsonRpcException] to refuse the request.
  */
 public class JsonRpcHandler<PATH : PathSpec>(
     private val methods: List<JsonRpcMethod<PATH, *, *, *>>,
+    private val auth: AuthRequirement<*> = noAuth,
     private val check: suspend context(ServerRuntime) (request: HttpRequest<PATH>, rpc: JsonRpcRequest) -> Unit = { _, _ -> },
 ) : HttpHandler<PATH> {
 
@@ -55,6 +60,8 @@ public class JsonRpcHandler<PATH : PathSpec>(
     @OverrideOnly
     context(server: ServerRuntime)
     override suspend fun handle(request: HttpRequest<PATH>): HttpResponse {
+        request.access(auth)
+
         // Parse the JSON-RPC request
         val rpcRequest = try {
             request.body?.parse(JsonRpcRequest.serializer())

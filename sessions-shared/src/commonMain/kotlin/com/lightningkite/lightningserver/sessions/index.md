@@ -8,7 +8,6 @@ This package contains shared multiplatform models and interfaces for the Lightni
 
 Core session data models:
 
-- **SubSessionRequest** - Request to create a derived session with reduced privileges
 - **Session** - Active authentication session with lifecycle management
 - **LogInRequest** - Request to authenticate and create a new session
 - **IdAndAuthMethods** - Response containing user ID and available authentication options

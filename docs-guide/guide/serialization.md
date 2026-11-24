@@ -78,7 +78,8 @@ error responses, and `toTypedData` fail with "No encoders found".
 |---|---|---|
 | `application/json` | JSON | Priority 1, so it's the default when `Accept` names nothing registered; streams to and from the body |
 | `application/x-www-form-urlencoded` | `FormDataFormat` | HTML forms |
-| `application/x-lightningserver-kotlin-bytes` | `KotlinBytesFormat` | Compact binary format for Kotlin clients |
+| `application/x-lightningserver-kotlin-wire` | `KotlinWireFormat` | Compact binary format for Kotlin clients |
+| `application/x-lightningserver-kotlin-bytes` | `OldKotlinBytesFormat` | The previous binary format, for existing clients |
 
 The registered JSON is deliberately lenient:
 
@@ -160,7 +161,7 @@ A server has two modules, both overridable on any `ServerBuilder`:
 Register a type in both when it is both sent and stored.  Modules from included builders are merged into the root's,
 which is how `GlobalUploadEndpoints` installs the `ServerFile` serializer (see [Files](files.md)).  At runtime,
 `serverRuntime.externalSerialization` and `internalSerialization` give a `Serialization` with ready-made `json`,
-`jsonWithoutDefaults`, `jsonWithoutExplicitNulls`, `formDataFormat`, and `kotlinBytesFormat` instances built from that
+`jsonWithoutDefaults`, `jsonWithoutExplicitNulls`, `formDataFormat`, `kotlinWireFormat`, and `oldKotlinBytesFormat` instances built from that
 module.
 
 ## Adding a format

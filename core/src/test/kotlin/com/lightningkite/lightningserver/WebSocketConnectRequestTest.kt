@@ -12,7 +12,7 @@ import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.serializerOrContextual
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
-import com.lightningkite.services.serializers.KotlinBytesFormat
+import com.lightningkite.services.serializers.KotlinWireFormat
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
@@ -60,7 +60,7 @@ class WebSocketConnectRequestTest {
 }
 
 val json = Json { prettyPrint = true; encodeDefaults = true }
-val kbytes = KotlinBytesFormat(EmptySerializersModule())
+val kbytes = KotlinWireFormat(EmptySerializersModule())
 inline fun <reified T> T.roundTripTest() {
     val serializer: KSerializer<T> = serializerOrContextual()
     assertEquals(this, Json.decodeFromString(serializer, Json.encodeToString(serializer, this).also { println(it) }))

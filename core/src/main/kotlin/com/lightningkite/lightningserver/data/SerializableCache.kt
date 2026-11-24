@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.data
 
 import com.lightningkite.lightningserver.data.SerializableCache.CalculatingKey
 import com.lightningkite.lightningserver.data.SerializableCache.Key
+import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import kotlinx.coroutines.sync.Mutex
@@ -48,7 +49,10 @@ import kotlin.time.Duration
 @Serializable(SerializableCache.Serializer::class)
 public class SerializableCache<out SCOPE> private constructor(
     private val serialized: ConcurrentHashMap<String, ByteArray>,
-    private val cache: ConcurrentHashMap<String, KeyAndResult<*>> = ConcurrentHashMap()
+    private val cache: ConcurrentHashMap<String, KeyAndResult<*>> = ConcurrentHashMap(),
+    // Entries a container written in OldKotlinBytesFormat brought in.  Read with that format and moved to
+    // [serialized] when retrieved; never serialized again, so an entry nobody retrieved is dropped (it is a cache).
+    private val oldFormatSerialized: ConcurrentHashMap<String, ByteArray> = ConcurrentHashMap(),
 ) {
     internal constructor(serialized: Map<String, ByteArray>) : this(ConcurrentHashMap(serialized))
 
@@ -142,13 +146,22 @@ public class SerializableCache<out SCOPE> private constructor(
             cache.remove(key.id, it)
         }
 
-        val bytes = serialized[key.id] ?: return null
-        val decoded = server.internalSerialization.kotlinBytesFormat.decodeFromByteArray(
-            Expiring.serializer(key.serializer),
-            bytes
-        )
+        val bytes = serialized[key.id]
+        val decoded = if (bytes != null) {
+            server.internalSerialization.kotlinWireFormat.decodeFromByteArray(Expiring.serializer(key.serializer), bytes)
+        } else {
+            val oldBytes = oldFormatSerialized[key.id] ?: return null
+            val old = server.internalSerialization.oldKotlinBytesFormat
+                .decodeFromByteArray(Expiring.serializer(key.serializer), oldBytes)
+            if (!old.expired) serialized.putIfAbsent(
+                key.id,
+                server.internalSerialization.kotlinWireFormat.encodeToByteArray(Expiring.serializer(key.serializer), old)
+            )
+            oldFormatSerialized.remove(key.id, oldBytes)
+            old
+        }
         if (decoded.expired) {
-            serialized.remove(key.id, bytes)
+            if (bytes != null) serialized.remove(key.id, bytes)
             return null
         }
 
@@ -167,12 +180,13 @@ public class SerializableCache<out SCOPE> private constructor(
     context(server: Engine)
     private fun <T> cache(key: Key<*, T>, value: T) {
         val expiring = Expiring(value, expireAfter = key.expireAfter)
-        val bytes = if (key.localOnly) null else server.internalSerialization.kotlinBytesFormat
+        val bytes = if (key.localOnly) null else server.internalSerialization.kotlinWireFormat
             .encodeToByteArray(Expiring.serializer(key.serializer), expiring)
         // The entry and its bytes are written together under the key's lock in `cache`, so concurrent
         // writers cannot leave them disagreeing.
         cache.compute(key.id) { _, _ ->
             if (bytes != null) serialized[key.id] = bytes
+            oldFormatSerialized.remove(key.id)
             KeyAndResult(key, expiring)
         }
         updated = true
@@ -250,17 +264,27 @@ public class SerializableCache<out SCOPE> private constructor(
 
     internal val bytes: Map<String, ByteArray> get() = serialized.toMap()
 
-    override fun equals(other: Any?): Boolean = other is SerializableCache<*> && run {
-        val a = this.bytes
-        val b = other.bytes
-        if (a.size != b.size) return false
-        for ((key, value) in a) {
-            if (b[key]?.let { it contentEquals value } != true) return false
-        }
-        return true
+    /**
+     * Marks the entries this cache was decoded with as written by `Serialization.oldKotlinBytesFormat`.  Call it on
+     * a cache decoded from a container in that format (an old tiny token, an old JWT's `cache` claim).
+     */
+    @InternalLightningServerApi
+    public fun markEntriesAsOldFormat() {
+        oldFormatSerialized.putAll(serialized)
+        serialized.clear()
     }
 
-    override fun hashCode(): Int = bytes.hashCode()
+    override fun equals(other: Any?): Boolean = other is SerializableCache<*> &&
+            sameBytes(serialized, other.serialized) && sameBytes(oldFormatSerialized, other.oldFormatSerialized)
+
+    private fun sameBytes(a: Map<String, ByteArray>, b: Map<String, ByteArray>): Boolean =
+        a.size == b.size && a.all { (key, value) -> b[key]?.contentEquals(value) == true }
+
+    // Map.hashCode would hash the arrays by identity, so equal caches would hash differently.
+    override fun hashCode(): Int = contentHash(serialized) * 31 + contentHash(oldFormatSerialized)
+
+    private fun contentHash(map: Map<String, ByteArray>): Int =
+        map.entries.sumOf { (key, value) -> key.hashCode() xor value.contentHashCode() }
 
     /**
      * Returns a human-readable string representation of the cache contents.
@@ -271,7 +295,7 @@ public class SerializableCache<out SCOPE> private constructor(
         .map { entry ->
             entry.key to entry.value.result.let { if (it.expiresAt == null) it.value else it }
         }
-        .plus((serialized.keys - cache.keys).map { it to "ENCODED" })
+        .plus((serialized.keys + oldFormatSerialized.keys - cache.keys).map { it to "ENCODED" })
         .joinToString(prefix = "{", separator = ", ", postfix = "}") { "${it.first}=${it.second}" }
 
 //    /**
@@ -285,7 +309,8 @@ public class SerializableCache<out SCOPE> private constructor(
 
     public fun copy(): SerializableCache<SCOPE> = SerializableCache(
         ConcurrentHashMap(serialized),
-        ConcurrentHashMap(cache)
+        ConcurrentHashMap(cache),
+        ConcurrentHashMap(oldFormatSerialized),
     )
 
     public companion object {

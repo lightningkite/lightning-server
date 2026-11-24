@@ -136,9 +136,8 @@ class HttpTest {
         val cookies = headers.getMany(HttpHeader.SetCookie)
         assertEquals(1, cookies.size)
         val cookie = cookies.first()
-        assertEquals("session", cookie.parameters["key"])
-        assertEquals("abc123", cookie.parameters["value"])
-        assertEquals("Strict", cookie.parameters["sameSite"])
+        assertEquals("abc123", cookie.parameters["session"])
+        assertEquals("Strict", cookie.parameters["SameSite"])
     }
 
     @Test

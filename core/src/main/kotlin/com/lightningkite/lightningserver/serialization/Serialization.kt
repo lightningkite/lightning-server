@@ -1,7 +1,8 @@
 package com.lightningkite.lightningserver.serialization
 
 import com.lightningkite.services.data.StringArrayFormat
-import com.lightningkite.services.serializers.KotlinBytesFormat
+import com.lightningkite.services.serializers.KotlinWireFormat
+import com.lightningkite.services.serializers.OldKotlinBytesFormat
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 
@@ -25,10 +26,16 @@ public open class Serialization(public val serializersModule: SerializersModule 
     public open val stringArrayFormat: StringArrayFormat = StringArrayFormat(serializersModule)
 
     /**
-     * Binary format for efficient Kotlin object serialization.
-     * Suitable for internal communication or caching where performance is critical.
+     * Binary format for Kotlin object serialization: tiny tokens, WebSocket state, cache entries, task payloads.
+     * Its bytes carry no marker, so whatever stores them must record that they are in this format.
      */
-    public open val kotlinBytesFormat: KotlinBytesFormat = KotlinBytesFormat(serializersModule)
+    public open val kotlinWireFormat: KotlinWireFormat = KotlinWireFormat(serializersModule)
+
+    /**
+     * The binary format used before [kotlinWireFormat].  Only for reading data written before it, such as tiny
+     * tokens without the new prefix; never write with it.
+     */
+    public open val oldKotlinBytesFormat: OldKotlinBytesFormat = OldKotlinBytesFormat(serializersModule)
 
     /**
      * Format for application/x-www-form-urlencoded data.

@@ -93,7 +93,15 @@ public class WebAuthNProofEndpoints(
     public val modelInfo: ModelInfo<HasId<*>, WebAuthNCredential, String> = database.modelInfo(
         tableName = "WebAuthNCredential",
         auth = proofMethodAuth or AuthRequirement.IsAdmin,
-        signals = { table -> signals?.invoke(serverRuntime, table) ?: table },
+        signals = { table ->
+            val table = signals?.invoke(serverRuntime, table) ?: table
+            table.postCreate { created ->
+                serverRuntime.reportAuthEvent(AuthEvent.FactorChanged(info, created.subjectType, created.subjectId, AuthEvent.FactorChanged.Change.Added))
+            }.postChange { old, new ->
+                if (old.disabledAt == null && new.disabledAt != null)
+                    serverRuntime.reportAuthEvent(AuthEvent.FactorChanged(info, new.subjectType, new.subjectId, AuthEvent.FactorChanged.Change.Removed))
+            }
+        },
         permissions = {
             val admin = Condition(AuthRequirement.IsAdmin.accepts(authOrNull))
             val mine = authOrNull?.let { a ->

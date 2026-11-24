@@ -14,6 +14,9 @@ import com.lightningkite.lightningserver.runtime.test.TestRunner
 import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
+import com.lightningkite.lightningserver.sessions.AuthEvent
+import com.lightningkite.lightningserver.sessions.AuthEventListener
+import com.lightningkite.lightningserver.sessions.install
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
 import com.lightningkite.lightningserver.typed.AuthAccess
 import com.lightningkite.lightningserver.typed.test
@@ -121,6 +124,8 @@ class WebAuthNProofEndpointsTest {
             register(TestAdmin)
         }
 
+        val factorChanges = install(FactorChanges())
+
         // A second proof method, so tests can obtain the kind of proof that unlocks credential ids in /start.
         val password = path.path("auth").path("password") include PasswordProofEndpoints(
             database = database,
@@ -147,6 +152,15 @@ class WebAuthNProofEndpointsTest {
                 )
             },
         )
+    }
+
+    private class FactorChanges : AuthEventListener {
+        val changes = mutableListOf<AuthEvent.FactorChanged.Change>()
+
+        context(runtime: ServerRuntime)
+        override suspend fun onEvent(event: AuthEvent) {
+            if (event is AuthEvent.FactorChanged) changes += event.change
+        }
     }
 
     private fun newUser(email: String = "user-${Uuid.random()}@example.com"): TestUser =
@@ -237,6 +251,35 @@ class WebAuthNProofEndpointsTest {
             val proof = server.webAuthN.prove.test(null, key.assert(started.challengeId, started.options.challenge, uv = true))
 
             assertEquals(20, proof.strength)
+        }
+    }
+
+    @Test
+    fun `registering and revoking a passkey are reported, failed registration and login are not`(): Unit = runBlocking {
+        val server = server()
+        server.test({}) {
+            val user = newUser()
+            val rejected = FakeAuthenticator()
+            val started = server.webAuthN.registerStart.test(authFor(user), WebAuthN.GeneralPreference.Preferred)
+            assertRejected("Failed to verify Authenticator") {
+                server.webAuthN.registerFinish.test(
+                    authFor(user),
+                    rejected.register(started.challengeId, started.options.challenge, origin = "https://evil.example.com")
+                )
+            }
+            assertEquals(listOf(), server.factorChanges.changes)
+
+            val key = FakeAuthenticator()
+            server.webAuthN.register(user, key)
+            val login = server.webAuthN.start()
+            server.webAuthN.prove.test(null, key.assert(login.challengeId, login.options.challenge))
+            assertEquals(listOf(AuthEvent.FactorChanged.Change.Added), server.factorChanges.changes)
+
+            server.webAuthN.rest.modify.test(key.id, authFor(user), Modification<WebAuthNCredential> { it.disabledAt assign Clock.System.now() })
+            assertEquals(
+                listOf(AuthEvent.FactorChanged.Change.Added, AuthEvent.FactorChanged.Change.Removed),
+                server.factorChanges.changes,
+            )
         }
     }
 

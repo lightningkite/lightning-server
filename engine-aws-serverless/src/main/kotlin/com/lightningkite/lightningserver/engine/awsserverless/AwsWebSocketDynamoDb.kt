@@ -3,7 +3,7 @@
 package com.lightningkite.lightningserver.engine.awsserverless
 
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
-import com.lightningkite.services.serializers.KotlinBytesFormat
+import com.lightningkite.services.serializers.KotlinWireFormat
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.reactive.asFlow
@@ -15,7 +15,6 @@ import kotlinx.serialization.builtins.NothingSerializer
 import software.amazon.awssdk.core.SdkBytes
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.dynamodb.model.*
-import java.io.IOException
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.measureTime
@@ -34,7 +33,8 @@ internal sealed interface SocketRow {
     data object Absent : SocketRow
 
     /**
-     * A row written by an earlier deployment, which this one can neither decode nor attribute.
+     * A row this deployment can't use: written before KotlinWireFormat (it has only the old attributes), or
+     * by a schema change KotlinWireFormat can't bridge.
      *
      * Nothing later can repair it.  The stored connect request is written once, at `${'$'}connect`, by
      * whatever code was deployed then, so the socket is ended and the client reconnects to get a row in
@@ -52,7 +52,7 @@ internal sealed interface SocketRow {
 internal class AwsWebSocketDynamoDb(
     val client: DynamoDbAsyncClient,
     val baseTableName: String,
-    val encoding: KotlinBytesFormat,
+    val encoding: KotlinWireFormat,
 ) {
     private val socketExpiration = 8.hours
     private val tableSubs = "$baseTableName-ws-subs"
@@ -68,9 +68,11 @@ internal class AwsWebSocketDynamoDb(
         private const val topicKey = "wsTopic"
         private const val expireKey = "wsExpire"
         private const val pathKey = "wsPath"
-        private const val stateKey = "wsState"
+        // KotlinWireFormat bytes.  Releases before it wrote OldKotlinBytesFormat under wsState and wsRequest; a row
+        // with only those is a stale socket, ended rather than read.
+        private const val stateKey = "wsWireState"
         private const val fromStateKey = "wsFromState"
-        private const val requestKey = "wsRequest"
+        private const val requestKey = "wsWireRequest"
     }
 
     private val initMutex = Mutex()
@@ -235,39 +237,27 @@ internal class AwsWebSocketDynamoDb(
     }
 
     /**
-     * Reads one stored row, reporting anything an earlier deployment wrote as [SocketRow.Legacy]
-     * instead of throwing.
+     * Reads one stored row, reporting one this deployment can't use as [SocketRow.Legacy] instead of throwing.
      *
-     * This is not defensive padding.  The stored connect request is a positional blob, and this branch
-     * removed two properties from [WebSocketConnectRequest], so every blob written before that change
-     * carries element indices past the end of the current descriptor, and one written before
-     * [WebSocketConnectRequest.socketId] existed lacks a required field.  Neither is a fault to report;
-     * both are simply data this deployment cannot read.
-     *
-     * Only the two failures a schema change produces are absorbed, and only around the decode itself:
-     * [SerializationException] for a missing field or an out-of-range element index, and [IOException]
-     * for a decode that ran off the end of the blob because the layout shifted under it.  Every other
-     * failure, DynamoDB's included, happens outside this block and still propagates.
+     * Only the decode's [SerializationException] is absorbed, which an incompatible schema change (a required
+     * field removed, a type changed) produces.  Every other failure, DynamoDB's included, still propagates.
      */
-    private fun decodeRow(socketId: String, item: Map<String, AttributeValue>): SocketRow {
+    internal fun decodeRow(socketId: String, item: Map<String, AttributeValue>): SocketRow {
+        val state = item[stateKey]
+        val request = item[requestKey]
+        if (state == null || request == null) return legacyRow(socketId, "it was written before KotlinWireFormat")
         return try {
             SocketRow.Current(
-                state = item[stateKey]!!.b().asByteArray(),
+                state = state.b().asByteArray(),
                 connectRequest = encoding.decodeFromByteArray(
                     WebSocketConnectRequest.serializer(NothingSerializer()),
-                    item[requestKey]!!.b().asByteArray()
+                    request.b().asByteArray()
                 ),
             )
         } catch (e: SerializationException) {
             legacyRow(
                 socketId,
                 "its stored data does not fit this deployment's schema (${e.message ?: e::class.simpleName})"
-            )
-        } catch (e: IOException) {
-            legacyRow(
-                socketId,
-                "its stored data ran out mid-decode, so its layout is another schema's " +
-                        "(${e.message ?: e::class.simpleName})"
             )
         }
     }
@@ -307,7 +297,8 @@ internal class AwsWebSocketDynamoDb(
             val response = client.getItem {
                 it.tableName(tableStates)
                 it.key(mapOf(socketIdKey to AttributeValue.fromS(id)))
-                it.projectionExpression("$stateKey, $requestKey")
+                // The key is projected too, so a row holding none of the other attributes (a stale one) still comes back.
+                it.projectionExpression("$socketIdKey, $stateKey, $requestKey")
                 it.consistentRead(true)
             }.await()
             // item() is an SDK auto-construct map: it returns empty rather than null when the socket

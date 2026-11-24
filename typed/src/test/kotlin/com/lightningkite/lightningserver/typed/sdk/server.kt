@@ -60,12 +60,27 @@ object Server : ServerBuilder() {
         }
     )
 
+    @OptIn(ExperimentalSdkTestApi::class)
+    val experimental = path.path("experimental").post bind ApiHttpHandler(
+        summary = "Experimental",
+        auth = noAuth,
+        implementation = { input: ExperimentalThing -> listOf(input) }
+    )
+
     val first = path.path("m1") module Module
     val second = path.path("m2") module SecondModule.withSdkInfo("CustomEndpoints", "custom")
     val third = path.path("third") module ThirdModule.withSdkInfo("OtherEndpoints", "other")
 
     val inline = path.path("inline") include Inlined
 }
+
+@RequiresOptIn
+@Retention(AnnotationRetention.BINARY)
+annotation class ExperimentalSdkTestApi
+
+@ExperimentalSdkTestApi
+@Serializable
+data class ExperimentalThing(val value: Int)
 
 @Serializable
 data class TestInput(

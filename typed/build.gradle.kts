@@ -18,6 +18,7 @@ dependencies {
     api(sa.cache)
     api(sa.http.client)
     api(libs.kotlin.reflect)
+    implementation(libs.asm)
     ksp(sa.database.processor)
     // The test source set declares its own models, and the processor no longer
     // covers test sources via the main `ksp` configuration.

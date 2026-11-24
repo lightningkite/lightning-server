@@ -139,6 +139,15 @@ object AuditedLoginServer : ServerBuilder() {
                 runtime.logger.warn { "Rejected ${event.method.via} proof for ${event.principal}" }
         }
     })
+
+    // In a real app, email the user here, so they hear about changes they did not make.
+    val factorNotices = install(object : AuthEventListener {
+        context(runtime: ServerRuntime)
+        override suspend fun onEvent(event: AuthEvent) {
+            if (event is AuthEvent.FactorChanged)
+                runtime.logger.info { "${event.method.via} ${event.change} for ${event.principal}" }
+        }
+    })
 }
 // endregion auth-listener
 

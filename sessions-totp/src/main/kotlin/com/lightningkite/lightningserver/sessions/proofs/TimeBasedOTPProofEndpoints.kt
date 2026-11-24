@@ -74,7 +74,26 @@ public class TimeBasedOTPProofEndpoints(
     public val modelInfo: ModelInfo<HasId<*>, TotpSecret, Uuid> = database.modelInfo(
         tableName = "TotpSecret",
         auth = proofMethodAuth or AuthRequirement.IsAdmin,
-        signals = { table -> signals?.invoke(serverRuntime, table) ?: table },
+        signals = { table ->
+            val table = signals?.invoke(serverRuntime, table) ?: table
+            // A secret is only a factor once confirmed by its first use, so an abandoned setup is neither added nor removed.
+            suspend fun othersConfirmed(secret: TotpSecret) = table.count(Condition {
+                it.subjectId.eq(secret.subjectId) and it.subjectType.eq(secret.subjectType) and
+                        it._id.neq(secret._id) and active and it.lastUsedAt.neq(null)
+            }) > 0
+            table.postChange { old, new ->
+                val confirmed = old.lastUsedAt == null && new.lastUsedAt != null
+                val revoked = old.disabledAt == null && new.disabledAt != null && old.lastUsedAt != null
+                val change = when {
+                    confirmed && othersConfirmed(new) -> AuthEvent.FactorChanged.Change.Replaced
+                    confirmed -> AuthEvent.FactorChanged.Change.Added
+                    // Confirming a replacement retires the old secret right after, which was already reported as Replaced.
+                    revoked && !othersConfirmed(new) -> AuthEvent.FactorChanged.Change.Removed
+                    else -> return@postChange
+                }
+                serverRuntime.reportAuthEvent(AuthEvent.FactorChanged(info, new.subjectType, new.subjectId, change))
+            }
+        },
         permissions = {
             val admin = Condition(AuthRequirement.IsAdmin.accepts(authOrNull))
             val mine = Condition<TotpSecret> {

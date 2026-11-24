@@ -1,6 +1,7 @@
 [versions]
 agp = "9.1.1"
 androidDesugaring = "2.1.5"
+asm = "9.10.1"
 awsVersion = "2.55.5"
 commonsCodec = "1.21.0"
 coroutines = "1.11.0"
@@ -31,6 +32,7 @@ webauthn4jCore = "0.31.10.RELEASE"
 
 [libraries]
 androidDesugaring = { module = "com.android.tools:desugar_jdk_libs", version = { ref = "androidDesugaring" } }
+asm = { module = "org.ow2.asm:asm", version = { ref = "asm" } }
 aws-apiGateway = { module = "software.amazon.awssdk:apigatewaymanagementapi", version = { ref = "awsVersion" } }
 aws-lambda = { module = "software.amazon.awssdk:lambda", version = { ref = "awsVersion" } }
 aws-s3 = { module = "software.amazon.awssdk:s3", version = { ref = "awsVersion" } }

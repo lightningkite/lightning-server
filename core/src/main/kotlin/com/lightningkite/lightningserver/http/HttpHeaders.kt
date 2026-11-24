@@ -250,7 +250,7 @@ public class HttpHeaders internal constructor(public val normalizedEntries: Map<
          * Example:
          * ```kotlin
          * setCookie(
-         *     key = "session",
+         *     name = "session",
          *     value = "abc123",
          *     maxAge = 3600,
          *     path = "/",
@@ -283,37 +283,38 @@ public class HttpHeaders internal constructor(public val normalizedEntries: Map<
             sameSite: SameSite? = null,
             extensions: Map<String, String?> = emptyMap(),
         ) {
+            // An empty value would be written as a bare name, which a browser reads as a nameless cookie.
+            require(value.isNotEmpty()) { "Cookie '$name' needs a non-empty value; to delete it, set any value with maxAge = 0." }
             add(
                 HttpHeader.SetCookie, HttpHeaderValue(
                 root = "",
                 parameters = buildMap {
-                    put("key", name)
-                    put("value", value)
+                    put(name, value)
                     if (expiresAt != null) {
                         put(
-                            "expiresAt",
+                            "Expires",
                             DateTimeFormatter.RFC_1123_DATE_TIME.format(
                                 expiresAt.toJavaInstant().atOffset(ZoneOffset.UTC)
                             )
                         )
                     }
                     if (maxAge != null) {
-                        put("maxAge", maxAge.toString())
+                        put("Max-Age", maxAge.toString())
                     }
                     if (domain != null) {
-                        put("domain", domain)
+                        put("Domain", domain)
                     }
                     if (path != null) {
-                        put("path", path)
+                        put("Path", path)
                     }
                     if (secure) {
-                        put("secure", "")
+                        put("Secure", "")
                     }
                     if (httpOnly) {
-                        put("httpOnly", "")
+                        put("HttpOnly", "")
                     }
                     if (sameSite != null) {
-                        put("sameSite", sameSite.name)
+                        put("SameSite", sameSite.name)
                     }
                     extensions.forEach {
                         if (it.value != null) {

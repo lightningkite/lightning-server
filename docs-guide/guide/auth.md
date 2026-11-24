@@ -235,8 +235,8 @@ To test with a real token, log in through the proof endpoints; see
 
 ## Custom credential readers
 
-`SessionManager` is an `Authentication.Reader`: it turns the `Authorization` header (or query parameter, or cookie)
-into an `Authentication`.  For other credentials, such as API keys, implement `Authentication.Reader` and register it
+`SessionManager` is an `Authentication.Reader`: it turns the access token in the `Authorization` header (or, for a
+WebSocket connect, a query parameter) into an `Authentication`.  For other credentials, such as API keys, implement `Authentication.Reader` and register it
 with `authReaders.register(reader)` in a `ServerBuilder`.  Readers run highest `priority` first and the first non-null
 result wins.  Return null for "no credentials of my kind", and throw `UnauthorizedException` for "credentials, but
 invalid".
@@ -245,5 +245,6 @@ invalid".
 
 - [Proof-based login](proof-session.md): sessions, proof methods, tokens, and revocation
 - [OAuth](oauth.md): signing in with Google, Apple, Microsoft, or GitHub
+- [OAuth authorization server](oauth-provider.md): issuing tokens to MCP clients and other apps
 - [Permissions](permissions.md): per-row access rules built on `auth`
 - [Testing](testing.md)

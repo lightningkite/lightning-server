@@ -1,6 +1,8 @@
 package com.lightningkite.lightningserver.data
 
+import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.definition.GeneralServerSettings
+import com.lightningkite.lightningserver.runtime.engine
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.runtime.ServerRuntime
@@ -493,6 +495,53 @@ class SerializableCacheTest {
                 // Should be able to retrieve the value from deserialized cache
                 assertEquals("test value", cache2.get(key))
             }
+        }
+    }
+
+    @OptIn(InternalLightningServerApi::class)
+    @Test
+    fun equalCachesHaveEqualHashCodes() {
+        TestServer.test(
+            settings = { generalSettings set GeneralServerSettings() }
+        ) {
+            val key = SerializableCache.Key<Any?, _>("k", String.serializer())
+            val a = SerializableCache<Any?>().apply { set(key, "v") }
+            // Copied arrays, so only their contents match.
+            val b = SerializableCache<Any?>(a.bytes.mapValues { it.value.copyOf() })
+            assertEquals(a, b)
+            assertEquals(a.hashCode(), b.hashCode())
+
+            val oldA = SerializableCache<Any?>(a.bytes.mapValues { it.value.copyOf() }).apply { markEntriesAsOldFormat() }
+            val oldB = SerializableCache<Any?>(a.bytes.mapValues { it.value.copyOf() }).apply { markEntriesAsOldFormat() }
+            assertEquals(oldA, oldB)
+            assertEquals(oldA.hashCode(), oldB.hashCode())
+            assertNotEquals(a, oldA, "The same bytes in the other format are a different cache")
+        }
+    }
+
+    @OptIn(InternalLightningServerApi::class)
+    @Test
+    fun oldFormatEntriesAreReadAndRewrittenInTheWireFormat() {
+        TestServer.test(
+            settings = { generalSettings set GeneralServerSettings() }
+        ) {
+            val old = engine.internalSerialization.oldKotlinBytesFormat
+            val wire = engine.internalSerialization.kotlinWireFormat
+            val read = SerializableCache.Key<Any?, _>("read", String.serializer())
+            val unread = SerializableCache.Key<Any?, _>("unread", String.serializer())
+            val oldBytes = listOf(read, unread).associate {
+                it.id to old.encodeToByteArray(Expiring.serializer(String.serializer()), Expiring("old " + it.id, expiresAt = null))
+            }
+            val cache = SerializableCache<Any?>(oldBytes).apply { markEntriesAsOldFormat() }
+
+            assertEquals("old read", cache[read])
+            val rewritten = cache.bytes
+            assertEquals(setOf("read"), rewritten.keys, "An entry nobody read stays behind rather than being written in the old format")
+            assertEquals(
+                Expiring("old read", expiresAt = null),
+                wire.decodeFromByteArray(Expiring.serializer(String.serializer()), rewritten.getValue("read")),
+            )
+            assertEquals("old unread", cache[unread], "Still readable from the cache it came in")
         }
     }
 

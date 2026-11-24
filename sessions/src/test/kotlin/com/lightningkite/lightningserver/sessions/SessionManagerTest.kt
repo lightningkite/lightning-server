@@ -33,6 +33,8 @@ import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.services.Namespaced
 import com.lightningkite.services.database.optics.*
 import com.lightningkite.services.cache.Cache
+import com.lightningkite.services.data.MediaType
+import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.database.*
 import com.lightningkite.services.telemetry.LogLevel
 import com.lightningkite.services.telemetry.TelemetryAttributes
@@ -87,12 +89,16 @@ class SessionManagerTest {
         private val staleDuration: Duration? = 7.days,
         private val allowedScopes: (SessionTestUser) -> Set<GrantedScope> = { setOf(GrantedScope.root) },
         sessionSignals: context(ServerRuntime) (Table<Session<SessionTestUser, Uuid>>) -> Table<Session<SessionTestUser, Uuid>> = { it },
+        refreshTokenCookieSecure: Runtime<Boolean> = Runtime { true },
+        acceptRefreshTokenAsBearer: Runtime<Boolean> = Runtime { false },
     ) : SessionManager<SessionTestUser, Uuid>(
         principal = SessionTestUser,
         database = database,
         tokenFormat = Runtime { PrivateTinyTokenFormat() },
         cache = cache,
         sessionSignals = sessionSignals,
+        refreshTokenCookieSecure = refreshTokenCookieSecure,
+        acceptRefreshTokenAsBearer = acceptRefreshTokenAsBearer,
     ) {
         context(server: ServerRuntime)
         override suspend fun sessionExpiration(subject: SessionTestUser): Instant? =
@@ -346,8 +352,7 @@ class SessionManagerTest {
      * The other half of the same audit-trail promise: what *is* observed must be the request's own
      * value, not something the code supplies. The test above drives the session through the typed
      * harness, which fixes the ip and sends no User-Agent, so it can only show that an absent value
-     * stays absent. Here a real request presents its refresh token as a bearer credential — the path
-     * a client that has not yet exchanged for an access token actually takes — carrying an ip and a
+     * stays absent. Here a raw request exchanges its refresh token at token/simple, carrying an ip and a
      * user agent that appear nowhere else, so a recorded constant could not pass for either.
      */
     @Test
@@ -367,22 +372,14 @@ class SessionManagerTest {
             server.test({}) {
                 val (session, refreshToken) = execute { server.sessions.newSession(userId) }
 
-                val request = HttpRequest<PathSpec>(
-                    path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
-                    queryParameters = QueryParameters.EMPTY,
-                    headers = HttpHeaders {
-                        add(HttpHeader.Authorization, "Bearer ${refreshToken.string}")
-                        add(HttpHeader.UserAgent, "ExampleClient/9.9 (audit-trail probe)")
-                    },
-                    domain = "example.com",
-                    protocol = "https",
+                val response = server.sessions.tokenSimple.test(
+                    headers = HttpHeaders { add(HttpHeader.UserAgent, "ExampleClient/9.9 (audit-trail probe)") },
                     sourceIp = "203.0.113.7",
+                    body = TypedData.text(Json.encodeToString(refreshToken.string), MediaType.Application.Json),
                 )
-                // Resolving the request's authentication is what drives the session-use update. If the
-                // token were not accepted no update would happen at all, and the assertions below would
+                // If the token were not accepted no update would happen at all, and the assertions below would
                 // be reading an untouched session rather than a recorded one.
-                val resolved = execute { request[Authentication.CacheKey] }
-                assertNotNull(resolved, "the refresh token was not accepted, so no session use was recorded")
+                assertEquals(HttpStatus.OK, response.status, "the refresh token was not accepted, so no session use was recorded")
 
                 val stored = execute { server.sessions.sessionInfo.table().get(session._id) }
                 assertNotNull(stored)
@@ -790,10 +787,7 @@ class SessionManagerTest {
                 val (parent, _) = execute { server.sessions.newSession(userId) }
                 time += 1.hours
 
-                val subRefresh = server.sessions.createSubSession.test(
-                    execute { with(server.sessions) { parent.toAuth() } },
-                    SubSessionRequest(label = "sub")
-                )
+                val subRefresh = execute { server.sessions.newSubSession(with(server.sessions) { parent.toAuth() }, label = "sub") }.second.string
                 val accessToken = server.sessions.tokenSimple.test(null, subRefresh)
                 val subAuth = execute { server.sessions.tokenFormat().read(SessionTestUser, accessToken) }!!
 
@@ -844,15 +838,9 @@ class SessionManagerTest {
         }.let { server ->
             server.test({}) {
                 val (parent, _) = execute { server.sessions.newSession(userId) }
-                val childRefresh = server.sessions.createSubSession.test(
-                    execute { with(server.sessions) { parent.toAuth() } },
-                    SubSessionRequest(label = "child")
-                )
+                val childRefresh = execute { server.sessions.newSubSession(with(server.sessions) { parent.toAuth() }, label = "child") }.second.string
                 val child = execute { server.sessions.sessionInfo.table().get(RefreshToken(childRefresh)._id) }!!
-                val grandchildRefresh = server.sessions.createSubSession.test(
-                    execute { with(server.sessions) { child.toAuth() } },
-                    SubSessionRequest(label = "grandchild")
-                )
+                val grandchildRefresh = execute { server.sessions.newSubSession(with(server.sessions) { child.toAuth() }, label = "grandchild") }.second.string
 
                 server.sessions.sessionTerminate.test(execute { with(server.sessions) { parent.toAuth() } }, Unit)
 
@@ -860,10 +848,7 @@ class SessionManagerTest {
                 assertFailsWith<UnauthorizedException> { server.sessions.tokenSimple.test(null, grandchildRefresh) }
 
                 val (deleted, _) = execute { server.sessions.newSession(userId) }
-                val deletedChild = server.sessions.createSubSession.test(
-                    execute { with(server.sessions) { deleted.toAuth() } },
-                    SubSessionRequest(label = "child")
-                )
+                val deletedChild = execute { server.sessions.newSubSession(with(server.sessions) { deleted.toAuth() }, label = "child") }.second.string
                 execute { server.sessions.sessionInfo.table().deleteOneById(deleted._id) }
                 assertFailsWith<UnauthorizedException> { server.sessions.tokenSimple.test(null, deletedChild) }
             }
@@ -895,10 +880,7 @@ class SessionManagerTest {
                 val adminAuth = execute { with(server.sessions) { server.sessions.newSession(adminId).first.toAuth() } }
 
                 val (terminated, _) = execute { server.sessions.newSession(userId) }
-                val terminatedChild = server.sessions.createSubSession.test(
-                    execute { with(server.sessions) { terminated.toAuth() } },
-                    SubSessionRequest(label = "child")
-                )
+                val terminatedChild = execute { server.sessions.newSubSession(with(server.sessions) { terminated.toAuth() }, label = "child") }.second.string
                 server.rest.modify.test(
                     terminated._id,
                     adminAuth,
@@ -933,7 +915,7 @@ class SessionManagerTest {
                 server.sessions.sessionTerminate.test(stillValidAccessToken, Unit)
 
                 assertFailsWith<UnauthorizedException> {
-                    server.sessions.createSubSession.test(stillValidAccessToken, SubSessionRequest(label = "sub"))
+                    execute { server.sessions.newSubSession(stillValidAccessToken, label = "sub") }.second.string
                 }
             }
         }
@@ -957,20 +939,16 @@ class SessionManagerTest {
                 val (parent, _) = execute { server.sessions.newSession(userId, scopes = setOf(GrantedScope("auth:sessions"))) }
                 val parentAuth = execute { with(server.sessions) { parent.toAuth() } }
 
-                val inherited = server.sessions.createSubSession.test(parentAuth, SubSessionRequest(label = "default"))
+                val inherited = execute { server.sessions.newSubSession(parentAuth, label = "default") }.second.string
                 val inheritedSession = execute { server.sessions.sessionInfo.table().get(RefreshToken(inherited)._id) }!!
                 assertEquals(setOf(GrantedScope("auth:sessions")), inheritedSession.scopes)
 
                 assertFailsWith<ForbiddenException> {
-                    server.sessions.createSubSession.test(
-                        parentAuth,
-                        SubSessionRequest(label = "other", scopes = setOf(GrantedScope("auth:self")))
-                    )
+                    execute { server.sessions.newSubSession(parentAuth, label = "other", scopes = setOf(GrantedScope("auth:self"))) }
                 }
-                val narrower = server.sessions.createSubSession.test(
-                    parentAuth,
-                    SubSessionRequest(label = "narrower", scopes = setOf(GrantedScope("auth:sessions:create")))
-                )
+                val narrower = execute {
+                    server.sessions.newSubSession(parentAuth, label = "narrower", scopes = setOf(GrantedScope("auth:sessions:create")))
+                }.second.string
                 val narrowerSession = execute { server.sessions.sessionInfo.table().get(RefreshToken(narrower)._id) }!!
                 assertEquals(setOf(GrantedScope("auth:sessions:create")), narrowerSession.scopes)
             }
@@ -1028,6 +1006,7 @@ class SessionManagerTest {
                 database = database,
                 cache = cache,
                 allowedScopes = { setupOnly },
+                acceptRefreshTokenAsBearer = Runtime { true },
             )
         }.let { server ->
             server.test({}) {
@@ -1090,7 +1069,11 @@ class SessionManagerTest {
             val database = setting("database", Database.Settings("ram"))
             val cache = setting("cache", Cache.Settings("ram"))
 
-            val sessions = path.path("auth") include TestSessionManager(database = database, cache = cache)
+            val sessions = path.path("auth") include TestSessionManager(
+                database = database,
+                cache = cache,
+                acceptRefreshTokenAsBearer = Runtime { true },
+            )
         }.let { server ->
             server.test({}) {
                 val (_, refreshToken) = execute { server.sessions.newSession(userId) }
@@ -1196,7 +1179,7 @@ class SessionManagerTest {
 
                 // The parent auth already carries the subject, so the sub-session reuses it
                 val parentAuth = execute { with(server.sessions) { parent.toAuth(user) } }
-                server.sessions.createSubSession.test(parentAuth, SubSessionRequest(label = "child"))
+                execute { server.sessions.newSubSession(parentAuth, label = "child") }
                 assertEquals(0, SessionTestUser.fetchCount)
 
                 SessionTestUser.users[userId] = user.copy(active = false)

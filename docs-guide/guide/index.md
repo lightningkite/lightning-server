@@ -62,6 +62,7 @@ Short on time?  The **[Condensed guide](condensed-guide.md)** shows every featur
 | Store and serve uploaded files or images | [Files](files.md), [Media](media.md) |
 | Send email, SMS, or push notifications | [Email and SMS](email.md), [Notifications](notifications.md) |
 | Log users in with a PIN, password, passkey, or Google | [Proof-based login](proof-session.md), [OAuth](oauth.md) |
+| Let MCP clients such as Claude act as a user | [OAuth authorization server](oauth-provider.md) |
 | Run work later or on a timer | [Tasks](tasks.md), [Schedules](schedules.md) |
 | Protect the server from abuse | [Rate limiting](rate-limiting.md), [CORS and interceptors](cors-interceptors.md) |
 | See what production is doing | [Observability](observability.md), [Meta endpoints and admin](meta-admin.md) |

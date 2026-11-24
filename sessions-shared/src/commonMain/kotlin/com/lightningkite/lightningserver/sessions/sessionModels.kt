@@ -10,23 +10,6 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
- * Asks for a sub-session with reduced privileges derived from the current session.
- *
- * @property scopes The scopes to grant. The default, root, grants the parent session's scopes; anything else must be
- *   within them.
- * @property oauthClient The OAuth client ID, if the sub-session is for OAuth.
- * @property expires When the sub-session expires, inheriting the parent's expiration if `null`.
- */
-@Serializable
-public data class SubSessionRequest(
-    val label: String,
-    val scopes: Set<GrantedScope> = setOf(GrantedScope.root),
-    val oauthClient: String? = null,
-    val expires: Instant? = null,
-) {
-}
-
-/**
  * Represents an authentication session of a subject, created after a successful login.
  *
  * @param SUBJECT The type of the subject.
@@ -42,6 +25,13 @@ public data class SubSessionRequest(
  * @property terminated When the session was explicitly terminated, or `null` if it was not.
  * @property ips The IP addresses that have used this session, for auditing.
  * @property userAgents The user agents that have used this session, for auditing.
+ * @property previousSecretHash The hash of the secret [secretHash] replaced at the last rotation, or `null` if the
+ *   session's refresh token does not rotate (see `SessionManager.rotateRefreshToken`).
+ * @property rotatedAt When the refresh token last rotated, or `null` if it does not rotate.
+ * @property oauthClient The OAuth client this session was issued to, or `null` for a first-party session. Such a
+ *   session rotates from the moment it is created, so its refresh token works only at the OAuth token endpoint.
+ * @property audience The one resource the session's access tokens are for (RFC 8707), such as an MCP server, or `null`
+ *   for this server's own API. Each access token carries it as `Authentication.audience`.
  */
 @Queryable
 @AdminTableColumns(["label", "subjectId", "scopes"])
@@ -61,7 +51,10 @@ public data class Session<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     val ips: Set<String> = setOf(),
     val userAgents: Set<String> = setOf(),
     val scopes: Set<GrantedScope> = setOf(GrantedScope.root),
-//    @References(OauthClient::class) val oauthClient: String? = null,
+    val previousSecretHash: String? = null,
+    val rotatedAt: Instant? = null,
+    val oauthClient: String? = null,
+    val audience: String? = null,
 ) : HasId<Uuid>
 
 /**

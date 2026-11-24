@@ -47,20 +47,28 @@ public class LiveAuthClientEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
         outSerializer = String.serializer()
     )
 
+    override suspend fun getTokenFromCookie(): String = fetcher(
+        url = "$subpath/token/cookie",
+        method = HttpMethod.POST,
+        inSerializer = Unit.serializer(),
+        body = Unit,
+        outSerializer = String.serializer()
+    )
+
+    override suspend fun setRefreshTokenCookie(input: String): Unit = fetcher(
+        url = "$subpath/token/set-cookie",
+        method = HttpMethod.POST,
+        inSerializer = String.serializer(),
+        body = input,
+        outSerializer = Unit.serializer()
+    )
+
     override suspend fun getSelf(): USER = fetcher(
         url = "$subpath/self",
         method = HttpMethod.GET,
         inSerializer = Unit.serializer(),
         body = Unit,
         outSerializer = subjectSerializer
-    )
-
-    override suspend fun subsession(input: SubSessionRequest): String = fetcher(
-        url = "$subpath/sub-session",
-        method = HttpMethod.POST,
-        inSerializer = SubSessionRequest.serializer(),
-        body = input,
-        outSerializer = String.serializer()
     )
 
     override suspend fun authRequirements(): AuthRequirements = fetcher(

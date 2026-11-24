@@ -8,7 +8,8 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.engine
 import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.services.data.*
-import com.lightningkite.services.serializers.KotlinBytesFormat
+import com.lightningkite.services.serializers.KotlinWireFormat
+import com.lightningkite.services.serializers.OldKotlinBytesFormat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.*
@@ -194,7 +195,8 @@ public class JsonMediaTypeCoder(
  * **Registered formats:**
  * - application/json (priority 1.0, streaming enabled)
  * - application/x-www-form-urlencoded
- * - application/x-lightningserver-kotlin-bytes
+ * - application/x-lightningserver-kotlin-wire ([KotlinWireFormat])
+ * - application/x-lightningserver-kotlin-bytes ([OldKotlinBytesFormat], kept for existing clients)
  *
  * @param serializersModule Runtime provider for the SerializersModule to use.
  *                         Defaults to the server's external serialization module.
@@ -226,7 +228,13 @@ public fun ServerBuilder.registerBasicMediaTypeCoders(serializersModule: Runtime
     )
     register(
         BinaryFormatMediaTypeCoder(
-            format = { KotlinBytesFormat(serializersModule()) },
+            format = { KotlinWireFormat(serializersModule()) },
+            mediaType = MediaType("application", "x-lightningserver-kotlin-wire")
+        )
+    )
+    register(
+        BinaryFormatMediaTypeCoder(
+            format = { OldKotlinBytesFormat(serializersModule()) },
             mediaType = MediaType("application", "x-lightningserver-kotlin-bytes")
         )
     )

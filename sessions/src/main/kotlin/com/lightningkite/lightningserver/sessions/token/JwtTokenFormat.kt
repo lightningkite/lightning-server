@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.sessions.token
 
+import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.definition.*
@@ -21,6 +22,10 @@ import kotlin.time.Instant
  *
  * The token's `prn` header is the principal's name, and [read] returns `null` for a token whose `prn` is another
  * principal's, so one format can serve several principals.
+ *
+ * `aud` is [audience], or for an authentication bound to a resource ([Authentication.audience]), that resource, which
+ * must be [audience] followed by a path (RFC 9068), as `OpenIdProviderEndpoints`'s resources are with the default
+ * [audience].
  */
 public class JwtTokenFormat(
     public val hasher: RuntimeDeferred<Signer> = secretBasis.signer("jwt"),
@@ -42,12 +47,12 @@ public class JwtTokenFormat(
                 sid = auth.sessionId,
                 siat = auth.sessionIssuedAt.epochSeconds,
                 sub = server.internalSerialization.json.encodeToString(principal.idSerializer, auth.id),
-                aud = audience(),
+                aud = auth.audience ?: audience(),
                 exp = now.plus(expiration).epochSeconds,
                 iat = now.epochSeconds,
                 nbf = now.epochSeconds,
                 scope = auth.scopes.joinToString(" "),
-                cache = server.internalSerialization.json.encodeToString(principal.cacheSerializer(), auth.cache)
+                wireCache = server.internalSerialization.json.encodeToString(principal.cacheSerializer(), auth.cache)
             )
         )
     }
@@ -57,7 +62,10 @@ public class JwtTokenFormat(
         principal: PrincipalType<SUBJECT, ID>,
         value: String,
     ): Authentication<SUBJECT>? {
-        val claims = hasher.await().verifyJwt(value, principal.name, audience(), issuer()) ?: return null
+        val claims = hasher.await().verifyJwt(value, principal.name, issuer()) ?: return null
+        val aud = claims.aud ?: throw JwtException("Invalid JWT")
+        val resource = aud.takeIf { it != audience() }
+        if (resource != null && !resource.startsWith(audience() + "/")) throw JwtException("Invalid JWT")
 
         return Authentication(
             principalType = principal,
@@ -67,7 +75,12 @@ public class JwtTokenFormat(
             tokenIssuedAt = Instant.fromEpochSeconds(claims.iat),
             expiration = Instant.fromEpochSeconds(claims.exp),
             scopes = claims.scope.split(' ').mapTo(HashSet(), ::GrantedScope),
-            cache = claims.cache?.let { server.internalSerialization.json.decodeFromString(principal.cacheSerializer(), it) }
+            cache = claims.wireCache?.let { server.internalSerialization.json.decodeFromString(principal.cacheSerializer(), it) }
+                ?: claims.cache?.let {
+                    server.internalSerialization.json.decodeFromString(principal.cacheSerializer(), it)
+                        .also { @OptIn(InternalLightningServerApi::class) it.markEntriesAsOldFormat() }
+                },
+            audience = resource,
         )
     }
 
@@ -109,8 +122,7 @@ public class JwtTokenFormat(
     private suspend fun Signer.verifyJwt(
         token: String,
         principalName: String,
-        requiredAudience: String? = null,
-        requiredIssuer: String? = null,
+        requiredIssuer: String,
     ): JwtClaims? {
 
         val parts = token.split('.')
@@ -147,8 +159,7 @@ public class JwtTokenFormat(
             throw JwtFormatException("Malformed JWT")
         }
 
-        requiredAudience?.let { if (claims.aud != it) throw JwtException("Invalid JWT") }
-        requiredIssuer?.let { if (claims.iss != it) throw JwtException("Invalid JWT") }
+        if (claims.iss != requiredIssuer) throw JwtException("Invalid JWT")
 
         if (now() > Instant.fromEpochSeconds(claims.exp)) throw JwtExpiredException("JWT has expired.")
         if (claims.nbf?.let { now() < Instant.fromEpochSeconds(it) } == true) throw JwtException("Token not valid yet")

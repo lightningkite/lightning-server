@@ -59,7 +59,7 @@ Client-side interface for authentication operations:
 - Login with proofs
 - Check proof sufficiency
 - Get/refresh tokens
-- Session management (create, terminate, subsession)
+- Session management (terminate, refresh token cookie)
 - Get authenticated user profile
 
 ### ProofClientEndpoints.kt

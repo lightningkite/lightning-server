@@ -161,12 +161,10 @@ class TokenInvalidationTest {
 
                 assertFailsWith<UnauthorizedException> { server.sessions.readBearer(before) }
 
-                // The session itself is untouched: its refresh token still works, both for a new access token and as a
-                // bearer token directly.
+                // The session itself is untouched: its refresh token still gets a new access token.
                 time += 1.seconds
                 val after = server.sessions.tokenSimple.test(null, refresh.string)
                 assertNotNull(server.sessions.readBearer(after))
-                assertNotNull(server.sessions.readBearer(refresh.string))
             }
         }
     }
@@ -236,10 +234,7 @@ class TokenInvalidationTest {
         server.test({}, clock = { clock }) {
             execute {
                 val (parent, parentRefresh) = server.sessions.newSession(Uuid.random())
-                val childRefresh = server.sessions.createSubSession.test(
-                    with(server.sessions) { parent.toAuth() },
-                    SubSessionRequest(label = "child")
-                )
+                val childRefresh = server.sessions.newSubSession(with(server.sessions) { parent.toAuth() }, label = "child").second.string
                 val parentToken = server.sessions.tokenSimple.test(null, parentRefresh.string)
                 val childToken = server.sessions.tokenSimple.test(null, childRefresh)
 
@@ -299,10 +294,7 @@ class TokenInvalidationTest {
         server.test({}, clock = { clock }) {
             execute {
                 val (parent, parentRefresh) = server.sessions.newSession(Uuid.random())
-                val childRefresh = server.sessions.createSubSession.test(
-                    with(server.sessions) { parent.toAuth() },
-                    SubSessionRequest(label = "child")
-                )
+                val childRefresh = server.sessions.newSubSession(with(server.sessions) { parent.toAuth() }, label = "child").second.string
                 server.sessions.tokenSimple.test(null, parentRefresh.string)
                 server.sessions.tokenSimple.test(null, childRefresh)
 

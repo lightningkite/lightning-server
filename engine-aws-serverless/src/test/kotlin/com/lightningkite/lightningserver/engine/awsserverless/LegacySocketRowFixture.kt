@@ -20,19 +20,12 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 
 /**
- * Writes socket rows in the shape a deployment at fork point `4910a921` wrote them.
+ * Writes socket rows in the shape a deployment at fork point `4910a921` wrote them: OldKotlinBytesFormat
+ * blobs under the old `wsState` and `wsRequest` attributes.
  *
- * This exists because a row produced by today's serializer cannot reproduce the failure a real one
- * causes.  The stored connect request is a positional `KotlinBytesFormat` blob, and this branch removed
- * two properties from [com.lightningkite.lightningserver.websockets.WebSocketConnectRequest], so the
- * only way to test the rolling-deploy path honestly is to encode the old layout.
- *
- * [LegacyWebSocketConnectRequest] mirrors that commit's type element for element, **including which
- * elements carried defaults**: `KotlinBytesFormat` writes an index marker for every optional element, so
- * the optionality pattern is part of the wire format rather than a detail of the source.  The removed
- * `requestId` (index 6, no default) and `parentRequestId` (index 7) are what make the blob unreadable
- * today - the old layout has 11 elements where the current descriptor has 9, and decoding walks off the
- * end of it.
+ * [LegacyWebSocketConnectRequest] mirrors that commit's type element for element, including which
+ * elements carried defaults, since OldKotlinBytesFormat is positional.  Today such a row is stale by its
+ * attribute names alone, so its contents are never decoded.
  */
 @Serializable
 class LegacyWebSocketConnectRequest<PATH : PathSpec>(
@@ -77,9 +70,9 @@ class LegacyWebSocketDidConnect(
 // Column names, duplicated from AwsWebSocketDynamoDb's private companion: writing the row by hand is
 // the point of this fixture, so the literal names are part of it.
 internal const val socketIdColumn = "wsSocketId"
-internal const val stateColumn = "wsState"
-internal const val requestColumn = "wsRequest"
-private const val expireColumn = "wsExpire"
+internal const val oldStateColumn = "wsState"
+internal const val oldRequestColumn = "wsRequest"
+internal const val expireColumn = "wsExpire"
 
 internal fun TestAwsAdapter.stateTableName(): String = ws.webSocketDynamo.baseTableName + "-ws-state"
 
@@ -99,7 +92,7 @@ internal fun TestAwsAdapter.legacyConnectRequest(connectionId: String) = LegacyW
  * that `didConnect` registered - and then age only the state row.
  */
 internal fun TestAwsAdapter.putLegacySocketRow(connectionId: String) {
-    val encoding = internalSerialization.kotlinBytesFormat
+    val encoding = internalSerialization.oldKotlinBytesFormat
     val request = legacyConnectRequest(connectionId)
     val storage = LegacyQueryParamWebSocketHandlerData(
         request = request,
@@ -113,7 +106,7 @@ internal fun TestAwsAdapter.putLegacySocketRow(connectionId: String) {
                 buildMap {
                     put(socketIdColumn, AttributeValue.fromS(connectionId))
                     put(
-                        stateColumn, AttributeValue.fromB(
+                        oldStateColumn, AttributeValue.fromB(
                             SdkBytes.fromByteArray(
                                 encoding.encodeToByteArray(
                                     LegacyQueryParamWebSocketHandlerData.serializer(),
@@ -123,7 +116,7 @@ internal fun TestAwsAdapter.putLegacySocketRow(connectionId: String) {
                         )
                     )
                     put(
-                        requestColumn, AttributeValue.fromB(
+                        oldRequestColumn, AttributeValue.fromB(
                             SdkBytes.fromByteArray(
                                 encoding.encodeToByteArray(LegacyWebSocketConnectRequest.serializer(NothingSerializer()), request)
                             )
@@ -141,7 +134,7 @@ internal fun TestAwsAdapter.putLegacySocketRow(connectionId: String) {
 
 /** The legacy `didConnect` payload the fork point's `${'$'}connect` would have fired for this socket. */
 internal fun TestAwsAdapter.legacyDidConnectPayload(connectionId: String): ByteArray {
-    val encoding = internalSerialization.kotlinBytesFormat
+    val encoding = internalSerialization.oldKotlinBytesFormat
     return internalSerialization.json.encodeToString(
         LegacyWebSocketDidConnect.serializer(),
         LegacyWebSocketDidConnect(

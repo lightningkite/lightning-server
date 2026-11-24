@@ -77,6 +77,21 @@ public class PasswordProofEndpoints(
                     if (it.hint?.contains(it.hash, true) == true)
                         throw BadRequestException("Hint cannot contain the password itself!")
                     it.copy(hash = it.hash.secureHash())
+                }.postCreate { created ->
+                    val replacesAnother = table.count(Condition {
+                        it.subjectId.eq(created.subjectId) and it.subjectType.eq(created.subjectType) and
+                                it._id.neq(created._id) and active
+                    }) > 0
+                    val change = if (replacesAnother) AuthEvent.FactorChanged.Change.Replaced else AuthEvent.FactorChanged.Change.Added
+                    serverRuntime.reportAuthEvent(AuthEvent.FactorChanged(info, created.subjectType, created.subjectId, change))
+                }.postChange { old, new ->
+                    if (old.disabledAt != null || new.disabledAt == null) return@postChange
+                    // establish retires the old password after inserting its replacement, which postCreate already reported.
+                    val stillHasOne = table.count(Condition {
+                        it.subjectId.eq(new.subjectId) and it.subjectType.eq(new.subjectType) and active
+                    }) > 0
+                    if (!stillHasOne)
+                        serverRuntime.reportAuthEvent(AuthEvent.FactorChanged(info, new.subjectType, new.subjectId, AuthEvent.FactorChanged.Change.Removed))
                 }
             },
             permissions = {

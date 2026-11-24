@@ -1,7 +1,7 @@
 // by Claude
 package com.lightningkite.lightningserver
 
-import com.lightningkite.services.serializers.KotlinBytesFormat
+import com.lightningkite.services.serializers.KotlinWireFormat
 import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.modules.EmptySerializersModule
@@ -12,8 +12,7 @@ import kotlin.test.*
  */
 class AnonTypeTest {
 
-    // Use KotlinBytesFormat for testing
-    private val format = KotlinBytesFormat(EmptySerializersModule())
+    private val format = KotlinWireFormat(EmptySerializersModule())
 
     // ========== Constructor Tests ==========
 

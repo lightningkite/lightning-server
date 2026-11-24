@@ -1,7 +1,10 @@
 package com.lightningkite.lightningserver.typed.jsonrpc
 
 import com.lightningkite.lightningserver.HttpStatusException
+import com.lightningkite.lightningserver.auth.Authentication
+import com.lightningkite.lightningserver.auth.authReaders
 import com.lightningkite.lightningserver.auth.noAuth
+import com.lightningkite.lightningserver.auth.register
 import com.lightningkite.lightningserver.auth.require
 import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.definition.Runtime
@@ -13,6 +16,7 @@ import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.lightningserver.runtime.test.TestRunner
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.serialization.EncodingInterceptor
 import com.lightningkite.services.data.MaxLength
@@ -28,6 +32,7 @@ import kotlinx.serialization.json.*
 import org.junit.Test
 import java.util.Collections
 import kotlin.test.*
+import kotlin.uuid.Uuid
 
 class JsonRpcHandlerTest {
 
@@ -76,6 +81,11 @@ class JsonRpcHandlerTest {
 
         init {
             registerBasicMediaTypeCoders()
+            register(User)
+            authReaders.register(Authentication.Reader { request ->
+                if (request.headers["X-Test-User"] == null) null
+                else Authentication(User, Uuid.random(), sessionId = null)
+            })
             install(Outputs)
         }
 
@@ -161,6 +171,11 @@ class JsonRpcHandlerTest {
             )
         )
 
+        val signedInEndpoint = path.path("signed-in").post bind JsonRpcHandler(
+            methods = listOf(signedInMethod),
+            auth = User.require(),
+        )
+
         val checkedEndpoint = path.path("checked").post bind JsonRpcHandler(
             methods = listOf(addMethod),
             check = { request, rpc ->
@@ -218,6 +233,42 @@ class JsonRpcHandlerTest {
                 e.status
             }
             assertTrue(status == HttpStatus.Unauthorized || status == HttpStatus.Forbidden, "got $status")
+        }
+    }
+
+    context(test: TestRunner<*>)
+    private suspend fun signedInEndpointStatus(body: TypedData): HttpStatus = try {
+        TestServer.signedInEndpoint.test(body = body).status
+    } catch (e: HttpStatusException) {
+        e.status
+    }
+
+    @Test
+    fun anUnauthenticatedCallToAnUnknownMethodFailsAuthentication() = runBlocking {
+        TestServer.test({}) {
+            val status = signedInEndpointStatus(call("nonexistent"))
+            assertTrue(status == HttpStatus.Unauthorized || status == HttpStatus.Forbidden, "got $status")
+        }
+    }
+
+    @Test
+    fun anUnauthenticatedCallWithABadVersionFailsAuthentication() = runBlocking {
+        TestServer.test({}) {
+            val status = signedInEndpointStatus(TypedData.text("""{"jsonrpc": "1.0", "method": "signedIn", "id": 1}""", MediaType.Application.Json))
+            assertTrue(status == HttpStatus.Unauthorized || status == HttpStatus.Forbidden, "got $status")
+        }
+    }
+
+    @Test
+    fun anAuthenticatedCallToAnUnknownMethodIsMethodNotFound() = runBlocking {
+        TestServer.test({}) {
+            val signedIn = HttpHeaders("X-Test-User" to "yes")
+            val unknown = TestServer.signedInEndpoint.test(body = call("nonexistent"), headers = signedIn)
+            assertEquals(HttpStatus.OK, unknown.status)
+            assertEquals(JsonRpcErrorCode.MethodNotFound, Json.decodeFromString<JsonRpcErrorResponse>(unknown.body!!.text()).error.code)
+
+            val known = TestServer.signedInEndpoint.test(body = call("signedIn"), headers = signedIn)
+            assertEquals(JsonPrimitive("ok"), Json.decodeFromString<JsonRpcResponse>(known.body!!.text()).result)
         }
     }
 

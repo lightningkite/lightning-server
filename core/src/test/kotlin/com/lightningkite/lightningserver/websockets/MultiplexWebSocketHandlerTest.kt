@@ -101,6 +101,26 @@ class MultiplexWebSocketHandlerTest {
     }
 
     @Test
+    fun binary_frames_are_kotlin_wire_format() = runBlocking {
+        TestServer.test(settings = {}) {
+            val mux = TestServer.multiplex.test()
+            val wire = engine.externalSerialization.kotlinWireFormat
+            var last: WebSocketFrame? = null
+            mux.onMessageSent = { last = it }
+
+            val start = MultiplexMessage(channel = "a", path = "/mirror", start = true)
+            mux.send(WebSocketFrame.Binary(wire.encodeToByteArray(MultiplexMessage.serializer(), start)))
+            val ack = engine.externalSerialization.json.decodeFromString(MultiplexMessage.serializer(), (last as WebSocketFrame.Text).text)
+            assertEquals("a", ack.channel)
+            assertEquals(true, ack.start)
+
+            val old = engine.externalSerialization.oldKotlinBytesFormat
+            val oldFrame = WebSocketFrame.Binary(old.encodeToByteArray(MultiplexMessage.serializer(), MultiplexMessage(channel = "a", data = "x")))
+            assertFailsWith<BadRequestException> { mux.send(oldFrame) }
+        }
+    }
+
+    @Test
     fun multiplex_basic_flow() = runBlocking {
         TestServer.test(settings = {}) {
             val mux = TestServer.multiplex.test()

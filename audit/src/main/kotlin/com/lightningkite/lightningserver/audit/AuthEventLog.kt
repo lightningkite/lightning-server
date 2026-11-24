@@ -21,6 +21,8 @@ import com.lightningkite.services.database.insertOne
  * real session or account is involved, so anyone can produce them at will, and recording them would
  * let an unauthenticated caller flood the audit database. They write no [OriginRecord] either, so such
  * attempts only show up in the server's access log.
+ *
+ * [AuthEvent.FactorChanged] is not recorded yet, since [AuthEventRecord.Type] has no value for it.
  */
 public class AuthEventLog(
     private val origins: OriginRecording<*>,
@@ -42,7 +44,7 @@ public class AuthEventLog(
         )
 
         val record = when (event) {
-            is AuthEvent.TokenRejected, is AuthEvent.ProofRejected -> return
+            is AuthEvent.TokenRejected, is AuthEvent.ProofRejected, is AuthEvent.FactorChanged -> return
             is AuthEvent.SessionRejected -> recordOf(AuthEventRecord.Type.AuthenticationFailed, event.principal).copy(
                 sessionId = event.sessionId,
                 failureReason = event.reason.name,

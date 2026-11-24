@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver
 
-import com.lightningkite.services.serializers.KotlinBytesFormat
+import kotlinx.serialization.BinaryFormat
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ByteArraySerializer
@@ -20,8 +20,8 @@ import kotlinx.serialization.encoding.Encoder
 @Serializable(with = AnonTypeSerializer::class)
 public class AnonType {
 
-    // Constructors enforce that we have either serializedBytes or kotlinBytesFormat/direct/hasDirect/serializer.
-    private var kotlinBytesFormat: KotlinBytesFormat? = null
+    // Constructors enforce that we have either serializedBytes or format/direct/hasDirect/serializer.
+    private var format: BinaryFormat? = null
     private var serializedBytes: ByteArray? = null
     private var serializer: KSerializer<*>? = null
     private var direct: Any? = null
@@ -30,12 +30,12 @@ public class AnonType {
     /**
      * Creates an AnonType from a direct value with its serializer.
      *
-     * @param kotlinBytesFormat The format to use for serialization when needed
+     * @param format The format to use for serialization when needed
      * @param direct The actual value to store
      * @param serializer The serializer for the value's type
      */
-    public constructor(kotlinBytesFormat: KotlinBytesFormat, direct: Any?, serializer: KSerializer<*>) {
-        this.kotlinBytesFormat = kotlinBytesFormat
+    public constructor(format: BinaryFormat, direct: Any?, serializer: KSerializer<*>) {
+        this.format = format
         this.direct = direct
         hasDirect = true
         this.serializer = serializer
@@ -60,7 +60,7 @@ public class AnonType {
     @Suppress("UNCHECKED_CAST")
     public fun serializedBytes(): ByteArray {
         return serializedBytes ?: run {
-            val newSer = kotlinBytesFormat!!.encodeToByteArray(serializer as KSerializer<Any?>, direct)
+            val newSer = format!!.encodeToByteArray(serializer as KSerializer<Any?>, direct)
             serializedBytes = newSer
             newSer
         }
@@ -70,15 +70,15 @@ public class AnonType {
      * Retrieves the contained value, deserializing it if necessary.
      *
      * @param T The expected type of the value
-     * @param kotlinBytesFormat The format to use for deserialization
+     * @param format The format the bytes were written in
      * @param serializer The serializer for the expected type
      * @return The deserialized value
      */
     @Suppress("UNCHECKED_CAST")
-    public fun <T> value(kotlinBytesFormat: KotlinBytesFormat, serializer: KSerializer<T>): T {
+    public fun <T> value(format: BinaryFormat, serializer: KSerializer<T>): T {
         if (hasDirect) return direct as T
-        this.kotlinBytesFormat = kotlinBytesFormat
-        val d = serializedBytes!!.let { kotlinBytesFormat.decodeFromByteArray(serializer, it) }
+        this.format = format
+        val d = serializedBytes!!.let { format.decodeFromByteArray(serializer, it) }
         direct = d
         hasDirect = true
         return d
