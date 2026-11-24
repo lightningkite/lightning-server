@@ -181,7 +181,7 @@ public class FetcherSdk(
             if (singleInterface == null) {
                 appendIdtLine(
                     depth,
-                    "interface ${info.interfaceName}" + (if (extendsInterfaces.isEmpty()) "" else " : ${extendsInterfaces.joinToString { it.item.kotlinString() }}") + " {"
+                    "interface ${info.interfaceName}" + (if (extendsInterfaces.isEmpty()) "" else " : ${extendsInterfaces.map { it.item.kotlinString() }.sorted().joinToString()}") + " {"
                 )
 
                 if (depth == 0) appendIdtLine(
@@ -213,7 +213,7 @@ public class FetcherSdk(
                     appendIdtLine(depth + 1, function.kotlinString())
                 }
 
-                for (module in children) module.writeInterface(depth + 1)
+                for (module in children.sortedBy { it.info.interfaceName }) module.writeInterface(depth + 1)
 
                 appendIdtLine(depth, "}")
             }
@@ -270,7 +270,7 @@ public class FetcherSdk(
 
                 if (depth == 0) {
                     appendLine("@OptIn(ExperimentalSerializationApi::class)")
-                    appendLine("class Live${info.interfaceName}(val fetcher: Fetcher) : ${extendsInterfaces.joinToString()} {")
+                    appendLine("class Live${info.interfaceName}(val fetcher: Fetcher) : ${extendsInterfaces.sorted().joinToString()} {")
 
                     appendIdtLine(
                         1,
@@ -279,7 +279,7 @@ public class FetcherSdk(
                     appendIdtLine(2, "Live${info.interfaceName}(fetcher.withHeaderCalculator(calculator))")
                 } else appendIdtLine(
                     depth,
-                    "inner class Live${info.interfaceName} : ${extendsInterfaces.joinToString()} {"
+                    "inner class Live${info.interfaceName} : ${extendsInterfaces.sorted().joinToString()} {"
                 )
 
                 for (function in declaredFunctions) {
@@ -304,7 +304,7 @@ public class FetcherSdk(
                     )
                 }
 
-                for (module in children) module.writeLive(ancestors + this)
+                for (module in children.sortedBy { it.info.interfaceName }) module.writeLive(ancestors + this)
 
                 appendIdtLine(depth, "}")
             }
