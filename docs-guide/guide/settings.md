@@ -181,7 +181,7 @@ instead, add the `secret-source-aws` module and override the source:
 
 ```kotlin
 override val secretsSource: SecretSource =
-    AwsSecretSource(profile = "my-profile", idPrefix = "shop-prod", region = Region.US_WEST_2)
+    SecretsManagerSecretSource(profile = "my-profile", idPrefix = "shop-prod", region = Region.US_WEST_2)
 ```
 
 Each secret is stored as `<idPrefix>/<name>`.  `ManySecretSources(a, b, ...)` chains sources, returning the first

@@ -200,20 +200,7 @@ tasks.register<JavaExec>("deployProduction") {
 ## Deploying
 
 ```bash
-./gradlew :your-module:run --main=com.example.api.ProductionEditKt
-# or: object ProductionEdit { @JvmStatic fun main(vararg args: String) = Production.editVars() }
-```
-
-`editVars()` opens an interactive terminal editor prompting for AWS credentials
-(access key or profile), MongoDB Atlas API keys, and any other variables declared
-with `byVariable()`.  Values are stored in the `EncryptedFileSecretSource` (or
-`SecretsManagerSecretSource`) so subsequent runs don't re-prompt.
-
-### 4. Deploy
-
-```bash
-./gradlew :your-module:lambda            # build the exploded JAR
-./gradlew :your-module:run --main=com.example.api.ProductionDeployKt
+./gradlew :server:deployProduction
 ```
 
 Add `JavaExec` tasks for `ProductionEditVars` and `ProductionWrite` the same way, or run them from your IDE.  The
