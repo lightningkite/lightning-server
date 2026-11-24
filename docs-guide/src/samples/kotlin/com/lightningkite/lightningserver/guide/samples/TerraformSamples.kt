@@ -7,7 +7,7 @@ import com.lightningkite.lightningserver.definition.loggingSettings
 import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.definition.telemetrySettings
 import com.lightningkite.lightningserver.engine.awsserverless.AwsAdapter
-import com.lightningkite.lightningserver.terraform.AwsSecretSource
+import com.lightningkite.lightningserver.terraform.SecretsManagerSecretSource
 import com.lightningkite.lightningserver.terraform.EnvironmentSecretSource
 import com.lightningkite.lightningserver.terraform.ManySecretSources
 import com.lightningkite.lightningserver.terraform.SecretSource
@@ -79,7 +79,7 @@ object Production : TerraformAwsServerlessDomainBuilder<Server>(Server) {
     override val secretsSource: SecretSource by lazy {
         ManySecretSources(
             EnvironmentSecretSource,
-            AwsSecretSource(profile = "my-company", idPrefix = "shop-api", region = region),
+            SecretsManagerSecretSource(profile = "my-company", idPrefix = "shop-api", region = region),
         )
     }
 

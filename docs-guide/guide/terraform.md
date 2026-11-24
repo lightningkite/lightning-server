@@ -17,7 +17,7 @@ import com.lightningkite.lightningserver.definition.loggingSettings
 import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.definition.telemetrySettings
 import com.lightningkite.lightningserver.engine.awsserverless.AwsAdapter
-import com.lightningkite.lightningserver.terraform.AwsSecretSource
+import com.lightningkite.lightningserver.terraform.SecretsManagerSecretSource
 import com.lightningkite.lightningserver.terraform.EnvironmentSecretSource
 import com.lightningkite.lightningserver.terraform.ManySecretSources
 import com.lightningkite.lightningserver.terraform.SecretSource
@@ -78,7 +78,7 @@ object Production : TerraformAwsServerlessDomainBuilder<Server>(Server) {
     override val secretsSource: SecretSource by lazy {
         ManySecretSources(
             EnvironmentSecretSource,
-            AwsSecretSource(profile = "my-company", idPrefix = "shop-api", region = region),
+            SecretsManagerSecretSource(profile = "my-company", idPrefix = "shop-api", region = region),
         )
     }
 
@@ -235,7 +235,8 @@ review and edit them all.
 |---|---|---|
 | `EnvironmentSecretSource` | `LS_SECRET_<name>` environment variables, read-only | CI |
 | `EncryptedFileSecretSource(name)` | `~/.lightningserver/<name>.json.enc`, AES-256 with a password you type (PBKDF2, 100,000 iterations) | One person deploying |
-| `AwsSecretSource(profile, idPrefix, region)` | AWS Secrets Manager, as `<idPrefix>/<name>`; module `secret-source-aws` | Teams |
+| `SecretsManagerSecretSource(profile, idPrefix, region)` | AWS Secrets Manager, as `<idPrefix>/<name>`; module `secret-source-aws` | Teams |
+| `S3EncryptedSecretSource(profile, bucket, key, region)` | One encrypted file in S3, same format as `EncryptedFileSecretSource`; module `secret-source-aws` | Teams, far cheaper than Secrets Manager |
 | `ManySecretSources(a, b, ...)` | Reads from the first source that has the value; asks which writable source to store new ones in | Combining the above |
 
 The default is `ManySecretSources(EnvironmentSecretSource, EncryptedFileSecretSource("<bucket>_<prefix>"),

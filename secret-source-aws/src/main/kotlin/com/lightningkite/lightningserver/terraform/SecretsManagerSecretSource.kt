@@ -1,10 +1,7 @@
 package com.lightningkite.lightningserver.terraform
 
-import ch.qos.logback.classic.Level
-import ch.qos.logback.classic.Logger as LogbackLogger
 import com.lightningkite.services.terraform.TerraformNeed
 import kotlinx.serialization.json.Json
-import org.slf4j.LoggerFactory
 import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient
@@ -16,7 +13,7 @@ import software.amazon.awssdk.services.secretsmanager.model.*
  * @param message Description of the failure
  * @param cause The underlying AWS SDK exception
  */
-public class AwsSecretException(message: String?, cause: Throwable?) : Exception(message, cause)
+public class SecretsManagerSecretException(message: String?, cause: Throwable?) : Exception(message, cause)
 
 /**
  * A secret source that reads and writes secrets to AWS Secrets Manager.
@@ -27,7 +24,7 @@ public class AwsSecretException(message: String?, cause: Throwable?) : Exception
  *
  * **Usage:**
  * ```kotlin
- * val secretSource = AwsSecretSource("myapp", Region.US_EAST_1)
+ * val secretSource = SecretsManagerSecretSource(profile = "my-aws-profile", idPrefix = "myapp", region = Region.US_EAST_1)
  * val dbPassword = secretSource.fetch(TerraformNeed("db-password", String.serializer()))?.value
  * ```
  *
@@ -42,7 +39,7 @@ public class AwsSecretException(message: String?, cause: Throwable?) : Exception
  *
  * **Error handling:**
  * - Returns null when secret doesn't exist ([ResourceNotFoundException])
- * - Throws [AwsSecretException] for other AWS Secrets Manager failures
+ * - Throws [SecretsManagerSecretException] for other AWS Secrets Manager failures
  *
  * @param idPrefix The prefix to prepend to all secret names (typically environment or application name)
  * @param region The AWS region where secrets are stored
@@ -50,16 +47,12 @@ public class AwsSecretException(message: String?, cause: Throwable?) : Exception
  * @see PopulatableSecretSource
  * @see TerraformNeed
  */
-public class AwsSecretSource(public val profile: String, private val idPrefix: String, region: Region) :
+public class SecretsManagerSecretSource(public val profile: String, private val idPrefix: String, region: Region) :
     PopulatableSecretSource {
 
     private companion object {
         init {
-            var sdkLogger = LoggerFactory.getLogger("org.apache.hc.client5") as? LogbackLogger
-            if(sdkLogger != null && sdkLogger.level == null) sdkLogger.level = Level.WARN
-
-            sdkLogger = LoggerFactory.getLogger("software.amazon.awssdk") as? LogbackLogger
-            if(sdkLogger != null && sdkLogger.level == null) sdkLogger.level = Level.WARN
+            quietAwsSdkLogging()
         }
     }
 
@@ -69,7 +62,7 @@ public class AwsSecretSource(public val profile: String, private val idPrefix: S
         .region(region)
         .build()
 
-    override val name: String = "AWS Secrets"
+    override val name: String = "AWS Secrets Manager"
 
     /**
      * Constructs the full AWS secret ID by combining the prefix with the secret name.
@@ -90,7 +83,7 @@ public class AwsSecretSource(public val profile: String, private val idPrefix: S
         } catch (e: ResourceNotFoundException) {
             null
         } catch (e: SecretsManagerException) {
-            throw AwsSecretException("Attempt to retrieve secret failed", e)
+            throw SecretsManagerSecretException("Attempt to retrieve secret failed", e)
         }
     }
 
@@ -116,7 +109,7 @@ public class AwsSecretSource(public val profile: String, private val idPrefix: S
                     .build()
             )
         } catch (e: SecretsManagerException) {
-            throw AwsSecretException("Attempt to save secret failed", e)
+            throw SecretsManagerSecretException("Attempt to save secret failed", e)
         }
     }
 }
@@ -143,3 +136,8 @@ public class AwsSecretSource(public val profile: String, private val idPrefix: S
  * 7. The Json instance uses default settings. Consider making it configurable or documenting
  *    that secrets must be compatible with default kotlinx.serialization JSON settings.
  */
+@Deprecated("Renamed to SecretsManagerSecretSource", ReplaceWith("SecretsManagerSecretSource"))
+public typealias AwsSecretSource = SecretsManagerSecretSource
+
+@Deprecated("Renamed to SecretsManagerSecretException", ReplaceWith("SecretsManagerSecretException"))
+public typealias AwsSecretException = SecretsManagerSecretException
