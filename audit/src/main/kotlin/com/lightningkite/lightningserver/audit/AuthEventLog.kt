@@ -21,8 +21,6 @@ import com.lightningkite.services.database.insertOne
  * real session or account is involved, so anyone can produce them at will, and recording them would
  * let an unauthenticated caller flood the audit database. They write no [OriginRecord] either, so such
  * attempts only show up in the server's access log.
- *
- * [AuthEvent.FactorChanged] is not recorded yet, since [AuthEventRecord.Type] has no value for it.
  */
 public class AuthEventLog(
     private val origins: OriginRecording<*>,
@@ -44,7 +42,7 @@ public class AuthEventLog(
         )
 
         val record = when (event) {
-            is AuthEvent.TokenRejected, is AuthEvent.ProofRejected, is AuthEvent.FactorChanged -> return
+            is AuthEvent.TokenRejected, is AuthEvent.ProofRejected -> return
             is AuthEvent.SessionRejected -> recordOf(AuthEventRecord.Type.AuthenticationFailed, event.principal).copy(
                 sessionId = event.sessionId,
                 failureReason = event.reason.name,
@@ -67,6 +65,18 @@ public class AuthEventLog(
             is AuthEvent.ProofIssued -> recordOf(AuthEventRecord.Type.ProofIssued, event.principal).copy(
                 method = event.method.via,
                 methodProperty = event.method.property,
+            )
+            is AuthEvent.FactorChanged -> recordOf(AuthEventRecord.Type.FactorChanged, event.principal).copy(
+                method = event.method.via,
+                methodProperty = event.method.property,
+                factorChange = event.change.name,
+            )
+            is AuthEvent.ConsentGranted -> recordOf(AuthEventRecord.Type.ConsentGranted, event.principal).copy(
+                oauthClient = event.clientId,
+                scopes = event.scopes,
+            )
+            is AuthEvent.ConsentWithdrawn -> recordOf(AuthEventRecord.Type.ConsentWithdrawn, event.principal).copy(
+                oauthClient = event.clientId,
             )
         }
         origins.flush()

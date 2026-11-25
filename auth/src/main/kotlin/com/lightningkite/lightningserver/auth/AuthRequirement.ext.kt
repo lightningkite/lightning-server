@@ -1,7 +1,12 @@
 package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.ForbiddenException
+import com.lightningkite.lightningserver.HttpStatusException
+import com.lightningkite.lightningserver.UnauthorizedException
 import com.lightningkite.lightningserver.auth.AuthRequirement.Options
+import com.lightningkite.lightningserver.data.Request
+import com.lightningkite.lightningserver.data.get
+import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.set
 import com.lightningkite.lightningserver.runtime.Engine
@@ -18,24 +23,65 @@ public suspend fun AuthRequirement<*>.accepts(auth: Authentication<*>?): Boolean
     }
 
 /**
- * Asserts that the given [Authentication] will be accepted by this [AuthRequirement].
- * If the authentication is not accepted, a [ForbiddenException] will be thrown.
+ * Asserts that the given [Authentication] will be accepted by this [AuthRequirement], answering a refusal the way
+ * RFC 6750 asks of a bearer-token resource:
+ * - no authentication: [UnauthorizedException] (401) with `WWW-Authenticate: Bearer`;
+ * - authenticated, but without the scopes needed: [ForbiddenException] (403) with
+ *   `WWW-Authenticate: Bearer error="insufficient_scope", scope="…"`;
+ * - authenticated, but refused for anything else: [ForbiddenException] (403).
+ *
+ * Prefer the overload taking the request, which can also tell an unreadable token from none.
  * */
 context(server: ServerRuntime)
 public suspend fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.assert(
     auth: Authentication<*>?,
 ): Authentication<SUBJECT & Any>? =
     when (val r = check(auth)) {
-        is AuthRequirement.Result.Rejected -> throw ForbiddenException(
-            """
-                You do not meet the authorization criteria
-                Requirement: ${this.naturalLanguage()}
-                Failed On: ${r.reason}
-            """.trimIndent()
-        )
-
+        is AuthRequirement.Result.Rejected -> throw rejection(r, auth, request = null)
         is AuthRequirement.Result.Accepted<SUBJECT> -> r.auth
     }
+
+/**
+ * Asserts that [request]'s [Authentication] will be accepted by this [AuthRequirement], as the other [assert] does.
+ * A request that sent an `Authorization` header no reader could read gets a 401 `error="invalid_token"`, and at a
+ * registered [ProtectedResource] the challenge also carries its `resource_metadata` and `scope`.
+ * */
+context(server: ServerRuntime)
+public suspend fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.assert(
+    request: Request<*>,
+): Authentication<SUBJECT & Any>? {
+    val auth = request.authentication()
+    return when (val r = check(auth)) {
+        is AuthRequirement.Result.Rejected -> throw rejection(r, auth, request)
+        is AuthRequirement.Result.Accepted<SUBJECT> -> r.auth
+    }
+}
+
+context(server: ServerRuntime)
+private fun AuthRequirement<*>.rejection(
+    rejected: AuthRequirement.Result.Rejected,
+    auth: Authentication<*>?,
+    request: Request<*>?,
+): HttpStatusException {
+    val message = """
+        You do not meet the authorization criteria
+        Requirement: ${this.naturalLanguage()}
+        Failed On: ${rejected.reason}
+    """.trimIndent()
+    return when {
+        auth == null -> {
+            // Readers pass over tokens they can't make sense of, so a token was sent but none was read.
+            val unreadable = request?.headers?.get(HttpHeader.Authorization) != null
+            val error = if (unreadable) "invalid_token" else null
+            UnauthorizedException(message = message, headers = bearerChallenge(request, error, scopes = null))
+        }
+        rejected.insufficientScopes != null -> ForbiddenException(
+            message = message,
+            headers = bearerChallenge(request, "insufficient_scope", rejected.insufficientScopes),
+        )
+        else -> ForbiddenException(message = message)
+    }
+}
 
 
 public fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.subscope(subscope: Subscope): AuthRequirement<SUBJECT> =

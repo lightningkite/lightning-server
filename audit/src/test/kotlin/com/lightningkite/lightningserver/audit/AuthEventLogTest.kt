@@ -94,4 +94,31 @@ class AuthEventLogTest {
         assertNull(events.getValue(AuthEventRecord.Type.ProofAccepted).failureReason)
         assertNull(events.getValue(AuthEventRecord.Type.ProofIssued).failureReason)
     }
+
+    @Test
+    fun `a factor change is recorded with its method and kind of change`() = onServer {
+        serverRuntime.reportAuthEvent(AuthEvent.FactorChanged(password, "User", "user-1", AuthEvent.FactorChanged.Change.Replaced))
+
+        val event = events().single()
+        assertEquals(AuthEventRecord.Type.FactorChanged, event.type)
+        assertEquals("user-1", event.principal)
+        assertEquals("password", event.method)
+        assertEquals("email", event.methodProperty)
+        assertEquals("Replaced", event.factorChange)
+    }
+
+    @Test
+    fun `granted and withdrawn consents are recorded with their client`() = onServer {
+        serverRuntime.reportAuthEvent(AuthEvent.ConsentGranted("User", "user-1", "claude", setOf("mcp")))
+        serverRuntime.reportAuthEvent(AuthEvent.ConsentWithdrawn("User", "user-1", "claude"))
+
+        val events = events().associateBy { it.type }
+        val granted = events.getValue(AuthEventRecord.Type.ConsentGranted)
+        assertEquals("user-1", granted.principal)
+        assertEquals("claude", granted.oauthClient)
+        assertEquals(setOf("mcp"), granted.scopes)
+        val withdrawn = events.getValue(AuthEventRecord.Type.ConsentWithdrawn)
+        assertEquals("claude", withdrawn.oauthClient)
+        assertNull(withdrawn.scopes)
+    }
 }

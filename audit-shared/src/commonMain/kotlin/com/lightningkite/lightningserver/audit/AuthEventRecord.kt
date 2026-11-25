@@ -27,6 +27,9 @@ import kotlin.uuid.Uuid
  * @property method The proof method's `via`, such as `"password"` or `"email"`, or `null` for a refresh token.
  * @property methodProperty The property [method] was applied to, such as the `email` of an emailed PIN,
  *   or `null` if the method identifies the subject directly.
+ * @property factorChange How the credentials of [method] changed, for [Type.FactorChanged]: `Added`, `Replaced` or `Removed`.
+ * @property oauthClient The OAuth client consented to, for [Type.ConsentGranted] and [Type.ConsentWithdrawn].
+ * @property scopes The scopes consented to, for [Type.ConsentGranted].
  */
 @Queryable
 public data class AuthEventRecord(
@@ -40,6 +43,9 @@ public data class AuthEventRecord(
     val failureReason: String? = null,
     val method: String? = null,
     val methodProperty: String? = null,
+    val factorChange: String? = null,
+    val oauthClient: String? = null,
+    val scopes: Set<String>? = null,
 ) : HasId<AuthEventRecord.ID> {
     @Serializable
     @JvmInline
@@ -65,6 +71,15 @@ public data class AuthEventRecord(
 
         /** A proof was sent to someone without any credential being presented, as with a magic link. */
         ProofIssued,
+
+        /** The credentials the subject can log in with by [method] changed, as [factorChange] says. */
+        FactorChanged,
+
+        /** The subject consented to let [oauthClient] act for them with [scopes]. */
+        ConsentGranted,
+
+        /** The subject withdrew their consent to [oauthClient]. */
+        ConsentWithdrawn,
     }
 
     /** Returns when the event happened, taken from the version 7 [_id]. */

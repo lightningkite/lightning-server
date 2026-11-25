@@ -1185,10 +1185,8 @@ class BackupCodeEndpointsTest {
                             Execution.ID.generate(),
                         )
                     }
-                    // Forbidden rather than Unauthorized is what AuthRequirement.assert raises for a
-                    // caller with no authentication at all; what matters here is that it refuses.
                     assertEquals(
-                        HttpStatus.Forbidden,
+                        HttpStatus.Unauthorized,
                         response.status,
                         "/auth/backup/$endpoint answered an unauthenticated caller with ${response.status}",
                     )

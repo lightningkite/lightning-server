@@ -19,6 +19,7 @@ import com.lightningkite.lightningserver.pathing.arg1
 import com.lightningkite.lightningserver.pathing.fullUrl
 import com.lightningkite.lightningserver.pathing.trailingSegments
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.serialization.parse
 import com.lightningkite.lightningserver.sessions.*
@@ -82,7 +83,8 @@ private val logger = KotlinLogging.logger("com.lightningkite.lightningserver.ses
  *   `exp`, `iat`, `nonce` and `auth_time`.
  * @param authorizationUiUrl The frontend route that handles authorization requests, advertised as the
  *   `authorization_endpoint`.
- * @param resources The resources tokens can be requested for, such as an MCP server.
+ * @param resources The resources tokens can be requested for, such as an MCP server.  They are registered in
+ *   [protectedResources], so requests to them refuse other tokens and challenge with their metadata.
  * @param scopeDescriptions What each scope allows, for the consent screen.
  */
 @ExperimentalOauthProviderApi
@@ -102,6 +104,7 @@ public class OpenIdProviderEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
         require(scopes.size == scopes.toSet().size) {
             "Protected resources must not share scopes, or a token for one would work at another"
         }
+        resources.forEach { protectedResources.register(it) }
     }
 
     public companion object {
@@ -266,6 +269,9 @@ public class OpenIdProviderEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
                 consents().insertOne(
                     UserConsent(userId = userId, clientId = valid.client._id, scopes = granted, grantedAt = now())
                 )
+                serverRuntime.reportAuthEvent(
+                    AuthEvent.ConsentGranted(principal.name, auth.id.toString(), valid.client._id, granted, request)
+                )
                 AuthorizeResult(redirectUri = issueCode(approve.request, valid, userId, granted))
             }
         )
@@ -329,11 +335,14 @@ public class OpenIdProviderEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
             outputType = Unit.serializer(),
             implementation = { _: Unit ->
                 val clientId = request.arg1
-                consents().deleteMany((UserConsent.userId eq encodeUserId(auth.id)) and (UserConsent.clientId eq clientId))
+                val withdrawn = consents().deleteMany((UserConsent.userId eq encodeUserId(auth.id)) and (UserConsent.clientId eq clientId))
                 sessions.sessionInfo.table().updateMany(
                     (sessionLens.subjectId eq auth.id) and (sessionLens.oauthClient eq clientId) and (sessionLens.terminated eq null),
                     Modification(sessionLens) { it.terminated assign now() },
                 )
+                if (withdrawn.isNotEmpty()) {
+                    serverRuntime.reportAuthEvent(AuthEvent.ConsentWithdrawn(principal.name, auth.id.toString(), clientId, request))
+                }
                 Unit
             }
         )

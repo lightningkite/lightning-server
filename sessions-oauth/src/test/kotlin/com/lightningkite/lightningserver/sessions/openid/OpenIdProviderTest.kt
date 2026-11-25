@@ -24,6 +24,11 @@ import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.sessions.SessionManager
+import com.lightningkite.lightningserver.typed.BulkRequest
+import com.lightningkite.lightningserver.typed.MetaEndpoints
+import com.lightningkite.lightningserver.sessions.AuthEvent
+import com.lightningkite.lightningserver.sessions.AuthEventListener
+import com.lightningkite.lightningserver.sessions.install
 import com.lightningkite.lightningserver.sessions.proofs.oauth.OauthClient
 import com.lightningkite.lightningserver.sessions.proofs.oauth.OauthClientEndpoints
 import com.lightningkite.lightningserver.sessions.proofs.oauth.OauthClientSecret
@@ -82,6 +87,15 @@ class OpenIdProviderTest {
 
     private val signingKey = OidcSigningKey.generate()
 
+    class RecordedEvents : AuthEventListener {
+        val received = mutableListOf<AuthEvent>()
+
+        context(runtime: ServerRuntime)
+        override suspend fun onEvent(event: AuthEvent) {
+            received += event
+        }
+    }
+
     inner class Fixture(
         resources: List<ProtectedResource> = listOf(ProtectedResource("/mcp", setOf("mcp"), "Test MCP")),
         tokenFormat: TokenFormat = PrivateTinyTokenFormat(),
@@ -92,6 +106,7 @@ class OpenIdProviderTest {
         val cache = setting("cache", Cache.Settings("ram"))
         val sessions = path.path("auth") include OSessions(database, tokenFormat)
         val oauthClients = path.path("oauth-clients") include OauthClientEndpoints(database, maintainPermissions = OUser.require())
+        val meta = path.path("meta") include MetaEndpoints("test", cache)
         val provider = path include OpenIdProviderEndpoints(
             sessions = sessions,
             database = database,
@@ -101,10 +116,11 @@ class OpenIdProviderTest {
             authorizationUiUrl = Runtime { "https://app.example.com/authorize" },
             resources = resources,
         )
-        val mcp = path.path("mcp").post bind BearerChallenge("mcp", HttpHandler { request ->
+        val mcp = path.path("mcp").post bind HttpHandler { request ->
             request.access(OUser.require(RequiredScope("mcp")))
             HttpResponse.plainText("ok")
-        })
+        }
+        val events = install(RecordedEvents())
     }
 
     private val user = Uuid.random()
@@ -409,6 +425,32 @@ class OpenIdProviderTest {
     }
 
     @Test
+    fun `granting and withdrawing consent are reported as auth events`() = runBlocking {
+        val server = Fixture()
+        server.test({}) {
+            server.addClient()
+            val tokens = server.redeem(server.code()).second
+            val sessionId = server.events.received.filterIsInstance<AuthEvent.SessionCreated>().last().sessionId
+            assertEquals(
+                listOf(AuthEvent.ConsentGranted("OUser", user.toString(), CLAUDE, setOf("mcp"))),
+                server.events.received.filterIsInstance<AuthEvent.ConsentGranted>().map { it.copy(request = null) },
+            )
+
+            server.provider.withdrawConsent.test(CLAUDE, userAuth(), Unit)
+            assertEquals(
+                listOf(AuthEvent.ConsentWithdrawn("OUser", user.toString(), CLAUDE)),
+                server.events.received.filterIsInstance<AuthEvent.ConsentWithdrawn>().map { it.copy(request = null) },
+            )
+            assertTrue(server.events.received.any { it is AuthEvent.SessionTerminated && it.sessionId == sessionId })
+            assertNotNull(tokens.string("refresh_token"))
+
+            // Nothing left to withdraw.
+            server.provider.withdrawConsent.test(CLAUDE, userAuth(), Unit)
+            assertEquals(1, server.events.received.count { it is AuthEvent.ConsentWithdrawn })
+        }
+    }
+
+    @Test
     fun `an MCP-scoped token can't list or withdraw consents`() = runBlocking {
         val server = Fixture()
         server.test({}) {
@@ -590,16 +632,17 @@ class OpenIdProviderTest {
             val tokens = server.redeem(server.code(authRequest(scope = "mcp-read"))).second
             val forbidden = server.callMcp(tokens.string("access_token"))
             assertEquals(HttpStatus.Forbidden, forbidden.status)
-            assertTrue(forbidden.headers[HttpHeader.WWWAuthenticate]!!.root.startsWith("Bearer error=\"insufficient_scope\""))
+            assertEquals(
+                "Bearer error=\"insufficient_scope\", resource_metadata=\"${execute { generalSettings().publicUrl }}/.well-known/oauth-protected-resource/mcp\", scope=\"mcp\"",
+                forbidden.headers[HttpHeader.WWWAuthenticate]?.root,
+            )
 
             val invalid = server.callMcp("refresh/OUser/${Uuid.random()}:nope")
             assertEquals(HttpStatus.Unauthorized, invalid.status)
             assertTrue(invalid.headers[HttpHeader.WWWAuthenticate]!!.root.startsWith("Bearer error=\"invalid_token\""))
 
-            // Unreadable tokens count as none, which still gets the challenge.
-            val garbage = server.callMcp("not-a-token")
-            assertEquals(HttpStatus.Unauthorized, garbage.status)
-            assertTrue(garbage.headers[HttpHeader.WWWAuthenticate]!!.root.startsWith("Bearer resource_metadata="))
+            // No reader can read it, but it was sent, so it is an invalid token rather than none.
+            assertInvalidToken(server.callMcp("not-a-token"))
         }
     }
 
@@ -613,6 +656,16 @@ class OpenIdProviderTest {
         val server = Fixture()
         server.test({}) {
             assertInvalidToken(server.callMcp(server.rootAccessToken()))
+        }
+    }
+
+    @Test
+    fun `a bulk part to the resource checks the token against the resource, not the bulk endpoint`() = runBlocking {
+        val server = Fixture()
+        server.test({}) {
+            // The part shares the bulk request's cache, where this authentication was read for /meta/bulk.
+            val parts = server.meta.bulk.test(userAuth(), mapOf("mcp" to BulkRequest("/mcp", "POST")))
+            assertEquals(401, parts.getValue("mcp").error?.http)
         }
     }
 
@@ -783,7 +836,9 @@ class OpenIdProviderTest {
             val body = listed.body!!.text()
             assertEquals(HttpStatus.OK, listed.status, body)
             assertTrue("\"$CLAUDE\"" in body, body)
-            assertTrue(get(null).status in setOf(HttpStatus.Unauthorized, HttpStatus.Forbidden))
+            val anonymous = get(null)
+            assertEquals(HttpStatus.Unauthorized, anonymous.status)
+            assertEquals("Bearer", anonymous.headers[HttpHeader.WWWAuthenticate]?.root)
         }
     }
 

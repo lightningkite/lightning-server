@@ -110,7 +110,8 @@ fun authTest() = UserProfileServer.testBlocking(settings = { database set Databa
 // region auth-rejection-test
 fun authRejectionTest() = UserProfileServer.testBlocking(settings = { database set Database.Settings("ram") }) {
     val response = getProfile.test()
-    check(response.status.code == 403)
+    check(response.status.code == 401)
+    check(response.headers[HttpHeader.WWWAuthenticate]?.root == "Bearer")
 }
 // endregion auth-rejection-test
 

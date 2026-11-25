@@ -77,8 +77,13 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
          * Authentication was rejected because it did not meet requirements.
          *
          * @property reason Human-readable explanation of why authentication was rejected
+         * @property insufficientScopes Set when the authentication was refused only for lacking scopes: the scopes
+         *   it needs.  [assert] then answers with a 403 `insufficient_scope` challenge naming them (RFC 6750).
          */
-        public data class Rejected(val reason: String) : Result<Nothing>
+        public data class Rejected(
+            val reason: String,
+            val insufficientScopes: Set<RequiredScope>? = null,
+        ) : Result<Nothing>
 
         /**
          * Authentication was accepted and meets all requirements.
@@ -275,7 +280,7 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
         override suspend fun check(auth: Authentication<*>?): Result<HasId<*>> {
             if (auth == null) return Result.Rejected("Auth required")
             if (maxAge != null && now() - auth.sessionIssuedAt > maxAge) return Result.Rejected("Auth is older than max age $maxAge")
-            if (!auth.meetsRequirements(scopes)) return Result.Rejected("Auth does not have required scopes $scopes")
+            if (!auth.meetsRequirements(scopes)) return Result.Rejected("Auth does not have required scopes $scopes", insufficientScopes = scopes)
             if (requirement?.invoke(
                     runtime,
                     auth
@@ -338,7 +343,7 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
             if (auth == null) return Result.Rejected("Auth required")
             if (principalType !== auth.untypedPrincipal) return Result.Rejected("Auth is not of type ${principalType.name}")
             if (maxAge != null && now() - auth.sessionIssuedAt > maxAge) return Result.Rejected("Auth is older than max age $maxAge")
-            if (!auth.meetsRequirements(scopes)) return Result.Rejected("Auth does not have required scopes $scopes")
+            if (!auth.meetsRequirements(scopes)) return Result.Rejected("Auth does not have required scopes $scopes", insufficientScopes = scopes)
 
             @Suppress("UNCHECKED_CAST") // typecheck done when principal type was checked
             auth as Authentication<SUBJECT>
@@ -410,7 +415,11 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
                 }
             }
             .let { failures ->
-                Result.Rejected(failures.joinToString { it.reason })
+                val scopeFailures = failures.mapNotNull { it.insufficientScopes }
+                Result.Rejected(
+                    reason = failures.joinToString { it.reason },
+                    insufficientScopes = if (failures.isNotEmpty() && scopeFailures.size == failures.size) scopeFailures.flatten().toSet() else null,
+                )
             }
 
         override fun toString(): String = options.joinToString(" or ")

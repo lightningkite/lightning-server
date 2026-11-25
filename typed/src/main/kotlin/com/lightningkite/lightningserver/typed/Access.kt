@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.ForbiddenException
+import com.lightningkite.lightningserver.UnauthorizedException
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.data.get
@@ -43,7 +44,7 @@ public val <SUBJECT : HasId<*>> Access<*, *, SUBJECT>.auth: Authentication<SUBJE
  *
  * This method calls [AuthRequirement.assert] to retrieve the authentication.
  *
- * @throws [ForbiddenException] if the authentication in this request does not satisfy [requirement]
+ * @throws [UnauthorizedException] or [ForbiddenException] if the authentication in this request does not satisfy [requirement]
  *
  * @see [AuthRequirement.assert]
  * */
@@ -53,19 +54,19 @@ public suspend fun <REQUEST : Request<PATH>, PATH : PathSpec, SUBJECT : HasId<*>
 ): Access<REQUEST, PATH, SUBJECT> =
     Access(
         request = this,
-        authOrNull = requirement.assert(this[Authentication.CacheKey])
+        authOrNull = requirement.assert(this)
     )
 
 /**
  * Creates a new [Access] for this request by retrieving this request's [Authentication]
  * and then checking the provided [AuthRequirement]. This method differs from [access] in that
- * a failed check against [requirement] will return `null` instead of throwing a [ForbiddenException].
+ * a failed check against [requirement] will return `null` instead of throwing.
  * */
 context(server: ServerRuntime)
 public suspend fun <REQUEST : Request<PATH>, PATH : PathSpec, SUBJECT : HasId<*>?> REQUEST.accessOrNull(
     requirement: AuthRequirement<SUBJECT>,
 ): Access<REQUEST, PATH, SUBJECT>? =
-    when (val r = requirement.check(this[Authentication.CacheKey])) {
+    when (val r = requirement.check(authentication())) {
         is AuthRequirement.Result.Accepted<SUBJECT> -> Access(this, r.auth)
         is AuthRequirement.Result.Rejected -> null
     }
@@ -81,18 +82,18 @@ public fun <SUBJECT : HasId<*>> AuthAccess(auth: Authentication<SUBJECT>): AuthA
 @JvmName("authNullable")
 context(server: ServerRuntime)
 public suspend fun <SUBJECT : HasId<*>> Request<*>.auth(auth: AuthRequirement<SUBJECT?>): Authentication<SUBJECT>? {
-    return auth.assert(this[Authentication.CacheKey])
+    return auth.assert(this)
 }
 
 @JvmName("auth")
 context(server: ServerRuntime)
 public suspend fun <SUBJECT : HasId<*>> Request<*>.auth(auth: AuthRequirement<SUBJECT>): Authentication<SUBJECT> {
-    return auth.assert(this[Authentication.CacheKey])!!
+    return auth.assert(this)!!
 }
 
 context(server: ServerRuntime)
 public suspend fun <SUBJECT : HasId<*>?> Request<*>.tryAuth(auth: AuthRequirement<SUBJECT>): AuthRequirement.Result<SUBJECT> =
-    auth.check(this[Authentication.CacheKey])
+    auth.check(authentication())
 
 context(server: ServerRuntime, access: Access<*, *, *>)
 public suspend operator fun AuthRequirement.AuthSetting<*>.invoke(): Boolean = accepts(access.authOrNull)

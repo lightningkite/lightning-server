@@ -217,6 +217,33 @@ public sealed interface AuthEvent {
             Removed,
         }
     }
+
+    /**
+     * Represents the subject [principal] (of principal type [principalType]) consenting to let the OAuth client
+     * [clientId] act for them with [scopes], replacing any earlier consent to that client.
+     *
+     * For example, a user approves an MCP client on the consent screen.
+     */
+    public data class ConsentGranted(
+        val principalType: String,
+        val principal: String,
+        val clientId: String,
+        val scopes: Set<String>,
+        override val request: Request<*>? = null,
+    ) : AuthEvent
+
+    /**
+     * Represents the subject [principal] (of principal type [principalType]) withdrawing their consent to the OAuth
+     * client [clientId].  Their sessions issued to it end too, each reported as [SessionTerminated].
+     *
+     * For example, a user removes a connected app from their account settings.
+     */
+    public data class ConsentWithdrawn(
+        val principalType: String,
+        val principal: String,
+        val clientId: String,
+        override val request: Request<*>? = null,
+    ) : AuthEvent
 }
 
 /** Receives each [AuthEvent] once installed with [install]. */

@@ -96,6 +96,10 @@ append (`+=`), and list/set drop-first/last.  `assign` the new value instead.
 - **Only access tokens authenticate requests.**  A refresh token sent as `Authorization` now gets a 401: exchange it
   at `token/simple` first.  If old clients can't be updated yet, pass `acceptRefreshTokenAsBearer = Runtime { true }`
   to the `SessionManager` / `AuthEndpoints`.
+- **A request without credentials gets a 401, not a 403.**  Refusals follow RFC 6750: no credentials is a 401
+  `WWW-Authenticate: Bearer`, an invalid or unrecognized token a 401 `error="invalid_token"`, and missing scopes a 403
+  `error="insufficient_scope"`; other refusals of an authenticated caller stay 403.  Tests that expected
+  `ForbiddenException` for an anonymous call expect `UnauthorizedException` (see [Auth](../auth.md)).
 - **Tokens in URLs work only on WebSocket connects.**  An HTTP request with an `Authorization` or `jwt` query
   parameter gets a 400; send the header.
 - **The `Authorization` cookie is no longer read.**  A request carrying only that cookie is unauthenticated.

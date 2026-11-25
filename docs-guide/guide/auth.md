@@ -126,8 +126,19 @@ Granted `reports:read` does not meet required `reports`.
 For requirements that accept any principal type, use `anyAuth` (authenticated, no scope needed), `recentRootAuth`
 (root scope, authenticated within 10 minutes), or `AuthRequirement.Authenticated(scopes, maxAge, requirement)`.
 
-A request with no credentials, or whose authentication fails the requirement, gets **403**.  A request with a token
-that is malformed, expired, or revoked gets **401**, which tells the client to refresh.
+Refusals follow RFC 6750, so OAuth clients know what to do:
+
+| Request | Response |
+|---|---|
+| No credentials | **401**, `WWW-Authenticate: Bearer` |
+| A token that is malformed, expired, or revoked, or an `Authorization` header no reader recognizes | **401**, `WWW-Authenticate: Bearer error="invalid_token"`: refresh or log in again |
+| Authenticated, but without the scopes the requirement needs | **403**, `WWW-Authenticate: Bearer error="insufficient_scope", scope="…"` |
+| Authenticated, but refused for anything else (principal type, `maxAge`, `requirement`) | **403** |
+
+At an [OAuth protected resource](oauth-provider.md), the challenges also carry `resource_metadata` and the resource's
+scopes, and tokens not issued for that resource are refused with `invalid_token`.  Typed endpoints check with
+`AuthRequirement.assert(request)`; `assert(auth)`, without the request, can't tell an unreadable token from none or
+find the resource.
 
 ## Super-user, admin, and developer
 
@@ -226,7 +237,8 @@ Calling the endpoint as a plain `HttpHandler` runs the full HTTP pipeline, crede
 ```kotlin
 fun authRejectionTest() = UserProfileServer.testBlocking(settings = { database set Database.Settings("ram") }) {
     val response = getProfile.test()
-    check(response.status.code == 403)
+    check(response.status.code == 401)
+    check(response.headers[HttpHeader.WWWAuthenticate]?.root == "Bearer")
 }
 ```
 

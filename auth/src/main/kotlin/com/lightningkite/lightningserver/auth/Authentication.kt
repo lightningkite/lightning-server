@@ -292,13 +292,26 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
         // so an anonymous carrier must not cache "anonymous" for it.
         override val cachesNull: Boolean get() = false
 
+        /**
+         * Reads the request's credentials with [authReaders], then applies any masquerade.
+         *
+         * A reader's [UnauthorizedException] gains a `WWW-Authenticate: Bearer error="invalid_token"` challenge
+         * unless it has one.
+         *
+         * The audience check is not here but in [Request.authentication]: a `/meta/bulk` part shares its carrier's cache,
+         * so what is calculated here may have been calculated for another path.
+         */
         context(server: ServerRuntime)
-        override suspend fun calculate(input: Request<*>): Authentication<*>? =
+        override suspend fun calculate(input: Request<*>): Authentication<*>? = try {
             server.server.authReaders.sortedByDescending { it.priority }.firstNotNullOfOrNull { reader ->
                 val auth = reader.read(input) ?: return@firstNotNullOfOrNull null
 
                 auth.masquerade(input) ?: auth
             }
+        } catch (e: UnauthorizedException) {
+            if (e.headers[HttpHeader.WWWAuthenticate] != null) throw e
+            throw UnauthorizedException(e.detail, e.message, e.data, e, bearerChallenge(input, "invalid_token", scopes = null))
+        }
 
         context(server: ServerRuntime)
         private suspend fun Authentication<*>.masquerade(request: Request<*>): Authentication<*>? {

@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.sessions.proofs.oauth
 
+import com.lightningkite.lightningserver.ExperimentalOauthProviderApi
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.Runtime
@@ -18,6 +19,7 @@ import kotlin.io.encoding.Base64
  * The registry of [OauthClient]s, for maintainers only: REST at this module's path, and `{_id}/create-secret`.
  * Nothing else needs to read it; the consent screen gets the client's name from the provider.
  */
+@ExperimentalOauthProviderApi
 public class OauthClientEndpoints(
     database: Runtime<Database>,
     private val maintainPermissions: AuthRequirement<*> = AuthRequirement.IsSuperUser,

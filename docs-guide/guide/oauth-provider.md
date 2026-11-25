@@ -1,7 +1,7 @@
 # OAuth authorization server
 
 > **Experimental.**  The provider has not been verified against the OAuth and OpenID Connect specifications or with
-> real clients, and may change.  Its declarations (and `BearerChallenge`, and the `OauthClient` fields only it reads)
+> real clients, and may change.  Its declarations (and `ProtectedResource`, and the `OauthClient` fields only it reads)
 > are marked `@ExperimentalOauthProviderApi`: opt in with `@OptIn(ExperimentalOauthProviderApi::class)` or the
 > compiler option `optIn.add("com.lightningkite.lightningserver.ExperimentalOauthProviderApi")`.
 
@@ -68,10 +68,10 @@ object McpServer : ServerBuilder() {
         resources = listOf(ProtectedResource(path = "/mcp", scopes = setOf("mcp"), name = "Example MCP")),
     )
 
-    val mcp = path.path("mcp").post bind BearerChallenge(scope = "mcp", HttpHandler { request ->
+    val mcp = path.path("mcp").post bind HttpHandler { request ->
         request.access(AccountAuth.require(RequiredScope("mcp")))
         HttpResponse.plainText("Hello from MCP")
-    })
+    }
 
     init {
         registerBasicMediaTypeCoders()
@@ -88,16 +88,18 @@ userinfo; the provider overwrites `iss`, `aud`, `exp`, `iat`, `nonce` and `auth_
 Keep that key: clients verify ID tokens against the published key set, so a new key makes earlier ID tokens
 unverifiable, and every instance must share it.  Only tests use the generated default.
 
-`BearerChallenge` wraps the MCP endpoint so a request without a token gets the 401 with
-`WWW-Authenticate: Bearer resource_metadata="…/.well-known/oauth-protected-resource/mcp"` that starts a client's login.
-A token that is invalid, or not issued for this resource, gets a 401 `error="invalid_token"`; a token for this
-resource without the scope gets a 403 `insufficient_scope`.
+The provider registers each of `resources` in `protectedResources`, so the MCP endpoint needs no wrapper: a request
+without a token gets the 401 with
+`WWW-Authenticate: Bearer resource_metadata="…/.well-known/oauth-protected-resource/mcp", scope="mcp"` that starts a
+client's login.  A token that is invalid, unreadable, or not issued for this resource gets a 401 `error="invalid_token"`;
+a token for this resource without the scope gets a 403 `insufficient_scope`.  Every endpoint answers this way (see
+[Auth](auth.md)); a protected resource only adds `resource_metadata` and its scopes.
 
 ## Audience
 
 A token issued with a `resource` parameter (RFC 8707) is bound to that resource: its `Authentication.audience` is the
 resource's URI (the public URL followed by its path, `https://example.com/mcp`), and with `JwtTokenFormat` that is its
-`aud` claim (RFC 9068).  `BearerChallenge` accepts only tokens whose audience is exactly the resource it wraps, so the
+`aud` claim (RFC 9068).  A request to a protected resource's path accepts only tokens whose audience is exactly it, so the
 app's own tokens, even root ones, and a client's token for another resource or for none are refused there.  MCP
 clients always send `resource`; a client that doesn't gets tokens the MCP endpoint refuses.
 

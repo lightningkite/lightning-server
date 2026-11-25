@@ -22,6 +22,9 @@ import com.lightningkite.lightningserver.sessions.proofs.IdentificationAndPasswo
 import com.lightningkite.lightningserver.sessions.proofs.PasswordProofEndpoints
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.typed.test
+import com.lightningkite.lightningserver.typed.BulkRequest
+import com.lightningkite.lightningserver.typed.MetaEndpoints
+import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
@@ -49,6 +52,7 @@ class RefreshTokenCookieTest {
         val cache = setting("cache", Cache.Settings("ram"))
 
         val sessions = path.path("auth") include TestSessionManager(database = database, cache = cache)
+        val meta = path.path("meta") include MetaEndpoints("test", cache)
 
         val events = install(object : AuthEventListener {
             val received = mutableListOf<AuthEvent>()
@@ -455,6 +459,27 @@ class RefreshTokenCookieTest {
             assertNull(stored(session._id).terminated)
             assertEquals(listOf(), reuses())
             assertEquals(HttpStatus.OK, exchange(third).status)
+        }
+    }
+
+    @Test
+    fun `the cookie endpoints refuse a bulk part or a server-side call with a 400, before rotating`() = runBlocking {
+        server.test({}) {
+            val (session, refresh) = execute { server.sessions.newSession(newUser()) }
+
+            val parts = server.meta.bulk.test(null, mapOf(
+                "set" to BulkRequest("/auth/token/set-cookie", "POST", Json.encodeToString(refresh.string)),
+                "get" to BulkRequest("/auth/token/cookie", "POST"),
+            ))
+            for ((name, part) in parts) {
+                assertEquals(400, part.error?.http, name)
+                assertTrue("directly over HTTP" in part.error!!.message, part.error!!.message)
+            }
+
+            assertFailsWith<BadRequestException> { server.sessions.setRefreshTokenCookie.test(null, refresh.string) }
+            assertFailsWith<BadRequestException> { server.sessions.tokenFromCookie.test(null, Unit) }
+
+            assertNull(stored(session._id).rotatedAt)
         }
     }
 }

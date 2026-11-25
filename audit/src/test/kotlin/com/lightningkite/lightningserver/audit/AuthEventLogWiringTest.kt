@@ -43,6 +43,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
+import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
 
 /**
@@ -277,6 +278,37 @@ class AuthEventLogWiringTest {
         val event = events().single { it.type == AuthEventRecord.Type.SessionTerminated }
         assertEquals(session.subjectId.toString(), event.principal)
         assertEquals(session._id, event.sessionId)
+    }
+
+    @Test
+    fun `reusing a rotated-out refresh token records the rejection and the termination it causes`() = runBlocking {
+        var time = Clock.System.now()
+        val clock = object : Clock { override fun now() = time }
+        TestServer.test(settings = { database set Database.Settings(); cache set Cache.Settings() }, clock = { clock }) {
+            fun setCookie(token: String) = HttpRequest<PathSpec>(
+                path = RawHttpEndpoint(asString = "/auth/token/set-cookie", method = HttpMethod.POST),
+                queryParameters = QueryParameters.EMPTY,
+                headers = HttpHeaders { add(HttpHeader.ContentType, MediaType.Application.Json.toString()) },
+                domain = "example.com",
+                protocol = "https",
+                sourceIp = "203.0.113.7",
+                body = TypedData.text("\"$token\"", MediaType.Application.Json),
+            )
+            val (session, refresh) = execute { TestServer.sessions.newSession(Uuid.random()) }
+            // Rotates the session, so `refresh` becomes its previous token.
+            assertTrue(engine.handleRoot(setCookie(refresh.string), testId(8)).status.success)
+
+            time += 61.seconds
+            assertEquals(HttpStatus.Unauthorized, engine.handleRoot(setCookie(refresh.string), testId(9)).status)
+
+            execute {
+                val events = events().filter { it.sessionId == session._id }
+                val rejected = events.single { it.type == AuthEventRecord.Type.AuthenticationFailed }
+                assertEquals("Reused", rejected.failureReason)
+                assertEquals(testId(9).originId, rejected.origin)
+                assertTrue(events.any { it.type == AuthEventRecord.Type.SessionTerminated }, events.toString())
+            }
+        }
     }
 
     @Test

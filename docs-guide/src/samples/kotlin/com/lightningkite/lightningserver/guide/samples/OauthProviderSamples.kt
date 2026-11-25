@@ -59,10 +59,10 @@ object McpServer : ServerBuilder() {
         resources = listOf(ProtectedResource(path = "/mcp", scopes = setOf("mcp"), name = "Example MCP")),
     )
 
-    val mcp = path.path("mcp").post bind BearerChallenge(scope = "mcp", HttpHandler { request ->
+    val mcp = path.path("mcp").post bind HttpHandler { request ->
         request.access(AccountAuth.require(RequiredScope("mcp")))
         HttpResponse.plainText("Hello from MCP")
-    })
+    }
 
     init {
         registerBasicMediaTypeCoders()

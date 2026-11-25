@@ -101,7 +101,8 @@ public open class UnauthorizedException(
     message: String = "",
     data: String = "",
     cause: Throwable? = null,
-) : HttpStatusException(HttpStatus.Unauthorized, detail, message, data, cause)
+    headers: HttpHeaders = HttpHeaders.EMPTY,
+) : HttpStatusException(HttpStatus.Unauthorized, detail, message, data, cause, headers)
 
 /**
  * A Helper function for creating an instance of UnauthorizedException.
@@ -117,7 +118,8 @@ public open class ForbiddenException(
     message: String = "",
     data: String = "",
     cause: Throwable? = null,
-) : HttpStatusException(HttpStatus.Forbidden, detail, message, data, cause)
+    headers: HttpHeaders = HttpHeaders.EMPTY,
+) : HttpStatusException(HttpStatus.Forbidden, detail, message, data, cause, headers)
 
 /**
  * A Helper function for creating an instance of ForbiddenException.

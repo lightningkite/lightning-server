@@ -21,6 +21,7 @@ dependencies {
 
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)
+    testImplementation(sa.database.mongodb)
 }
 
 kotlin {
@@ -39,4 +40,8 @@ kotlin {
 
 mavenPublishing {
     pom { description.set("A set of tools and endpoints for managing user sessions.") }
+}
+// Lets RefreshTokenRotationRaceTest run against another database: -Dlightningserver.test.database=mongodb-test://
+tasks.test {
+    providers.systemProperty("lightningserver.test.database").orNull?.let { systemProperty("lightningserver.test.database", it) }
 }

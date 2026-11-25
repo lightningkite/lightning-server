@@ -2,6 +2,8 @@
 package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.ForbiddenException
+import com.lightningkite.lightningserver.UnauthorizedException
+import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.execute
@@ -420,25 +422,52 @@ class AuthRequirementTest {
     }
 
     @Test
-    fun `assert throws ForbiddenException for rejected`() = runBlocking {
+    fun `assert without authentication is a 401 bearer challenge`() = runBlocking {
         TestServer.test({}) {
-            val req = TestUser.require()
-
-            assertFailsWith<ForbiddenException> {
-                execute { req.assert(null) }
+            val exception = assertFailsWith<UnauthorizedException> {
+                execute { TestUser.require().assert(null) }
             }
+            assertTrue(exception.message.contains("authorization criteria"))
+            assertEquals("Bearer", exception.headers[HttpHeader.WWWAuthenticate]?.root)
         }
     }
 
     @Test
-    fun `assert throws with descriptive message`() = runBlocking {
+    fun `assert with too few scopes is a 403 insufficient_scope naming them`() = runBlocking {
         TestServer.test({}) {
-            val req = TestUser.require()
-
+            val auth = TestUser.testAuth(TestUser(), scopes = setOf(GrantedScope("reports")))
             val exception = assertFailsWith<ForbiddenException> {
-                execute { req.assert(null) }
+                execute { TestUser.require(scope = RequiredScope("mcp")).assert(auth) }
             }
-            assertTrue(exception.message.contains("authorization criteria"))
+            assertEquals(
+                "Bearer error=\"insufficient_scope\", scope=\"mcp\"",
+                exception.headers[HttpHeader.WWWAuthenticate]?.root,
+            )
+        }
+    }
+
+    @Test
+    fun `options failing only on scopes name every option's scopes`() = runBlocking {
+        TestServer.test({}) {
+            val auth = TestUser.testAuth(TestUser(), scopes = setOf(GrantedScope("reports")))
+            val req = TestUser.require(scope = RequiredScope("a")) or TestUser.require(scope = RequiredScope("b"))
+            val rejected = execute { req.check(auth) } as AuthRequirement.Result.Rejected
+            assertEquals(setOf(RequiredScope("a"), RequiredScope("b")), rejected.insufficientScopes)
+        }
+    }
+
+    @Test
+    fun `assert refused for anything but scopes is a plain 403`() = runBlocking {
+        TestServer.test({}) {
+            val auth = AdminUser.testAuth(AdminUser())
+            val wrongType = assertFailsWith<ForbiddenException> { execute { TestUser.require().assert(auth) } }
+            assertNull(wrongType.headers[HttpHeader.WWWAuthenticate])
+
+            // One option failed on its principal type, so the refusal isn't only about scopes.
+            val mixed = TestUser.require() or AdminUser.require(scope = RequiredScope("x"))
+            val limited = AdminUser.testAuth(AdminUser(), scopes = setOf(GrantedScope("y")))
+            val rejected = execute { mixed.check(limited) } as AuthRequirement.Result.Rejected
+            assertNull(rejected.insufficientScopes)
         }
     }
 

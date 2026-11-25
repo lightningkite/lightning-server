@@ -1,7 +1,7 @@
 // by Claude
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.lightningserver.ForbiddenException
+import com.lightningkite.lightningserver.UnauthorizedException
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.GeneralServerSettings
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
@@ -209,7 +209,7 @@ class FunnelEndpointsTest {
             generalSettings set GeneralServerSettings()
             database set Database.Settings()
         }) {
-            assertFailsWith<ForbiddenException> {
+            assertFailsWith<UnauthorizedException> {
                 TestServer.funnel.summarizeNow.test(null, LocalDate(2024, 5, 1))
             }
             Unit

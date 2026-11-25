@@ -764,6 +764,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
      *
      * @throws UnauthorizedException if the cookie is missing, or its refresh token is expired, revoked, retired, or
      *   otherwise invalid.
+     * @throws BadRequestException if called through `/meta/bulk` or from server code, whose responses lose the cookie.
      */
     public val tokenFromCookie: ApiHttpHandler<PathSpec0, HasId<*>?, Unit, String> =
         path.path("token").path("cookie").post bind object : ApiHttpHandler<PathSpec0, HasId<*>?, Unit, String> by explicitApiHttpHandler(
@@ -772,11 +773,12 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             outputType = String.serializer(),
             summary = "Get Token From Cookie",
             description = "Returns an access token for the refresh token held in the HttpOnly cookie set by setRefreshTokenCookie.",
-            implementation = { _ -> throw UnsupportedOperationException("getTokenFromCookie sets a cookie, so it only works over HTTP.") },
+            implementation = { _ -> throw cookieNeedsDirectHttp("getTokenFromCookie") },
         ) {
             @OverrideOnly
             context(server: ServerRuntime)
             override suspend fun handle(request: HttpRequest<PathSpec0>): HttpResponse {
+                if (server.execution.parent != null) throw cookieNeedsDirectHttp("getTokenFromCookie")
                 val refresh = request.headers.cookies[refreshTokenCookieName]
                     ?: throw UnauthorizedException("No refresh token cookie")
                 val rotated = rotateRefreshToken(RefreshToken(refresh), request)
@@ -801,7 +803,8 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
      * session's next refresh token rather than the one sent, which passed through page scripts and is now retired, as
      * [rotateRefreshToken] describes.
      *
-     * @throws BadRequestException if the refresh token format is invalid.
+     * @throws BadRequestException if the refresh token format is invalid, or if called through `/meta/bulk` or from
+     *   server code, whose responses lose the cookie.
      * @throws UnauthorizedException if the refresh token is expired, revoked, or otherwise invalid.
      */
     public val setRefreshTokenCookie: ApiHttpHandler<PathSpec0, HasId<*>?, String, Unit> =
@@ -811,11 +814,12 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             outputType = Unit.serializer(),
             summary = "Set Refresh Token Cookie",
             description = "Moves a web client's refresh token into an HttpOnly cookie after login, so page scripts never need to keep it. Get access tokens from it with getTokenFromCookie.",
-            implementation = { _ -> throw UnsupportedOperationException("setRefreshTokenCookie sets a cookie, so it only works over HTTP.") },
+            implementation = { _ -> throw cookieNeedsDirectHttp("setRefreshTokenCookie") },
         ) {
             @OverrideOnly
             context(server: ServerRuntime)
             override suspend fun handle(request: HttpRequest<PathSpec0>): HttpResponse {
+                if (server.execution.parent != null) throw cookieNeedsDirectHttp("setRefreshTokenCookie")
                 // A cross-site HTML form can send form or text bodies but not JSON, so this keeps another site from
                 // planting its own session in the browser (login CSRF).
                 val body = request.body?.takeIf { it.mediaType.copy(parameters = mapOf()) == MediaType.Application.Json }
@@ -828,6 +832,12 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 )
             }
         }
+
+    // A bulk part or a call from server code runs inside another execution, and its response headers never reach the
+    // browser, so the cookie would be lost after its session had already rotated.
+    private fun cookieNeedsDirectHttp(endpoint: String) = BadRequestException(
+        "$endpoint sets a cookie, so it must be called directly over HTTP, not through /meta/bulk or from server code."
+    )
 
     context(server: ServerRuntime)
     private fun HttpHeaders.Builder.setRefreshCookie(token: RefreshToken, session: Session<SUBJECT, ID>) = setCookie(

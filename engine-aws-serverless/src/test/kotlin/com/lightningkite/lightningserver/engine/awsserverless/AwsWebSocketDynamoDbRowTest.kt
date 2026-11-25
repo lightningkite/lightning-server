@@ -69,4 +69,25 @@ class AwsWebSocketDynamoDbRowTest {
         )
         assertIs<SocketRow.Legacy>(row)
     }
+
+    @Test
+    fun rowMissingOneNewAttributeIsStale() {
+        val encodedRequest = serialization.kotlinWireFormat.encodeToByteArray(WebSocketConnectRequest.serializer(NothingSerializer()), request)
+        val withoutRequest = mapOf("wsSocketId" to AttributeValue.fromS("connection"), "wsWireState" to bytes(byteArrayOf(1)))
+        val withoutState = mapOf("wsSocketId" to AttributeValue.fromS("connection"), "wsWireRequest" to bytes(encodedRequest))
+        assertIs<SocketRow.Legacy>(dynamo.decodeRow("connection", withoutRequest))
+        assertIs<SocketRow.Legacy>(dynamo.decodeRow("connection", withoutState))
+    }
+
+    @Test
+    fun rowWithUndecodableWireRequestIsStale() {
+        val row = dynamo.decodeRow(
+            "connection", mapOf(
+                "wsSocketId" to AttributeValue.fromS("connection"),
+                "wsWireState" to bytes(byteArrayOf(1, 2, 3)),
+                "wsWireRequest" to bytes(ByteArray(12) { -1 }),
+            )
+        )
+        assertIs<SocketRow.Legacy>(row)
+    }
 }

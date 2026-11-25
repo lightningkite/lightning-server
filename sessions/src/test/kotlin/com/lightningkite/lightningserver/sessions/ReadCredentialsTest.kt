@@ -70,6 +70,23 @@ class ReadCredentialsTest {
     }
 
     @Test
+    fun `refused credentials get RFC 6750 bearer challenges`() = runBlocking {
+        val server = TestServer(acceptRefreshTokenAsBearer = false)
+        server.test({}) {
+            suspend fun challenge(authorization: String?) = server.sessions.self.test(
+                headers = authorization?.let { HttpHeaders(HttpHeader.Authorization to it) } ?: HttpHeaders.EMPTY
+            ).let { it.status to it.headers[HttpHeader.WWWAuthenticate]?.root }
+
+            val (_, refresh) = execute { server.sessions.newSession(newUser()) }
+            assertEquals(HttpStatus.Unauthorized to "Bearer", challenge(null))
+            // No reader recognizes it.
+            assertEquals(HttpStatus.Unauthorized to "Bearer error=\"invalid_token\"", challenge("Bearer not-a-token"))
+            // The session manager reads it and throws.
+            assertEquals(HttpStatus.Unauthorized to "Bearer error=\"invalid_token\"", challenge("Bearer ${refresh.string}"))
+        }
+    }
+
+    @Test
     fun `acceptRefreshTokenAsBearer lets a refresh token authenticate, except a rotating session's, which it leaves alone`() = runBlocking {
         val server = TestServer(acceptRefreshTokenAsBearer = true)
         server.test({}) {
@@ -115,8 +132,9 @@ class ReadCredentialsTest {
             val access = server.sessions.tokenSimple.test(null, refresh.string)
 
             val response = server.sessions.self.test(headers = HttpHeaders(HttpHeader.Cookie to "Authorization=$access"))
-            // Treated as no credentials at all, which a required-auth endpoint answers with 403.
-            assertEquals(HttpStatus.Forbidden, response.status)
+            // Treated as no credentials at all, which a required-auth endpoint answers with a 401 challenge.
+            assertEquals(HttpStatus.Unauthorized, response.status)
+            assertEquals("Bearer", response.headers[HttpHeader.WWWAuthenticate]?.root)
             assertEquals(server.sessions.self.test().status, response.status)
         }
     }

@@ -21,6 +21,7 @@ import kotlin.uuid.Uuid
  * @property postLogoutRedirectUris Where the OpenID end-session endpoint may send the browser afterwards.
  * @property allowRefreshTokens Whether the client gets refresh tokens.
  */
+@ExperimentalOauthProviderApi
 @Queryable
 public data class OauthClient(
     override val _id: String,
@@ -29,8 +30,8 @@ public data class OauthClient(
     val scopes: Set<String> = setOf(),
     val secrets: Set<OauthClientSecret> = setOf(),
     val redirectUris: Set<String> = setOf(),
-    @ExperimentalOauthProviderApi val postLogoutRedirectUris: Set<String> = setOf(),
-    @ExperimentalOauthProviderApi val allowRefreshTokens: Boolean = true,
+    val postLogoutRedirectUris: Set<String> = setOf(),
+    val allowRefreshTokens: Boolean = true,
 ) : HasId<String>
 
 /**
@@ -42,6 +43,7 @@ public data class OauthClient(
  * @property secretHash The hash of the secret, which is never stored in plaintext.
  * @property disabledAt When the secret stopped being valid, or `null` if it is still valid.
  */
+@ExperimentalOauthProviderApi
 @Queryable
 public data class OauthClientSecret(
     val createdAt: Instant,

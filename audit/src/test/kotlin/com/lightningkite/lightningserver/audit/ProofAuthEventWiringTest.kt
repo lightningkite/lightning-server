@@ -201,8 +201,22 @@ class ProofAuthEventWiringTest {
         }
     }
 
+    // Setting up each account's credentials records a factor change, which these tests are not about.
     context(server: ServerRuntime)
-    private suspend fun events() = TestServer.audit.authEvents.table().find(Condition.Always).toList()
+    private suspend fun events() = TestServer.audit.authEvents.table()
+        .find(Condition.Always).toList().filter { it.type != AuthEventRecord.Type.FactorChanged }
+
+    @Test
+    fun `establishing a password is recorded as a factor change`() = onServer {
+        val victim = user()
+        TestServer.password.establish(ProofUser, victim._id, EstablishPassword("correct-horse"))
+
+        val event = TestServer.audit.authEvents.table().find(Condition.Always).toList().single()
+        assertEquals(AuthEventRecord.Type.FactorChanged, event.type)
+        assertEquals(victim._id.toString(), event.principal)
+        assertEquals("password", event.method)
+        assertEquals("Added", event.factorChange)
+    }
 
     private fun user(email: String = "victim@example.com"): ProofUser =
         ProofUser(Uuid.random(), email).also { ProofUser.users[it._id] = it }

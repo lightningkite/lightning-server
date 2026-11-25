@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.auth.register
 import com.lightningkite.lightningserver.auth.require
 import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.definition.Runtime
+import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.typed.sdk.User
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
@@ -227,35 +228,33 @@ class JsonRpcHandlerTest {
     @Test
     fun aFailedAuthenticationIsAnHttpError() = runBlocking {
         TestServer.test({}) {
-            val status = try {
-                TestServer.rpcEndpoint.test(body = call("signedIn")).status
+            val (status, challenge) = try {
+                TestServer.rpcEndpoint.test(body = call("signedIn")).let { it.status to it.headers[HttpHeader.WWWAuthenticate]?.root }
             } catch (e: HttpStatusException) {
-                e.status
+                e.status to e.headers[HttpHeader.WWWAuthenticate]?.root
             }
-            assertTrue(status == HttpStatus.Unauthorized || status == HttpStatus.Forbidden, "got $status")
+            assertEquals(HttpStatus.Unauthorized to "Bearer", status to challenge)
         }
     }
 
     context(test: TestRunner<*>)
-    private suspend fun signedInEndpointStatus(body: TypedData): HttpStatus = try {
-        TestServer.signedInEndpoint.test(body = body).status
+    private suspend fun signedInEndpointChallenge(body: TypedData): Pair<HttpStatus, String?> = try {
+        TestServer.signedInEndpoint.test(body = body).let { it.status to it.headers[HttpHeader.WWWAuthenticate]?.root }
     } catch (e: HttpStatusException) {
-        e.status
+        e.status to e.headers[HttpHeader.WWWAuthenticate]?.root
     }
 
     @Test
     fun anUnauthenticatedCallToAnUnknownMethodFailsAuthentication() = runBlocking {
         TestServer.test({}) {
-            val status = signedInEndpointStatus(call("nonexistent"))
-            assertTrue(status == HttpStatus.Unauthorized || status == HttpStatus.Forbidden, "got $status")
+            assertEquals(HttpStatus.Unauthorized to "Bearer", signedInEndpointChallenge(call("nonexistent")))
         }
     }
 
     @Test
     fun anUnauthenticatedCallWithABadVersionFailsAuthentication() = runBlocking {
         TestServer.test({}) {
-            val status = signedInEndpointStatus(TypedData.text("""{"jsonrpc": "1.0", "method": "signedIn", "id": 1}""", MediaType.Application.Json))
-            assertTrue(status == HttpStatus.Unauthorized || status == HttpStatus.Forbidden, "got $status")
+            assertEquals(HttpStatus.Unauthorized to "Bearer", signedInEndpointChallenge(TypedData.text("""{"jsonrpc": "1.0", "method": "signedIn", "id": 1}""", MediaType.Application.Json)))
         }
     }
 
