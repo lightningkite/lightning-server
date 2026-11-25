@@ -102,7 +102,8 @@ public class OpenIdProviderEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
     init {
         val scopes = resources.flatMap { it.scopes }
         require(scopes.size == scopes.toSet().size) {
-            "Protected resources must not share scopes, or a token for one would work at another"
+            "Protected resources must not share scopes: a client's allowed scopes and a user's consent name scopes, not " +
+                "resources, so consenting to one resource would grant the other"
         }
         resources.forEach { protectedResources.register(it) }
     }

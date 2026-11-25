@@ -25,7 +25,9 @@ import com.lightningkite.lightningserver.definition.getValue
  * which is how clients find where to log in.
  *
  * @param path Where the resource is served, starting with `/`, e.g. `/mcp`.
- * @param scopes The scopes its tokens may carry, e.g. `mcp`.  No two resources may share a scope.
+ * @param scopes The scopes its tokens may carry, e.g. `mcp`.  No two resources may share a scope: an `OauthClient`'s
+ *   allowed scopes and a user's consent name scopes, not resources, so a shared scope would let consent to one
+ *   resource silently grant the other.
  * @param name Shown to the user by clients that read the resource's metadata.
  */
 @ExperimentalOauthProviderApi

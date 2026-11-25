@@ -196,8 +196,11 @@ Because the session rotates, its refresh token is refused at `auth/token/simple`
 - PKCE with S256 is required for every client.
 - Codes are random, last five minutes, work once (even under concurrent redemption), and are bound to the client,
   redirect URI, resource and scopes.  A failed redemption burns the code.
-- A token for a resource is bound to it (see [Audience](#audience)) and carries only that resource's scopes, and
-  resources can't share scopes.
+- A token for a resource is bound to it (see [Audience](#audience)) and carries only that resource's scopes.
+- Resources can't share scopes.  Audience binding already keeps a token to its resource, but a client's allowed
+  scopes and a user's consent name scopes, not resources: with a shared scope, a client allowed one resource could ask
+  for the other, and a user's consent to one would skip the consent screen for the other.  Give each resource, such as
+  each MCP server, its own scope.
 - The authorize endpoints require a root-scoped user token, so an issued token can't approve further grants.
 - Token endpoint errors are `{"error", "error_description"}` with no internal details; unexpected failures are
   `server_error`.
