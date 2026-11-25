@@ -134,6 +134,25 @@ public class TypescriptFetcherSdk(
     }
 
     /**
+     * Returns this module with every endpoint's name unique within its module, numbering repeats as
+     * [ensureUniqueNames] does.
+     *
+     * TypeScript has no overloads, so names that differ only in arguments, which [ensureUniqueNames] keeps for
+     * Kotlin, would otherwise become duplicate keys.
+     */
+    private fun SDK.Module.withUniqueEndpointNames(): SDK.Module {
+        val seen = HashMap<String, Int>()
+        return copy(
+            functions = functions.map {
+                if (it !is SDK.Function.Endpoint) return@map it
+                val count = seen.merge(it.functionName, 1, Int::plus)!!
+                if (count == 1) it else it.copy(functionName = it.functionName + count)
+            },
+            children = children.map { it.withUniqueEndpointNames() },
+        )
+    }
+
+    /**
      * Generates TypeScript SDK files and writes them to the archive.
      *
      * This method:
@@ -146,7 +165,7 @@ public class TypescriptFetcherSdk(
     context(server: Engine)
     override fun write(archive: Archive): Unit = when (fileStructure) {
         is Structure.SingleFile -> {
-            val processed = server.server.sdk(rootInfo).processToModules().ensureUniqueNames()
+            val processed = server.server.sdk(rootInfo).processToModules().ensureUniqueNames().withUniqueEndpointNames()
 
             fun Appendable.bigGap() = append("\n\n\n")
 
@@ -162,7 +181,7 @@ public class TypescriptFetcherSdk(
         }
 
         is Structure.MultipleFiles -> {
-            val processed = server.server.sdk(rootInfo).processToModules().ensureUniqueNames()
+            val processed = server.server.sdk(rootInfo).processToModules().ensureUniqueNames().withUniqueEndpointNames()
 
             val models = server.models()
 

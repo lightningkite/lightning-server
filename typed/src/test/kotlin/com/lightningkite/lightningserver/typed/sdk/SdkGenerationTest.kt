@@ -445,6 +445,33 @@ class SdkGenerationTest {
         sdk.writeUsingDefaultSettings(DuplicateNameServer, folder)
     }
 
+    /** Like SessionManager's two terminate endpoints: one name, different arguments. */
+    object OverloadServer : ServerBuilder() {
+        val terminateCurrent = path.path("terminate").post bind ApiHttpHandler(
+            summary = "Terminate Current Session",
+            functionName = "terminateSession",
+            auth = noAuth,
+            implementation = { _: Unit -> }
+        )
+
+        val terminateOther = path.arg<String>("sessionId").path("terminate").post bind ApiHttpHandler(
+            summary = "Terminate Session",
+            auth = noAuth,
+            implementation = { _: Unit -> }
+        )
+    }
+
+    @Test
+    fun typescript_sdk_numbers_names_that_differ_only_in_arguments() {
+        val folder = KFile("./build/test-sdk-ts-overloads")
+        TypescriptFetcherSdk(fileStructure = TypescriptFetcherSdk.Structure.SingleFile("sdk.ts"))
+            .writeUsingDefaultSettings(OverloadServer, folder)
+
+        val sdk = java.io.File("./build/test-sdk-ts-overloads/sdk.ts").readText()
+        assertContains(sdk, "terminateSession: Api[\"terminateSession\"] = () => this.fetcher(`/terminate`")
+        assertContains(sdk, "terminateSession2: Api[\"terminateSession2\"] = (sessionId) => this.fetcher(`/\${sessionId}/terminate`")
+    }
+
     // ========== Edge Cases ==========
 
     @Test
