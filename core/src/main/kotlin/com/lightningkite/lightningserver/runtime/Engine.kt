@@ -70,6 +70,15 @@ public interface Engine : SettingContext, Namespaced {
         get() = generalSettings().publicUrl
 
     /**
+     * Derives services' keys from [secretBasis], which every server of the deployment shares, so they
+     * agree without a setting of their own.
+     *
+     * Rotating the secret basis changes every key derived from it.
+     */
+    override fun deriveSecret(purpose: String): ByteArray? =
+        secretBasis().deriveBlocking("services/$purpose")
+
+    /**
      * Serialization configuration for external API communication (HTTP bodies, etc.).
      */
     public val externalSerialization: Serialization
