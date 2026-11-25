@@ -351,7 +351,8 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
             val idString = masquerade.substringAfter('/')
             val id = try {
                 encoding.decodeFromString(principal.idSerializer, idString)
-            } catch (e: SerializationException) {
+            } catch (e: IllegalArgumentException) {
+                // Not just SerializationException: serializers such as Uuid's reject input with a plain IllegalArgumentException.
                 throw BadRequestException(
                     message = "Invalid masquerade id: ${e.message}",
                     data = idString,

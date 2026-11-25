@@ -113,8 +113,48 @@ class ImplementationHelpersHandleTest {
             throw NotFoundException(detail = "boom", message = "Boom.")
         }
 
+        val numbered = path.path("numbered").arg<Int>("number").post bind HttpHandler<PathSpec1<Int>> {
+            HttpResponse.plainText("number ${it.path.arg1}")
+        }
+
+        val ignoresItsArgument = path.path("ignored").arg<Int>("number").get bind HttpHandler<PathSpec1<Int>> {
+            HttpResponse.plainText("ignored")
+        }
+
+        val identified = path.path("identified").arg<kotlin.uuid.Uuid>("id").post bind HttpHandler<PathSpec1<kotlin.uuid.Uuid>> {
+            HttpResponse.plainText("id ${it.path.arg1}")
+        }
+
         init {
             registerBasicMediaTypeCoders()
+        }
+    }
+
+    context(runner: com.lightningkite.lightningserver.runtime.test.TestRunner<TestServer>)
+    private suspend fun root(method: HttpMethod, path: String): HttpResponse = runner.handleRoot(
+        HttpRequest(
+            path = RawHttpEndpoint(asString = path, method = method),
+            queryParameters = QueryParameters.EMPTY,
+            headers = HttpHeaders { add(HttpHeader.Origin, "https://example.com") },
+            domain = "example.com",
+            protocol = "https",
+            sourceIp = "local",
+        ),
+        Execution.ID.generate(),
+    )
+
+    @Test
+    fun unparsable_path_argument_is_a_400_with_an_error_body() = TestServer.testBlocking(settings = {}) {
+        assertEquals("number 7", root(HttpMethod.POST, "/numbered/7").body!!.text())
+        for ((method, path) in listOf(
+            HttpMethod.POST to "/numbered/seven",
+            HttpMethod.GET to "/ignored/seven",
+            HttpMethod.POST to "/identified/not-a-uuid",
+        )) {
+            val resp = root(method, path)
+            assertEquals(HttpStatus.BadRequest, resp.status, "$method $path")
+            assertContains(resp.body!!.text(), "formatted incorrectly", message = "$method $path")
+            assertEquals("https://example.com", resp.headers[HttpHeader.AccessControlAllowOrigin]?.root, "$method $path")
         }
     }
 

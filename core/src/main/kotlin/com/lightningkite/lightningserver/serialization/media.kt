@@ -153,8 +153,9 @@ public suspend fun <T> TypedData.parse(serializer: DeserializationStrategy<T>): 
         ?: throw BadRequestException("No media type decoder found supporting $mediaType")
     return try {
         format.decode(this, serializer)
-    } catch (e: SerializationException) {
-        throw BadRequestException(e.message ?: "Unknown formatting error", cause = e.cause)
+    } catch (e: IllegalArgumentException) {
+        // Not just SerializationException: serializers such as Uuid's reject input with a plain IllegalArgumentException.
+        throw BadRequestException(e.message ?: "Unknown formatting error", cause = e)
     }
 }
 
@@ -205,11 +206,12 @@ public fun <T> HttpRequest<*>.queryParameters(serializer: KSerializer<T>): T {
             serializer,
             queryParameters.groupBy { it.first }.mapValues { it.value.joinToString(",") { it.second } }
         )
-    } catch (e: SerializationException) {
+    } catch (e: IllegalArgumentException) {
+        // Not just SerializationException: serializers such as Uuid's reject input with a plain IllegalArgumentException.
         throw BadRequestException(
             detail = "serialization",
             message = e.message ?: "Unknown serialization error",
-            cause = e.cause
+            cause = e
         )
     }
 }

@@ -5,7 +5,6 @@ import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.services.data.StringArrayFormat
 import com.lightningkite.services.data.Unsafe
-import kotlinx.serialization.SerializationException
 
 /**
  * A specialized map for routing requests to handlers based on [PathSpec] patterns.
@@ -94,13 +93,23 @@ public interface PathSpecMap<out V> : Map<PathSpec, V> {
      * Contains the matched PathSpec pattern, the parsed wildcard arguments, and the associated value (handler).
      *
      * @param V The type of value associated with the matched PathSpec
-     * @property path The resolved path with parsed arguments
      * @property value The handler/value associated with this PathSpec
      */
-    public class Match<out V>(
-        override val path: ResolvedPath<PathSpec>,
+    public class Match<out V> private constructor(
+        public val pathSpec: PathSpec,
         public val value: V,
+        parseArguments: () -> ResolvedPath<PathSpec>,
     ) : HasResolvedPath<PathSpec> {
+        public constructor(path: ResolvedPath<PathSpec>, value: V) : this(path.pathSpec, value, { path })
+
+        /**
+         * The path with its arguments parsed, on first read; throws a [BadRequestException] if one is malformed.
+         *
+         * Matching itself never parses, so code that only needs the route (telemetry, CORS, picking the
+         * handler) can't fail on a client's bad argument outside the request's error handling.
+         */
+        override val path: ResolvedPath<PathSpec> by lazy(parseArguments)
+
         public companion object {
             public fun <V> parse(
                 format: StringArrayFormat,
@@ -112,7 +121,7 @@ public interface PathSpecMap<out V> : Map<PathSpec, V> {
                 require(rawPathArguments.size == pathSpec.wildcards.size) {
                     "Incorrect number of arguments provided in '$pathSpec'. Expected (${pathSpec.wildcards.size}) got (${rawPathArguments.size})."
                 }
-                return Match(
+                return Match(pathSpec, value) {
                     @OptIn(Unsafe::class)
                     // SAFETY: Arguments are parsed from the wildcard serializers, so types must be correct
                     ResolvedPath.fromRawPathArguments(
@@ -120,20 +129,18 @@ public interface PathSpecMap<out V> : Map<PathSpec, V> {
                         rawPathArguments.zip(pathSpec.wildcards) { v, s ->
                             try {
                                 format.decodeFromString(s.serializer, v)
-                            } catch (e: SerializationException) {
+                            } catch (e: IllegalArgumentException) {
+                                // Not just SerializationException: serializers such as Uuid's reject input with a plain IllegalArgumentException.
                                 throw BadRequestException("${s.name} in '$pathSpec' is formatted incorrectly", cause = e)
                             }
                         },
                         trailingSegments = wildcard
-                    ),
-                    value
-                )
+                    )
+                }
             }
         }
 
-        public val pathSpec: PathSpec get() = path.pathSpec
-
-        override fun toString(): String = "Match(path = $path, value = $value)"
+        override fun toString(): String = "Match(pathSpec = $pathSpec, value = $value)"
     }
 
     override fun containsKey(key: PathSpec): Boolean = get(key) != null

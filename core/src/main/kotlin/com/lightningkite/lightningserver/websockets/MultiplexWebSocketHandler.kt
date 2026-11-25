@@ -214,7 +214,8 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                 is WebSocketFrame.Text ->
                     serverRuntime.externalSerialization.json.decodeFromString<MultiplexMessage>(frame.content)
             }
-        } catch (e: SerializationException) {
+        } catch (e: IllegalArgumentException) {
+            // Not just SerializationException: serializers such as Uuid's reject input with a plain IllegalArgumentException.
             // Claude: the decoder's own message can echo the client's input back; a fixed one cannot.
             throw BadRequestException(message = "Invalid multiplex message", cause = e)
         }

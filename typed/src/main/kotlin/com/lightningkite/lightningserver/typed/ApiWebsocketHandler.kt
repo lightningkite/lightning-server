@@ -103,7 +103,8 @@ public interface ApiWebSocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
         }
         val parsed = try {
             connection.currentState.mediaType.decoder!!.decode(frame, inputType)
-        } catch (e: SerializationException) {
+        } catch (e: IllegalArgumentException) {
+            // Not just SerializationException: serializers such as Uuid's reject input with a plain IllegalArgumentException.
             throw BadRequestException(e.message ?: "Could not parse", cause = e)
         }
         messageFromClientTyped(connection.typed(), parsed)

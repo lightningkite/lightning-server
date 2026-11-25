@@ -262,7 +262,9 @@ private suspend fun <PATH : PathSpec> ServerRuntime.routeHttpRequest(req: HttpRe
     // Route resolution must live inside this try so that a RouteNotFoundException (e.g. a HEAD
     // request with no HEAD handler, or a missing trailing slash) is caught below and recovered
     // via the HEAD->GET fallback / slash-redirect logic rather than escaping as a bare 404.
-    val handler = req.path.resolve().value
+    val match = req.path.resolve()
+    match.path // A malformed argument is a 400 even for a handler that never reads it.
+    val handler = match.value
     withHandlerTimeout(handler.timeout) { handler.handle(req) }
 } catch (notFound: RouteNotFoundException) {
     when (req.path.method) {
